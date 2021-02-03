@@ -6,7 +6,10 @@ project(simu
         )
 
 find_package(Jibal REQUIRED)
-
+option(DEBUG_OUTPUT_ENABLE "Enable debug output" OFF)
+if(DEBUG_OUTPUT_ENABLE)
+    add_compile_options(-DDEBUG)
+endif()
 add_executable(simu main.c)
 target_link_libraries(simu Jibal)
 
