@@ -5,15 +5,17 @@
 #include <jibal_stop.h>
 #include <jibal_stragg.h>
 #include <jibal_kin.h>
+#include <gsl/gsl_sf.h>
+#include <gsl/gsl_histogram.h>
 
 #define ALPHA (0.0*C_DEG)
 #define BETA (10.0*C_DEG)
 #define THETA (170.0*C_DEG)
+#define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
 
-double gaussian() {
-
-    return 0.0;
-}
+//double gaussian(double sigma, double mu, double x) {
+//    return exp(-)
+//}
 
 typedef struct brick {
     double E_front;
@@ -23,7 +25,35 @@ typedef struct brick {
     double Q;
 } brick;
 
-// Tee funktio, jossa gaussinen konvoluutio ja brick.
+
+void foo() {
+    double x;
+    int i;
+    double sigma = 1.0;
+    double x_0 = 100.0;
+    double x_L = 50.0;
+    double x_H = 55.0;
+    double sum = 0.0;
+    double step = 0.2;
+    for(i=0; i <10000; i++) {
+        x = -1000.0 + i*step;
+        double fx = gsl_sf_erf_Q((x_H-x)/sigma);
+        double fx_low = gsl_sf_erf_Q((x_L-x)/sigma);
+        double out = (fx_low-fx)/(x_H-x_L); /* One count, convolution of gaussian rectangle */
+        sum += out*step; /* This is the integral! */
+        fprintf(stdout, "%g %g %g %g\n", x, fx, out, sum);
+    }
+}
+
+void brick_int(double sigma, double E_low, double E_high, gsl_histogram *h, double Q) { /* Energy spectrum h, integrate over rectangular brick convoluted with a gaussian */
+    int i;
+    for(i=0; i < h->n; i++) {
+        double w = h->range[i+1] - h->range[i];
+        double E = (h->range[i] + h->range[i+1])/2.0; /* Approximate gaussian at center */
+        double y = (gsl_sf_erf_Q((E_low-E)/sigma)-gsl_sf_erf_Q((E_high-E)/sigma))/(E_high-E_low);
+        h->bin[i] += y*w*Q;
+    }
+}
 
 double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, const jibal_material *material, double h, double *E, double *S) {
     double k1, k2, k3, k4, stop, dE;
@@ -42,7 +72,7 @@ double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, const jib
 }
 
 
-double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, const jibal_layer *layer, double p_sr, double E_0, double *S) {
+double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, const jibal_layer *layer, double p_sr, double E_0, double *S, gsl_histogram *histo) {
     double E = E_0;
     double dE;
     double x;
@@ -50,6 +80,8 @@ double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, const jib
 #ifdef DEBUG
     fprintf(stderr, "Thickness %g tfu, stop step %g tfu, E_0 = %g MeV\n", layer->thickness/C_TFU, h/C_TFU, E_0/C_MEV);
 #endif
+    double K = jibal_kin_rbs(incident->mass, layer->material->elements[0].isotopes[0]->mass, THETA, '+');
+    double E_out_prev = K*E;
     for (x = layer->thickness; x >= 0.0;) {
         if(x-h < 0.0) { /* Last step may be partial */
             h=x;
@@ -87,7 +119,6 @@ double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, const jib
 #ifdef DEBUG
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sigma = %g mb/sr, sqrt(S) = %g keV, Q = %g\n", E_front/C_MEV, E_back/C_MEV, E_mean/C_MEV, sigma/C_MB_SR, sqrt(*S)/C_KEV, Q);
 #endif
-        double K = jibal_kin_rbs(incident->mass, layer->material->elements[0].isotopes[0]->mass, THETA, '+');
         double S_out = S_back * K;
         double E_out = E_back * K;
         double x_out;
@@ -96,8 +127,18 @@ double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, const jib
             stop_step(workspace, incident, layer->material, h, &E_out, &S_out);
             x_out += h;
         }
-        fprintf(stderr, "Surf: from x_out = %g tfu, gives E_out = %g MeV, stragg = %g keV\n", (x-h)/C_TFU, E_out/C_MEV, sqrt(S_out)/C_KEV);
+        double E_diff = E_out_prev-E_out;
+        if(h > 1.0*C_TFU && E_diff > 5.0*C_KEV || E_diff < 2.0*C_KEV) {
+            fprintf(stderr, "E_diff too large or too small: %g keV with step %g tfu!\n", E_diff/C_KEV, h/C_TFU);
+            h *= 3.5*C_KEV/E_diff;
+            E = E_front;
+            fprintf(stderr, "New step %g tfu, back to E = %g MeV!\n\n", h/C_TFU, E/C_MEV);
+            continue;
+        }
+        fprintf(stderr, "Surf: from x_out = %g tfu, gives E_out = %g MeV (prev was %g MeV, diff %g keV), stragg = %g keV\n", (x-h)/C_TFU, E_out/C_MEV, E_out_prev/C_MEV, (E_diff)/C_KEV, sqrt(S_out)/C_KEV);
         fprintf(stderr, "\n");
+        //fprintf(stdout, "%.5lf %.5lf\n", E_out/C_KEV, Q);
+        brick_int(sqrt(*S+DETECTOR_RESOLUTION*DETECTOR_RESOLUTION), E_out, E_out_prev, histo, Q);
         if(!isnormal(E)) {
             fprintf(stderr, "SOMETHING DOESN'T LOOK RIGHT HERE.\n");
             return 0.0;
@@ -105,6 +146,7 @@ double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, const jib
         x -= h;
         *S = S_back;
         E = E_back;
+        E_out_prev = E_out;
     }
     return E;
 }
@@ -136,10 +178,13 @@ int main(int argc, char **argv) {
     }
     jibal_gsto_print_assignments(jibal->gsto);
     jibal_gsto_load_all(jibal->gsto);
+    gsl_histogram *histo = gsl_histogram_calloc_uniform(1000, 100*C_KEV, 2100*C_KEV);
     double E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, argv[4]);
     double S = 0.0;
     double p_sr = 2.0e12; /* TODO: particles * sr / cos(alpha) */
-    overlayer(jibal->gsto, incident, layer, p_sr, E, &S);
+    overlayer(jibal->gsto, incident, layer, p_sr, E, &S, histo);
     jibal_free(jibal);
+    gsl_histogram_fprintf(stdout, histo, "%g", "%g");
+    gsl_histogram_free(histo);
     return 0;
 }
