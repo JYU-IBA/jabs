@@ -13,19 +13,6 @@
 #define THETA (170.0*C_DEG)
 #define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
 
-//double gaussian(double sigma, double mu, double x) {
-//    return exp(-)
-//}
-
-typedef struct brick {
-    double E_front;
-    double E_back;
-    double S_front;
-    double S_back;
-    double Q;
-} brick;
-
-
 void foo() {
     double x;
     int i;
@@ -178,10 +165,10 @@ int main(int argc, char **argv) {
     }
     jibal_gsto_print_assignments(jibal->gsto);
     jibal_gsto_load_all(jibal->gsto);
-    gsl_histogram *histo = gsl_histogram_calloc_uniform(1000, 100*C_KEV, 2100*C_KEV);
+    gsl_histogram *histo = gsl_histogram_calloc_uniform(2000, 100*C_KEV, 2100*C_KEV);
     double E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, argv[4]);
     double S = 0.0;
-    double p_sr = 2.0e12; /* TODO: particles * sr / cos(alpha) */
+    double p_sr = 1.0e12; /* TODO: particles * sr / cos(alpha) */
     overlayer(jibal->gsto, incident, layer, p_sr, E, &S, histo);
     jibal_free(jibal);
     gsl_histogram_fprintf(stdout, histo, "%g", "%g");
