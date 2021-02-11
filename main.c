@@ -90,42 +90,16 @@ sim_isotope *sim_isotopes_alloc(size_t n_isotopes, size_t n_channels, conc_range
     return isotopes;
 }
 
-/* TODO:
- *  - make conc profiles for each isotope to be simulated.
- *    Ranges from layer model? Linear varying (like MCERD) or histogram-like (layer-model)?
- *
- * - Allocate energy histograms.
- *   These should have ranges independently from other energy histograms, since the same bin can correspond to a different energy.
- *   Energy histograms can be summed this way, too.
- * - Provide stopping calls, like jibal_stop(), but using the new material description.
- * - List of reactions? By default lets start with RBS from every target isotope (if RBS possible)
- * - Track "bricking" process in some helper varible (like E_out_prev)
- * */
-
-#define ERFC_A (1.98)
-#define ERFC_B (1.135*sqrt(C_PI))
-
-double erfc2(double x) {
-    double out = 0.5*(1-exp(-ERFC_A*x))*exp(-x*x)/(ERFC_B*x);
-    if(x < 0.1)
-        return (out*x/0.1)+1.0*(0.1-x)/0.1;
-    else
-        return out;
-}
-
-double erfc(double x) {
+inline double erfc(double x) {
     return exp(-1.0950081470333*x-0.75651138383854*x*x);
     /* Tsay, WJ., Huang, C.J., Fu, TT. et al. J Prod Anal 39, 259–269 (2013). https://doi.org/10.1007/s11123-012-0283-1 */
 }
 
-double erf_Q(double x ) {
-    if(x < 0.0)
-        return 1.0-0.5*erfc(-1.0*x/sqrt(2.0));
-    else
-        return 0.5*erfc(x/sqrt(2.0));
+inline double erf_Q(double x) {
+    return x < 0.0 ? 1.0-0.5*erfc(-1.0*x/sqrt(2.0)) : 0.5*erfc(x/sqrt(2.0));
 }
 
-void foo() {
+void erf_Q_test() {
     double x;
     int i;
     double sigma = 1.0;
@@ -148,7 +122,7 @@ void foo() {
 
 void brick_int(double sigma, double E_low, double E_high, gsl_histogram *h, double Q) { /* Energy spectrum h, integrate over rectangular brick convoluted with a gaussian */
     int i;
-#ifndef OPTIMIZE_BRICK
+#ifndef NO_OPTIMIZE_BRICK
     size_t lo;
     size_t hi;
     gsl_histogram_find(h, E_low, &lo);
@@ -271,13 +245,6 @@ double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
     return dE; /* TODO: return something useful */
 }
 
-void scatter(const jibal_isotope *incident, const jibal_isotope *target, double E) {
-    double sigma = jibal_cross_section_rbs(incident, target, THETA, E, JIBAL_CS_ANDERSEN);
-}
-
-
-
-
 void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double p_sr, double E_0, double *S, conc_range *crange) {
     double E = E_0;
     double E_prev = E;
@@ -318,18 +285,6 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
             fprintf(stderr, "Return due to low energy.\n");
             return;
         }
-#if 0
-        if(next_crossing - x < 50.0*C_TFU) {
-            h_max = next_crossing - x;
-            if(h_max < 1.0*C_TFU && i_range == crange->n-2) {
-                fprintf(stderr, "Close enough. I'm done.\n");
-                return;
-            }
-            fprintf(stderr, "Crossing approaching (#%i), enforcing maximum step of %g tfu\n", i_range, h_max/C_TFU);
-        } else {
-            h_max = 50.0*C_TFU;
-        }
-#endif
         h_max = next_crossing - x;
         if(h_max < 0.0001*C_TFU) {
             x += 0.0001*C_TFU;
@@ -349,16 +304,6 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
 #endif
         double S_back = *S;
         double E_mean = (E_front+E_back)/2.0;
-#ifdef NO_ADAPTIVE_STEPPING_FOR_INCIDENT
-
-        if(h > 1.0*C_TFU && E_diff > 5.0*C_KEV || E_diff < 2.0*C_KEV) {
-            fprintf(stderr, "E_diff too large or too small: %g keV with step %g tfu!\n", E_diff/C_KEV, h/C_TFU);
-            //h *= 1.0*C_KEV/E_diff;
-            //E = E_front;
-            //fprintf(stderr, "New step %g tfu, back to E = %g MeV!\n\n", h/C_TFU, E/C_MEV);
-            continue;
-        }
-#endif
 #ifdef DEBUG
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
                         E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(*S) / C_KEV);
@@ -386,13 +331,13 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
                 x_out -= it->step;
                 if(it->step == 0.0)
                     break;
+                if(E_out < E_MIN)
+                    break;
             }
             if(c > 1e-12 && E_out > E_MIN) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 const jibal_isotope *isotope = it->isotope;
                 double sigma = jibal_cross_section_rbs(incident, isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
                 double Q = c * p_sr * sigma * h; /* TODO: worst possible approximation... */
-
-
 #if 0
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf, sigma = %g mb/sr, Q = %g\n", isotope->name, E_back * it->K/C_KEV, E_out/C_KEV, sigma/C_MB_SR, Q);
 #endif
@@ -404,7 +349,6 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
             it->E = E_out;
         }
 #if 0
-
         fprintf(stderr, "Surf: from x_out = %g tfu, gives E_out = %g MeV (prev was %g MeV, diff %g keV), stragg = %g keV\n", (x-h)/C_TFU, E_out/C_MEV, E_out_prev/C_MEV, (E_diff)/C_KEV, sqrt(S_out)/C_KEV);
         fprintf(stderr, "\n");
 #endif
@@ -419,8 +363,10 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
 }
 
 int main(int argc, char **argv) {
-    //foo();
-    //return 0;
+#if 0
+    erf_Q_test();
+    return 0;
+#endif
     jibal *jibal = jibal_init(NULL);
     if(jibal->error) {
         fprintf(stderr, "Initializing JIBAL failed with error code %i (%s)\n", jibal->error, jibal_error_string(jibal->error));
