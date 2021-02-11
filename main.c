@@ -276,10 +276,14 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
         while (x >= crange->ranges[i_range+1]) {
             i_range++;
             if (i_range >= crange->n-1) {
+#ifdef DEBUG
                 fprintf(stderr, "return due to last range, last (uncalculated) x = %g tfu\n", x/C_TFU);
+#endif
                 return;
             }
+#ifdef DEBUG
             fprintf(stderr, "Crossing to range %i = [%g, %g)\n", i_range, crange->ranges[i_range]/C_TFU, crange->ranges[i_range+1]/C_TFU);
+#endif
             next_crossing = crange->ranges[i_range+1];
         }
 #endif
@@ -287,16 +291,19 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
             fprintf(stderr, "Return due to low energy.\n");
             return;
         }
+#if 0
         if(next_crossing - x < 50.0*C_TFU) {
             h_max = next_crossing - x;
-            fprintf(stderr, "Crossing approaching (#%i), enforcing maximum step of %g tfu\n", i_range, h_max/C_TFU);
             if(h_max < 1.0*C_TFU && i_range == crange->n-2) {
                 fprintf(stderr, "Close enough. I'm done.\n");
                 return;
             }
+            fprintf(stderr, "Crossing approaching (#%i), enforcing maximum step of %g tfu\n", i_range, h_max/C_TFU);
         } else {
             h_max = 50.0*C_TFU;
         }
+#endif
+        h_max = next_crossing - x;
         if(h_max < 0.0001*C_TFU) {
             x += 0.0001*C_TFU;
             fprintf(stderr, "Step too small. Let's nudge forward! x=%lf tfu\n", x/C_TFU);
@@ -305,12 +312,12 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
 
         double E_front = E;
         recalculate_concs(target, x);
-        stop_step(workspace, incident, target, &h, h_max, &E, S, 100.0); /* TODO: maximum "jump" to next sharp transition? */
+        stop_step(workspace, incident, target, &h, h_max, &E, S, 5.0);
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
         double E_back = E;
         double E_diff = E_front-E_back;
-#if 1
+#if 0
         fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3lf keV to  %8.3lf keV (diff %6.4lf keV)\n", x/C_TFU, (x+h)/C_TFU, E_front/C_KEV, E/C_KEV, E_diff/C_KEV);
 #endif
         double S_back = *S;
@@ -495,19 +502,18 @@ int main(int argc, char **argv) {
     jibal_gsto_print_assignments(jibal->gsto);
     jibal_gsto_load_all(jibal->gsto);
 
-
+    //for (int n = 0; n < 10; n++) {
         double S = 0.0;
         double p_sr = 1.0e12; /* TODO: particles * sr / cos(alpha) */
         rbs(jibal->gsto, incident, its, p_sr, E, &S, crange);
-
+    //}
     for(i = 0; i < HISTOGRAM_CHANNELS; i++) {
-        fprintf(stdout, "%4i", i);
         double sum = 0.0;
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
             sim_isotope *it = &its[i_isotope];
             sum += it->h->bin[i];
         }
-        fprintf(stdout, " %e", sum);
+        fprintf(stdout, "%4i %e", i, sum);
         for(i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
             sim_isotope *it = &its[i_isotope];
             fprintf(stdout, " %e", it->h->bin[i]);
