@@ -30,6 +30,7 @@ typedef struct {
     double E;
     double K; /* TODO: this should be part of a "reaction" and not the "isotope" */
     double c; /* accelerator of concentration */
+    double step;
     gsl_histogram *h;
     double *conc; /* concentration values corresponding to ranges given in an associated (shared!) conc_range */
     conc_range *r;
@@ -124,7 +125,7 @@ void brick_int(double sigma, double E_low, double E_high, gsl_histogram *h, doub
     int i;
     size_t lo;
     size_t hi;
-#ifdef NO_OPTIMIZE_BRICK
+#ifndef NO_OPTIMIZE_BRICK
     gsl_histogram_find(h, E_low, &lo);
     gsl_histogram_find(h, E_low, &hi);
     if(lo > 20)
@@ -195,12 +196,14 @@ double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
     *S *= (s_ratio)*(s_ratio);
     *S += fabs(h)*stragg_target(workspace, incident, target, (*E+dE/2)); /* Straggling, calculate at mid-energy */
     *E += dE;
-    return 0.0; /* TODO: return something useful */
+    return dE; /* TODO: return something useful */
 }
 
 void scatter(const jibal_isotope *incident, const jibal_isotope *target, double E) {
     double sigma = jibal_cross_section_rbs(incident, target, THETA, E, JIBAL_CS_ANDERSEN);
 }
+
+
 
 
 double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double p_sr, double E_0, double *S, conc_range *crange) {
@@ -214,6 +217,7 @@ double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
         sim_isotope *it = &target[n_isotopes];
         it->K = jibal_kin_rbs(incident->mass, it->isotope->mass, THETA, '+'); /* TODO: this is too hard coded for RBS right now */
         it->E = E * it->K;
+        it->step = h;
     };
     double thickness = crange->ranges[crange->n-1];
 #ifdef DEBUG
@@ -233,7 +237,7 @@ double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
         double S_back = *S;
         double E_back = E;
         double E_mean = (E_front+E_back)/2.0;
-#if 0
+#ifndef NO_ADAPTIVE_STEPPING_FOR_INCIDENT
         double E_diff = E_front-E_back;
         if(h > 1.0*C_TFU && E_diff > 2.0*C_KEV || E_diff < 0.5*C_KEV) {
             fprintf(stderr, "E_diff too large or too small: %g keV with step %g tfu!\n", E_diff/C_KEV, h/C_TFU);
@@ -243,14 +247,14 @@ double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
             continue;
         }
 #endif
-#if 1
+#ifdef DEBUG
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
                         E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(*S) / C_KEV);
 #endif
         int i_isotope;
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
             sim_isotope *it = &target[i_isotope];
-            if(it->c < 1e-12) /* TODO: concentration cutoff? TODO: should it->E be updated?*/
+            if(it->c < 1e-12) /* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 continue;
             const jibal_isotope *isotope = it->isotope;
             double sigma = jibal_cross_section_rbs(incident, isotope, THETA, E_mean,JIBAL_CS_ANDERSEN);
@@ -260,15 +264,17 @@ double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
             double x_out;
             for (x_out = x + h; x_out >= 0.0;) { /* Calculate energy and straggling of backside of slab */
                     //fprintf(stderr, "Surfacing... x_out = %g tfu... ", x_out/C_TFU);
-                    if(x_out < h) {
+                    if(x_out < it->step) {
                         stop_step(workspace, incident, target, x_out, &E_out, &S_out);
                         break;
                     } else {
-                        stop_step(workspace, incident, target, h, &E_out, &S_out);
-                        x_out -= h;
+                        stop_step(workspace, incident, target, it->step, &E_out, &S_out);
+                        x_out -= it->step;
                     }
             }
+#ifdef DEBUG
             fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf, sigma = %g mb/sr\n", isotope->name, E_back * it->K/C_KEV, E_out/C_KEV, sigma/C_MB_SR);
+#endif
             brick_int(sqrt(*S+DETECTOR_RESOLUTION*DETECTOR_RESOLUTION), E_out, it->E, it->h, Q);
             it->E = E_out;
         }
