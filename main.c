@@ -102,31 +102,55 @@ sim_isotope *sim_isotopes_alloc(size_t n_isotopes, size_t n_channels, conc_range
  * - Track "bricking" process in some helper varible (like E_out_prev)
  * */
 
+#define ERFC_A (1.98)
+#define ERFC_B (1.135*sqrt(C_PI))
+
+double erfc2(double x) {
+    double out = 0.5*(1-exp(-ERFC_A*x))*exp(-x*x)/(ERFC_B*x);
+    if(x < 0.1)
+        return (out*x/0.1)+1.0*(0.1-x)/0.1;
+    else
+        return out;
+}
+
+double erfc(double x) {
+    return exp(-1.0950081470333*x-0.75651138383854*x*x);
+    /* Tsay, WJ., Huang, C.J., Fu, TT. et al. J Prod Anal 39, 259–269 (2013). https://doi.org/10.1007/s11123-012-0283-1 */
+}
+
+double erf_Q(double x ) {
+    if(x < 0.0)
+        return 1.0-0.5*erfc(-1.0*x/sqrt(2.0));
+    else
+        return 0.5*erfc(x/sqrt(2.0));
+}
 
 void foo() {
     double x;
     int i;
     double sigma = 1.0;
     double x_0 = 100.0;
-    double x_L = 50.0;
-    double x_H = 55.0;
+    double x_L = 10.0;
+    double x_H = 15.0;
     double sum = 0.0;
-    double step = 0.2;
+    double step = 0.03;
     for(i=0; i <10000; i++) {
-        x = -1000.0 + i*step;
+        x = -50.0 + i*step;
         double fx = gsl_sf_erf_Q((x_H-x)/sigma);
         double fx_low = gsl_sf_erf_Q((x_L-x)/sigma);
+        fx = erf_Q((x_H-x)/sigma);
+        fx_low = erf_Q((x_L-x)/sigma);
         double out = (fx_low-fx)/(x_H-x_L); /* One count, convolution of gaussian rectangle */
         sum += out*step; /* This is the integral! */
-        fprintf(stdout, "%g %g %g %g\n", x, fx, out, sum);
+        fprintf(stdout, "%g %g %g %12.8lf\n", x, fx, out, sum);
     }
 }
 
 void brick_int(double sigma, double E_low, double E_high, gsl_histogram *h, double Q) { /* Energy spectrum h, integrate over rectangular brick convoluted with a gaussian */
     int i;
+#ifndef OPTIMIZE_BRICK
     size_t lo;
     size_t hi;
-#ifndef NO_OPTIMIZE_BRICK
     gsl_histogram_find(h, E_low, &lo);
     gsl_histogram_find(h, E_high, &hi);
     double foo = (E_high-E_low)/(HISTOGRAM_BIN);
@@ -141,14 +165,17 @@ void brick_int(double sigma, double E_low, double E_high, gsl_histogram *h, doub
         hi = h->n;
     else
         hi += n;
-#else
-    lo = 0;
-    hi = h->n;
-#endif
     for(i = lo; i < hi; i++) {
+#else
+    for(i = 0; i < h->n; i++) {
+#endif
         double w = h->range[i+1] - h->range[i];
         double E = (h->range[i] + h->range[i+1])/2.0; /* Approximate gaussian at center */
+#ifdef ERF_Q_FROM_GSL
         double y = (gsl_sf_erf_Q((E_low-E)/sigma)-gsl_sf_erf_Q((E_high-E)/sigma))/(E_high-E_low);
+#else
+        double y = (erf_Q((E_low-E)/sigma)-erf_Q((E_high-E)/sigma))/(E_high-E_low);
+#endif
         h->bin[i] += y*w*Q;
     }
 }
@@ -392,6 +419,8 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
 }
 
 int main(int argc, char **argv) {
+    //foo();
+    //return 0;
     jibal *jibal = jibal_init(NULL);
     if(jibal->error) {
         fprintf(stderr, "Initializing JIBAL failed with error code %i (%s)\n", jibal->error, jibal_error_string(jibal->error));
@@ -403,12 +432,16 @@ int main(int argc, char **argv) {
     }
     const jibal_isotope *incident = jibal_isotope_find(jibal->isotopes, argv[1], 0, 0);
     if(incident) {
+#ifdef DEBUG
         fprintf(stderr, "Mass %.3lf u\n", incident->mass/C_U);
+#endif
     } else {
         fprintf(stderr, "No isotope %s found.\n", argv[1]);
     }
     double E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, argv[2]);
+#ifdef DEBUG
     fprintf(stderr, "Beam E = %g MeV\n", E/C_MEV);
+#endif
     if (E > 1000.0*C_MEV || E < 10*C_KEV) {
         fprintf(stderr, "Hmm...? Check your numbers.\n");
         return -1;
@@ -438,18 +471,22 @@ int main(int argc, char **argv) {
     int i_isotope, n_isotopes=0;
     for(i = 0; i < n_layers; i++) {
         jibal_layer *layer = layers[i];
+#ifdef DEBUG
         fprintf(stderr, "Layer %i/%i. Thickness %g tfu\n", i+1, n_layers, layer->thickness/C_TFU);
         jibal_material_print(stderr, layer->material);
+#endif
         crange->ranges[2*i] = i?crange->ranges[2*i-1]:0.0;
         crange->ranges[2*i+1] = crange->ranges[2*i] + layer->thickness;
         for (j = 0; j < layer->material->n_elements; ++j) {
             n_isotopes += layer->material->elements[j].n_isotopes;
         }
     }
+#ifdef DEBUG
     for (i = 0; i < crange->n; i++) {
         fprintf(stderr, "ranges[%i]  = %g\n", i, crange->ranges[i]);
     }
     fprintf(stderr, "Total %i isotopes (each isotope in each layer treated differently...)\n", n_isotopes);
+#endif
 
     sim_isotope *its = calloc(n_isotopes+1, sizeof(sim_isotope));
     its[n_isotopes].isotope = NULL; /* Last isotope of isotopes is NULL. For-loops without knowledge of n_isotopes are possible. */
@@ -473,7 +510,7 @@ int main(int argc, char **argv) {
             }
         }
     }
-    fprintf(stderr, "\nDEPTH(tfu) ");
+    fprintf(stderr, "DEPTH(tfu) ");
     for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
         fprintf(stderr, "%8s ", its[i_isotope].isotope->name);
     }
@@ -502,11 +539,11 @@ int main(int argc, char **argv) {
     jibal_gsto_print_assignments(jibal->gsto);
     jibal_gsto_load_all(jibal->gsto);
 
-    //for (int n = 0; n < 10; n++) {
+    for (int n = 0; n < 1; n++) {
         double S = 0.0;
         double p_sr = 1.0e12; /* TODO: particles * sr / cos(alpha) */
         rbs(jibal->gsto, incident, its, p_sr, E, &S, crange);
-    //}
+    }
     for(i = 0; i < HISTOGRAM_CHANNELS; i++) {
         double sum = 0.0;
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
