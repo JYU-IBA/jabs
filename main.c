@@ -125,17 +125,17 @@ void brick_int(double sigma, double E_low, double E_high, gsl_histogram *h, doub
     int i;
     size_t lo;
     size_t hi;
-#ifndef NO_OPTIMIZE_BRICK
+#ifdef OPTIMIZE_BRICK
     gsl_histogram_find(h, E_low, &lo);
     gsl_histogram_find(h, E_low, &hi);
-    if(lo > 20)
-        lo -= 20;
+    if(lo > 50)
+        lo -= 50;
     else
         lo = 0;
-    if(hi > h->n-20)
+    if(hi > h->n-50)
         hi = h->n;
     else
-        hi += 20;
+        hi += 50;
 #else
     lo = 0;
     hi = h->n;
@@ -182,19 +182,22 @@ void recalculate_concs(sim_isotope *its, double x) {
     }
 }
 
-double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double h, double *E, double *S) {
+double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double *h, double h_max, double *E, double *S, double adaptive) {
     double k1, k2, k3, k4, stop, dE;
     k1 = -1.0*stop_target(workspace, incident, target, *E); /* */
-    k2 = -1.0*stop_target(workspace, incident, target, *E + (h / 2) * k1);
-    k3 = -1.0*stop_target(workspace, incident, target, *E + (h / 2) * k2);
-    k4 = -1.0*stop_target(workspace, incident, target, *E + h * k3);
+    *h = (-1.0*C_KEV*adaptive / k1); /* if adaptive, we try to aim for some energy loss */
+    if(*h > h_max)
+        *h = h_max;
+    k2 = -1.0*stop_target(workspace, incident, target, *E + (*h / 2) * k1);
+    k3 = -1.0*stop_target(workspace, incident, target, *E + (*h / 2) * k2);
+    k4 = -1.0*stop_target(workspace, incident, target, *E + (*h) * k3);
     stop = (k1 + 2 * k2 + 2 * k3 + k4)/6;
     //stop = k1;
-    dE = h*stop; /* Energy change in thickness "h" */
+    dE = (*h)*stop; /* Energy change in thickness "h" */
     //fprintf(stderr, "stop = %g eV/tfu, E = %g keV,  dE = %g keV\n", stop/C_EV_TFU, *E/C_KEV, dE/C_KEV);
     double s_ratio = stop_target(workspace, incident, target, *E+dE)/(k1); /* Ratio of stopping */
     *S *= (s_ratio)*(s_ratio);
-    *S += fabs(h)*stragg_target(workspace, incident, target, (*E+dE/2)); /* Straggling, calculate at mid-energy */
+    *S += fabs(*h)*stragg_target(workspace, incident, target, (*E+dE/2)); /* Straggling, calculate at mid-energy */
     *E += dE;
     return dE; /* TODO: return something useful */
 }
@@ -206,7 +209,7 @@ void scatter(const jibal_isotope *incident, const jibal_isotope *target, double 
 
 
 
-double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double p_sr, double E_0, double *S, conc_range *crange) {
+void overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double p_sr, double E_0, double *S, conc_range *crange) {
     double E = E_0;
     double E_prev = E;
     double dE;
@@ -220,30 +223,53 @@ double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
         it->step = h;
     };
     double thickness = crange->ranges[crange->n-1];
+    double next_crossing = crange->ranges[1];
+    double h_max;
+    int i_range = 0;
 #ifdef DEBUG
     fprintf(stderr, "Thickness %g tfu, stop step %g tfu, E_0 = %g MeV\n", thickness/C_TFU, h/C_TFU, E_0/C_MEV);
 #endif
     for (x = 0.0; x <= thickness;) {
-        if(x+h > thickness || E < E_MIN) { /* Last step may be partial */ /* TODO: sharp transitions from one range bin to other?! */
-            break; /* TODO: BRUTAL */
+#if 1
+        while (x >= crange->ranges[i_range+1]) {
+            i_range++;
+            if (i_range == crange->n-1) {
+                fprintf(stderr, "return due to last range, last (uncalculated) x = %g tfu\n", x/C_TFU);
+                return;
+            }
+            fprintf(stderr, "Crossing to range %i = [%g, %g)\n", i_range, crange->ranges[i_range]/C_TFU, crange->ranges[i_range+1]/C_TFU);
+            next_crossing = crange->ranges[i_range+1];
+        }
+#endif
+        if(E < E_MIN) {
+            fprintf(stderr, "Return due to low energy.\n");
+            return;
+        }
+        if(next_crossing - x < 50.0*C_TFU) {
+            h_max = next_crossing - x;
+            fprintf(stderr, "Crossing approaching, enforcing maximum step of %g tfu\n", h_max/C_TFU);
+        } else {
+            h_max = 50.0*C_TFU;
         }
         recalculate_concs(target, x);
         /* DEPTH BIN [x, x-h) */
-#if 1
-        fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3g keV\n", x/C_TFU, (x+h)/C_TFU, E/C_KEV);
-#endif
+
         double E_front = E;
-        stop_step(workspace, incident, target, h, &E, S);
-        double S_back = *S;
+        stop_step(workspace, incident, target, &h, h_max, &E, S, 3.0); /* TODO: maximum "jump" to next sharp transition? */
         double E_back = E;
-        double E_mean = (E_front+E_back)/2.0;
-#ifndef NO_ADAPTIVE_STEPPING_FOR_INCIDENT
         double E_diff = E_front-E_back;
-        if(h > 1.0*C_TFU && E_diff > 2.0*C_KEV || E_diff < 0.5*C_KEV) {
+#if 1
+        fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3lf keV to  %8.3lf keV (diff %6.4lf keV)\n", x/C_TFU, (x+h)/C_TFU, E_front/C_KEV, E/C_KEV, E_diff/C_KEV);
+#endif
+        double S_back = *S;
+        double E_mean = (E_front+E_back)/2.0;
+#ifdef NO_ADAPTIVE_STEPPING_FOR_INCIDENT
+
+        if(h > 1.0*C_TFU && E_diff > 5.0*C_KEV || E_diff < 2.0*C_KEV) {
             fprintf(stderr, "E_diff too large or too small: %g keV with step %g tfu!\n", E_diff/C_KEV, h/C_TFU);
-            h *= 1.0*C_KEV/E_diff;
-            E = E_front;
-            fprintf(stderr, "New step %g tfu, back to E = %g MeV!\n\n", h/C_TFU, E/C_MEV);
+            //h *= 1.0*C_KEV/E_diff;
+            //E = E_front;
+            //fprintf(stderr, "New step %g tfu, back to E = %g MeV!\n\n", h/C_TFU, E/C_MEV);
             continue;
         }
 #endif
@@ -254,28 +280,27 @@ double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
         int i_isotope;
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
             sim_isotope *it = &target[i_isotope];
-            if(it->c < 1e-12) /* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
-                continue;
-            const jibal_isotope *isotope = it->isotope;
-            double sigma = jibal_cross_section_rbs(incident, isotope, THETA, E_mean,JIBAL_CS_ANDERSEN);
-            double Q = it->c * p_sr * sigma * h; /* TODO: worst possible approximation... */
+
             double S_out = S_back * it->K;
             double E_out = E_back * it->K;
             double x_out;
-            for (x_out = x + h; x_out >= 0.0;) { /* Calculate energy and straggling of backside of slab */
-                    //fprintf(stderr, "Surfacing... x_out = %g tfu... ", x_out/C_TFU);
-                    if(x_out < it->step) {
-                        stop_step(workspace, incident, target, x_out, &E_out, &S_out);
-                        break;
-                    } else {
-                        stop_step(workspace, incident, target, it->step, &E_out, &S_out);
-                        x_out -= it->step;
-                    }
+            for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
+                //fprintf(stderr, "Surfacing... x_out = %g tfu... ", x_out/C_TFU);
+                stop_step(workspace, incident, target, &(it->step), x_out, &E_out, &S_out, 3.0);
+                x_out -= it->step;
+                if(x_out < 1*C_TFU)
+                    break;
             }
+            if(it->c > 1e-12) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
+                const jibal_isotope *isotope = it->isotope;
+                double sigma = jibal_cross_section_rbs(incident, isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
+                double Q = it->c * p_sr * sigma * h; /* TODO: worst possible approximation... */
+
 #ifdef DEBUG
-            fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf, sigma = %g mb/sr\n", isotope->name, E_back * it->K/C_KEV, E_out/C_KEV, sigma/C_MB_SR);
+                fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf, sigma = %g mb/sr\n", isotope->name, E_back * it->K/C_KEV, E_out/C_KEV, sigma/C_MB_SR);
 #endif
-            brick_int(sqrt(*S+DETECTOR_RESOLUTION*DETECTOR_RESOLUTION), E_out, it->E, it->h, Q);
+                brick_int(sqrt(*S + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), E_out, it->E, it->h, Q);
+            }
             it->E = E_out;
         }
 #if 0
@@ -285,13 +310,12 @@ double overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
 #endif
         if(!isnormal(E)) {
             fprintf(stderr, "SOMETHING DOESN'T LOOK RIGHT HERE.\n");
-            return 0.0;
+            return;
         }
         x += h;
         *S = S_back;
         E = E_back;
     }
-    return E;
 }
 
 int main(int argc, char **argv) {
@@ -417,10 +441,15 @@ int main(int argc, char **argv) {
         double sum = 0.0;
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
             sim_isotope *it = &its[i_isotope];
-            fprintf(stdout, " %10.3lf", it->h->bin[i]);
             sum += it->h->bin[i];
         }
-        fprintf(stdout, " %10.3lf\n", sum);
+        fprintf(stdout, " %10.3lf", sum);
+        for(i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
+            sim_isotope *it = &its[i_isotope];
+            fprintf(stdout, " %10.3lf", it->h->bin[i]);
+
+        }
+        fprintf(stdout, "\n");
     }
 
     jibal_free(jibal);
