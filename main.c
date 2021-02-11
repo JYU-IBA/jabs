@@ -155,11 +155,17 @@ double stop_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_iso
     double S1 = 0.0;
     for(i_isotope = 0; target[i_isotope].isotope != NULL; i_isotope++) {
         sim_isotope *it = &target[i_isotope];
+       // if(it->c < 1e-6)
+       //     continue;
         S1 += it->c * (
                 jibal_gsto_get_em(workspace, GSTO_STO_ELE, incident->Z, it->isotope->Z, em)
                 +jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, it->isotope->Z, it->isotope->mass)
                 );
     }
+    if(S1 == 0.0) {
+        fprintf(stderr, "Zero stopping.\n");
+    }
+    assert(S1 > 0.0);
     return S1;
 }
 
@@ -170,6 +176,8 @@ double stragg_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_i
     double S2 = 0.0;
     for(i_isotope = 0; target[i_isotope].isotope != NULL; i_isotope++) {
         sim_isotope *it = &target[i_isotope];
+        if(it->c < 1e-6)
+            continue;
         S2 +=  it->c*jibal_gsto_get_em(workspace, GSTO_STO_STRAGG, incident->Z, it->isotope->Z, em);
     }
     return S2;
@@ -177,8 +185,15 @@ double stragg_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_i
 
 void recalculate_concs(sim_isotope *its, double x) {
     int i_isotope;
+    double sum = 0.0;
+    int n_isotopes = 0;
     for(i_isotope = 0; its[i_isotope].isotope != NULL; i_isotope++) {
+        n_isotopes++;
         its[i_isotope].c = get_conc(x, &its[i_isotope]);
+        sum += its[i_isotope].c;
+    }
+    if(sum < 0.99 || sum > 1.01) {
+        fprintf(stderr, "ISSUE AT x=%g with %i isotopes, x=%12.8lf, sum of concs is %g\n", x, n_isotopes, x, sum);
     }
 }
 
@@ -188,17 +203,33 @@ double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
     *h = (-1.0*C_KEV*adaptive / k1); /* if adaptive, we try to aim for some energy loss */
     if(*h > h_max)
         *h = h_max;
+    if(*h < 0.1*C_TFU) {
+        *h = 0.1*C_TFU;
+    }
+    if(*E < E_MIN) {
+        *h = 0.0;
+        return 0.0;
+    }
+//    assert(isnormal(h));
     k2 = -1.0*stop_target(workspace, incident, target, *E + (*h / 2) * k1);
     k3 = -1.0*stop_target(workspace, incident, target, *E + (*h / 2) * k2);
     k4 = -1.0*stop_target(workspace, incident, target, *E + (*h) * k3);
     stop = (k1 + 2 * k2 + 2 * k3 + k4)/6;
     //stop = k1;
     dE = (*h)*stop; /* Energy change in thickness "h" */
-    //fprintf(stderr, "stop = %g eV/tfu, E = %g keV,  dE = %g keV\n", stop/C_EV_TFU, *E/C_KEV, dE/C_KEV);
+    //fprintf(stderr, "stop = %g eV/tfu, E = %g keV, h = %6.3lf  dE = %g keV\n", stop/C_EV_TFU, *E/C_KEV, *h/C_TFU, dE/C_KEV);
+    if(fabs(stop) < 0.1*C_EV_TFU) {
+        fprintf(stderr, "Nott goood.\n");
+        return 0.0;
+    }
     double s_ratio = stop_target(workspace, incident, target, *E+dE)/(k1); /* Ratio of stopping */
+    if((s_ratio)*(s_ratio) < 0.9 || (s_ratio)*(s_ratio) > 1.1) {
+        fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
+    }
     *S *= (s_ratio)*(s_ratio);
     *S += fabs(*h)*stragg_target(workspace, incident, target, (*E+dE/2)); /* Straggling, calculate at mid-energy */
     *E += dE;
+    assert(isnormal(*S));
     return dE; /* TODO: return something useful */
 }
 
@@ -233,7 +264,7 @@ void overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope
 #if 1
         while (x >= crange->ranges[i_range+1]) {
             i_range++;
-            if (i_range == crange->n-1) {
+            if (i_range >= crange->n-1) {
                 fprintf(stderr, "return due to last range, last (uncalculated) x = %g tfu\n", x/C_TFU);
                 return;
             }
@@ -245,17 +276,27 @@ void overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope
             fprintf(stderr, "Return due to low energy.\n");
             return;
         }
-        if(next_crossing - x < 50.0*C_TFU) {
+        if(next_crossing - x < 30.0*C_TFU) {
             h_max = next_crossing - x;
-            fprintf(stderr, "Crossing approaching, enforcing maximum step of %g tfu\n", h_max/C_TFU);
+            fprintf(stderr, "Crossing approaching (#%i), enforcing maximum step of %g tfu\n", i_range, h_max/C_TFU);
+            if(h_max < 1.0*C_TFU && i_range == crange->n-2) {
+                fprintf(stderr, "Close enough. I'm done.\n");
+                return;
+            }
         } else {
-            h_max = 50.0*C_TFU;
+            h_max = 30.0*C_TFU;
         }
-        recalculate_concs(target, x);
-        /* DEPTH BIN [x, x-h) */
+        if(h_max < 0.001*C_TFU) {
+            x += 0.001*C_TFU;
+            fprintf(stderr, "Step too small. Let's nudge forward!\n");
+            continue;
+        }
 
         double E_front = E;
+        recalculate_concs(target, x);
         stop_step(workspace, incident, target, &h, h_max, &E, S, 3.0); /* TODO: maximum "jump" to next sharp transition? */
+        assert(h > 0.0);
+        /* DEPTH BIN [x, x+h) */
         double E_back = E;
         double E_diff = E_front-E_back;
 #if 1
@@ -279,27 +320,33 @@ void overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope
 #endif
         int i_isotope;
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
+            recalculate_concs(target, x);
             sim_isotope *it = &target[i_isotope];
-
+            double c = it->c;
             double S_out = S_back * it->K;
             double E_out = E_back * it->K;
             double x_out;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
                 //fprintf(stderr, "Surfacing... x_out = %g tfu... ", x_out/C_TFU);
-                stop_step(workspace, incident, target, &(it->step), x_out, &E_out, &S_out, 3.0);
+                recalculate_concs(target, x_out-0.00001*C_TFU); /* TODO: x_out may be close to an area where concentrations are zero, therefore no stopping... */
+                stop_step(workspace, incident, target, &(it->step), x_out, &E_out, &S_out, 1.0);
                 x_out -= it->step;
-                if(x_out < 1*C_TFU)
+                if(it->step == 0.0)
                     break;
             }
-            if(it->c > 1e-12) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
+            if(c > 1e-12 && E_out > E_MIN) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 const jibal_isotope *isotope = it->isotope;
                 double sigma = jibal_cross_section_rbs(incident, isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
-                double Q = it->c * p_sr * sigma * h; /* TODO: worst possible approximation... */
+                double Q = c * p_sr * sigma * h; /* TODO: worst possible approximation... */
+
 
 #ifdef DEBUG
-                fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf, sigma = %g mb/sr\n", isotope->name, E_back * it->K/C_KEV, E_out/C_KEV, sigma/C_MB_SR);
+                fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf, sigma = %g mb/sr, Q = %g\n", isotope->name, E_back * it->K/C_KEV, E_out/C_KEV, sigma/C_MB_SR, Q);
 #endif
-                brick_int(sqrt(*S + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), E_out, it->E, it->h, Q);
+                assert(sigma > 0.0);
+                assert(S_out > 0.0);
+                assert(Q < 1.0e7 || Q > 0.0);
+                brick_int(sqrt(S_out + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), E_out, it->E, it->h, Q);
             }
             it->E = E_out;
         }
@@ -417,16 +464,16 @@ int main(int argc, char **argv) {
 #ifdef PRINT_SAMPLE_MODEL
     for (i = 0; i < 100; ++i) {
         double d = 10.0*C_TFU*i;
-        fprintf(stdout, "%10.3lf", d/C_TFU);
+        fprintf(stderr, "%10.3lf", d/C_TFU);
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
             sim_isotope *it =  &its[i_isotope];
             double x = get_conc(d, it);
-            fprintf(stdout, " %8.4lf", x*100.0);
+            fprintf(stderr, " %8.4lf", x*100.0);
         }
-        fprintf(stdout, "\n");
+        fprintf(stderr, "\n");
     }
 #endif
-
+    //return 0;
     jibal_gsto_print_assignments(jibal->gsto);
     jibal_gsto_load_all(jibal->gsto);
 
