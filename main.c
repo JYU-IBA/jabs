@@ -17,8 +17,9 @@
 
 #define E_MIN (100.0*C_KEV)
 #define N_LAYERS_MAX 100
-#define HISTOGRAM_CHANNELS 3000
 #define HISTOGRAM_BIN (1.0*C_KEV)
+#define STOP_STEP_INCIDENT (5.0*C_KEV)
+#define STOP_STEP_EXITING (5.0*C_KEV)
 
 typedef struct {
     size_t n;
@@ -165,7 +166,7 @@ double stop_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_iso
              continue;
         S1 += it->c * (
                 jibal_gsto_get_em(workspace, GSTO_STO_ELE, incident->Z, it->isotope->Z, em)
-                +jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, it->isotope->Z, it->isotope->mass)
+                //+jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, it->isotope->Z, it->isotope->mass)
                 );
     }
 #ifdef DEBUG
@@ -204,16 +205,16 @@ void recalculate_concs(sim_isotope *its, double x) {
 #endif
 }
 
-double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double *h, double h_max, double *E, double *S, double adaptive) {
+double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double *h, double h_max, double *E, double *S, double step) {
     double k1, k2, k3, k4, stop, dE;
     k1 = -1.0*stop_target(workspace, incident, target, *E);
     if(k1 > -0.01*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
         *h = 0.0;
         return 0.0;
     }
-    *h = (-1.0*C_KEV*adaptive / k1); /* if adaptive, we try to aim for some energy loss */
+    *h = (-1.0*step / k1); /* we try to aim for some energy loss */
     if(*h > h_max)
-        *h = h_max;
+        *h = h_max; /* but we have some other limitations too */
 #ifdef NO_ULTRASMALL_STEPS
     if(*h < 0.1*C_TFU) {
         *h = 0.1*C_TFU;
@@ -294,7 +295,7 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
 
         double E_front = E;
         recalculate_concs(target, x);
-        stop_step(workspace, incident, target, &h, h_max, &E, S, 5.0);
+        stop_step(workspace, incident, target, &h, h_max, &E, S, STOP_STEP_INCIDENT);
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
         double E_back = E;
@@ -326,7 +327,7 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
                     i_range_out--;
                     continue;
                 } else {
-                    stop_step(workspace, incident, target, &(it->step), remaining, &E_out, &S_out, 10.0);
+                    stop_step(workspace, incident, target, &(it->step), remaining, &E_out, &S_out, STOP_STEP_EXITING);
                 }
                 x_out -= it->step;
                 if(it->step == 0.0)
@@ -437,6 +438,7 @@ int main(int argc, char **argv) {
     sim_isotope *its = calloc(n_isotopes+1, sizeof(sim_isotope));
     its[n_isotopes].isotope = NULL; /* Last isotope of isotopes is NULL. For-loops without knowledge of n_isotopes are possible. */
     i_isotope=0;
+    int histogram_channels = ceil(1.1*E/HISTOGRAM_BIN);
     for(i = 0; i < n_layers; i++) {
         jibal_layer *layer = layers[i];
         for (j = 0; j < layer->material->n_elements; ++j) {
@@ -448,7 +450,7 @@ int main(int argc, char **argv) {
                 it->conc = calloc(crange->n, sizeof (double));
                 it->conc[2*i] = element->concs[k] * layer->material->concs[j];
                 it->conc[2*i+1] = element->concs[k] * layer->material->concs[j];
-                it->h = gsl_histogram_calloc_uniform(HISTOGRAM_CHANNELS, 0*C_KEV, HISTOGRAM_BIN*HISTOGRAM_CHANNELS);
+                it->h = gsl_histogram_calloc_uniform(histogram_channels, 0*C_KEV, HISTOGRAM_BIN*histogram_channels);
                 it->r = crange;
                 it->E = 0.0;
                 //fprintf(stderr, "i: %i, j: %i, k: %i, i_isotope: %i, name: %s\n", i, j, k, i_isotope, it->isotope->name);
@@ -490,7 +492,7 @@ int main(int argc, char **argv) {
         double p_sr = 1.0e12; /* TODO: particles * sr / cos(alpha) */
         rbs(jibal->gsto, incident, its, p_sr, E, &S, crange);
     }
-    for(i = 0; i < HISTOGRAM_CHANNELS; i++) {
+    for(i = 0; i < histogram_channels; i++) {
         double sum = 0.0;
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
             sim_isotope *it = &its[i_isotope];
