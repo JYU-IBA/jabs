@@ -17,8 +17,8 @@
 
 #define E_MIN (100.0*C_KEV)
 #define N_LAYERS_MAX 100
-#define HISTOGRAM_CHANNELS 1500
-#define HISTOGRAM_BIN (2.0*C_KEV)
+#define HISTOGRAM_CHANNELS 3000
+#define HISTOGRAM_BIN (1.0*C_KEV)
 
 typedef struct {
     size_t n;
@@ -126,11 +126,13 @@ void brick_int(double sigma, double E_low, double E_high, gsl_histogram *h, doub
     int i;
     size_t lo;
     size_t hi;
-#ifndef OPTIMIZE_BRICK
+#ifndef NO_OPTIMIZE_BRICK
     gsl_histogram_find(h, E_low, &lo);
     gsl_histogram_find(h, E_high, &hi);
     double foo = (E_high-E_low)/(HISTOGRAM_BIN);
     int n = ceil(foo*5);
+    if(n < 50)
+        n = 50;
     if(lo > n)
         lo -= n;
     else
@@ -249,7 +251,7 @@ void scatter(const jibal_isotope *incident, const jibal_isotope *target, double 
 
 
 
-void overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double p_sr, double E_0, double *S, conc_range *crange) {
+void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double p_sr, double E_0, double *S, conc_range *crange) {
     double E = E_0;
     double E_prev = E;
     double dE;
@@ -303,7 +305,7 @@ void overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope
 
         double E_front = E;
         recalculate_concs(target, x);
-        stop_step(workspace, incident, target, &h, h_max, &E, S, 10.0); /* TODO: maximum "jump" to next sharp transition? */
+        stop_step(workspace, incident, target, &h, h_max, &E, S, 100.0); /* TODO: maximum "jump" to next sharp transition? */
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
         double E_back = E;
@@ -490,15 +492,13 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\n");
     }
 #endif
-    //return 0;
     jibal_gsto_print_assignments(jibal->gsto);
     jibal_gsto_load_all(jibal->gsto);
 
-    //gsl_histogram *histo = gsl_histogram_calloc_uniform(2000, 100*C_KEV, 2100*C_KEV);
 
-    double S = 0.0;
-    double p_sr = 1.0e12; /* TODO: particles * sr / cos(alpha) */
-    overlayer(jibal->gsto, incident, its, p_sr, E, &S, crange);
+        double S = 0.0;
+        double p_sr = 1.0e12; /* TODO: particles * sr / cos(alpha) */
+        rbs(jibal->gsto, incident, its, p_sr, E, &S, crange);
 
     for(i = 0; i < HISTOGRAM_CHANNELS; i++) {
         fprintf(stdout, "%4i", i);
@@ -507,17 +507,26 @@ int main(int argc, char **argv) {
             sim_isotope *it = &its[i_isotope];
             sum += it->h->bin[i];
         }
-        fprintf(stdout, " %10.3lf", sum);
+        fprintf(stdout, " %e", sum);
         for(i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
             sim_isotope *it = &its[i_isotope];
-            fprintf(stdout, " %10.3lf", it->h->bin[i]);
+            fprintf(stdout, " %e", it->h->bin[i]);
 
         }
         fprintf(stdout, "\n");
     }
-
+    for(i = 0; i < n_layers; i++) {
+        jibal_layer_free(layers[i]);
+    }
+    free(layers);
     jibal_free(jibal);
-    //gsl_histogram_fprintf(stdout, histo, "%g", "%g");
-    //gsl_histogram_free(histo);
+    for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
+        sim_isotope *it = &its[i_isotope];
+        free(it->conc);
+        gsl_histogram_free(it->h);
+    }
+    free(its);
+    free(crange->ranges);
+    free(crange);
     return 0;
 }
