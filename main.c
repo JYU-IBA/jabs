@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <time.h>
 #include <jibal.h>
 #include <jibal_gsto.h>
 #include <jibal_stop.h>
@@ -15,11 +16,15 @@
 #define THETA (170.0*C_DEG)
 #define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
 
-#define E_MIN (100.0*C_KEV)
+#define E_MIN (150.0*C_KEV)
 #define N_LAYERS_MAX 100
 #define HISTOGRAM_BIN (1.0*C_KEV)
 #define STOP_STEP_INCIDENT (5.0*C_KEV)
 #define STOP_STEP_EXITING (5.0*C_KEV)
+
+#define CONCENTRATION_CUTOFF 1e-8
+
+#define NUMBER_OF_SIMULATIONS 1
 
 typedef struct {
     size_t n;
@@ -162,7 +167,7 @@ double stop_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_iso
     double S1 = 0.0;
     for(i_isotope = 0; target[i_isotope].isotope != NULL; i_isotope++) {
         sim_isotope *it = &target[i_isotope];
-        if(it->c < 1e-6)
+        if(it->c < CONCENTRATION_CUTOFF)
              continue;
         S1 += it->c * (
                 jibal_gsto_get_em(workspace, GSTO_STO_ELE, incident->Z, it->isotope->Z, em)
@@ -182,7 +187,7 @@ double stragg_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_i
     double S2 = 0.0;
     for(i_isotope = 0; target[i_isotope].isotope != NULL; i_isotope++) {
         sim_isotope *it = &target[i_isotope];
-        if(it->c < 1e-6)
+        if(it->c <= CONCENTRATION_CUTOFF)
             continue;
         S2 +=  it->c*jibal_gsto_get_em(workspace, GSTO_STO_STRAGG, incident->Z, it->isotope->Z, em);
     }
@@ -335,7 +340,7 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
                 if(E_out < E_MIN)
                     break;
             }
-            if(c > 1e-12 && E_out > E_MIN) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
+            if(c > CONCENTRATION_CUTOFF && E_out > E_MIN) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 const jibal_isotope *isotope = it->isotope;
                 double sigma = jibal_cross_section_rbs(incident, isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
                 double Q = c * p_sr * sigma * h; /* TODO: worst possible approximation... */
@@ -364,6 +369,8 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
 }
 
 int main(int argc, char **argv) {
+    clock_t start, end;
+    double cpu_time_used;
 #if 0
     erf_Q_test();
     return 0;
@@ -487,11 +494,14 @@ int main(int argc, char **argv) {
     jibal_gsto_print_assignments(jibal->gsto);
     jibal_gsto_load_all(jibal->gsto);
 
-    for (int n = 0; n < 1; n++) {
+    start = clock();
+    for (int n = 0; n < NUMBER_OF_SIMULATIONS; n++) {
         double S = 0.0;
         double p_sr = 1.0e12; /* TODO: particles * sr / cos(alpha) */
         rbs(jibal->gsto, incident, its, p_sr, E, &S, crange);
     }
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
     for(i = 0; i < histogram_channels; i++) {
         double sum = 0.0;
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
@@ -506,6 +516,7 @@ int main(int argc, char **argv) {
         }
         fprintf(stdout, "\n");
     }
+    fprintf(stderr, "CPU time: %g ms per spectrum, for actual simulation of %i spectra.\n", cpu_time_used*1000.0/NUMBER_OF_SIMULATIONS, NUMBER_OF_SIMULATIONS);
     for(i = 0; i < n_layers; i++) {
         jibal_layer_free(layers[i]);
     }
