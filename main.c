@@ -13,7 +13,7 @@
 #define ALPHA (0.0*C_DEG)
 #define BETA (10.0*C_DEG)
 #define THETA (170.0*C_DEG)
-#define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
+#define DETECTOR_RESOLUTION (5.0*C_KEV/C_FWHM)
 
 #define E_MIN (100.0*C_KEV)
 #define N_LAYERS_MAX 100
@@ -162,10 +162,9 @@ double stop_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_iso
                 +jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, it->isotope->Z, it->isotope->mass)
                 );
     }
-    if(S1 == 0.0) {
-        fprintf(stderr, "Zero stopping.\n");
-    }
+#ifdef DEBUG
     assert(S1 > 0.0);
+#endif
     return S1;
 }
 
@@ -192,40 +191,47 @@ void recalculate_concs(sim_isotope *its, double x) {
         its[i_isotope].c = get_conc(x, &its[i_isotope]);
         sum += its[i_isotope].c;
     }
+#ifdef DEBUG
     if(sum < 0.99 || sum > 1.01) {
         fprintf(stderr, "ISSUE AT x=%g with %i isotopes, x=%12.8lf, sum of concs is %g\n", x, n_isotopes, x, sum);
     }
+#endif
 }
 
 double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double *h, double h_max, double *E, double *S, double adaptive) {
     double k1, k2, k3, k4, stop, dE;
-    k1 = -1.0*stop_target(workspace, incident, target, *E); /* */
-    *h = (-1.0*C_KEV*adaptive / k1); /* if adaptive, we try to aim for some energy loss */
-    if(*h > h_max)
-        *h = h_max;
-    if(*h < 0.1*C_TFU) {
-        *h = 0.1*C_TFU;
-    }
-    if(*E < E_MIN) {
+    k1 = -1.0*stop_target(workspace, incident, target, *E);
+    if(k1 > -0.01*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
         *h = 0.0;
         return 0.0;
     }
-//    assert(isnormal(h));
+    *h = (-1.0*C_KEV*adaptive / k1); /* if adaptive, we try to aim for some energy loss */
+    if(*h > h_max)
+        *h = h_max;
+#ifdef NO_ULTRASMALL_STEPS
+    if(*h < 0.1*C_TFU) {
+        *h = 0.1*C_TFU;
+    }
+#endif
     k2 = -1.0*stop_target(workspace, incident, target, *E + (*h / 2) * k1);
     k3 = -1.0*stop_target(workspace, incident, target, *E + (*h / 2) * k2);
     k4 = -1.0*stop_target(workspace, incident, target, *E + (*h) * k3);
     stop = (k1 + 2 * k2 + 2 * k3 + k4)/6;
-    //stop = k1;
+    stop = k1;
     dE = (*h)*stop; /* Energy change in thickness "h" */
-    //fprintf(stderr, "stop = %g eV/tfu, E = %g keV, h = %6.3lf  dE = %g keV\n", stop/C_EV_TFU, *E/C_KEV, *h/C_TFU, dE/C_KEV);
+    fprintf(stderr, "stop = %g eV/tfu, E = %g keV, h = %6.3lf  dE = %g keV\n", stop/C_EV_TFU, *E/C_KEV, *h/C_TFU, dE/C_KEV);
+#ifdef DEBUG
     if(fabs(stop) < 0.1*C_EV_TFU) {
-        fprintf(stderr, "Nott goood.\n");
+        fprintf(stderr, "Not good!\n");
         return 0.0;
     }
+#endif
     double s_ratio = stop_target(workspace, incident, target, *E+dE)/(k1); /* Ratio of stopping */
+#ifdef DEBUG
     if((s_ratio)*(s_ratio) < 0.9 || (s_ratio)*(s_ratio) > 1.1) {
         fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
     }
+#endif
     *S *= (s_ratio)*(s_ratio);
     *S += fabs(*h)*stragg_target(workspace, incident, target, (*E+dE/2)); /* Straggling, calculate at mid-energy */
     *E += dE;
@@ -276,7 +282,7 @@ void overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope
             fprintf(stderr, "Return due to low energy.\n");
             return;
         }
-        if(next_crossing - x < 30.0*C_TFU) {
+        if(next_crossing - x < 50.0*C_TFU) {
             h_max = next_crossing - x;
             fprintf(stderr, "Crossing approaching (#%i), enforcing maximum step of %g tfu\n", i_range, h_max/C_TFU);
             if(h_max < 1.0*C_TFU && i_range == crange->n-2) {
@@ -284,7 +290,7 @@ void overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope
                 return;
             }
         } else {
-            h_max = 30.0*C_TFU;
+            h_max = 50.0*C_TFU;
         }
         if(h_max < 0.001*C_TFU) {
             x += 0.001*C_TFU;
@@ -340,7 +346,7 @@ void overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope
                 double Q = c * p_sr * sigma * h; /* TODO: worst possible approximation... */
 
 
-#ifdef DEBUG
+#if 1
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf, sigma = %g mb/sr, Q = %g\n", isotope->name, E_back * it->K/C_KEV, E_out/C_KEV, sigma/C_MB_SR, Q);
 #endif
                 assert(sigma > 0.0);
