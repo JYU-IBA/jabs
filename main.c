@@ -36,10 +36,11 @@ typedef struct {
     const jibal_isotope *isotope;
     double E;
     double K; /* TODO: this should be part of a "reaction" and not the "isotope" */
-    double c; /* accelerator of concentration */
+    double c; /* accelerator of concentration, value assigned by recalculate_concs() and used by stopping related things etc */
     double step;
     gsl_histogram *h;
     double *conc; /* concentration values corresponding to ranges given in an associated (shared!) conc_range */
+    double max_depth;
     conc_range *r;
 } sim_isotope;
 
@@ -316,8 +317,10 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
 #endif
         int i_isotope;
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
-            recalculate_concs(target, x);
             sim_isotope *it = &target[i_isotope];
+            if( x > it->max_depth)
+                continue;
+            recalculate_concs(target, x);
             double c = it->c;
             double S_out = S_back * it->K;
             double E_out = E_back * it->K;
@@ -457,6 +460,7 @@ int main(int argc, char **argv) {
                 it->conc = calloc(crange->n, sizeof (double));
                 it->conc[2*i] = element->concs[k] * layer->material->concs[j];
                 it->conc[2*i+1] = element->concs[k] * layer->material->concs[j];
+                it->max_depth = crange->ranges[2*i+1];
                 it->h = gsl_histogram_calloc_uniform(histogram_channels, 0*C_KEV, HISTOGRAM_BIN*histogram_channels);
                 it->r = crange;
                 it->E = 0.0;
