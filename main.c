@@ -13,11 +13,12 @@
 #define ALPHA (0.0*C_DEG)
 #define BETA (10.0*C_DEG)
 #define THETA (170.0*C_DEG)
-#define DETECTOR_RESOLUTION (5.0*C_KEV/C_FWHM)
+#define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
 
 #define E_MIN (100.0*C_KEV)
 #define N_LAYERS_MAX 100
-#define HISTOGRAM_CHANNELS 4000
+#define HISTOGRAM_CHANNELS 1500
+#define HISTOGRAM_BIN (2.0*C_KEV)
 
 typedef struct {
     size_t n;
@@ -125,17 +126,19 @@ void brick_int(double sigma, double E_low, double E_high, gsl_histogram *h, doub
     int i;
     size_t lo;
     size_t hi;
-#ifdef OPTIMIZE_BRICK
+#ifndef OPTIMIZE_BRICK
     gsl_histogram_find(h, E_low, &lo);
-    gsl_histogram_find(h, E_low, &hi);
-    if(lo > 50)
-        lo -= 50;
+    gsl_histogram_find(h, E_high, &hi);
+    double foo = (E_high-E_low)/(HISTOGRAM_BIN);
+    int n = ceil(foo*5);
+    if(lo > n)
+        lo -= n;
     else
         lo = 0;
-    if(hi > h->n-50)
+    if(hi > h->n-n)
         hi = h->n;
     else
-        hi += 50;
+        hi += n;
 #else
     lo = 0;
     hi = h->n;
@@ -155,8 +158,8 @@ double stop_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_iso
     double S1 = 0.0;
     for(i_isotope = 0; target[i_isotope].isotope != NULL; i_isotope++) {
         sim_isotope *it = &target[i_isotope];
-       // if(it->c < 1e-6)
-       //     continue;
+        if(it->c < 1e-6)
+             continue;
         S1 += it->c * (
                 jibal_gsto_get_em(workspace, GSTO_STO_ELE, incident->Z, it->isotope->Z, em)
                 +jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, it->isotope->Z, it->isotope->mass)
@@ -170,7 +173,7 @@ double stop_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_iso
 
 double stragg_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double E) { /* Call recalculate_concs() before this */
     double em=E/incident->mass;
-    int i, i_isotope;
+    int i_isotope;
 
     double S2 = 0.0;
     for(i_isotope = 0; target[i_isotope].isotope != NULL; i_isotope++) {
@@ -219,7 +222,7 @@ double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
     stop = (k1 + 2 * k2 + 2 * k3 + k4)/6;
     stop = k1;
     dE = (*h)*stop; /* Energy change in thickness "h" */
-    fprintf(stderr, "stop = %g eV/tfu, E = %g keV, h = %6.3lf  dE = %g keV\n", stop/C_EV_TFU, *E/C_KEV, *h/C_TFU, dE/C_KEV);
+    //fprintf(stderr, "stop = %g eV/tfu, E = %g keV, h = %6.3lf  dE = %g keV\n", stop/C_EV_TFU, *E/C_KEV, *h/C_TFU, dE/C_KEV);
 #ifdef DEBUG
     if(fabs(stop) < 0.1*C_EV_TFU) {
         fprintf(stderr, "Not good!\n");
@@ -292,15 +295,15 @@ void overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope
         } else {
             h_max = 50.0*C_TFU;
         }
-        if(h_max < 0.001*C_TFU) {
-            x += 0.001*C_TFU;
-            fprintf(stderr, "Step too small. Let's nudge forward!\n");
+        if(h_max < 0.0001*C_TFU) {
+            x += 0.0001*C_TFU;
+            fprintf(stderr, "Step too small. Let's nudge forward! x=%lf tfu\n", x/C_TFU);
             continue;
         }
 
         double E_front = E;
         recalculate_concs(target, x);
-        stop_step(workspace, incident, target, &h, h_max, &E, S, 3.0); /* TODO: maximum "jump" to next sharp transition? */
+        stop_step(workspace, incident, target, &h, h_max, &E, S, 10.0); /* TODO: maximum "jump" to next sharp transition? */
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
         double E_back = E;
@@ -332,10 +335,18 @@ void overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope
             double S_out = S_back * it->K;
             double E_out = E_back * it->K;
             double x_out;
+            int i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
                 //fprintf(stderr, "Surfacing... x_out = %g tfu... ", x_out/C_TFU);
                 recalculate_concs(target, x_out-0.00001*C_TFU); /* TODO: x_out may be close to an area where concentrations are zero, therefore no stopping... */
-                stop_step(workspace, incident, target, &(it->step), x_out, &E_out, &S_out, 1.0);
+                double remaining = x_out - crange->ranges[i_range_out];
+                if(remaining < 0.1*C_TFU) {
+                    x_out = crange->ranges[i_range_out];
+                    i_range_out--;
+                    continue;
+                } else {
+                    stop_step(workspace, incident, target, &(it->step), remaining, &E_out, &S_out, 10.0);
+                }
                 x_out -= it->step;
                 if(it->step == 0.0)
                     break;
@@ -346,7 +357,7 @@ void overlayer(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope
                 double Q = c * p_sr * sigma * h; /* TODO: worst possible approximation... */
 
 
-#if 1
+#if 0
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf, sigma = %g mb/sr, Q = %g\n", isotope->name, E_back * it->K/C_KEV, E_out/C_KEV, sigma/C_MB_SR, Q);
 #endif
                 assert(sigma > 0.0);
@@ -445,7 +456,7 @@ int main(int argc, char **argv) {
                 it->conc = calloc(crange->n, sizeof (double));
                 it->conc[2*i] = element->concs[k] * layer->material->concs[j];
                 it->conc[2*i+1] = element->concs[k] * layer->material->concs[j];
-                it->h = gsl_histogram_calloc_uniform(HISTOGRAM_CHANNELS, 0*C_KEV, 4000*C_KEV);
+                it->h = gsl_histogram_calloc_uniform(HISTOGRAM_CHANNELS, 0*C_KEV, HISTOGRAM_BIN*HISTOGRAM_CHANNELS);
                 it->r = crange;
                 it->E = 0.0;
                 //fprintf(stderr, "i: %i, j: %i, k: %i, i_isotope: %i, name: %s\n", i, j, k, i_isotope, it->isotope->name);
