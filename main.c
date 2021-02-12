@@ -15,8 +15,9 @@
 #define BETA (10.0*C_DEG)
 #define THETA (170.0*C_DEG)
 #define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
+#define PARTICLES_SR (1.0e12)
 
-#define E_MIN (150.0*C_KEV)
+#define E_MIN (100.0*C_KEV)
 #define N_LAYERS_MAX 100
 #define HISTOGRAM_BIN (1.0*C_KEV)
 #define STOP_STEP_INCIDENT (5.0*C_KEV)
@@ -38,11 +39,39 @@ typedef struct {
     double K; /* TODO: this should be part of a "reaction" and not the "isotope" */
     double c; /* accelerator of concentration, value assigned by recalculate_concs() and used by stopping related things etc */
     double step;
-    gsl_histogram *h;
+    gsl_histogram *h; /* energy histogram */
     double *conc; /* concentration values corresponding to ranges given in an associated (shared!) conc_range */
     double max_depth;
     conc_range *r;
 } sim_isotope;
+
+typedef struct {
+    const jibal_isotope *isotope;
+    double E;
+    double mass;
+    int Z;
+    double angle; /* Traversing matter "straight on" when angle = 0, getting stuck sideways if angle = 90.0*C_DEG */
+    double inverse_cosine; /* Inverse cosine of angle. Traversing matter "straight on" means 1.0 and going sidewways approaches infinity. */
+} sim_ion;
+
+typedef struct {
+    int n_isotopes;
+    sim_isotope *its;
+    conc_range crange;
+} sample;
+
+typedef struct {
+    int n_channels;
+    double histogram_bin;
+    const jibal_isotope *incident;
+    double E;
+    double p_sr;
+    double p_sr_cos_alpha; /* particles * sr / cos(alpha) */
+    double alpha;
+    double beta;
+    double theta;
+} simulation;
+
 
 
 double get_conc(double x, const sim_isotope *it) {
@@ -74,11 +103,10 @@ double get_conc(double x, const sim_isotope *it) {
     return it->conc[lo] + ((it->conc[lo+1] - it->conc[lo])/(r->ranges[lo+1] - r->ranges[lo])) * (x - r->ranges[lo]);
 }
 
-conc_range *conc_rance_alloc(size_t n) {
-    conc_range *r = malloc(sizeof(conc_range));
-    r->n = n;
-    r->ranges = calloc(n, sizeof(double ));
-    r->i = 0;
+conc_range conc_rance_alloc(size_t n) {
+    //conc_range *r = malloc(sizeof(conc_range));
+    conc_range r = {.n = n, .i = 0};
+    r.ranges = calloc(n, sizeof(double ));
     return r;
 }
 
@@ -101,8 +129,9 @@ inline double erfc(double x) {
     return exp(-1.0950081470333*x-0.75651138383854*x*x);
     /* Tsay, WJ., Huang, C.J., Fu, TT. et al. J Prod Anal 39, 259–269 (2013). https://doi.org/10.1007/s11123-012-0283-1 */
 }
+inline double erf_Q(double x);
 
-inline double erf_Q(double x) {
+double erf_Q(double x) {
     return x < 0.0 ? 1.0-0.5*erfc(-1.0*x/sqrt(2.0)) : 0.5*erfc(x/sqrt(2.0));
 }
 
@@ -172,12 +201,10 @@ double stop_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_iso
              continue;
         S1 += it->c * (
                 jibal_gsto_get_em(workspace, GSTO_STO_ELE, incident->Z, it->isotope->Z, em)
-                //+jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, it->isotope->Z, it->isotope->mass)
+                +jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, it->isotope->Z, it->isotope->mass)
                 );
     }
-#ifdef DEBUG
     assert(S1 > 0.0);
-#endif
     return S1;
 }
 
@@ -230,7 +257,7 @@ double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
     k3 = -1.0*stop_target(workspace, incident, target, *E + (*h / 2) * k2);
     k4 = -1.0*stop_target(workspace, incident, target, *E + (*h) * k3);
     stop = (k1 + 2 * k2 + 2 * k3 + k4)/6;
-    stop = k1;
+    //stop = k1;
     dE = (*h)*stop; /* Energy change in thickness "h" */
     //fprintf(stderr, "stop = %g eV/tfu, E = %g keV, h = %6.3lf  dE = %g keV\n", stop/C_EV_TFU, *E/C_KEV, *h/C_TFU, dE/C_KEV);
 #ifdef DEBUG
@@ -252,16 +279,18 @@ double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
     return dE; /* TODO: return something useful */
 }
 
-void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double p_sr, double E_0, double *S, conc_range *crange) {
-    double E = E_0;
-    double E_prev = E;
-    double dE;
+void rbs(jibal_gsto *workspace, simulation *sim, sample *sample, sim_ion *ion) {
+    double E = sim->E;
+    double S=0.0;
     double x;
     double h = workspace->stop_step;
-    int n_isotopes;
-    for(n_isotopes = 0; target[n_isotopes].isotope != NULL; n_isotopes++) {
-        sim_isotope *it = &target[n_isotopes];
-        it->K = jibal_kin_rbs(incident->mass, it->isotope->mass, THETA, '+'); /* TODO: this is too hard coded for RBS right now */
+    conc_range *crange = &sample->crange;
+    sim_isotope *its = sample->its;
+    int i_isotope;
+    int n_isotopes = sample->n_isotopes;
+    for(i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
+        sim_isotope *it = &its[i_isotope];
+        it->K = jibal_kin_rbs(ion->mass, it->isotope->mass, sim->theta, '+'); /* TODO: this is too hard coded for RBS right now */
         it->E = E * it->K;
         it->step = h;
     };
@@ -270,7 +299,7 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
     double h_max;
     int i_range = 0;
 #ifdef DEBUG
-    fprintf(stderr, "Thickness %g tfu, stop step %g tfu, E_0 = %g MeV\n", thickness/C_TFU, h/C_TFU, E_0/C_MEV);
+    fprintf(stderr, "Thickness %g tfu, stop step %g tfu, E = %g MeV\n", thickness/C_TFU, h/C_TFU, E/C_MEV);
 #endif
     for (x = 0.0; x <= thickness;) {
 #if 1
@@ -300,8 +329,8 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
         }
 
         double E_front = E;
-        recalculate_concs(target, x);
-        stop_step(workspace, incident, target, &h, h_max, &E, S, STOP_STEP_INCIDENT);
+        recalculate_concs(its, x);
+        stop_step(workspace, ion->isotope, its, &h, h_max, &E, &S, STOP_STEP_INCIDENT);
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
         double E_back = E;
@@ -309,18 +338,17 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
 #if 0
         fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3lf keV to  %8.3lf keV (diff %6.4lf keV)\n", x/C_TFU, (x+h)/C_TFU, E_front/C_KEV, E/C_KEV, E_diff/C_KEV);
 #endif
-        double S_back = *S;
+        double S_back = S;
         double E_mean = (E_front+E_back)/2.0;
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
-                        E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(*S) / C_KEV);
+                        E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(S) / C_KEV);
 #endif
-        int i_isotope;
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
-            sim_isotope *it = &target[i_isotope];
+            sim_isotope *it = &its[i_isotope];
             if( x > it->max_depth)
                 continue;
-            recalculate_concs(target, x);
+            recalculate_concs(its, x);
             double c = it->c;
             double S_out = S_back * it->K;
             double E_out = E_back * it->K;
@@ -328,14 +356,14 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
             int i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
                 //fprintf(stderr, "Surfacing... x_out = %g tfu... ", x_out/C_TFU);
-                recalculate_concs(target, x_out-0.00001*C_TFU); /* TODO: x_out may be close to an area where concentrations are zero, therefore no stopping... */
+                recalculate_concs(its, x_out-0.00001*C_TFU); /* TODO: x_out may be close to an area where concentrations are zero, therefore no stopping... */
                 double remaining = x_out - crange->ranges[i_range_out];
                 if(remaining < 0.1*C_TFU) {
                     x_out = crange->ranges[i_range_out];
                     i_range_out--;
                     continue;
                 } else {
-                    stop_step(workspace, incident, target, &(it->step), remaining, &E_out, &S_out, STOP_STEP_EXITING);
+                    stop_step(workspace, ion->isotope, its, &(it->step), remaining, &E_out, &S_out, STOP_STEP_EXITING);
                 }
                 x_out -= it->step;
                 if(it->step == 0.0)
@@ -345,9 +373,9 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
             }
             if(c > CONCENTRATION_CUTOFF && E_out > E_MIN) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 const jibal_isotope *isotope = it->isotope;
-                double sigma = jibal_cross_section_rbs(incident, isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
-                double Q = c * p_sr * sigma * h; /* TODO: worst possible approximation... */
-#if 0
+                double sigma = jibal_cross_section_rbs(ion->isotope, isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
+                double Q = c * sim->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
+#ifdef DEBUG
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf, sigma = %g mb/sr, Q = %g\n", isotope->name, E_back * it->K/C_KEV, E_out/C_KEV, sigma/C_MB_SR, Q);
 #endif
                 assert(sigma > 0.0);
@@ -366,68 +394,42 @@ void rbs(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *targ
             return;
         }
         x += h;
-        *S = S_back;
+        S = S_back;
         E = E_back;
     }
 }
 
-int main(int argc, char **argv) {
-    clock_t start, end;
-    double cpu_time_used;
-#if 0
-    erf_Q_test();
-    return 0;
-#endif
-    jibal *jibal = jibal_init(NULL);
-    if(jibal->error) {
-        fprintf(stderr, "Initializing JIBAL failed with error code %i (%s)\n", jibal->error, jibal_error_string(jibal->error));
-        return 1;
-    }
-    if(argc < 5) {
-        fprintf(stderr, "Not enough arguments! Usage: %s: isotope energy material thickness material2 thickness2\n", argv[0]);
-        return 1;
-    }
-    const jibal_isotope *incident = jibal_isotope_find(jibal->isotopes, argv[1], 0, 0);
-    if(incident) {
-#ifdef DEBUG
-        fprintf(stderr, "Mass %.3lf u\n", incident->mass/C_U);
-#endif
-    } else {
-        fprintf(stderr, "No isotope %s found.\n", argv[1]);
-    }
-    double E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, argv[2]);
-#ifdef DEBUG
-    fprintf(stderr, "Beam E = %g MeV\n", E/C_MEV);
-#endif
-    if (E > 1000.0*C_MEV || E < 10*C_KEV) {
-        fprintf(stderr, "Hmm...? Check your numbers.\n");
-        return -1;
-    }
-    argc -= 3;
-    argv += 3;
+jibal_layer **read_layers(jibal *jibal, int argc, char **argv, int *n_layers) {
     jibal_layer **layers = calloc(N_LAYERS_MAX, sizeof(jibal_layer *));
-    int n_layers=0;
-    while (argc >= 2 && n_layers < N_LAYERS_MAX) {
+    *n_layers=0;
+    while (argc >= 2 && *n_layers < N_LAYERS_MAX) {
         jibal_layer *layer = jibal_layer_new(jibal_material_create(jibal->elements, argv[0]),
                                              jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]));
         if (!layer) {
-            fprintf(stderr, "NO LAYER %s!\n", argv[0]);
-            return (EXIT_FAILURE);
+            fprintf(stderr, "Not a valid layer: %s!\n", argv[0]);
+            free(layers);
+            return NULL;
         }
-        if (!jibal_gsto_auto_assign_material(jibal->gsto, incident, layer->material)) {
-            fprintf(stderr, "Couldn't assign stopping.\n");
-            return (EXIT_FAILURE);
-        }
-        layers[n_layers] = layer;
+
+        layers[*n_layers] = layer;
         argc -= 2;
         argv += 2;
-        n_layers++;
+        (*n_layers)++;
     }
-    int i,j,k;
-    conc_range *crange = conc_rance_alloc(2*n_layers);
+    return layers;
+}
+sample sample_from_layers(jibal *jibal, simulation *sim, jibal_layer **layers, int n_layers) {
+        sample s = {.n_isotopes = 0, .its = NULL};
+        int i, j, k;
+    s.crange = conc_rance_alloc(2*n_layers);
+    conc_range *crange = &s.crange;
     int i_isotope, n_isotopes=0;
     for(i = 0; i < n_layers; i++) {
         jibal_layer *layer = layers[i];
+        if(!jibal_gsto_auto_assign_material(jibal->gsto, sim->incident, layer->material)) {
+            fprintf(stderr, "Couldn't assign stopping.\n");
+            return s;
+        }
 #ifdef DEBUG
         fprintf(stderr, "Layer %i/%i. Thickness %g tfu\n", i+1, n_layers, layer->thickness/C_TFU);
         jibal_material_print(stderr, layer->material);
@@ -444,31 +446,97 @@ int main(int argc, char **argv) {
     }
     fprintf(stderr, "Total %i isotopes (each isotope in each layer treated differently...)\n", n_isotopes);
 #endif
-
-    sim_isotope *its = calloc(n_isotopes+1, sizeof(sim_isotope));
+    sim_isotope *its = calloc(n_isotopes + 1, sizeof(sim_isotope));
     its[n_isotopes].isotope = NULL; /* Last isotope of isotopes is NULL. For-loops without knowledge of n_isotopes are possible. */
-    i_isotope=0;
-    int histogram_channels = ceil(1.1*E/HISTOGRAM_BIN);
-    for(i = 0; i < n_layers; i++) {
+    i_isotope = 0;
+    for (i = 0; i < n_layers; i++) {
         jibal_layer *layer = layers[i];
         for (j = 0; j < layer->material->n_elements; ++j) {
             jibal_element *element = &layer->material->elements[j];
-            for(k = 0; k < element->n_isotopes; k++) {
+            for (k = 0; k < element->n_isotopes; k++) {
                 assert(i_isotope < n_isotopes);
                 sim_isotope *it = &its[i_isotope];
                 it->isotope = element->isotopes[k];
-                it->conc = calloc(crange->n, sizeof (double));
-                it->conc[2*i] = element->concs[k] * layer->material->concs[j];
-                it->conc[2*i+1] = element->concs[k] * layer->material->concs[j];
-                it->max_depth = crange->ranges[2*i+1];
-                it->h = gsl_histogram_calloc_uniform(histogram_channels, 0*C_KEV, HISTOGRAM_BIN*histogram_channels);
+                it->conc = calloc(crange->n, sizeof(double));
+                it->conc[2 * i] = element->concs[k] * layer->material->concs[j];
+                it->conc[2 * i + 1] = element->concs[k] * layer->material->concs[j];
+                it->max_depth = crange->ranges[2 * i + 1];
+                it->h = gsl_histogram_calloc_uniform(sim->n_channels, 0 * C_KEV, sim->histogram_bin * sim->n_channels);
                 it->r = crange;
                 it->E = 0.0;
-                //fprintf(stderr, "i: %i, j: %i, k: %i, i_isotope: %i, name: %s\n", i, j, k, i_isotope, it->isotope->name);
                 i_isotope++;
             }
         }
     }
+    s.its = its;
+    s.n_isotopes = n_isotopes;
+    return s;
+}
+
+
+
+int main(int argc, char **argv) {
+    simulation sim;
+        int i,j,k;
+    clock_t start, end;
+    double cpu_time_used;
+#if 0
+    erf_Q_test();
+    return 0;
+#endif
+    jibal *jibal = jibal_init(NULL);
+    if(jibal->error) {
+        fprintf(stderr, "Initializing JIBAL failed with error code %i (%s)\n", jibal->error, jibal_error_string(jibal->error));
+        return 1;
+    }
+    if(argc < 5) {
+        fprintf(stderr, "Not enough arguments! Usage: %s: isotope energy file material thickness material2 thickness2...\n", argv[0]);
+        return 1;
+    }
+    sim.incident = jibal_isotope_find(jibal->isotopes, argv[1], 0, 0);
+    if(sim.incident) {
+#ifdef DEBUG
+        fprintf(stderr, "Mass %.3lf u\n", sim.incident->mass/C_U);
+#endif
+    } else {
+        fprintf(stderr, "No isotope %s found.\n", argv[1]);
+    }
+    sim.E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, argv[2]);
+#ifdef DEBUG
+    fprintf(stderr, "Beam E = %g MeV\n", sim.E/C_MEV);
+#endif
+    if (sim.E > 1000.0*C_MEV || sim.E < 10*C_KEV) {
+        fprintf(stderr, "Hmm...? Check your numbers.\n");
+        return -1;
+    }
+    sim.histogram_bin = HISTOGRAM_BIN;
+    sim.n_channels= ceil(1.1 * sim.E / sim.histogram_bin);
+    sim.p_sr = PARTICLES_SR; /* TODO: particles * sr / cos(alpha) */
+    sim.alpha = ALPHA;
+    sim.beta = BETA;
+    sim.theta = THETA;
+    sim.p_sr_cos_alpha = sim.p_sr / cos(sim.alpha);
+    const char *filename = argv[3];
+    FILE *f = fopen(filename, "w");
+    if(!f) {
+        fprintf(stderr, "Can't open file \"%s\" for output.\n", filename);
+        return EXIT_FAILURE;
+    }
+    argc -= 4;
+    argv += 4;
+
+    int n_layers = 0;
+    jibal_layer **layers = read_layers(jibal, argc, argv, &n_layers);
+    if(!layers)
+        return EXIT_FAILURE;
+
+    sample sample = sample_from_layers(jibal, &sim, layers, n_layers);
+    if(sample.n_isotopes == 0)
+        return EXIT_FAILURE;
+    int i_isotope;
+    int n_isotopes = sample.n_isotopes;
+    conc_range *crange = &sample.crange;
+    sim_isotope *its = sample.its;
     fprintf(stderr, "DEPTH(tfu) ");
     for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
         fprintf(stderr, "%8s ", its[i_isotope].isotope->name);
@@ -500,27 +568,33 @@ int main(int argc, char **argv) {
 
     start = clock();
     for (int n = 0; n < NUMBER_OF_SIMULATIONS; n++) {
-        double S = 0.0;
-        double p_sr = 1.0e12; /* TODO: particles * sr / cos(alpha) */
-        rbs(jibal->gsto, incident, its, p_sr, E, &S, crange);
+        sim_ion ion;
+        ion.E = sim.E;
+        ion.isotope = sim.incident;
+        ion.angle = 0.0;
+        ion.inverse_cosine = 1.0; /* TODO: calc these */
+        ion.mass = ion.isotope->mass;
+        ion.Z = ion.isotope->Z;
+        rbs(jibal->gsto, &sim, &sample, &ion);
     }
     end = clock();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    for(i = 0; i < histogram_channels; i++) {
+    for(i = 0; i < sim.n_channels; i++) {
         double sum = 0.0;
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
             sim_isotope *it = &its[i_isotope];
             sum += it->h->bin[i];
         }
-        fprintf(stdout, "%4i %e", i, sum);
+        fprintf(f, "%4i %e", i, sum);
         for(i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
             sim_isotope *it = &its[i_isotope];
-            fprintf(stdout, " %e", it->h->bin[i]);
+            fprintf(f, " %e", it->h->bin[i]);
 
         }
-        fprintf(stdout, "\n");
+        fprintf(f, "\n");
     }
     fprintf(stderr, "CPU time: %g ms per spectrum, for actual simulation of %i spectra.\n", cpu_time_used*1000.0/NUMBER_OF_SIMULATIONS, NUMBER_OF_SIMULATIONS);
+    fclose(f);
     for(i = 0; i < n_layers; i++) {
         jibal_layer_free(layers[i]);
     }
@@ -533,6 +607,5 @@ int main(int argc, char **argv) {
     }
     free(its);
     free(crange->ranges);
-    free(crange);
     return 0;
 }
