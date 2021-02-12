@@ -12,20 +12,20 @@
 #include <gsl/gsl_histogram.h>
 
 #define ALPHA (0.0*C_DEG)
-#define BETA (10.0*C_DEG)
-#define THETA (170.0*C_DEG)
+#define BETA (20.0*C_DEG)
+#define THETA (160.0*C_DEG)
 #define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
 #define PARTICLES_SR (1.0e12)
 
 #define E_MIN (100.0*C_KEV)
 #define N_LAYERS_MAX 100
-#define HISTOGRAM_BIN (1.0*C_KEV)
+#define HISTOGRAM_BIN (2.0*C_KEV)
 #define STOP_STEP_INCIDENT (5.0*C_KEV)
-#define STOP_STEP_EXITING (5.0*C_KEV)
+#define STOP_STEP_EXITING (25.0*C_KEV)
 
 #define CONCENTRATION_CUTOFF 1e-8
 
-#define NUMBER_OF_SIMULATIONS 1
+#define NUMBER_OF_SIMULATIONS 100
 
 typedef struct {
     size_t n;
@@ -35,10 +35,9 @@ typedef struct {
 
 typedef struct {
     const jibal_isotope *isotope;
-    double E;
+    double E; /* TODO: this should be part of a "reaction" and not the "isotope" */
     double K; /* TODO: this should be part of a "reaction" and not the "isotope" */
     double c; /* accelerator of concentration, value assigned by recalculate_concs() and used by stopping related things etc */
-    double step;
     gsl_histogram *h; /* energy histogram */
     double *conc; /* concentration values corresponding to ranges given in an associated (shared!) conc_range */
     double max_depth;
@@ -48,10 +47,12 @@ typedef struct {
 typedef struct {
     const jibal_isotope *isotope;
     double E;
+    double S;
     double mass;
     int Z;
     double angle; /* Traversing matter "straight on" when angle = 0, getting stuck sideways if angle = 90.0*C_DEG */
-    double inverse_cosine; /* Inverse cosine of angle. Traversing matter "straight on" means 1.0 and going sidewways approaches infinity. */
+    double cosine;
+    double inverse_cosine; /* Inverse cosine of angle. Traversing matter "straight on" means 1.0 and going sideways approaches infinity. */
 } sim_ion;
 
 typedef struct {
@@ -73,6 +74,17 @@ typedef struct {
 } simulation;
 
 
+void ion_set_isotope(sim_ion *ion, const jibal_isotope *isotope) {
+    ion->isotope = isotope;
+    ion->mass = isotope->mass;
+    ion->Z = isotope->Z;
+}
+
+void ion_set_angle(sim_ion *ion, double angle) {
+    ion->angle = angle;
+    ion->cosine = cos(angle);
+    ion->inverse_cosine = 1.0/ion->cosine;
+}
 
 double get_conc(double x, const sim_isotope *it) {
     int lo, mi, hi;
@@ -190,9 +202,9 @@ void brick_int(double sigma, double E_low, double E_high, gsl_histogram *h, doub
     }
 }
 
-double stop_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double E) { /* Call recalculate_concs() before this */
+double stop_target(jibal_gsto *workspace, const sim_ion *incident, sim_isotope *target, double E) { /* Call recalculate_concs() before this */
     double em=E/incident->mass;
-    int i, i_isotope;
+    int i_isotope;
 
     double S1 = 0.0;
     for(i_isotope = 0; target[i_isotope].isotope != NULL; i_isotope++) {
@@ -208,7 +220,7 @@ double stop_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_iso
     return S1;
 }
 
-double stragg_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double E) { /* Call recalculate_concs() before this */
+double stragg_target(jibal_gsto *workspace, const sim_ion *incident, sim_isotope *target, double E) { /* Call recalculate_concs() before this */
     double em=E/incident->mass;
     int i_isotope;
 
@@ -219,7 +231,7 @@ double stragg_target(jibal_gsto *workspace, const jibal_isotope *incident, sim_i
             continue;
         S2 +=  it->c*jibal_gsto_get_em(workspace, GSTO_STO_STRAGG, incident->Z, it->isotope->Z, em);
     }
-    return S2;
+    return S2/incident->inverse_cosine;
 }
 
 void recalculate_concs(sim_isotope *its, double x) {
@@ -238,13 +250,15 @@ void recalculate_concs(sim_isotope *its, double x) {
 #endif
 }
 
-double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isotope *target, double *h, double h_max, double *E, double *S, double step) {
-    double k1, k2, k3, k4, stop, dE;
-    k1 = -1.0*stop_target(workspace, incident, target, *E);
+double stop_step(jibal_gsto *workspace, sim_ion *incident, sim_isotope *target, double h_max, double step, double *h) {
+    double k1, k2, k3, k4, stop, dE, E;
+    E = incident->E;
+    k1 = -1.0*stop_target(workspace, incident, target, E);
     if(k1 > -0.01*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
         *h = 0.0;
         return 0.0;
     }
+    h_max *= incident->inverse_cosine; /* See the end of this function */
     *h = (-1.0*step / k1); /* we try to aim for some energy loss */
     if(*h > h_max)
         *h = h_max; /* but we have some other limitations too */
@@ -253,9 +267,9 @@ double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
         *h = 0.1*C_TFU;
     }
 #endif
-    k2 = -1.0*stop_target(workspace, incident, target, *E + (*h / 2) * k1);
-    k3 = -1.0*stop_target(workspace, incident, target, *E + (*h / 2) * k2);
-    k4 = -1.0*stop_target(workspace, incident, target, *E + (*h) * k3);
+    k2 = -1.0*stop_target(workspace, incident, target, E + (*h / 2) * k1);
+    k3 = -1.0*stop_target(workspace, incident, target, E + (*h / 2) * k2);
+    k4 = -1.0*stop_target(workspace, incident, target, E + (*h) * k3);
     stop = (k1 + 2 * k2 + 2 * k3 + k4)/6;
     //stop = k1;
     dE = (*h)*stop; /* Energy change in thickness "h" */
@@ -266,22 +280,22 @@ double stop_step(jibal_gsto *workspace, const jibal_isotope *incident, sim_isoto
         return 0.0;
     }
 #endif
-    double s_ratio = stop_target(workspace, incident, target, *E+dE)/(k1); /* Ratio of stopping */
+    double s_ratio = stop_target(workspace, incident, target, E+dE)/(k1); /* Ratio of stopping */
 #ifdef DEBUG
     if((s_ratio)*(s_ratio) < 0.9 || (s_ratio)*(s_ratio) > 1.1) {
         fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
     }
 #endif
-    *S *= (s_ratio)*(s_ratio);
-    *S += fabs(*h)*stragg_target(workspace, incident, target, (*E+dE/2)); /* Straggling, calculate at mid-energy */
-    *E += dE;
-    assert(isnormal(*S));
+    incident->S *= (s_ratio)*(s_ratio);
+    incident->S += fabs(*h)*stragg_target(workspace, incident, target, (E+dE/2)); /* Straggling, calculate at mid-energy */
+    E += dE;
+    incident->E = E;
+    assert(isnormal(incident->S));
+    *h *=  incident->cosine; /* Scaling factor. Stopping is calculated in material the usual way, but we only report progress perpendicular to the (flat)sample. If incident->angle is 45 deg, cosine is 0.7-ish. h_max is given in unscaled units and was scaled earlier in this function. */
     return dE; /* TODO: return something useful */
 }
 
 void rbs(jibal_gsto *workspace, simulation *sim, sample *sample, sim_ion *ion) {
-    double E = sim->E;
-    double S=0.0;
     double x;
     double h = workspace->stop_step;
     conc_range *crange = &sample->crange;
@@ -291,18 +305,16 @@ void rbs(jibal_gsto *workspace, simulation *sim, sample *sample, sim_ion *ion) {
     for(i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
         sim_isotope *it = &its[i_isotope];
         it->K = jibal_kin_rbs(ion->mass, it->isotope->mass, sim->theta, '+'); /* TODO: this is too hard coded for RBS right now */
-        it->E = E * it->K;
-        it->step = h;
+        it->E = ion->E * it->K;
     };
     double thickness = crange->ranges[crange->n-1];
     double next_crossing = crange->ranges[1];
     double h_max;
     int i_range = 0;
 #ifdef DEBUG
-    fprintf(stderr, "Thickness %g tfu, stop step %g tfu, E = %g MeV\n", thickness/C_TFU, h/C_TFU, E/C_MEV);
+    fprintf(stderr, "Thickness %g tfu, stop step %g tfu, E = %g MeV\n", thickness/C_TFU, h/C_TFU, ion->E/C_MEV);
 #endif
     for (x = 0.0; x <= thickness;) {
-#if 1
         while (x >= crange->ranges[i_range+1]) {
             i_range++;
             if (i_range >= crange->n-1) {
@@ -316,8 +328,7 @@ void rbs(jibal_gsto *workspace, simulation *sim, sample *sample, sim_ion *ion) {
 #endif
             next_crossing = crange->ranges[i_range+1];
         }
-#endif
-        if(E < E_MIN) {
+        if(ion->E < E_MIN) {
             fprintf(stderr, "Return due to low energy.\n");
             return;
         }
@@ -328,31 +339,34 @@ void rbs(jibal_gsto *workspace, simulation *sim, sample *sample, sim_ion *ion) {
             continue;
         }
 
-        double E_front = E;
+        double E_front = ion->E;
         recalculate_concs(its, x);
-        stop_step(workspace, ion->isotope, its, &h, h_max, &E, &S, STOP_STEP_INCIDENT);
+        stop_step(workspace, ion, its, h_max, STOP_STEP_INCIDENT, &h);
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
-        double E_back = E;
+        double E_back = ion->E;
+#ifdef DEBUG
         double E_diff = E_front-E_back;
-#if 0
-        fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3lf keV to  %8.3lf keV (diff %6.4lf keV)\n", x/C_TFU, (x+h)/C_TFU, E_front/C_KEV, E/C_KEV, E_diff/C_KEV);
+        fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3lf keV to  %8.3lf keV (diff %6.4lf keV)\n", x/C_TFU, (x+h)/C_TFU, E_front/C_KEV, ion->E/C_KEV, E_diff/C_KEV);
 #endif
-        double S_back = S;
+        double S_back = ion->S;
         double E_mean = (E_front+E_back)/2.0;
-#ifdef DEBUG_VERBOSE
+#ifdef DEBUG
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
-                        E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(S) / C_KEV);
+                        E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ion->S) / C_KEV);
 #endif
         for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
             sim_isotope *it = &its[i_isotope];
-            if( x > it->max_depth)
+            sim_ion p;
+            ion_set_isotope(&p, ion->isotope); /* TODO: for RBS, yes... */
+            ion_set_angle(&p, sim->beta);
+            p.E = ion->E * it->K;
+            p.S = ion->S * it->K;
+            if(x > it->max_depth)
                 continue;
-            recalculate_concs(its, x);
-            double c = it->c;
-            double S_out = S_back * it->K;
-            double E_out = E_back * it->K;
+            double c = get_conc(x, it);
             double x_out;
+            double h_out;
             int i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
                 //fprintf(stderr, "Surfacing... x_out = %g tfu... ", x_out/C_TFU);
@@ -363,39 +377,39 @@ void rbs(jibal_gsto *workspace, simulation *sim, sample *sample, sim_ion *ion) {
                     i_range_out--;
                     continue;
                 } else {
-                    stop_step(workspace, ion->isotope, its, &(it->step), remaining, &E_out, &S_out, STOP_STEP_EXITING);
+                    stop_step(workspace, &p, its, remaining, STOP_STEP_EXITING, &h_out);
                 }
-                x_out -= it->step;
-                if(it->step == 0.0)
+                x_out -= h_out;
+                if(h_out == 0.0)
                     break;
-                if(E_out < E_MIN)
+                if(p.E < E_MIN)
                     break;
             }
-            if(c > CONCENTRATION_CUTOFF && E_out > E_MIN) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
+            if(c > CONCENTRATION_CUTOFF && p.E > E_MIN) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 const jibal_isotope *isotope = it->isotope;
                 double sigma = jibal_cross_section_rbs(ion->isotope, isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
                 double Q = c * sim->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
 #ifdef DEBUG
-                fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf, sigma = %g mb/sr, Q = %g\n", isotope->name, E_back * it->K/C_KEV, E_out/C_KEV, sigma/C_MB_SR, Q);
+                fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf, sigma = %g mb/sr, Q = %g\n", isotope->name, E_back * it->K/C_KEV, p.E/C_KEV, sigma/C_MB_SR, Q);
 #endif
                 assert(sigma > 0.0);
-                assert(S_out > 0.0);
+                assert(p.S > 0.0);
                 assert(Q < 1.0e7 || Q > 0.0);
-                brick_int(sqrt(S_out + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), E_out, it->E, it->h, Q);
+                brick_int(sqrt(p.S + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), p.E, it->E, it->h, Q);
             }
-            it->E = E_out;
+            it->E = p.E;
         }
 #if 0
         fprintf(stderr, "Surf: from x_out = %g tfu, gives E_out = %g MeV (prev was %g MeV, diff %g keV), stragg = %g keV\n", (x-h)/C_TFU, E_out/C_MEV, E_out_prev/C_MEV, (E_diff)/C_KEV, sqrt(S_out)/C_KEV);
         fprintf(stderr, "\n");
 #endif
-        if(!isnormal(E)) {
+        if(!isnormal(ion->E)) {
             fprintf(stderr, "SOMETHING DOESN'T LOOK RIGHT HERE.\n");
             return;
         }
         x += h;
-        S = S_back;
-        E = E_back;
+        ion->S = S_back;
+        ion->E = E_back;
     }
 }
 
@@ -511,11 +525,6 @@ int main(int argc, char **argv) {
     }
     sim.histogram_bin = HISTOGRAM_BIN;
     sim.n_channels= ceil(1.1 * sim.E / sim.histogram_bin);
-    sim.p_sr = PARTICLES_SR; /* TODO: particles * sr / cos(alpha) */
-    sim.alpha = ALPHA;
-    sim.beta = BETA;
-    sim.theta = THETA;
-    sim.p_sr_cos_alpha = sim.p_sr / cos(sim.alpha);
     const char *filename = argv[3];
     FILE *f = fopen(filename, "w");
     if(!f) {
@@ -568,13 +577,16 @@ int main(int argc, char **argv) {
 
     start = clock();
     for (int n = 0; n < NUMBER_OF_SIMULATIONS; n++) {
+        sim.alpha = ALPHA;
+        sim.beta = BETA;
+        sim.theta = THETA;
+        sim.p_sr = PARTICLES_SR; /* TODO: particles * sr / cos(alpha) */
+        sim.p_sr_cos_alpha = sim.p_sr / cos(sim.alpha);
         sim_ion ion;
         ion.E = sim.E;
-        ion.isotope = sim.incident;
-        ion.angle = 0.0;
-        ion.inverse_cosine = 1.0; /* TODO: calc these */
-        ion.mass = ion.isotope->mass;
-        ion.Z = ion.isotope->Z;
+        ion.S = 0.0;
+        ion_set_isotope(&ion, sim.incident);
+        ion_set_angle(&ion, ALPHA);
         rbs(jibal->gsto, &sim, &sample, &ion);
     }
     end = clock();
