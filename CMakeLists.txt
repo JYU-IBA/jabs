@@ -10,7 +10,7 @@ option(DEBUG_OUTPUT_ENABLE "Enable debug output" OFF)
 if(DEBUG_OUTPUT_ENABLE)
     add_compile_options(-DDEBUG)
 endif()
-add_executable(simu main.c)
+add_executable(simu main.c sample.c sample.h brick.c ion.c ion.h simulation.c simulation.h)
 target_link_libraries(simu Jibal)
 
 install(TARGETS simu RUNTIME DESTINATION bin)
