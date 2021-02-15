@@ -16,14 +16,14 @@
 #include "simulation.h"
 
 #define ALPHA (0.0*C_DEG)
-#define BETA (20.0*C_DEG)
-#define THETA (160.0*C_DEG)
+#define BETA (0.0*C_DEG)
+#define THETA (170*C_DEG)
 #define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
 #define PARTICLES_SR (1.0e12)
 
 #define E_MIN (100.0*C_KEV)
 #define N_LAYERS_MAX 100
-#define HISTOGRAM_BIN (2.0*C_KEV)
+#define HISTOGRAM_BIN (1.0*C_KEV)
 #define STOP_STEP_INCIDENT (5.0*C_KEV)
 #define STOP_STEP_EXITING (50.0*C_KEV)
 
@@ -247,9 +247,10 @@ void rbs(jibal_gsto *workspace, simulation *sim, sample *sample) {
                 assert(sigma > 0.0);
                 assert(r->p.S > 0.0);
                 assert(Q < 1.0e7 || Q > 0.0);
-                brick_int(sqrt(r->p.S + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), r->p.E, r->E, r->histo, Q);
+                brick_int(sqrt(r->p.S + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), sqrt(r->S + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), r->p.E, r->E, r->histo, Q);
             }
             r->E = r->p.E;
+            r->S = r->p.S;
         }
 #if 0
         fprintf(stderr, "Surf: from x_out = %g tfu, gives E_out = %g MeV (prev was %g MeV, diff %g keV), stragg = %g keV\n", (x-h)/C_TFU, E_out/C_MEV, E_out_prev/C_MEV, (E_diff)/C_KEV, sqrt(S_out)/C_KEV);
@@ -418,6 +419,7 @@ int main(int argc, char **argv) {
             reaction *r = &sim.reactions[j];
             r->p.E = sim.ion.E * r->K;
             r->E = r->p.E;
+            r->S = 0.0;
             r->p.S = 0.0;
             r->stop = 0;
         }

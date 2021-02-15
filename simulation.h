@@ -17,6 +17,7 @@ typedef struct {
     /* TODO: cross section to use? */
     /* TODO: cross sections from files */
     double E; /* Energy bin */
+    double S;
     int stop;
 } reaction;
 

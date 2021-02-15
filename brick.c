@@ -2,14 +2,13 @@
 #ifdef ERF_Q_FROM_GSL
 #include <gsl/gsl_sf.h>
 #endif
-
 #include "brick.h"
 
 inline double erfc(double x) {
     return exp(-1.0950081470333*x-0.75651138383854*x*x);
     /* Tsay, WJ., Huang, C.J., Fu, TT. et al. J Prod Anal 39, 259–269 (2013). https://doi.org/10.1007/s11123-012-0283-1 */
 }
-//inline double erf_Q(double x);
+extern inline double erf_Q(double x);
 
 inline double erf_Q(double x) {
     return x < 0.0 ? 1.0-0.5*erfc(-1.0*x/sqrt(2.0)) : 0.5*erfc(x/sqrt(2.0));
@@ -39,7 +38,7 @@ void erf_Q_test() {
     }
 }
 
-void brick_int(double sigma, double E_low, double E_high, gsl_histogram *h, double Q) { /* Energy spectrum h, integrate over rectangular brick convoluted with a gaussian */
+void brick_int(double sigma_low, double sigma_high, double E_low, double E_high, gsl_histogram *h, double Q) { /* Energy spectrum h, integrate over rectangular brick convoluted with a gaussian */
     int i;
 #ifndef OPTIMIZE_BRICK
     size_t lo;
@@ -68,11 +67,16 @@ void brick_int(double sigma, double E_low, double E_high, gsl_histogram *h, doub
         for(i = 0; i < h->n; i++) {
 #endif
         double w = h->range[i+1] - h->range[i];
-        double E = (h->range[i] + h->range[i+1])/2.0; /* Approximate gaussian at center */
+        double E = (h->range[i] + h->range[i+1])/2.0; /* Approximate gaussian at center bin */
 #ifdef ERF_Q_FROM_GSL
         double y = (gsl_sf_erf_Q((E_low-E)/sigma)-gsl_sf_erf_Q((E_high-E)/sigma))/(E_high-E_low);
 #else
+#ifdef SIGMA_MEAN
+        double sigma = (sigma_low+sigma_high)/2.0;
         double y = (erf_Q((E_low-E)/sigma)-erf_Q((E_high-E)/sigma))/(E_high-E_low);
+#else
+        double y = (erf_Q((E_low-E)/sigma_low)-erf_Q((E_high-E)/sigma_high))/(E_high-E_low);
+#endif
 #endif
         h->bin[i] += y*w*Q;
     }
