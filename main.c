@@ -16,7 +16,7 @@
 #include "simulation.h"
 
 #define ALPHA (0.0*C_DEG)
-#define BETA (20.0*C_DEG)
+#define BETA (0.0*C_DEG)
 #define THETA (160.0*C_DEG)
 #define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
 #define PARTICLES_SR (1.0e12)
@@ -69,27 +69,33 @@ void recalculate_concs(sim_isotope *its, double x) {
 #endif
 
 double stop_step(jibal_gsto *workspace, ion *incident, sample *sample, double x, double h_max, double step) {
+    /* positive max depth step (h_max) also gives the direction. Energy step (step) should be negative if regular stopping is done. */
     double k1, k2, k3, k4, stop, dE, E;
+    /* k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
     E = incident->E;
-    k1 = -1.0*stop_sample(workspace, incident, sample, GSTO_STO_ELE, x, E);
-    if(k1 > -0.001*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
+    k1 = stop_sample(workspace, incident, sample, GSTO_STO_ELE, x, E);
+    if(k1 < 0.001*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
 #ifdef DEBUG
         fprintf(stderr, "stop_step returns 0.0, because k1 = %g eV/tfu\n", k1/C_EV_TFU);
 #endif
         return 0.0;
     }
     h_max *= incident->inverse_cosine; /* See the end of this function */
-    double h = (-1.0*step / k1); /* we try to aim for some energy loss */
-    if(h >= h_max)
-        h = h_max; /* but we have some other limitations too */
-    k2 = -1.0*stop_sample(workspace, incident, sample, GSTO_STO_ELE, x + (h / 2.0), E + (h / 2.0) * k1);
-    k3 = -1.0*stop_sample(workspace, incident, sample, GSTO_STO_ELE, x + (h / 2.0), E + (h / 2.0) * k2);
-    k4 = -1.0*stop_sample(workspace, incident, sample, GSTO_STO_ELE, x + h, E + h * k3);
+    double h = (step / k1); /* step should always be positive, as well as k1  */
+    if(h > fabs(h_max)) {
+        h = fabs(h_max);
+    }
+    double h_abs = h;
+    h = copysign(h, h_max); /* h is positive when going deeper, i.e. h + x is deeper than x . */
+
+    k2 = stop_sample(workspace, incident, sample, GSTO_STO_ELE, x + (h / 2.0), E - (h_abs / 2.0) * k1);
+    k3 = stop_sample(workspace, incident, sample, GSTO_STO_ELE, x + (h / 2.0), E - (h_abs / 2.0) * k2);
+    k4 = stop_sample(workspace, incident, sample, GSTO_STO_ELE, x + h, E - h_abs * k3);
     stop = (k1 + 2 * k2 + 2 * k3 + k4)/6;
     //stop = k1;
-    dE =  h * stop; /* Energy change in thickness "h" */
-    if(x >= 400.0*C_TFU && x <= 650.0*C_TFU && E >= 1.5*C_MEV)
-        fprintf(stderr, "%s stop = %g eV/tfu ( x = %g, h = %g), E = %g keV, h = %6.3lf  dE = %g keV\n", incident->isotope->name, stop/C_EV_TFU, x/C_TFU, h/C_TFU, E/C_KEV, h/C_TFU, dE/C_KEV);
+    dE =  -1.0*h_abs * stop; /* Energy change in thickness "h". It is always negative! */
+    if(x <= 400.0*C_TFU && x <= 650.0*C_TFU && E >= 1.5*C_MEV)
+        fprintf(stderr, "%s stop = %.3lf eV/tfu ( x = %.3lf, h = %.3lf, h_max = %.3lf), E = %.3lf keV, h = %6.3lf  dE = %.5lf keV\n", incident->isotope->name, stop/C_EV_TFU, x/C_TFU, h/C_TFU, h_max/C_TFU, E/C_KEV, h/C_TFU, dE/C_KEV);
 #ifdef DEBUG
     if(fabs(stop) < 0.1*C_EV_TFU) {
         fprintf(stderr, "Not good!\n");
@@ -106,12 +112,15 @@ double stop_step(jibal_gsto *workspace, ion *incident, sample *sample, double x,
     incident->S += fabs(h)*stop_sample(workspace, incident, sample, GSTO_STO_STRAGG, x + (h/2.0), (E+dE/2)); /* Straggling, calculate at mid-energy */
 
     assert(isnormal(incident->S));
+#if 0
     if(h >= 0.9999*h_max) {
         incident->E += dE/0.9999;
         h = h_max;
     } else {
         incident->E += dE;
     }
+#endif
+    incident->E += dE;
     h *=  incident->cosine; /* Scaling factor. Stopping is calculated in material the usual way, but we only report progress perpendicular to the (flat)sample. If incident->angle is 45 deg, cosine is 0.7-ish. h_max is given in unscaled units and was scaled earlier in this function. */
     return h;
 }
@@ -174,7 +183,6 @@ void rbs(jibal_gsto *workspace, simulation *sim, sample *sample) {
 #endif
         for (i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
             reaction *r = &reactions[i_reaction];
-            double E_prev = r->p.E;
             r->p.E = ion->E * r->K;
             r->p.S = ion->S * r->K;
             assert(r->p.E > 0.0);
@@ -188,34 +196,28 @@ void rbs(jibal_gsto *workspace, simulation *sim, sample *sample) {
             int i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
                 //fprintf(stderr, "Surfacing... x_out = %g tfu... ", x_out/C_TFU);
-                //recalculate_concs(its, x_out-0.00001*C_TFU); /* TODO: x_out may be close to an area where concentrations are zero, therefore no stopping... */
-                double remaining = x_out - sample->cranges[i_range_out];
-                if(remaining < 0.1*C_TFU) {
-                    x_out = sample->cranges[i_range_out];
+                //recalculate_concs(its, x_out-0.00001*C_TFU);
+                h_out = stop_step(workspace, &r->p, sample, x_out, sample->cranges[i_range_out] - x_out, STOP_STEP_EXITING);
+                x_out += h_out;
+                if(h_out >= 0.0 || r->p.E < E_MIN ||x_out <= 0.0)
+                    break;
+                while (x_out <= sample->cranges[i_range_out]) {
                     i_range_out--;
-                    continue;
-                } else {
-                    h_out = stop_step(workspace, &r->p, sample, x_out, remaining, STOP_STEP_EXITING);
                 }
-                x_out -= h_out;
-                if(h_out == 0.0)
-                    break;
-                if(r->p.E < E_MIN)
-                    break;
             }
             if(c > CONCENTRATION_CUTOFF && r->p.E > E_MIN) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 double sigma = jibal_cross_section_rbs(ion->isotope, r->isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
                 double Q = c * sim->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
 #ifdef DEBUG
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf (prev %.3lf, sigma = %g mb/sr, Q = %g (c = %.4lf%%)\n",
-                        r->isotope->name, E_back * r->K/C_KEV, r->p.E/C_KEV, E_prev/C_KEV, sigma/C_MB_SR, Q, c*100.0);
+                        r->isotope->name, E_back * r->K/C_KEV, r->p.E/C_KEV, r->E/C_KEV, sigma/C_MB_SR, Q, c*100.0);
 #endif
                 assert(sigma > 0.0);
                 assert(r->p.S > 0.0);
                 assert(Q < 1.0e7 || Q > 0.0);
-                brick_int(sqrt(r->p.S + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), r->p.E, E_prev, r->histo, Q);
+                brick_int(sqrt(r->p.S + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), r->p.E, r->E, r->histo, Q);
             }
-            //->E = p.E;
+            r->E = r->p.E;
         }
 #if 0
         fprintf(stderr, "Surf: from x_out = %g tfu, gives E_out = %g MeV (prev was %g MeV, diff %g keV), stragg = %g keV\n", (x-h)/C_TFU, E_out/C_MEV, E_out_prev/C_MEV, (E_diff)/C_KEV, sqrt(S_out)/C_KEV);
@@ -243,6 +245,7 @@ void make_rbs_reactions(const sample *sample, simulation *sim) { /* Note that si
         ion_set_angle(&r->p, sim->beta);
         r->K = jibal_kin_rbs(sim->ion.mass, r->isotope->mass, sim->theta, '+'); /* TODO: this is too hard coded for RBS right now */
         r->p.E = sim->ion.E * r->K;
+        r->E = r->p.E;
         r->p.S = 0.0;
         r->histo = gsl_histogram_calloc_uniform(sim->n_channels, 0 * C_KEV, sim->histogram_bin * sim->n_channels); /* TODO: reaction? */
         r->max_depth = sample->cranges[2 * i + 1]; /* TODO: only for layer models! */
