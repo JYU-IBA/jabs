@@ -16,7 +16,7 @@
 #include "simulation.h"
 
 #define ALPHA (0.0*C_DEG)
-#define BETA (0.0*C_DEG)
+#define BETA (20.0*C_DEG)
 #define THETA (160.0*C_DEG)
 #define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
 #define PARTICLES_SR (1.0e12)
@@ -25,7 +25,7 @@
 #define N_LAYERS_MAX 100
 #define HISTOGRAM_BIN (2.0*C_KEV)
 #define STOP_STEP_INCIDENT (5.0*C_KEV)
-#define STOP_STEP_EXITING (5.0*C_KEV)
+#define STOP_STEP_EXITING (50.0*C_KEV)
 
 #define CONCENTRATION_CUTOFF 1e-8
 
@@ -38,13 +38,19 @@ double stop_sample(jibal_gsto *workspace, const ion *incident, sample *sample, g
 
     double S1 = 0.0;
     for(i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
-        double c = get_conc(sample, x, i_isotope);
+        double c = get_conc(sample, x, i_isotope); /* TODO: this could be sped up */
         if(c < CONCENTRATION_CUTOFF)
              continue;
-        S1 += c * (
-                jibal_gsto_get_em(workspace, type, incident->Z, sample->isotopes[i_isotope]->Z, em)
-                //+jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, sample->isotopes[i_isotope]->Z, sample->isotopes[i_isotope]->mass)
-                );
+        if(type == GSTO_STO_TOT) {
+            S1 += c * (
+                    jibal_gsto_get_em(workspace, GSTO_STO_ELE, incident->Z, sample->isotopes[i_isotope]->Z, em)
+                    +jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, sample->isotopes[i_isotope]->Z, sample->isotopes[i_isotope]->mass)
+            );
+        } else {
+            S1 += c * (
+                    jibal_gsto_get_em(workspace, type, incident->Z, sample->isotopes[i_isotope]->Z, em)
+            );
+        }
     }
     //assert(S1 > 0.0);
     return S1;
@@ -70,59 +76,69 @@ void recalculate_concs(sim_isotope *its, double x) {
 
 double stop_step(jibal_gsto *workspace, ion *incident, sample *sample, double x, double h_max, double step) {
     /* positive max depth step (h_max) also gives the direction. Energy step (step) should be negative if regular stopping is done. */
-    double k1, k2, k3, k4, stop, dE, E;
+    double k1, k2, k3, k4, stop, dE, E, h_max_orig = h_max;
+    int maxstep = 0;
     /* k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
     E = incident->E;
-    k1 = stop_sample(workspace, incident, sample, GSTO_STO_ELE, x, E);
+    gsto_stopping_type type = GSTO_STO_TOT;
+    k1 = stop_sample(workspace, incident, sample, type, x, E);
     if(k1 < 0.001*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
 #ifdef DEBUG
-        fprintf(stderr, "stop_step returns 0.0, because k1 = %g eV/tfu\n", k1/C_EV_TFU);
+        fprintf(stderr, "stop_step returns 0.0, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)\n", k1/C_EV_TFU, x/C_TFU, E/C_KEV);
 #endif
         return 0.0;
     }
-    h_max *= incident->inverse_cosine; /* See the end of this function */
+    h_max *=  incident->inverse_cosine; /* h_max is the perpendicular distance, but we can take bigger steps (note scaling elsewhere) */
     double h = (step / k1); /* step should always be positive, as well as k1  */
-    if(h > fabs(h_max)) {
-        h = fabs(h_max);
+    if(h >= fabs(h_max)) {
+        maxstep = 1;
+        h = fabs(h_max) * 0.999;
     }
     double h_abs = h;
+    assert(h_abs > 0.0);
     h = copysign(h, h_max); /* h is positive when going deeper, i.e. h + x is deeper than x . */
 
-    k2 = stop_sample(workspace, incident, sample, GSTO_STO_ELE, x + (h / 2.0), E - (h_abs / 2.0) * k1);
-    k3 = stop_sample(workspace, incident, sample, GSTO_STO_ELE, x + (h / 2.0), E - (h_abs / 2.0) * k2);
-    k4 = stop_sample(workspace, incident, sample, GSTO_STO_ELE, x + h, E - h_abs * k3);
+    double h_perp = h*incident->cosine; /* x + h_perp is the actual perpendicular depth */
+#ifndef NO_RK4
+    k2 = stop_sample(workspace, incident, sample, type, x + (h_perp / 2.0), E - (h_abs / 2.0) * k1);
+    k3 = stop_sample(workspace, incident, sample, type, x + (h_perp / 2.0), E - (h_abs / 2.0) * k2);
+    k4 = stop_sample(workspace, incident, sample, type, x + h_perp, E - h_abs * k3);
     stop = (k1 + 2 * k2 + 2 * k3 + k4)/6;
-    //stop = k1;
+    assert(stop > 0.0);
+#else
+    stop = k1;
+#endif
     dE =  -1.0*h_abs * stop; /* Energy change in thickness "h". It is always negative! */
-    if(x <= 400.0*C_TFU && x <= 650.0*C_TFU && E >= 1.5*C_MEV)
-        fprintf(stderr, "%s stop = %.3lf eV/tfu ( x = %.3lf, h = %.3lf, h_max = %.3lf), E = %.3lf keV, h = %6.3lf  dE = %.5lf keV\n", incident->isotope->name, stop/C_EV_TFU, x/C_TFU, h/C_TFU, h_max/C_TFU, E/C_KEV, h/C_TFU, dE/C_KEV);
+#if 0
+    fprintf(stderr, "%s stop = %.3lf eV/tfu ( x = %.3lf, h = %.3lf, h_max = %.3lf), E = %.3lf keV, h = %6.3lf  dE = %.5lf keV\n", incident->isotope->name, stop/C_EV_TFU, x/C_TFU, h/C_TFU, h_max/C_TFU, E/C_KEV, h/C_TFU, dE/C_KEV);
+#endif
 #ifdef DEBUG
     if(fabs(stop) < 0.1*C_EV_TFU) {
         fprintf(stderr, "Not good!\n");
         return 0.0;
     }
 #endif
-    double s_ratio = stop_sample(workspace, incident, sample, GSTO_STO_ELE, x, E+dE)/k1; /* Ratio of stopping */
+#ifndef STATISTICAL_STRAGGLING
+   double s_ratio = stop_sample(workspace, incident, sample, type, x, E+dE)/k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
 #ifdef DEBUG
-    if((s_ratio)*(s_ratio) < 0.9 || (s_ratio)*(s_ratio) > 1.1) {
-        fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
-    }
+    //if((s_ratio)*(s_ratio) < 0.9 || (s_ratio)*(s_ratio) > 1.1) { /* Non-statistical broadening. */
+    //   fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
+    //}
 #endif
-    incident->S *= (s_ratio)*(s_ratio);
-    incident->S += fabs(h)*stop_sample(workspace, incident, sample, GSTO_STO_STRAGG, x + (h/2.0), (E+dE/2)); /* Straggling, calculate at mid-energy */
+   incident->S *= (s_ratio)*(s_ratio);
+#endif
+   incident->S += h_abs*stop_sample(workspace, incident, sample, GSTO_STO_STRAGG, x + (h_perp/2.0), (E+dE/2)); /* Straggling, calculate at mid-energy */
 
-    assert(isnormal(incident->S));
-#if 0
-    if(h >= 0.9999*h_max) {
-        incident->E += dE/0.9999;
-        h = h_max;
+   assert(isnormal(incident->S));
+
+    if(maxstep) {
+        incident->E += dE/0.999;
+        return h_max_orig;
     } else {
         incident->E += dE;
+        return h*incident->cosine;
     }
-#endif
-    incident->E += dE;
-    h *=  incident->cosine; /* Scaling factor. Stopping is calculated in material the usual way, but we only report progress perpendicular to the (flat)sample. If incident->angle is 45 deg, cosine is 0.7-ish. h_max is given in unscaled units and was scaled earlier in this function. */
-    return h;
+      /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
 void rbs(jibal_gsto *workspace, simulation *sim, sample *sample) {
@@ -140,7 +156,7 @@ void rbs(jibal_gsto *workspace, simulation *sim, sample *sample) {
 #ifdef DEBUG
     fprintf(stderr, "Thickness %g tfu, stop step %g tfu, E = %g MeV\n", thickness/C_TFU, h/C_TFU, ion->E/C_MEV);
 #endif
-    for (x = 0.0; x <= thickness;) {
+    for (x = 0.0; x < thickness;) {
         while (x >= sample->cranges[i_range+1]) {
             i_range++;
             if (i_range >= sample->n_ranges-1) {
@@ -183,32 +199,48 @@ void rbs(jibal_gsto *workspace, simulation *sim, sample *sample) {
 #endif
         for (i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
             reaction *r = &reactions[i_reaction];
+            if(r->stop)
+                continue;
             r->p.E = ion->E * r->K;
             r->p.S = ion->S * r->K;
             assert(r->p.E > 0.0);
-#if 0
-            if(x > r->max_depth)
-                continue;
+
+            if(x >= r->max_depth) {
+#ifdef DEBUG
+                fprintf(stderr, "Reaction %i with %s stops, because maximum depth is reached.\n", i_reaction, reactions[i_reaction].isotope->name);
 #endif
+                r->stop = 1;
+                continue;
+            }
+
             double c = get_conc(sample, x+h/2.0, r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
             double x_out;
-            double h_out;
             int i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
                 //fprintf(stderr, "Surfacing... x_out = %g tfu... ", x_out/C_TFU);
                 //recalculate_concs(its, x_out-0.00001*C_TFU);
-                h_out = stop_step(workspace, &r->p, sample, x_out, sample->cranges[i_range_out] - x_out, STOP_STEP_EXITING);
+                double h_max = sample->cranges[i_range_out] - x_out;
+                double h_out = stop_step(workspace, &r->p, sample, x_out-0.0001*C_TFU, h_max, STOP_STEP_EXITING); /* FIXME: 0.0001*C_TFU IS A STUPID HACK */
                 x_out += h_out;
-                if(h_out >= 0.0 || r->p.E < E_MIN ||x_out <= 0.0)
+                if( r->p.E < E_MIN) {
+                    r->stop = 1;
+#ifdef DEBUG
+                    fprintf(stderr, "Reaction %i with %s: Energy below EMIN when surfacing from %.3lf tfu, break break. Last above was %.3lf keV\n",i_reaction, reactions[i_reaction].isotope->name, (x+h)/C_TFU, r->E/C_KEV);
+#endif
                     break;
-                while (x_out <= sample->cranges[i_range_out]) {
+                }
+                assert(h_out <= 0.0);
+                while (i_range_out > 0 && x_out <= sample->cranges[i_range_out]) {
                     i_range_out--;
+#ifdef DEBUG
+                    fprintf(stderr, "Outgoing from reaction %i crossing to range %i = [%g, %g) when x_out = %g tfu.\n", i_reaction, i_range_out, sample->cranges[i_range_out]/C_TFU, sample->cranges[i_range_out+1]/C_TFU, x_out/C_TFU);
+#endif
                 }
             }
             if(c > CONCENTRATION_CUTOFF && r->p.E > E_MIN) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 double sigma = jibal_cross_section_rbs(ion->isotope, r->isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
                 double Q = c * sim->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
-#ifdef DEBUG
+#ifdef dfDEBUG
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf (prev %.3lf, sigma = %g mb/sr, Q = %g (c = %.4lf%%)\n",
                         r->isotope->name, E_back * r->K/C_KEV, r->p.E/C_KEV, r->E/C_KEV, sigma/C_MB_SR, Q, c*100.0);
 #endif
@@ -247,10 +279,12 @@ void make_rbs_reactions(const sample *sample, simulation *sim) { /* Note that si
         r->p.E = sim->ion.E * r->K;
         r->E = r->p.E;
         r->p.S = 0.0;
-        r->histo = gsl_histogram_calloc_uniform(sim->n_channels, 0 * C_KEV, sim->histogram_bin * sim->n_channels); /* TODO: reaction? */
-        r->max_depth = sample->cranges[2 * i + 1]; /* TODO: only for layer models! */
+        r->histo = gsl_histogram_calloc_uniform(sim->n_channels, 0 * C_KEV, sim->histogram_bin * sim->n_channels);
+        r->max_depth = sample->cranges[sample->n_ranges-1]-1000.0*C_TFU; /* TODO: figure it out! */
+
+        r->stop = 0;
 #ifdef DEBUG
-        fprintf(stderr, "Reaction i=%i, with %s:\n", sim->n_reactions, r->isotope->name);
+        fprintf(stderr, "Reaction i=%i, with %s: K = %.5lf, max depth : %.3lf tfu\n", sim->n_reactions, r->isotope->name, r->K, r->max_depth/C_TFU);
 #endif
         sim->n_reactions++;
     };
@@ -328,7 +362,8 @@ int main(int argc, char **argv) {
     } else {
         fprintf(stderr, "No isotope %s found.\n", argv[1]);
     }
-    sim.ion.E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, argv[2]);
+    double E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, argv[2]);
+    sim.ion.E = E;
 #ifdef DEBUG
     fprintf(stderr, "Beam E = %g MeV\n", sim.ion.E/C_MEV);
 #endif
@@ -376,6 +411,16 @@ int main(int argc, char **argv) {
 
     start = clock();
     for (int n = 0; n < NUMBER_OF_SIMULATIONS; n++) {
+        /* TODO: resetting some variables that are changed during the simulation. We should possibly split immutable things to separate structs. */
+        sim.ion.E = E;
+        sim.ion.S = 0.0;
+        for(j = 0; j < sim.n_reactions; j++) {
+            reaction *r = &sim.reactions[j];
+            r->p.E = sim.ion.E * r->K;
+            r->E = r->p.E;
+            r->p.S = 0.0;
+            r->stop = 0;
+        }
         rbs(jibal->gsto, &sim, &sample);
     }
     end = clock();

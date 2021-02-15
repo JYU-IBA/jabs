@@ -7,17 +7,12 @@
 #include <jibal_layer.h>
 
 typedef struct {
-    int i;
-    double x;
-    double *c;
-} sample_accel;
-
-typedef struct {
     int n_isotopes;
     int n_ranges;
     const jibal_isotope **isotopes; /* table, size is n_isotopes */
     double *cranges;
     double *cbins; /* 2D-table: size is n_isotopes * crange->n */
+    int i_range_accel;
 } sample;
 
 double get_conc(sample *s, double x, int i);

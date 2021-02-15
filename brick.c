@@ -9,9 +9,9 @@ inline double erfc(double x) {
     return exp(-1.0950081470333*x-0.75651138383854*x*x);
     /* Tsay, WJ., Huang, C.J., Fu, TT. et al. J Prod Anal 39, 259–269 (2013). https://doi.org/10.1007/s11123-012-0283-1 */
 }
-inline double erf_Q(double x);
+//inline double erf_Q(double x);
 
-double erf_Q(double x) {
+inline double erf_Q(double x) {
     return x < 0.0 ? 1.0-0.5*erfc(-1.0*x/sqrt(2.0)) : 0.5*erfc(x/sqrt(2.0));
 }
 
@@ -41,15 +41,20 @@ void erf_Q_test() {
 
 void brick_int(double sigma, double E_low, double E_high, gsl_histogram *h, double Q) { /* Energy spectrum h, integrate over rectangular brick convoluted with a gaussian */
     int i;
-#ifdef OPTIMIZE_BRICK
+#ifndef OPTIMIZE_BRICK
     size_t lo;
     size_t hi;
     gsl_histogram_find(h, E_low, &lo);
     gsl_histogram_find(h, E_high, &hi);
-    double foo = (E_high-E_low)/(HISTOGRAM_BIN);
+#if 0
+    double foo = (E_high-E_low)/(3.0); /* TODO: smart choice */
     int n = ceil(foo*5);
+
     if(n < 50)
         n = 50;
+#else
+    int n = 50;
+#endif
     if(lo > n)
         lo -= n;
     else

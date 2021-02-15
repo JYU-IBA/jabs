@@ -17,6 +17,7 @@ typedef struct {
     /* TODO: cross section to use? */
     /* TODO: cross sections from files */
     double E; /* Energy bin */
+    int stop;
 } reaction;
 
 
@@ -30,7 +31,7 @@ typedef struct {
     double alpha;
     double beta;
     double theta;
-    ion ion;
+    ion ion; /* TODO: this is altered by the simulation */
     reaction *reactions; /* size AT LEAST n_reactions */
 } simulation;
 
