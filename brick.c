@@ -11,7 +11,15 @@ inline double erfc(double x) {
 extern inline double erf_Q(double x);
 
 inline double erf_Q(double x) {
-    return x < 0.0 ? 1.0-0.5*erfc(-1.0*x/sqrt(2.0)) : 0.5*erfc(x/sqrt(2.0));
+    return x < 0.0 ? 1.0-0.5*erfc(-1.0*x/M_SQRT2) : 0.5*erfc(x/M_SQRT2);
+}
+
+#define ERFQ_A (-1.0950081470333/M_SQRT2)
+#define ERFQ_B (-0.75651138383854*0.5)
+#define ERFQ_CUTOFF 5.0 // 5.0 is enough
+
+inline double erf_Q_optim(double x) {
+    return x < (-ERFQ_CUTOFF) ? 1.0 : x > (ERFQ_CUTOFF) ? 0.0 : x < 0.0? 1.0-0.5*exp(-1.0*ERFQ_A*x+ERFQ_B*x*x) : 0.5*exp(ERFQ_A*x+ERFQ_B*x*x);
 }
 
 void erf_Q_test() {
@@ -45,24 +53,26 @@ void brick_int(double sigma_low, double sigma_high, double E_low, double E_high,
     size_t hi;
     gsl_histogram_find(h, E_low, &lo);
     gsl_histogram_find(h, E_high, &hi);
-#if 0
+
+#ifdef SMART
     double foo = (E_high-E_low)/(3.0); /* TODO: smart choice */
     int n = ceil(foo*5);
 
     if(n < 50)
         n = 50;
 #else
-    int n = 50;
+    int n = 50; /* TODO: stupid choice */
 #endif
+
     if(lo > n)
         lo -= n;
     else
         lo = 0;
-    if(hi > h->n-n)
+    if(hi > h->n-n-1)
         hi = h->n;
     else
         hi += n;
-    for(i = lo; i < hi; i++) {
+    for(i = lo; i <= hi; i++) {
 #else
         for(i = 0; i < h->n; i++) {
 #endif
@@ -75,7 +85,7 @@ void brick_int(double sigma_low, double sigma_high, double E_low, double E_high,
         double sigma = (sigma_low+sigma_high)/2.0;
         double y = (erf_Q((E_low-E)/sigma)-erf_Q((E_high-E)/sigma))/(E_high-E_low);
 #else
-        double y = (erf_Q((E_low-E)/sigma_low)-erf_Q((E_high-E)/sigma_high))/(E_high-E_low);
+        double y = (erf_Q_optim((E_low-E)/sigma_low)-erf_Q_optim((E_high-E)/sigma_high))/(E_high-E_low);
 #endif
 #endif
         h->bin[i] += y*w*Q;

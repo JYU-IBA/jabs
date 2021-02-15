@@ -29,7 +29,7 @@
 
 #define CONCENTRATION_CUTOFF 1e-8
 
-#define NUMBER_OF_SIMULATIONS 1
+#define NUMBER_OF_SIMULATIONS 20
 
 
 double stop_sample(jibal_gsto *workspace, const ion *incident, sample *sample, gsto_stopping_type type, double x, double E) {
