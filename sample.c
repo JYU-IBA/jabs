@@ -3,7 +3,11 @@
 #include "sample.h"
 
 
-int get_range_bin(sim_workspace *ws, const sample *s, double x) {
+inline double *sample_conc_bin(const sample *s, int i_range, int i_isotope) {
+    return s->cbins + i_range * s->n_isotopes + i_isotope;
+}
+
+int get_range_bin(const sample *s, double x) {
     int lo, mi, hi;
 #ifdef RANGE_PEDANTIC
     if(x < s->cranges[0] || x >= s->cranges[s->n_ranges-1]) { /* Out of bounds concentration is zero. Maybe the execution doesn't go here if all goes as planned, so this could be changed to an assert. */
@@ -26,7 +30,6 @@ int get_range_bin(sim_workspace *ws, const sample *s, double x) {
             hi = mi;
         }
     }
-    ws->i_range_accel = lo;
     return lo;
 }
 
@@ -40,7 +43,8 @@ double get_conc(sim_workspace *ws, const sample *s, double x, int i_isotope) {
         else /* Linear interpolation */
             return s->cbins[i] + ((s->cbins[i+s->n_isotopes] - s->cbins[i])/(s->cranges[ws->i_range_accel+1] - s->cranges[ws->i_range_accel])) * (x - s->cranges[ws->i_range_accel]);
     }
-    i_range = get_range_bin(ws, s, x);
+    i_range = get_range_bin(s, x);
+    ws->i_range_accel = i_range;
     if(i_range < 0) {
 #ifdef DEBUG
         fprintf(stderr, "No depth range found for x = %.5lf\n", x/C_TFU);
@@ -60,7 +64,8 @@ int get_concs(sim_workspace *ws, const sample *s, double x, double *out) {
     if(x >= s->cranges[ws->i_range_accel] && x < s->cranges[ws->i_range_accel+1]) { /* Use saved bin. */
         i_range = ws->i_range_accel;
     } else {
-        i_range = get_range_bin(ws, s, x);
+        i_range = get_range_bin(s, x);
+        ws->i_range_accel = i_range;
     }
     if(i_range < 0) {
 #ifdef DEBUG
@@ -163,4 +168,14 @@ void sample_free(sample *sample) {
     free(sample->cranges);
     free(sample->isotopes);
     free(sample->cbins);
+}
+
+double sample_isotope_max_depth(const sample *sample, int i_isotope) {
+    int i;
+    for(i = sample->n_ranges - 1; i >= 0; i--) {
+        double *c = sample_conc_bin(sample, i, i_isotope);
+        if(*c > 0.0) /* TODO: other cutoff? */
+            break;
+    }
+    return sample->cranges[i];
 }

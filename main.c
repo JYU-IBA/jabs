@@ -282,12 +282,8 @@ reaction *make_rbs_reactions(const sample *sample, const simulation *sim, int *n
         r->p.E = sim->ion.E * r->K;
         r->E = r->p.E;
         r->p.S = 0.0;
-        r->max_depth = sample->cranges[sample->n_ranges-1]-1000.0*C_TFU;
-
+        r->max_depth = sample_isotope_max_depth(sample, r->i_isotope);
         r->stop = 0;
-#ifdef DEBUG
-        fprintf(stderr, "Reaction i=%i, with %s: K = %.5lf, max depth : %.3lf tfu\n", sim->n_reactions, r->isotope->name, r->K, r->max_depth/C_TFU);
-#endif
         (*n_reactions)++;
     };
     return reactions;
@@ -347,6 +343,16 @@ void layers_free(jibal_layer **layers, int n_layers) {
     free(layers);
 }
 
+void reactions_print(FILE *f, reaction *reactions, int n_reactions) {
+    int i;
+    for (int i = 0; i < n_reactions; i++) {
+        reaction *r = &reactions[i];
+        fprintf(stderr, "Reaction %i/%i: RBS with %s: K = %.5lf, max depth : %.3lf tfu\n", i+1, n_reactions,
+                r->isotope->name, r->K, r->max_depth / C_TFU);
+    }
+
+}
+
 int main(int argc, char **argv) {
     simulation sim;
     sample sample;
@@ -367,7 +373,7 @@ int main(int argc, char **argv) {
     }
     sim.ion.E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, argv[2]);
 #ifdef DEBUG
-    fprintf(stderr, "Beam E = %g MeV, incident ion Z = %i, mass = %.4lf u\n", sim.ion.E/C_MEV, sim.incident->Z, sim.incident->mass/C_U);
+    fprintf(stderr, "Beam E = %g MeV, incident ion Z = %i, mass = %.4lf u\n", sim.ion.E/C_MEV, incident->Z, incident->mass/C_U);
 #endif
     if (sim.ion.E > 1000.0*C_MEV || sim.ion.E < 10*C_KEV) {
         fprintf(stderr, "Hmm...? Check your numbers.\n");
@@ -390,7 +396,7 @@ int main(int argc, char **argv) {
     if(!layers)
         return EXIT_FAILURE;
 
-    sample = sample_from_layers( layers, n_layers);
+    sample = sample_from_layers(layers, n_layers);
     if(sample.n_isotopes == 0)
         return EXIT_FAILURE;
     sample_print(stderr, &sample);
@@ -405,6 +411,8 @@ int main(int argc, char **argv) {
     ion_set_angle(&sim.ion, ALPHA);
 
     reaction *reactions = make_rbs_reactions(&sample, &sim, &sim.n_reactions);
+    reactions_print(stderr, reactions, sim.n_reactions);
+
     if(assign_stopping(jibal->gsto, &sim, &sample)) {
         return EXIT_FAILURE;
     }
@@ -416,6 +424,10 @@ int main(int argc, char **argv) {
         reaction *r = malloc(sim.n_reactions * sizeof(reaction));
         memcpy(r, reactions, sim.n_reactions * sizeof(reaction)); /* TODO: when we stop mutilating the reactions we can stop doing this */
         sim_workspace *ws = sim_workspace_init(&sim, &sample, jibal->gsto);
+#ifdef FAST
+        ws->stopping_type = GSTO_STO_ELE;
+        ws->rk4 = 0;
+#endif
         rbs(ws, &sim, reactions, &sample);
 #if 0
         if(n == NUMBER_OF_SIMULATIONS-1)
