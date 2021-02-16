@@ -10,8 +10,11 @@
 
 typedef struct {
     double *c; /* Concentrations for n_isotopes at some arbitrary x */
+    double c_x; /* at this x */
     jibal_gsto *gsto;
-} sim_accel;
+    int rk4;
+    gsto_stopping_type stopping_type;
+} sim_workspace;
 
 
 typedef struct {
@@ -45,7 +48,7 @@ typedef struct {
 } simulation;
 
 
-sim_accel *accel_init(sample *sample, jibal_gsto *gsto);
-void accel_free(sim_accel *accel);
+sim_workspace *sim_workspace_init(sample *sample, jibal_gsto *gsto);
+void sim_workspace_free(sim_workspace *ws);
 
 #endif /* _SIMULATION_H_ */

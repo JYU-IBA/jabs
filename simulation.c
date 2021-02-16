@@ -1,12 +1,16 @@
 #include "simulation.h"
 
-sim_accel *accel_init(sample *sample, jibal_gsto *gsto) {
-    sim_accel *accel = malloc(sizeof(sim_accel));
-    accel->c = calloc(sample->n_isotopes, sizeof(double));
-    accel->gsto = gsto;
-    return accel;
+sim_workspace *sim_workspace_init(sample *sample, jibal_gsto *gsto) {
+    sim_workspace *ws = malloc(sizeof(sim_workspace));
+    ws->c = calloc(sample->n_isotopes, sizeof(double));
+    ws->gsto = gsto;
+    ws->rk4 = 1;
+    ws->stopping_type = GSTO_STO_TOT;
+    ws->c_x = 0.0;
+    get_concs(sample, ws->c_x, ws->c);
+    return ws;
 }
 
-void accel_free(sim_accel *accel) {
-    free(accel->c);
+void sim_workspace_free(sim_workspace *ws) {
+    free(ws->c);
 }
