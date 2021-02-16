@@ -361,17 +361,12 @@ int main(int argc, char **argv) {
         return 1;
     }
     sim.incident = jibal_isotope_find(jibal->isotopes, argv[1], 0, 0);
-    if(sim.incident) {
-#ifdef DEBUG
-        fprintf(stderr, "Mass %.3lf u\n", sim.incident->mass/C_U);
-#endif
-    } else {
+    if(!sim.incident) {
         fprintf(stderr, "No isotope %s found.\n", argv[1]);
     }
-    double E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, argv[2]);
-    sim.ion.E = E;
+    sim.ion.E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, argv[2]);
 #ifdef DEBUG
-    fprintf(stderr, "Beam E = %g MeV\n", sim.ion.E/C_MEV);
+    fprintf(stderr, "Beam E = %g MeV, incident ion Z = %i, mass = %.4lf u\n", sim.ion.E/C_MEV, sim.incident->Z, sim.incident->mass/C_U);
 #endif
     if (sim.ion.E > 1000.0*C_MEV || sim.ion.E < 10*C_KEV) {
         fprintf(stderr, "Hmm...? Check your numbers.\n");
@@ -404,7 +399,7 @@ int main(int argc, char **argv) {
     sim.theta = THETA;
     sim.p_sr = PARTICLES_SR; /* TODO: particles * sr / cos(alpha) */
     sim.p_sr_cos_alpha = sim.p_sr / cos(sim.alpha);
-    sim.ion.S = 0.0;
+    sim.ion.S = 0.0; /* TODO: initial beam broadening goes here */
     ion_set_isotope(&sim.ion, sim.incident);
     ion_set_angle(&sim.ion, ALPHA);
 
@@ -418,9 +413,6 @@ int main(int argc, char **argv) {
     start = clock();
     sim_workspace *ws = sim_workspace_init(&sample, jibal->gsto);
     for (int n = 0; n < NUMBER_OF_SIMULATIONS; n++) {
-        /* TODO: resetting some variables that are changed during the simulation. We should possibly split immutable things to separate structs. */
-        sim.ion.E = E;
-        sim.ion.S = 0.0; /* TODO: initial beam broadening goes here */
         rbs(ws, &sim, &sample);
     }
     end = clock();
