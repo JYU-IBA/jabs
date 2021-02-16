@@ -26,16 +26,16 @@ Simulates RBS spectra rapidly.
 
 3. Build, see [CMake instructions](https://cmake.org/runningcmake/), or try...
 
-        mkdir build
-        cd build
-        cmake ../
-        make
+        $ mkdir build
+        $ cd build
+        $ cmake ../
+        $ make
        
 ## Usage
 
 Several (undocumented) parameters can be set from the command line. Try something like this:
 
 ~~~~
-./jabs -f -I 4He -E 2MeV -o tmp.csv --alpha 10deg --beta 10deg --theta 160deg -R 20keV Au 500tfu SiO2 1000tfu Si 10000tfu
+$ ./jabs -I 4He -E 2MeV -o tmp.csv --alpha 10deg --beta 10deg --theta 160deg -R 20keV Au 500tfu SiO2 1000tfu Si 10000tfu
 ~~~~
 
