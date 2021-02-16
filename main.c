@@ -296,7 +296,7 @@ void rbs(sim_workspace *ws, const simulation *sim, reaction *reactions, const sa
         }
 
         double E_front = ion.E;
-        double h = stop_step(ws, &ion, sample, x, h_max, STOP_STEP_INCIDENT);
+        double h = stop_step(ws, &ion, sample, x, h_max, sim->stop_step_incident);
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
         double E_back = ion.E;
@@ -330,7 +330,7 @@ void rbs(sim_workspace *ws, const simulation *sim, reaction *reactions, const sa
             int i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
                 double h_out_max = sample->cranges[i_range_out] - x_out;
-                double h_out = stop_step(ws, &r->p, sample, x_out-0.00001*C_TFU, h_out_max, STOP_STEP_EXITING); /* FIXME: 0.0001*C_TFU IS A STUPID HACK */
+                double h_out = stop_step(ws, &r->p, sample, x_out-0.00001*C_TFU, h_out_max, sim->stop_step_exiting); /* FIXME: 0.0001*C_TFU IS A STUPID HACK */
                 x_out += h_out;
                 if( r->p.E < E_MIN) {
                     r->stop = 1;
