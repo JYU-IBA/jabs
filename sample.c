@@ -34,11 +34,11 @@ double get_conc(sample *s, double x, int i_isotope) {
     int i_range, i;
 
     if(x >= s->cranges[s->i_range_accel] && x < s->cranges[s->i_range_accel+1]) { /* Use saved bin. We'll probably receive a lot of repeated calls to the same bin, so this avoid cost of other range checking and binary searches. */
-        i = i_isotope * s->n_ranges + s->i_range_accel;
+        i = s->i_range_accel * s->n_isotopes + i_isotope;
         if(s->cranges[s->i_range_accel] == s->cranges[s->i_range_accel+1]) /* Constant */
             return s->cbins[i];
         else /* Linear interpolation */
-            return s->cbins[i] + ((s->cbins[i+1] - s->cbins[i])/(s->cranges[s->i_range_accel+1] - s->cranges[s->i_range_accel])) * (x - s->cranges[s->i_range_accel]);
+            return s->cbins[i] + ((s->cbins[i+s->n_isotopes] - s->cbins[i])/(s->cranges[s->i_range_accel+1] - s->cranges[s->i_range_accel])) * (x - s->cranges[s->i_range_accel]);
     }
     i_range = get_range_bin(s, x);
     if(i_range < 0) {
@@ -48,10 +48,41 @@ double get_conc(sample *s, double x, int i_isotope) {
         return 0.0;
     }
     assert(i_isotope < s->n_isotopes);
-    i = i_isotope * s->n_ranges + i_range;
+    i = i_range * s->n_isotopes + i_isotope;
     if(s->cranges[i_range+1] - s->cranges[i_range] == 0) /* Zero width. Return value of left side. */
         return s->cbins[i];
-    return s->cbins[i] + ((s->cbins[i+1] - s->cbins[i])/(s->cranges[i_range+1] - s->cranges[i_range])) * (x - s->cranges[i_range]);
+    return s->cbins[i] + ((s->cbins[i+s->n_isotopes] - s->cbins[i])/(s->cranges[i_range+1] - s->cranges[i_range])) * (x - s->cranges[i_range]);
+}
+
+int get_concs(sample *s, double x, double *out) {
+    int i_range, i;
+
+    if(x >= s->cranges[s->i_range_accel] && x < s->cranges[s->i_range_accel+1]) { /* Use saved bin. */
+        i_range = s->i_range_accel;
+    } else {
+        i_range = get_range_bin(s, x);
+    }
+    if(i_range < 0) {
+#ifdef DEBUG
+        fprintf(stderr, "No depth range found for x = %.5lf\n", x/C_TFU);
+#endif
+        return 0;
+    }
+    double *bins_low = &s->cbins[i_range * s->n_isotopes];
+    double *bins_high = &s->cbins[(i_range+1) * s->n_isotopes];
+    if(s->cranges[i_range+1] - s->cranges[i_range] == 0) {
+        for(i = 0; i < s->n_isotopes; i++) {
+            out[i] = bins_low[i]; /* TODO: memcpy? */
+        }
+        return 1;
+    } else {
+        double dx = (s->cranges[i_range+1] - s->cranges[i_range]);
+        double deltax = (x - s->cranges[i_range]);
+        for (i = 0; i < s->n_isotopes; i++) {
+            out[i] = bins_low[i] + ((bins_high[i] - bins_low[i])/dx) * deltax;
+        }
+        return 2;
+    }
 }
 
 sample sample_from_layers(jibal_layer **layers, int n_layers) {
@@ -79,8 +110,9 @@ sample sample_from_layers(jibal_layer **layers, int n_layers) {
     fprintf(stderr, "Total %i isotopes and %i ranges\n", n_isotopes, s.n_ranges);
 #endif
     s.isotopes = calloc(n_isotopes, sizeof(jibal_isotope *));
-    s.cbins = calloc(n_isotopes * s.n_ranges, sizeof(double));
+    s.cbins = calloc( s.n_ranges * n_isotopes, sizeof(double));
     i_isotope = 0;
+    s.n_isotopes = n_isotopes;
     for (i = 0; i < n_layers; i++) {
         jibal_layer *layer = layers[i];
         for (j = 0; j < layer->material->n_elements; ++j) {
@@ -88,14 +120,13 @@ sample sample_from_layers(jibal_layer **layers, int n_layers) {
             for (k = 0; k < element->n_isotopes; k++) {
                 //assert(i_isotope < n_isotopes);
                 s.isotopes[i_isotope] = element->isotopes[k];
-                int i_bin_zero = i_isotope * s.n_ranges;
-                s.cbins[ i_bin_zero + 2 * i] = element->concs[k] * layer->material->concs[j];
-                s.cbins[ i_bin_zero + 2 * i + 1] = element->concs[k] * layer->material->concs[j];
+                s.cbins[(2 * i)*s.n_isotopes + i_isotope] = element->concs[k] * layer->material->concs[j];
+                s.cbins[(2 * i + 1)*s.n_isotopes + i_isotope] = element->concs[k] * layer->material->concs[j];
                 i_isotope++;
             }
         }
     }
-    s.n_isotopes = n_isotopes;
+
     return s;
 }
 
@@ -110,7 +141,7 @@ void print_sample(FILE *f, sample *sample) {
     for (i = 0; i < sample->n_ranges; i++) {
         fprintf(stderr, "%10.3lf", sample->cranges[i]/C_TFU);
         for (j = 0; j < sample->n_isotopes; j++) {
-            fprintf(stderr, " %8.4lf", sample->cbins[j * sample->n_ranges + i]*100.0);
+            fprintf(stderr, " %8.4lf", sample->cbins[i * sample->n_isotopes + j]*100.0);
         }
         fprintf(stderr, "\n");
     }

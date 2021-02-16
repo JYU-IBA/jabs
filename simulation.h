@@ -3,8 +3,16 @@
 
 #include <gsl/gsl_histogram.h>
 #include <jibal_masses.h>
+#include <jibal_gsto.h>
 
 #include "ion.h"
+#include "sample.h"
+
+typedef struct {
+    double *c; /* Concentrations for n_isotopes at some arbitrary x */
+    jibal_gsto *gsto;
+} sim_accel;
+
 
 typedef struct {
     const jibal_isotope *isotope; /* target isotope */
@@ -35,5 +43,9 @@ typedef struct {
     ion ion; /* TODO: this is altered by the simulation */
     reaction *reactions; /* size AT LEAST n_reactions */
 } simulation;
+
+
+sim_accel *accel_init(sample *sample, jibal_gsto *gsto);
+void accel_free(sim_accel *accel);
 
 #endif /* _SIMULATION_H_ */

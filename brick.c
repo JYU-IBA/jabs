@@ -18,6 +18,8 @@ inline double erf_Q(double x) {
 #define ERFQ_B (-0.75651138383854*0.5)
 #define ERFQ_CUTOFF 5.0 // 5.0 is enough
 
+double erf_Q_optim(double x);
+
 inline double erf_Q_optim(double x) {
     return x < (-ERFQ_CUTOFF) ? 1.0 : x > (ERFQ_CUTOFF) ? 0.0 : x < 0.0? 1.0-0.5*exp(-1.0*ERFQ_A*x+ERFQ_B*x*x) : 0.5*exp(ERFQ_A*x+ERFQ_B*x*x);
 }
