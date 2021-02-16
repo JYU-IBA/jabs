@@ -131,7 +131,7 @@ sample sample_from_layers(jibal_layer **layers, int n_layers) {
 }
 
 
-void print_sample(FILE *f, sample *sample) {
+void sample_print(FILE *f, const sample *sample) {
     int i,j;
     fprintf(stderr, "DEPTH(tfu) ");
     for (i = 0; i < sample->n_isotopes; i++) {
@@ -157,4 +157,10 @@ void print_sample(FILE *f, sample *sample) {
         fprintf(stderr, "\n");
     }
 #endif
+}
+
+void sample_free(sample *sample) {
+    free(sample->cranges);
+    free(sample->isotopes);
+    free(sample->cbins);
 }

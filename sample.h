@@ -22,5 +22,6 @@ int get_concs(sim_workspace *ws, const sample *s, double x, double *out);
 int get_range_bin(sim_workspace *ws, const sample *s, double x);
 
 sample sample_from_layers(jibal_layer **layers, int n_layers);
-void print_sample(FILE *f, sample *sample);
+void sample_print(FILE *f, const sample *sample);
+void sample_free(sample *sample);
 #endif /* _SAMPLE_H_ */

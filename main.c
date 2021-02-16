@@ -145,12 +145,9 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
       /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
-void rbs(sim_workspace *ws, const simulation *sim, const sample *sample) {
+void rbs(sim_workspace *ws, const simulation *sim, reaction *reactions, const sample *sample) {
     double x;
     ion ion = sim->ion;
-    reaction *reactions = malloc(sim->n_reactions * sizeof(reaction));
-    memcpy(reactions, sim->reactions, sim->n_reactions * sizeof(reaction));
-    /* TODO: realloc reactions if some are discarded */
     assert(sample->n_ranges);
     double thickness = sample->cranges[sample->n_ranges-1];
     double next_crossing = sample->cranges[1];
@@ -167,6 +164,8 @@ void rbs(sim_workspace *ws, const simulation *sim, const sample *sample) {
         r->S = 0.0;
         r->p.S = 0.0;
         r->stop = 0;
+        ws->histos[i_reaction] = gsl_histogram_calloc_uniform(sim->n_channels, 0 * C_KEV, sim->histogram_bin * sim->n_channels); /* free'd by sim_workspace_free */
+
     }
     for (x = 0.0; x < thickness;) {
         while (i_range < sample->n_ranges-1 && x >= sample->cranges[i_range+1]) {
@@ -218,7 +217,6 @@ void rbs(sim_workspace *ws, const simulation *sim, const sample *sample) {
                 continue;
             }
 
-            double c = get_conc(ws, sample, x+h/2.0, r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
             double x_out;
             int i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
@@ -240,6 +238,7 @@ void rbs(sim_workspace *ws, const simulation *sim, const sample *sample) {
 #endif
                 }
             }
+            double c = get_conc(ws, sample, x+h/2.0, r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
             if(c > CONCENTRATION_CUTOFF && r->p.E > E_MIN) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 double sigma = jibal_cross_section_rbs(ion.isotope, r->isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
                 double Q = c * sim->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
@@ -250,7 +249,7 @@ void rbs(sim_workspace *ws, const simulation *sim, const sample *sample) {
                 assert(sigma > 0.0);
                 assert(r->p.S > 0.0);
                 assert(Q < 1.0e7 || Q > 0.0);
-                brick_int(sqrt(r->p.S + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), sqrt(r->S + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), r->p.E, r->E, r->histo, Q);
+                brick_int(sqrt(r->p.S + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), sqrt(r->S + DETECTOR_RESOLUTION * DETECTOR_RESOLUTION), r->p.E, r->E, ws->histos[i_reaction], Q);
             }
             r->E = r->p.E;
             r->S = r->p.S;
@@ -267,14 +266,12 @@ void rbs(sim_workspace *ws, const simulation *sim, const sample *sample) {
         ion.S = S_back;
         ion.E = E_back;
     }
-    free(reactions);
 }
 
-void make_rbs_reactions(const sample *sample, simulation *sim) { /* Note that sim->ion needs to be set! */
+reaction *make_rbs_reactions(const sample *sample, const simulation *sim, int *n_reactions) { /* Note that sim->ion needs to be set! */
     int i;
-    sim->n_reactions = 0; /* we calculate this */
+    *n_reactions = 0; /* we calculate this */
     reaction * reactions = malloc(sample->n_isotopes*sizeof(reaction)); /* TODO: possible memory leak */
-    sim->reactions = reactions;
     for(i = 0; i < sample->n_isotopes; i++) {
         reaction *r = &reactions[sim->n_reactions];
         r->isotope = sample->isotopes[i];
@@ -285,15 +282,15 @@ void make_rbs_reactions(const sample *sample, simulation *sim) { /* Note that si
         r->p.E = sim->ion.E * r->K;
         r->E = r->p.E;
         r->p.S = 0.0;
-        r->histo = gsl_histogram_calloc_uniform(sim->n_channels, 0 * C_KEV, sim->histogram_bin * sim->n_channels);
-        r->max_depth = sample->cranges[sample->n_ranges-1]-1000.0*C_TFU; /* TODO: figure it out! */
+        r->max_depth = sample->cranges[sample->n_ranges-1]-1000.0*C_TFU;
 
         r->stop = 0;
 #ifdef DEBUG
         fprintf(stderr, "Reaction i=%i, with %s: K = %.5lf, max depth : %.3lf tfu\n", sim->n_reactions, r->isotope->name, r->K, r->max_depth/C_TFU);
 #endif
-        sim->n_reactions++;
+        (*n_reactions)++;
     };
+    return reactions;
 }
 
 jibal_layer **read_layers(jibal *jibal, int argc, char **argv, int *n_layers) {
@@ -327,23 +324,23 @@ int assign_stopping(jibal_gsto *gsto, simulation *sim, sample *sample) {
     return 0;
 }
 
-void print_spectra(FILE *f, const simulation *sim) {
+void print_spectra(FILE *f, const simulation *sim, const sim_workspace *ws) {
     int i, j;
     for(i = 0; i < sim->n_channels; i++) {
         double sum = 0.0;
         for (j = 0; j < sim->n_reactions; j++) {
-            sum += sim->reactions[j].histo->bin[i];
+            sum += ws->histos[j]->bin[i];
         }
         fprintf(f, "%4i %e", i, sum);
         for (j = 0; j < sim->n_reactions; j++) {
-            fprintf(f, " %e", sim->reactions[j].histo->bin[i]);
+            fprintf(f, " %e", ws->histos[j]->bin[i]);
         }
         fprintf(f, "\n");
     }
 }
 
 int main(int argc, char **argv) {
-    simulation sim = {.reactions = NULL};
+    simulation sim;
     int i,j,k;
     clock_t start, end;
     double cpu_time_used;
@@ -392,7 +389,7 @@ int main(int argc, char **argv) {
     if(sample.n_isotopes == 0)
         return EXIT_FAILURE;
 
-    print_sample(stderr, &sample);
+    sample_print(stderr, &sample);
 
     sim.alpha = ALPHA;
     sim.beta = BETA;
@@ -403,7 +400,7 @@ int main(int argc, char **argv) {
     ion_set_isotope(&sim.ion, sim.incident);
     ion_set_angle(&sim.ion, ALPHA);
 
-    make_rbs_reactions(&sample, &sim);
+    reaction *reactions = make_rbs_reactions(&sample, &sim, &sim.n_reactions);
     if(assign_stopping(jibal->gsto, &sim, &sample)) {
         return EXIT_FAILURE;
     }
@@ -411,30 +408,30 @@ int main(int argc, char **argv) {
     jibal_gsto_load_all(jibal->gsto);
 
     start = clock();
-    sim_workspace *ws = sim_workspace_init(&sample, jibal->gsto);
     for (int n = 0; n < NUMBER_OF_SIMULATIONS; n++) {
-        rbs(ws, &sim, &sample);
+        reaction *r = malloc(sim.n_reactions * sizeof(reaction));
+        memcpy(r, reactions, sim.n_reactions * sizeof(reaction)); /* TODO: when we stop mutilating the reactions we can stop doing this */
+        sim_workspace *ws = sim_workspace_init(&sim, &sample, jibal->gsto);
+        rbs(ws, &sim, reactions, &sample);
+#if 0
+        if(n == NUMBER_OF_SIMULATIONS-1)
+#else
+        if(n == 0)
+#endif
+            print_spectra(f, &sim, ws);
+        sim_workspace_free(ws);
+        free(r);
     }
     end = clock();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-
-    print_spectra(f, &sim);
 
     fprintf(stderr, "CPU time: %g ms per spectrum, for actual simulation of %i spectra.\n", cpu_time_used*1000.0/NUMBER_OF_SIMULATIONS, NUMBER_OF_SIMULATIONS);
     fclose(f);
     for(i = 0; i < n_layers; i++) {
         jibal_layer_free(layers[i]);
     }
+    sample_free(&sample);
     free(layers);
     jibal_free(jibal);
-    sim_workspace_free(ws);
-    free(ws);
-#if 0
-    for (i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
-        sim_isotope *it = &its[i_isotope];
-        free(it->conc);
-        gsl_histogram_free(it->h);
-    }
-#endif
     return 0;
 }
