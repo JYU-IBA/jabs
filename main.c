@@ -59,10 +59,11 @@
 
 #define NUMBER_OF_SIMULATIONS 1
 
-#define USAGE_STRING "Usage simu [-E <energy>] <material1> <thickness1> [<material2> <thickness2> ...]\n\nExample: simu -E 2MeV --alpha 10deg --beta 0deg -theta 170deg Au 500tfu SiO2 1000tfu Si 10000tfu\n"
+#define USAGE_STRING "Usage: jabs [-E <energy>] <material1> <thickness1> [<material2> <thickness2> ...]\n\nExample: jabs -E 2MeV --alpha 10deg --beta 0deg -theta 170deg Au 500tfu SiO2 1000tfu Si 10000tfu\n"
+#define COPYRIGHT_STRING "    Jaakko's Backscattering Simulator (JaBS)\n    Copyright (C) 2021 Jaakko Julin\n\n    This program is free software; you can redistribute it and/or modify \n    it under the terms of the GNU General Public License as published by\n    the Free Software Foundation; either version 2 of the License, or\n    (at your option) any later version.\n\n   See LICENSE.txt for the full license.\n\n"
 
-const char *simu_version() {
-        return simu_VERSION;
+const char *jabs_version() {
+        return jabs_VERSION;
 }
 
 void usage() {
@@ -95,7 +96,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
     };
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:b:t:I:F:R:S:f", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "hvVE:o:a:b:t:I:F:R:S:f:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -121,11 +122,12 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 sim->theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 'h':
+                fputs(COPYRIGHT_STRING, stderr);
                 usage();
                 exit(EXIT_SUCCESS);
                 break;
             case 'V':
-                printf("%s\n", simu_VERSION);
+                printf("%s\n", jabs_version());
                 exit(EXIT_SUCCESS);
                 break; /* Unnecessary */
             case 'v':
@@ -507,6 +509,9 @@ void simulation_print(FILE *f, const simulation *sim) {
 }
 
 int main(int argc, char **argv) {
+    fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version());
+    fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
+                    "This is free software, and you are welcome to redistribute it under certain conditions.\n\n");
     global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0};
     simulation sim = {.alpha = ALPHA, .beta = BETA, .theta = THETA,
                       .p_sr = PARTICLES_SR, .energy_resolution = DETECTOR_RESOLUTION*DETECTOR_RESOLUTION,

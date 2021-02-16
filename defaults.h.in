@@ -1,5 +1,5 @@
-#define simu_VERSION "@simu_VERSION@"
-#define simu_VERSION_MAJOR @simu_VERSION_MAJOR@
-#define simu_VERSION_MINOR @simu_VERSION_MINOR@
-#define simu_VERSION_PATCH @simu_VERSION_PATCH@
-#define simu_DESCRIPTION "@simu_DESCRIPTION@"
+#define jabs_VERSION "@jabs_VERSION@"
+#define jabs_VERSION_MAJOR @jabs_VERSION_MAJOR@
+#define jabs_VERSION_MINOR @jabs_VERSION_MINOR@
+#define jabs_VERSION_PATCH @jabs_VERSION_PATCH@
+#define jabs_DESCRIPTION "@jabs_DESCRIPTION@"
