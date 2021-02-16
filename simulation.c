@@ -23,3 +23,13 @@ void sim_workspace_free(sim_workspace *ws) {
     free(ws->histos);
     free(ws);
 }
+
+void sim_set_calibration(simulation *sim, double slope, double offset) {
+    sim->energy_slope = slope;
+    sim->energy_offset = 0.0*C_KEV;
+    sim_recalculate_calibration(sim);
+}
+
+void sim_recalculate_calibration(simulation *sim) {
+    sim->n_channels= ceil((1.1 * sim->ion.E - sim->energy_offset)/ sim->energy_slope);
+}

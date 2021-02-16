@@ -13,8 +13,8 @@
 typedef struct {
     int n_channels;
     int n_reactions;
-    double histogram_bin;
-    const jibal_isotope *incident;
+    double energy_slope;
+    double energy_offset;
     double p_sr;
     double p_sr_cos_alpha; /* particles * sr / cos(alpha) */
     double alpha;
@@ -38,5 +38,7 @@ typedef struct {
 
 sim_workspace *sim_workspace_init(const simulation *sim, sample *sample, jibal_gsto *gsto);
 void sim_workspace_free(sim_workspace *ws);
+void sim_set_calibration(simulation *sim, double slope, double offset); /*Note that sim->ion.E needs to be set before */
+void sim_recalculate_calibration();
 
 #endif /* _SIMULATION_H_ */

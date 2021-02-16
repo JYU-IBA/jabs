@@ -164,7 +164,7 @@ void rbs(sim_workspace *ws, const simulation *sim, reaction *reactions, const sa
         r->S = 0.0;
         r->p.S = 0.0;
         r->stop = 0;
-        ws->histos[i_reaction] = gsl_histogram_calloc_uniform(sim->n_channels, 0 * C_KEV, sim->histogram_bin * sim->n_channels); /* free'd by sim_workspace_free */
+        ws->histos[i_reaction] = gsl_histogram_calloc_uniform(sim->n_channels, sim->energy_offset, sim->energy_offset+sim->energy_slope * sim->n_channels); /* free'd by sim_workspace_free */
 
     }
     for (x = 0.0; x < thickness;) {
@@ -339,15 +339,19 @@ void print_spectra(FILE *f, const simulation *sim, const sim_workspace *ws) {
     }
 }
 
+void layers_free(jibal_layer **layers, int n_layers) {
+    int i;
+    for(i = 0; i < n_layers; i++) {
+        jibal_layer_free(layers[i]);
+    }
+    free(layers);
+}
+
 int main(int argc, char **argv) {
     simulation sim;
-    int i,j,k;
-    clock_t start, end;
-    double cpu_time_used;
-#if 0
-    erf_Q_test();
-    return 0;
-#endif
+    sample sample;
+    clock_t init, start, end;
+    init = clock();
     jibal *jibal = jibal_init(NULL);
     if(jibal->error) {
         fprintf(stderr, "Initializing JIBAL failed with error code %i (%s)\n", jibal->error, jibal_error_string(jibal->error));
@@ -357,8 +361,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Not enough arguments! Usage: %s: isotope energy file material thickness material2 thickness2...\n", argv[0]);
         return 1;
     }
-    sim.incident = jibal_isotope_find(jibal->isotopes, argv[1], 0, 0);
-    if(!sim.incident) {
+    const jibal_isotope *incident = jibal_isotope_find(jibal->isotopes, argv[1], 0, 0);
+    if(!incident) {
         fprintf(stderr, "No isotope %s found.\n", argv[1]);
     }
     sim.ion.E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, argv[2]);
@@ -369,8 +373,9 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Hmm...? Check your numbers.\n");
         return -1;
     }
-    sim.histogram_bin = HISTOGRAM_BIN;
-    sim.n_channels= ceil(1.1 * sim.ion.E / sim.histogram_bin);
+    sim.energy_slope = HISTOGRAM_BIN;
+    sim.energy_offset = 0.0*C_KEV;
+    sim.n_channels= ceil((1.1 * sim.ion.E - sim.energy_offset)/ sim.energy_slope);
     const char *filename = argv[3];
     FILE *f = fopen(filename, "w");
     if(!f) {
@@ -385,10 +390,9 @@ int main(int argc, char **argv) {
     if(!layers)
         return EXIT_FAILURE;
 
-    sample sample = sample_from_layers( layers, n_layers);
+    sample = sample_from_layers( layers, n_layers);
     if(sample.n_isotopes == 0)
         return EXIT_FAILURE;
-
     sample_print(stderr, &sample);
 
     sim.alpha = ALPHA;
@@ -397,7 +401,7 @@ int main(int argc, char **argv) {
     sim.p_sr = PARTICLES_SR; /* TODO: particles * sr / cos(alpha) */
     sim.p_sr_cos_alpha = sim.p_sr / cos(sim.alpha);
     sim.ion.S = 0.0; /* TODO: initial beam broadening goes here */
-    ion_set_isotope(&sim.ion, sim.incident);
+    ion_set_isotope(&sim.ion, incident);
     ion_set_angle(&sim.ion, ALPHA);
 
     reaction *reactions = make_rbs_reactions(&sample, &sim, &sim.n_reactions);
@@ -423,15 +427,10 @@ int main(int argc, char **argv) {
         free(r);
     }
     end = clock();
-    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-
-    fprintf(stderr, "CPU time: %g ms per spectrum, for actual simulation of %i spectra.\n", cpu_time_used*1000.0/NUMBER_OF_SIMULATIONS, NUMBER_OF_SIMULATIONS);
+    fprintf(stderr, "CPU time: %g ms per spectrum (total %g s, including initialization), for actual simulation of %i spectra.\n", (((double) (end - start)) / CLOCKS_PER_SEC)*1000.0/NUMBER_OF_SIMULATIONS, ((double) (end - init)) / CLOCKS_PER_SEC, NUMBER_OF_SIMULATIONS);
     fclose(f);
-    for(i = 0; i < n_layers; i++) {
-        jibal_layer_free(layers[i]);
-    }
+    layers_free(layers, n_layers);
     sample_free(&sample);
-    free(layers);
     jibal_free(jibal);
-    return 0;
+    return EXIT_SUCCESS;
 }
