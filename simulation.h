@@ -16,12 +16,15 @@ typedef struct {
     double energy_slope;
     double energy_offset;
     double energy_resolution; /* Stored as variance, i.e. energy squared (in SI-units J^2) */
+    double stop_step_incident;
+    double stop_step_exiting;
     double p_sr;
     double p_sr_cos_alpha; /* particles * sr / cos(alpha) */
     double alpha;
     double beta;
     double theta;
     ion ion;
+    int fast;
 } simulation;
 
 typedef struct {

@@ -34,7 +34,7 @@
 
 #define CONCENTRATION_CUTOFF 1e-8
 
-#define NUMBER_OF_SIMULATIONS 20
+#define NUMBER_OF_SIMULATIONS 1
 
 #define USAGE_STRING "Usage simu [-E <energy>] <material1> <thickness1> [<material2> <thickness2> ...]\n\nExample: simu -E 2MeV --alpha 10deg --beta 0deg -theta 170deg Au 500tfu SiO2 1000tfu Si 10000tfu\n"
 
@@ -65,14 +65,29 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"theta",     required_argument, NULL, 't'},
             {"fluence",   required_argument, NULL, 'F'},
             {"resolution",required_argument, NULL, 'R'},
+            {"step_incident",required_argument, NULL, 'S'},
+            {"step_exiting",required_argument, NULL, '0'},
+            {"fast", optional_argument, NULL, 'f'},
             {NULL, 0,                NULL,   0}
     };
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:b:t:I:F:R:", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "hvVE:o:a:b:t:I:F:R:S:f", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
+            case 'f':
+                if (optarg)
+                    sim->fast = atoi(optarg);
+                else
+                    sim->fast++;
+                break;
+            case '0':
+                sim->stop_step_exiting = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                break;
+            case 'S':
+                sim->stop_step_incident = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                break;
             case 'a':
                 sim->alpha = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
@@ -462,15 +477,21 @@ void simulation_print(FILE *f, const simulation *sim) {
     fprintf(stderr, "particles * sr = %e\n", sim->p_sr);
     fprintf(stderr, "calibration offset = %.3lf keV\n", sim->energy_offset/C_KEV);
     fprintf(stderr, "calibration slope = %.5lf keV\n", sim->energy_slope/C_KEV);
-    fprintf(stderr, "detector resolution = %.lf keV FWHM\n", sqrt(sim->energy_resolution)*C_FWHM/C_KEV);
+    fprintf(stderr, "detector resolution = %.3lf keV FWHM\n", sqrt(sim->energy_resolution)*C_FWHM/C_KEV);
+    fprintf(stderr, "step for incident ions = %.3lf keV\n", sim->stop_step_incident/C_KEV);
+    fprintf(stderr, "step for exiting ions = %.3lf keV\n", sim->stop_step_exiting/C_KEV);
+    fprintf(stderr, "fast level = %i\n", sim->fast);
 }
 
 int main(int argc, char **argv) {
     global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0};
-    simulation sim = {.alpha = ALPHA, .beta = BETA, .theta = THETA, .p_sr = PARTICLES_SR, .energy_resolution = DETECTOR_RESOLUTION*DETECTOR_RESOLUTION, .ion = {.E = ENERGY }};
+    simulation sim = {.alpha = ALPHA, .beta = BETA, .theta = THETA,
+                      .p_sr = PARTICLES_SR, .energy_resolution = DETECTOR_RESOLUTION*DETECTOR_RESOLUTION,
+                      .stop_step_incident = STOP_STEP_INCIDENT, .stop_step_exiting = STOP_STEP_EXITING,
+                      .fast = 0,
+                      .ion = {.E = ENERGY }};
     sample sample;
-    clock_t init, start, end;
-    init = clock();
+    clock_t start, end;
     jibal *jibal = jibal_init(NULL);
     if(jibal->error) {
         fprintf(stderr, "Initializing JIBAL failed with error code %i (%s)\n", jibal->error, jibal_error_string(jibal->error));
@@ -530,18 +551,20 @@ int main(int argc, char **argv) {
     jibal_gsto_print_assignments(jibal->gsto);
     jibal_gsto_load_all(jibal->gsto);
 
-    fprintf(stderr, "\nSTARTING SIMULATION\n");
+
     simulation_print(stderr, &sim);
-    fprintf(stderr, "..now (hold your breath)!\n");
+    fprintf(stderr, "\nSTARTING SIMULATION... NOW! Hold your breath!\n");
+    fflush(stderr);
     start = clock();
     for (int n = 0; n < NUMBER_OF_SIMULATIONS; n++) {
         reaction *r = malloc(sim.n_reactions * sizeof(reaction));
-        memcpy(r, reactions, sim.n_reactions * sizeof(reaction)); /* TODO: when we stop mutilating the reactions we can stop doing this */
+        memcpy(r, reactions, sim.n_reactions *
+                             sizeof(reaction)); /* TODO: when we stop mutilating the reactions we can stop doing this */
         sim_workspace *ws = sim_workspace_init(&sim, &sample, jibal->gsto);
-#ifdef FAST
-        ws->stopping_type = GSTO_STO_ELE;
-        ws->rk4 = 0;
-#endif
+        if (sim.fast) {
+            ws->stopping_type = GSTO_STO_ELE;
+            ws->rk4 = 0;
+        }
         rbs(ws, &sim, reactions, &sample);
 #if 0
         if(n == NUMBER_OF_SIMULATIONS-1)
@@ -553,11 +576,9 @@ int main(int argc, char **argv) {
         free(r);
     }
     end = clock();
-    fprintf(stderr, "..finished!\n\n");
-    fprintf(stderr, "Average CPU time: %.3lf ms. Total of all %i spectra including initialization: %.3lf s.\n",
-            (((double) (end - start)) / CLOCKS_PER_SEC)*1000.0/NUMBER_OF_SIMULATIONS,
-            NUMBER_OF_SIMULATIONS,
-            ((double) (end - init)) / CLOCKS_PER_SEC);
+    double cputime_spectrum_ms = (((double) (end - start)) / CLOCKS_PER_SEC)*1000.0/NUMBER_OF_SIMULATIONS;
+    fprintf(stderr, "...finished!\n\n");
+    fprintf(stderr, "CPU time per spectrum: %.3lf ms.%s\n", cputime_spectrum_ms, cputime_spectrum_ms<10.0?" That was fast!":"");
     if(f != stdout) {
         fclose(f);
     }
