@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <assert.h>
 #include <time.h>
+#include <string.h>
+#include <math.h>
 #include <jibal.h>
 #include <jibal_gsto.h>
 #include <jibal_stop.h>
@@ -32,13 +34,13 @@
 #define NUMBER_OF_SIMULATIONS 20
 
 
-double stop_sample(sim_workspace *ws, const ion *incident, sample *sample, gsto_stopping_type type, double x, double E) {
+double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E) {
     double em=E/incident->mass;
     int i_isotope;
 
     double S1 = 0.0;
 
-    get_concs(sample, x, ws->c);
+    get_concs(ws, sample, x, ws->c);
     for(i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
         //double c = get_conc(sample, x, i_isotope); /* TODO: this could be sped up */
         double c = ws->c[i_isotope];
@@ -77,7 +79,7 @@ void recalculate_concs(sim_isotope *its, double x) {
 }
 #endif
 
-double stop_step(sim_workspace *ws, ion *incident, sample *sample, double x, double h_max, double step) {
+double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double x, double h_max, double step) {
     /* positive max depth step (h_max) also gives the direction. Energy step (step) should be negative if regular stopping is done. */
     double k1, k2, k3, k4, stop, dE, E, h_max_orig = h_max;
     int maxstep = 0;
@@ -143,10 +145,11 @@ double stop_step(sim_workspace *ws, ion *incident, sample *sample, double x, dou
       /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
-void rbs(sim_workspace *accel, simulation *sim, sample *sample) {
+void rbs(sim_workspace *ws, const simulation *sim, const sample *sample) {
     double x;
-    ion *ion = &sim->ion;
-    reaction *reactions = sim->reactions;
+    ion ion = sim->ion;
+    reaction *reactions = malloc(sim->n_reactions * sizeof(reaction));
+    memcpy(reactions, sim->reactions, sim->n_reactions * sizeof(reaction));
     /* TODO: realloc reactions if some are discarded */
     assert(sample->n_ranges);
     double thickness = sample->cranges[sample->n_ranges-1];
@@ -155,10 +158,10 @@ void rbs(sim_workspace *accel, simulation *sim, sample *sample) {
     int i_range = 0;
     int i_reaction;
 #ifdef DEBUG
-    fprintf(stderr, "Thickness %g tfu, E = %g MeV\n", thickness/C_TFU, ion->E/C_MEV);
+    fprintf(stderr, "Thickness %g tfu, E = %g MeV\n", thickness/C_TFU, ion.E/C_MEV);
 #endif
     for(i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-        reaction *r = &sim->reactions[i_reaction];
+        reaction *r = &reactions[i_reaction];
         r->p.E = sim->ion.E * r->K;
         r->E = r->p.E;
         r->S = 0.0;
@@ -166,22 +169,16 @@ void rbs(sim_workspace *accel, simulation *sim, sample *sample) {
         r->stop = 0;
     }
     for (x = 0.0; x < thickness;) {
-        while (x >= sample->cranges[i_range+1]) {
+        while (i_range < sample->n_ranges-1 && x >= sample->cranges[i_range+1]) {
             i_range++;
-            if (i_range >= sample->n_ranges-1) {
-#ifdef DEBUG
-                fprintf(stderr, "return due to last range, last (uncalculated) x = %g tfu\n", x/C_TFU);
-#endif
-                return;
-            }
 #ifdef DEBUG
             fprintf(stderr, "Crossing to range %i = [%g, %g)\n", i_range, sample->cranges[i_range]/C_TFU, sample->cranges[i_range+1]/C_TFU);
 #endif
             next_crossing = sample->cranges[i_range+1];
         }
-        if(ion->E < E_MIN) {
+        if(ion.E < E_MIN) {
             fprintf(stderr, "Return due to low energy.\n");
-            return;
+            break;
         }
         h_max = next_crossing - x;
         if(h_max < 0.0001*C_TFU) {
@@ -190,28 +187,27 @@ void rbs(sim_workspace *accel, simulation *sim, sample *sample) {
             continue;
         }
 
-        double E_front = ion->E;
-        //recalculate_concs(its, x);
-        double h = stop_step(accel, ion, sample, x, h_max, STOP_STEP_INCIDENT);
+        double E_front = ion.E;
+        double h = stop_step(ws, &ion, sample, x, h_max, STOP_STEP_INCIDENT);
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
-        double E_back = ion->E;
+        double E_back = ion.E;
 #ifdef DEBUG
         double E_diff = E_front-E_back;
-        fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3lf keV to  %8.3lf keV (diff %6.4lf keV)\n", x/C_TFU, (x+h)/C_TFU, E_front/C_KEV, ion->E/C_KEV, E_diff/C_KEV);
+        fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3lf keV to  %8.3lf keV (diff %6.4lf keV)\n", x/C_TFU, (x+h)/C_TFU, E_front/C_KEV, ion.E/C_KEV, E_diff/C_KEV);
 #endif
-        double S_back = ion->S;
+        double S_back = ion.S;
         double E_mean = (E_front+E_back)/2.0;
 #ifdef DEBUG
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
-                        E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ion->S) / C_KEV);
+                        E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ion.S) / C_KEV);
 #endif
         for (i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
             reaction *r = &reactions[i_reaction];
             if(r->stop)
                 continue;
-            r->p.E = ion->E * r->K;
-            r->p.S = ion->S * r->K;
+            r->p.E = ion.E * r->K;
+            r->p.S = ion.S * r->K;
             assert(r->p.E > 0.0);
 
             if(x >= r->max_depth) {
@@ -222,14 +218,12 @@ void rbs(sim_workspace *accel, simulation *sim, sample *sample) {
                 continue;
             }
 
-            double c = get_conc(sample, x+h/2.0, r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
+            double c = get_conc(ws, sample, x+h/2.0, r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
             double x_out;
             int i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
-                //fprintf(stderr, "Surfacing... x_out = %g tfu... ", x_out/C_TFU);
-                //recalculate_concs(its, x_out-0.00001*C_TFU);
-                double h_max = sample->cranges[i_range_out] - x_out;
-                double h_out = stop_step(accel, &r->p, sample, x_out-0.0001*C_TFU, h_max, STOP_STEP_EXITING); /* FIXME: 0.0001*C_TFU IS A STUPID HACK */
+                double h_out_max = sample->cranges[i_range_out] - x_out;
+                double h_out = stop_step(ws, &r->p, sample, x_out-0.00001*C_TFU, h_out_max, STOP_STEP_EXITING); /* FIXME: 0.0001*C_TFU IS A STUPID HACK */
                 x_out += h_out;
                 if( r->p.E < E_MIN) {
                     r->stop = 1;
@@ -241,13 +235,13 @@ void rbs(sim_workspace *accel, simulation *sim, sample *sample) {
                 assert(h_out < 0.0);
                 while (i_range_out > 0 && x_out <= sample->cranges[i_range_out]) {
                     i_range_out--;
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
                     fprintf(stderr, "Outgoing from reaction %i crossing to range %i = [%g, %g) when x_out = %g tfu.\n", i_reaction, i_range_out, sample->cranges[i_range_out]/C_TFU, sample->cranges[i_range_out+1]/C_TFU, x_out/C_TFU);
 #endif
                 }
             }
             if(c > CONCENTRATION_CUTOFF && r->p.E > E_MIN) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
-                double sigma = jibal_cross_section_rbs(ion->isotope, r->isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
+                double sigma = jibal_cross_section_rbs(ion.isotope, r->isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
                 double Q = c * sim->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
 #ifdef dfDEBUG
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf (prev %.3lf, sigma = %g mb/sr, Q = %g (c = %.4lf%%)\n",
@@ -265,22 +259,24 @@ void rbs(sim_workspace *accel, simulation *sim, sample *sample) {
         fprintf(stderr, "Surf: from x_out = %g tfu, gives E_out = %g MeV (prev was %g MeV, diff %g keV), stragg = %g keV\n", (x-h)/C_TFU, E_out/C_MEV, E_out_prev/C_MEV, (E_diff)/C_KEV, sqrt(S_out)/C_KEV);
         fprintf(stderr, "\n");
 #endif
-        if(!isnormal(ion->E)) {
+        if(!isnormal(ion.E)) {
             fprintf(stderr, "SOMETHING DOESN'T LOOK RIGHT HERE.\n");
             return;
         }
         x += h;
-        ion->S = S_back;
-        ion->E = E_back;
+        ion.S = S_back;
+        ion.E = E_back;
     }
+    free(reactions);
 }
 
 void make_rbs_reactions(const sample *sample, simulation *sim) { /* Note that sim->ion needs to be set! */
     int i;
     sim->n_reactions = 0; /* we calculate this */
-    sim->reactions = malloc(sample->n_isotopes*sizeof(reaction)); /* TODO: possible memory leak */
+    reaction * reactions = malloc(sample->n_isotopes*sizeof(reaction)); /* TODO: possible memory leak */
+    sim->reactions = reactions;
     for(i = 0; i < sample->n_isotopes; i++) {
-        reaction *r = &sim->reactions[sim->n_reactions];
+        reaction *r = &reactions[sim->n_reactions];
         r->isotope = sample->isotopes[i];
         r->i_isotope = i;
         ion_set_isotope(&r->p, sim->ion.isotope); /* TODO: for RBS, yes... */

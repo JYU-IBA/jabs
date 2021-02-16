@@ -3,7 +3,7 @@
 #include "sample.h"
 
 
-int get_range_bin(sample *s, double x) {
+int get_range_bin(sim_workspace *ws, const sample *s, double x) {
     int lo, mi, hi;
 #ifdef RANGE_PEDANTIC
     if(x < s->cranges[0] || x >= s->cranges[s->n_ranges-1]) { /* Out of bounds concentration is zero. Maybe the execution doesn't go here if all goes as planned, so this could be changed to an assert. */
@@ -26,21 +26,21 @@ int get_range_bin(sample *s, double x) {
             hi = mi;
         }
     }
-    s->i_range_accel = lo;
+    ws->i_range_accel = lo;
     return lo;
 }
 
-double get_conc(sample *s, double x, int i_isotope) {
+double get_conc(sim_workspace *ws, const sample *s, double x, int i_isotope) {
     int i_range, i;
 
-    if(x >= s->cranges[s->i_range_accel] && x < s->cranges[s->i_range_accel+1]) { /* Use saved bin. We'll probably receive a lot of repeated calls to the same bin, so this avoid cost of other range checking and binary searches. */
-        i = s->i_range_accel * s->n_isotopes + i_isotope;
-        if(s->cranges[s->i_range_accel] == s->cranges[s->i_range_accel+1]) /* Constant */
+    if(x >= s->cranges[ws->i_range_accel] && x < s->cranges[ws->i_range_accel+1]) { /* Use saved bin. We'll probably receive a lot of repeated calls to the same bin, so this avoid cost of other range checking and binary searches. */
+        i = ws->i_range_accel * s->n_isotopes + i_isotope;
+        if(s->cranges[ws->i_range_accel] == s->cranges[ws->i_range_accel+1]) /* Constant */
             return s->cbins[i];
         else /* Linear interpolation */
-            return s->cbins[i] + ((s->cbins[i+s->n_isotopes] - s->cbins[i])/(s->cranges[s->i_range_accel+1] - s->cranges[s->i_range_accel])) * (x - s->cranges[s->i_range_accel]);
+            return s->cbins[i] + ((s->cbins[i+s->n_isotopes] - s->cbins[i])/(s->cranges[ws->i_range_accel+1] - s->cranges[ws->i_range_accel])) * (x - s->cranges[ws->i_range_accel]);
     }
-    i_range = get_range_bin(s, x);
+    i_range = get_range_bin(ws, s, x);
     if(i_range < 0) {
 #ifdef DEBUG
         fprintf(stderr, "No depth range found for x = %.5lf\n", x/C_TFU);
@@ -54,13 +54,13 @@ double get_conc(sample *s, double x, int i_isotope) {
     return s->cbins[i] + ((s->cbins[i+s->n_isotopes] - s->cbins[i])/(s->cranges[i_range+1] - s->cranges[i_range])) * (x - s->cranges[i_range]);
 }
 
-int get_concs(sample *s, double x, double *out) {
+int get_concs(sim_workspace *ws, const sample *s, double x, double *out) {
     int i_range, i;
 
-    if(x >= s->cranges[s->i_range_accel] && x < s->cranges[s->i_range_accel+1]) { /* Use saved bin. */
-        i_range = s->i_range_accel;
+    if(x >= s->cranges[ws->i_range_accel] && x < s->cranges[ws->i_range_accel+1]) { /* Use saved bin. */
+        i_range = ws->i_range_accel;
     } else {
-        i_range = get_range_bin(s, x);
+        i_range = get_range_bin(ws, s, x);
     }
     if(i_range < 0) {
 #ifdef DEBUG
@@ -86,7 +86,7 @@ int get_concs(sample *s, double x, double *out) {
 }
 
 sample sample_from_layers(jibal_layer **layers, int n_layers) {
-    sample s = {.n_isotopes = 0, .i_range_accel = 0};
+    sample s = {.n_isotopes = 0};
     int i, j, k;
     s.n_ranges = 2*n_layers;
     s.cranges = malloc(s.n_ranges*sizeof(double));
