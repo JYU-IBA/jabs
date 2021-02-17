@@ -24,18 +24,19 @@ Simulates RBS spectra rapidly.
 
         $ git clone git@gitlab.jyu.fi:iba/jabs.git
 
+
 3. Build, see [CMake instructions](https://cmake.org/runningcmake/), or try...
 
         $ mkdir build
         $ cd build
-        $ cmake ../
-        $ make
+        $ cmake ../
+        $ make
        
 ## Usage
 
-Several (undocumented) parameters can be set from the command line. Try something like this:
+Several parameters can be set from the command line. See `jabs -h` and try something like this:
 
 ~~~~
-$ ./jabs -I 4He -E 2MeV -o tmp.csv --alpha 10deg --beta 10deg --theta 160deg -R 20keV Au 500tfu SiO2 1000tfu Si 10000tfu
+$ ./jabs -E 2MeV --alpha=10deg --beta=0deg --theta=170deg --out=spectrum.csv Au 500tfu SiO2 1000tfu Si 10000tfu
 ~~~~
 
