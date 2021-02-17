@@ -34,7 +34,7 @@ double get_conc(sim_workspace *ws, const sample *s, double x, int i);
 int get_concs(sim_workspace *ws, const sample *s, double x, double *out);
 int get_range_bin(const sample *s, double x);
 
-sample *sample_from_layers(jibal_layer **layers, int n_layers);
+sample *sample_from_layers(jibal_layer * const *layers, int n_layers);
 void sample_print(FILE *f, const sample *sample);
 void sample_free(sample *sample);
 double sample_isotope_max_depth(const sample *sample, int i_isotope);

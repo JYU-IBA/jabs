@@ -19,6 +19,7 @@
 typedef struct {
     jibal *jibal;
     int verbose;
+    int fit;
     char *out_filename;
     char *exp_filename;
 } global_options;

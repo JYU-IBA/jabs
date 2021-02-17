@@ -51,14 +51,13 @@ typedef struct {
     gsl_histogram **histos; /* array of n_reactions */
     int n_channels; /* NEW: histogram */
     double p_sr_cos_alpha; /* NEW: particles * sr / cos(alpha) */
-
 } sim_workspace;
 
 #include "sample.h"
 simulation *sim_init();
 void sim_free(simulation *sim);
 int sim_sanity_check(const simulation *sim);
-sim_workspace *sim_workspace_init(const simulation *sim, sample *sample, jibal_gsto *gsto);
+sim_workspace *sim_workspace_init(const simulation *sim, const sample *sample, jibal_gsto *gsto);
 void sim_workspace_free(sim_workspace *ws);
 void sim_set_calibration(simulation *sim, double slope, double offset); /*Note that sim->ion.E needs to be set before */
 void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *sim);

@@ -50,7 +50,7 @@ void erf_Q_test() {
 
 void brick_int(double sigma_low, double sigma_high, double E_low, double E_high, gsl_histogram *h, double Q) { /* Energy spectrum h, integrate over rectangular brick convoluted with a gaussian */
     int i;
-#ifndef OPTIMIZE_BRICK
+#ifdef OPTIMIZE_BRICK
     size_t lo;
     size_t hi;
     gsl_histogram_find(h, E_low, &lo);

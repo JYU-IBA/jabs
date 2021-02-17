@@ -11,6 +11,7 @@
     See LICENSE.txt for the full license.
 
  */
+#include <assert.h>
 #include "simulation.h"
 #include "defaults.h"
 
@@ -49,15 +50,13 @@ int sim_sanity_check(const simulation *sim) {
     return 0;
 }
 
-sim_workspace *sim_workspace_init(const simulation *sim, sample *sample, jibal_gsto *gsto) {
+sim_workspace *sim_workspace_init(const simulation *sim, const sample *sample, jibal_gsto *gsto) {
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->n_reactions = sim->n_reactions;
-    ws->c = calloc(sample->n_isotopes, sizeof(double));
     ws->gsto = gsto;
     ws->i_range_accel = 0;
     ws->c_x = 0.0;
-    get_concs(ws, sample, ws->c_x, ws->c);
-    ws->histos = calloc(ws->n_reactions, sizeof(gsl_histogram *));
+
     ws->p_sr_cos_alpha = sim->p_sr / cos(sim->alpha);
     if (sim->fast) {
         ws->stopping_type = GSTO_STO_ELE;
@@ -67,13 +66,32 @@ sim_workspace *sim_workspace_init(const simulation *sim, sample *sample, jibal_g
         ws->rk4 = 1;
     }
     sim_workspace_recalculate_calibration(ws, sim);
+    if(ws->n_channels == 0) {
+        free(ws);
+        return NULL;
+    }
+    ws->histos = calloc(ws->n_reactions, sizeof(gsl_histogram *));
+    int i_reaction;
+    for(i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
+        ws->histos[i_reaction] = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
+        gsl_histogram_set_ranges_uniform(ws->histos[i_reaction],
+                                         sim->energy_offset,
+                                         sim->energy_offset + sim->energy_slope * ws->n_channels);
+    }
+    ws->c = calloc(sample->n_isotopes, sizeof(double));
+    get_concs(ws, sample, ws->c_x, ws->c);
     return ws;
 }
 
 void sim_workspace_free(sim_workspace *ws) {
+    if(!ws)
+        return;
     int i;
     for(i = 0; i < ws->n_reactions; i++) {
-        gsl_histogram_free(ws->histos[i]);
+        if(ws->histos[i]) {
+            gsl_histogram_free(ws->histos[i]);
+            ws->histos[i] = NULL;
+        }
     }
     free(ws->c);
     free(ws->histos);
@@ -86,7 +104,10 @@ void sim_set_calibration(simulation *sim, double slope, double offset) {
 }
 
 void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *sim) {
-    ws->n_channels = ceil((1.1 * sim->ion.E - sim->energy_offset)/ sim->energy_slope);
+    ws->n_channels = ceil((1.1 * sim->ion.E - sim->energy_offset) / sim->energy_slope);
+    if(ws->n_channels < 0 || ws->n_channels > 100000) {
+        ws->n_channels = 0;
+    }
 }
 
 void simulation_print(FILE *f, const simulation *sim) {

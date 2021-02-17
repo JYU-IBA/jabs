@@ -88,7 +88,7 @@ int get_concs(sim_workspace *ws, const sample *s, double x, double *out) {
     }
     double *bins_low = &s->cbins[i_range * s->n_isotopes];
     double *bins_high = &s->cbins[(i_range+1) * s->n_isotopes];
-    if(s->cranges[i_range+1] - s->cranges[i_range] == 0) {
+    if(s->cranges[i_range] == s->cranges[i_range+1]) {
         for(i = 0; i < s->n_isotopes; i++) {
             out[i] = bins_low[i]; /* TODO: memcpy? */
         }
@@ -103,7 +103,7 @@ int get_concs(sim_workspace *ws, const sample *s, double x, double *out) {
     }
 }
 
-sample *sample_from_layers(jibal_layer **layers, int n_layers) {
+sample *sample_from_layers(jibal_layer * const *layers, int n_layers) {
     int i, j, k;
     sample *s = malloc(sizeof(sample));
     s->n_isotopes = 0;
@@ -111,7 +111,7 @@ sample *sample_from_layers(jibal_layer **layers, int n_layers) {
     s->cranges = malloc(s->n_ranges*sizeof(double));
     int i_isotope, n_isotopes=0;
     for(i = 0; i < n_layers; i++) {
-        jibal_layer *layer = layers[i];
+        const jibal_layer *layer = layers[i];
 #ifdef DEBUG
         fprintf(stderr, "Layer %i/%i. Thickness %g tfu\n", i+1, n_layers, layer->thickness/C_TFU);
         jibal_material_print(stderr, layer->material);
@@ -133,7 +133,7 @@ sample *sample_from_layers(jibal_layer **layers, int n_layers) {
     i_isotope = 0;
     s->n_isotopes = n_isotopes;
     for (i = 0; i < n_layers; i++) {
-        jibal_layer *layer = layers[i];
+        const jibal_layer *layer = layers[i];
         for (j = 0; j < layer->material->n_elements; ++j) {
             jibal_element *element = &layer->material->elements[j];
             for (k = 0; k < element->n_isotopes; k++) {
@@ -179,6 +179,8 @@ void sample_print(FILE *f, const sample *sample) {
 }
 
 void sample_free(sample *sample) {
+    if(!sample)
+        return;
     free(sample->cranges);
     free(sample->isotopes);
     free(sample->cbins);

@@ -42,6 +42,7 @@
 #include "simulation.h"
 #include "layers.h"
 #include "spectrum.h"
+#include "fit.h"
 
 #define CONCENTRATION_CUTOFF 1e-8
 
@@ -138,7 +139,7 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
       /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
-void rbs(sim_workspace *ws, const simulation *sim, reaction *reactions, const sample *sample) {
+void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, const sample *sample) {
     double x;
     ion ion = sim->ion;
     assert(sample->n_ranges);
@@ -154,7 +155,6 @@ void rbs(sim_workspace *ws, const simulation *sim, reaction *reactions, const sa
         r->S = 0.0;
         r->p.S = 0.0;
         r->stop = 0;
-        ws->histos[i_reaction] = gsl_histogram_calloc_uniform(ws->n_channels, sim->energy_offset, sim->energy_offset+sim->energy_slope * ws->n_channels); /* free'd by sim_workspace_free */
     }
     for (x = 0.0; x < thickness;) {
         while (i_range < sample->n_ranges-1 && x >= sample->cranges[i_range+1]) {
@@ -349,7 +349,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it under certain conditions.\n"
                     "Run 'jabs -h' for more information.\n\n");
-    global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0, .exp_filename = NULL};
+    global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0, .exp_filename = NULL, .fit = 0};
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -408,25 +408,55 @@ int main(int argc, char **argv) {
     fprintf(stderr, "\nSTARTING SIMULATION... NOW! Hold your breath!\n");
     fflush(stderr);
     start = clock();
-    for (int n = 0; n < NUMBER_OF_SIMULATIONS; n++) {
-        reaction *r = malloc(sim->n_reactions * sizeof(reaction));
-        memcpy(r, reactions, sim->n_reactions *
-                             sizeof(reaction)); /* TODO: when we stop mutilating the reactions we can stop doing this */
-        sim_workspace *ws = sim_workspace_init(sim, sample, jibal->gsto);
-        rbs(ws, sim, reactions, sample);
-#if 0
-        if(n == NUMBER_OF_SIMULATIONS-1)
-#else
-        if(n == 0)
-#endif
-            print_spectra(f, &global, sim, ws, sample, reactions, exp);
-        sim_workspace_free(ws);
-        free(r);
+    sim_workspace *ws = NULL;
+    struct fit_stats fit_stats;
+    if(global.fit) {
+        struct fit_data fit_data;
+        fit_data.n_iters_max = 300;
+        fit_data.low_ch = 300;
+        fit_data.high_ch = 1000;
+        fit_data.jibal = jibal;
+        fit_data.sim = sim;
+        fit_data.exp = exp;
+        fit_data.sample = NULL;
+        fit_data.layers = layers;
+        fit_data.n_layers = n_layers;
+        fit_data.reactions = reactions;
+        fit_data.ws = NULL;
+        fit_data.fit_params = fit_params_new();
+        fit_params *fit_params = fit_data.fit_params;
+        fit_params_add_parameter(fit_params, &sim->energy_slope);
+        fit_params_add_parameter(fit_params, &sim->energy_offset);
+        fit_params_add_parameter(fit_params, &sim->p_sr);
+        fit_params_add_parameter(fit_params, &sim->energy_resolution);
+        fit_params_add_parameter(fit_params, &layers[0]->thickness);
+        //fit_params_add_parameter(fit_params, &sample->cranges[])
+        fit_stats = fit(exp, &fit_data);
+        fprintf(stderr, "\nFinal parameters:\n");
+        simulation_print(stderr, sim);
+        fprintf(stderr, "\nFinal composition:\n");
+        sample_print(stderr, fit_data.sample);
+        if (fit_data.ws) {
+            print_spectra(f, &global, sim, fit_data.ws, sample, reactions, exp);
+        }
+        ws = fit_data.ws;
+        fprintf(stderr,"CPU time used for actual simulation: %.3lf s.\n", fit_data.cputime_actual);
+        fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_data.cputime_actual/fit_stats.n_evals);
+        fit_params_free(fit_params);
+    } else {
+        ws = sim_workspace_init(sim, sample, jibal->gsto);
+        simulate(ws, sim, reactions, sample);
     }
+    if(!ws) {
+        fprintf(stderr, "Unexpected error.\n");
+        return EXIT_FAILURE;
+    }
+    print_spectra(f, &global, sim, ws, sample, reactions, exp);
+    sim_workspace_free(ws);
     end = clock();
-    double cputime_spectrum_ms = (((double) (end - start)) / CLOCKS_PER_SEC)*1000.0/NUMBER_OF_SIMULATIONS;
+    double cputime_total =(((double) (end - start)) / CLOCKS_PER_SEC);
     fprintf(stderr, "...finished!\n\n");
-    fprintf(stderr, "CPU time per spectrum: %.3lf ms.%s\n", cputime_spectrum_ms, cputime_spectrum_ms<10.0?" That was fast!":"");
+    fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
     if(f != stdout) {
         fclose(f);
     }

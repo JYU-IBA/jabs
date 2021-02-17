@@ -40,3 +40,8 @@ Several parameters can be set from the command line. See `jabs -h` and try somet
 $ ./jabs -E 2MeV --alpha=10deg --beta=0deg --theta=170deg --out=spectrum.csv Au 500tfu SiO2 1000tfu Si 10000tfu
 ~~~~
 
+
+## Fitting
+
+There is a highly experimental fitting feature too, but the user can not choose which parameters to fit.
+Also the fit range is fixed.

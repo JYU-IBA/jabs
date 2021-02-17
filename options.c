@@ -42,7 +42,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"alpha",     required_argument, NULL, 'a'},
             {"beta",      required_argument, NULL, 'b'},
             {"theta",     required_argument, NULL, 't'},
-            {"fluence",   required_argument, NULL, 'F'},
+            {"fluence",   required_argument, NULL, '3'},
             {"resolution",required_argument, NULL, 'R'},
             {"step_incident",required_argument, NULL, 'S'},
             {"step_exiting",required_argument, NULL, '0'},
@@ -50,6 +50,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"offset",    required_argument, NULL, '2'},
             {"fast",      optional_argument, NULL, 'f'},
             {"exp",       required_argument, NULL, 'e'},
+            {"fit",        no_argument,      NULL, 'F'},
             {NULL, 0,                NULL,   0}
     };
     static const char *help_texts[] = {
@@ -74,7 +75,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:b:t:I:F:R:S:fe:", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "hvVE:o:a:b:t:I:R:S:fe:F", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -92,6 +93,12 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 break;
             case '2':
                 sim->energy_offset = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                break;
+            case '3':
+                sim->p_sr = strtod(optarg, NULL);
+                break;
+            case 'F':
+                global->fit = 1;
                 break;
             case 'S':
                 sim->stop_step_incident = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
@@ -149,9 +156,6 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                     fprintf(stderr, "%s is not a valid isotope.\n", optarg);
                     exit(EXIT_FAILURE);
                 }
-                break;
-            case 'F':
-                sim->p_sr = strtod(optarg, NULL);
                 break;
             case 'R':
                 sim->energy_resolution = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg)/C_FWHM;
