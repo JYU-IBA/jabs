@@ -15,7 +15,7 @@
 #include <getopt.h>
 #include <stdio.h>
 
-#include "defaults.h"
+#include "version.h"
 #include "options.h"
 
 

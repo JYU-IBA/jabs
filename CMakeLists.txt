@@ -17,7 +17,7 @@ project(jabs
 
 set(CMAKE_C_STANDARD 99)
 
-configure_file(defaults.h.in defaults.h @ONLY)
+configure_file(version.h.in version.h @ONLY)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 find_package(GSL 2.6 REQUIRED)
