@@ -1,5 +1,5 @@
-#ifndef _ION_H_
-#define _ION_H_
+#ifndef JABS_ION_H
+#define JABS_ION_H
 #include <jibal_masses.h>
 
 typedef struct {
@@ -15,4 +15,4 @@ typedef struct {
 
 void ion_set_isotope(ion *ion, const jibal_isotope *isotope);
 void ion_set_angle(ion *ion, double angle);
-#endif /*_ION_H_*/
+#endif // JABS_ION_H

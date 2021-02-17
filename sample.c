@@ -103,11 +103,12 @@ int get_concs(sim_workspace *ws, const sample *s, double x, double *out) {
     }
 }
 
-sample sample_from_layers(jibal_layer **layers, int n_layers) {
-    sample s = {.n_isotopes = 0};
+sample *sample_from_layers(jibal_layer **layers, int n_layers) {
     int i, j, k;
-    s.n_ranges = 2*n_layers;
-    s.cranges = malloc(s.n_ranges*sizeof(double));
+    sample *s = malloc(sizeof(sample));
+    s->n_isotopes = 0;
+    s->n_ranges = 2*n_layers;
+    s->cranges = malloc(s->n_ranges*sizeof(double));
     int i_isotope, n_isotopes=0;
     for(i = 0; i < n_layers; i++) {
         jibal_layer *layer = layers[i];
@@ -115,31 +116,31 @@ sample sample_from_layers(jibal_layer **layers, int n_layers) {
         fprintf(stderr, "Layer %i/%i. Thickness %g tfu\n", i+1, n_layers, layer->thickness/C_TFU);
         jibal_material_print(stderr, layer->material);
 #endif
-        s.cranges[2*i] = i?s.cranges[2*i-1]:0.0;
-        s.cranges[2*i+1] = s.cranges[2*i] + layer->thickness;
+        s->cranges[2*i] = i?s->cranges[2*i-1]:0.0;
+        s->cranges[2*i+1] = s->cranges[2*i] + layer->thickness;
         for (j = 0; j < layer->material->n_elements; ++j) {
             n_isotopes += layer->material->elements[j].n_isotopes;
         }
     }
 #ifdef DEBUG
-    for (i = 0; i < s.n_ranges; i++) {
-        fprintf(stderr, "ranges[%i]  = %g\n", i, s.cranges[i]);
+    for (i = 0; i < s->n_ranges; i++) {
+        fprintf(stderr, "ranges[%i]  = %g\n", i, s->cranges[i]);
     }
-    fprintf(stderr, "Total %i isotopes and %i ranges\n", n_isotopes, s.n_ranges);
+    fprintf(stderr, "Total %i isotopes and %i ranges\n", n_isotopes, s->n_ranges);
 #endif
-    s.isotopes = calloc(n_isotopes, sizeof(jibal_isotope *));
-    s.cbins = calloc( s.n_ranges * n_isotopes, sizeof(double));
+    s->isotopes = calloc(n_isotopes, sizeof(jibal_isotope *));
+    s->cbins = calloc( s->n_ranges * n_isotopes, sizeof(double));
     i_isotope = 0;
-    s.n_isotopes = n_isotopes;
+    s->n_isotopes = n_isotopes;
     for (i = 0; i < n_layers; i++) {
         jibal_layer *layer = layers[i];
         for (j = 0; j < layer->material->n_elements; ++j) {
             jibal_element *element = &layer->material->elements[j];
             for (k = 0; k < element->n_isotopes; k++) {
                 //assert(i_isotope < n_isotopes);
-                s.isotopes[i_isotope] = element->isotopes[k];
-                s.cbins[(2 * i)*s.n_isotopes + i_isotope] = element->concs[k] * layer->material->concs[j];
-                s.cbins[(2 * i + 1)*s.n_isotopes + i_isotope] = element->concs[k] * layer->material->concs[j];
+                s->isotopes[i_isotope] = element->isotopes[k];
+                s->cbins[(2 * i)*s->n_isotopes + i_isotope] = element->concs[k] * layer->material->concs[j];
+                s->cbins[(2 * i + 1)*s->n_isotopes + i_isotope] = element->concs[k] * layer->material->concs[j];
                 i_isotope++;
             }
         }
@@ -181,6 +182,7 @@ void sample_free(sample *sample) {
     free(sample->cranges);
     free(sample->isotopes);
     free(sample->cbins);
+    free(sample);
 }
 
 double sample_isotope_max_depth(const sample *sample, int i_isotope) {

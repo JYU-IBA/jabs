@@ -11,8 +11,8 @@
     See LICENSE.txt for the full license.
 
  */
-#ifndef _REACTION_H_
-#define _REACTION_H_
+#ifndef JABS_REACTION_H
+#define JABS_REACTION_H
 
 #include <jibal_masses.h>
 #include <gsl/gsl_histogram.h>
@@ -32,4 +32,5 @@ typedef struct {
     int stop;
 } reaction;
 
-#endif //_REACTION_H_
+void reactions_print(FILE *f, reaction *reactions, int n_reactions);
+#endif //JABS_REACTION_H

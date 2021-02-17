@@ -11,8 +11,8 @@
     See LICENSE.txt for the full license.
 
  */
-#ifndef _SAMPLE_H_
-#define _SAMPLE_H_
+#ifndef JABS_SAMPLE_H
+#define JABS_SAMPLE_H
 
 #include <stdio.h>
 #include <jibal_masses.h>
@@ -34,9 +34,9 @@ double get_conc(sim_workspace *ws, const sample *s, double x, int i);
 int get_concs(sim_workspace *ws, const sample *s, double x, double *out);
 int get_range_bin(const sample *s, double x);
 
-sample sample_from_layers(jibal_layer **layers, int n_layers);
+sample *sample_from_layers(jibal_layer **layers, int n_layers);
 void sample_print(FILE *f, const sample *sample);
 void sample_free(sample *sample);
 double sample_isotope_max_depth(const sample *sample, int i_isotope);
 extern inline double *sample_conc_bin(const sample *s, int i_range, int i_isotope);
-#endif /* _SAMPLE_H_ */
+#endif /* JABS_SAMPLE_H */

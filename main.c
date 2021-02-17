@@ -27,7 +27,6 @@
 #include <time.h>
 #include <string.h>
 #include <math.h>
-#include <getopt.h>
 
 #include <jibal.h>
 #include <jibal_gsto.h>
@@ -36,135 +35,16 @@
 #include <jibal_cs.h>
 #include <gsl/gsl_histogram.h>
 
-#include "defaults.h"
+#include "options.h"
 #include "sample.h"
 #include "ion.h"
 #include "brick.h"
 #include "simulation.h"
-
-#define ENERGY (2.0*C_MEV)
-#define ALPHA (15.0*C_DEG)
-#define BETA (0.0*C_DEG)
-#define THETA (165.0*C_DEG)
-#define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
-#define PARTICLES_SR (1.0e12)
-
-#define E_MIN (100.0*C_KEV)
-#define N_LAYERS_MAX 100
-#define HISTOGRAM_BIN (1.0*C_KEV)
-#define STOP_STEP_INCIDENT (5.0*C_KEV)
-#define STOP_STEP_EXITING (25.0*C_KEV)
+#include "layers.h"
 
 #define CONCENTRATION_CUTOFF 1e-8
 
 #define NUMBER_OF_SIMULATIONS 1
-
-#define USAGE_STRING "Usage: jabs [-E <energy>] <material1> <thickness1> [<material2> <thickness2> ...]\n\nExample: jabs -E 2MeV --alpha 10deg --beta 0deg -theta 170deg Au 500tfu SiO2 1000tfu Si 10000tfu\n"
-#define COPYRIGHT_STRING "    Jaakko's Backscattering Simulator (JaBS)\n    Copyright (C) 2021 Jaakko Julin\n\n    This program is free software; you can redistribute it and/or modify \n    it under the terms of the GNU General Public License as published by\n    the Free Software Foundation; either version 2 of the License, or\n    (at your option) any later version.\n\n   See LICENSE.txt for the full license.\n\n"
-
-const char *jabs_version() {
-        return jabs_VERSION;
-}
-
-void usage() {
-    fprintf(stderr, USAGE_STRING);
-}
-
-typedef struct {
-    jibal *jibal;
-    int verbose;
-    char *out_filename;
-} global_options;
-
-void read_options(global_options *global, simulation *sim, int *argc, char ***argv) {
-    static struct option long_options[] = {
-            {"help",      no_argument,       NULL, 'h'},
-            {"version",   no_argument,       NULL, 'V'},
-            {"verbose",   optional_argument, NULL, 'v'},
-            {"out",       required_argument, NULL, 'o'},
-            {"ion",       required_argument, NULL, 'I'},
-            {"energy",    required_argument, NULL, 'E'},
-            {"alpha",     required_argument, NULL, 'a'},
-            {"beta",      required_argument, NULL, 'b'},
-            {"theta",     required_argument, NULL, 't'},
-            {"fluence",   required_argument, NULL, 'F'},
-            {"resolution",required_argument, NULL, 'R'},
-            {"step_incident",required_argument, NULL, 'S'},
-            {"step_exiting",required_argument, NULL, '0'},
-            {"fast", optional_argument, NULL, 'f'},
-            {NULL, 0,                NULL,   0}
-    };
-    while (1) {
-        int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:b:t:I:F:R:S:f:", long_options, &option_index);
-        if (c == -1)
-            break;
-        switch (c) {
-            case 'f':
-                if (optarg)
-                    sim->fast = atoi(optarg);
-                else
-                    sim->fast++;
-                break;
-            case '0':
-                sim->stop_step_exiting = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
-                break;
-            case 'S':
-                sim->stop_step_incident = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
-                break;
-            case 'a':
-                sim->alpha = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
-                break;
-            case 'b':
-                sim->beta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
-                break;
-            case 't':
-                sim->theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
-                break;
-            case 'h':
-                fputs(COPYRIGHT_STRING, stderr);
-                usage();
-                exit(EXIT_SUCCESS);
-                break;
-            case 'V':
-                printf("%s\n", jabs_version());
-                exit(EXIT_SUCCESS);
-                break; /* Unnecessary */
-            case 'v':
-                if (optarg)
-                    global->verbose = atoi(optarg);
-                else
-                    global->verbose++;
-                break;
-            case 'o':
-                global->out_filename = optarg;
-                break;
-            case 'E':
-                sim->ion.E = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
-                break;
-            case 'I':
-                ion_set_isotope(&sim->ion, jibal_isotope_find(global->jibal->isotopes, optarg, 0, 0));
-                if(!sim->ion.isotope) {
-                    fprintf(stderr, "%s is not a valid isotope.\n", optarg);
-                    exit(EXIT_FAILURE);
-                }
-                break;
-            case 'F':
-                sim->p_sr = strtod(optarg, NULL);
-                break;
-            case 'R':
-                sim->energy_resolution = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg)/C_FWHM;
-                sim->energy_resolution *= sim->energy_resolution; /* square */
-                break;
-            default:
-                usage();
-                exit(EXIT_FAILURE);
-                break;
-        }
-    }
-    *argc -= optind;
-    *argv += optind;
-}
 
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E) {
     double em=E/incident->mass;
@@ -273,7 +153,7 @@ void rbs(sim_workspace *ws, const simulation *sim, reaction *reactions, const sa
         r->S = 0.0;
         r->p.S = 0.0;
         r->stop = 0;
-        ws->histos[i_reaction] = gsl_histogram_calloc_uniform(sim->n_channels, sim->energy_offset, sim->energy_offset+sim->energy_slope * sim->n_channels); /* free'd by sim_workspace_free */
+        ws->histos[i_reaction] = gsl_histogram_calloc_uniform(ws->n_channels, sim->energy_offset, sim->energy_offset+sim->energy_slope * ws->n_channels); /* free'd by sim_workspace_free */
 
     }
     for (x = 0.0; x < thickness;) {
@@ -284,7 +164,7 @@ void rbs(sim_workspace *ws, const simulation *sim, reaction *reactions, const sa
 #endif
             next_crossing = sample->cranges[i_range+1];
         }
-        if(ion.E < E_MIN) {
+        if(ion.E < sim->emin) {
             fprintf(stderr, "Return due to low energy.\n");
             break;
         }
@@ -332,7 +212,7 @@ void rbs(sim_workspace *ws, const simulation *sim, reaction *reactions, const sa
                 double h_out_max = sample->cranges[i_range_out] - x_out;
                 double h_out = stop_step(ws, &r->p, sample, x_out-0.00001*C_TFU, h_out_max, sim->stop_step_exiting); /* FIXME: 0.0001*C_TFU IS A STUPID HACK */
                 x_out += h_out;
-                if( r->p.E < E_MIN) {
+                if( r->p.E < sim->emin) {
                     r->stop = 1;
 #ifdef DEBUG
                     fprintf(stderr, "Reaction %i with %s: Energy below EMIN when surfacing from %.3lf tfu, break break. Last above was %.3lf keV\n",i_reaction, reactions[i_reaction].isotope->name, (x+h)/C_TFU, r->E/C_KEV);
@@ -348,9 +228,9 @@ void rbs(sim_workspace *ws, const simulation *sim, reaction *reactions, const sa
                 }
             }
             double c = get_conc(ws, sample, x+h/2.0, r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
-            if(c > CONCENTRATION_CUTOFF && r->p.E > E_MIN) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
-                double sigma = jibal_cross_section_rbs(ion.isotope, r->isotope, THETA, E_mean, JIBAL_CS_ANDERSEN);
-                double Q = c * sim->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
+            if(c > CONCENTRATION_CUTOFF && r->p.E > sim->emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
+                double sigma = jibal_cross_section_rbs(ion.isotope, r->isotope, sim->theta, E_mean, JIBAL_CS_ANDERSEN);
+                double Q = c * ws->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
 #ifdef dfDEBUG
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf (prev %.3lf, sigma = %g mb/sr, Q = %g (c = %.4lf%%)\n",
                         r->isotope->name, E_back * r->K/C_KEV, r->p.E/C_KEV, r->E/C_KEV, sigma/C_MB_SR, Q, c*100.0);
@@ -405,26 +285,6 @@ reaction *make_rbs_reactions(const sample *sample, const simulation *sim, int *n
     return reactions;
 }
 
-jibal_layer **read_layers(jibal *jibal, int argc, char **argv, int *n_layers) {
-    jibal_layer **layers = calloc(N_LAYERS_MAX, sizeof(jibal_layer *));
-    *n_layers=0;
-    while (argc >= 2 && *n_layers < N_LAYERS_MAX) {
-        jibal_layer *layer = jibal_layer_new(jibal_material_create(jibal->elements, argv[0]),
-                                             jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]));
-        if (!layer) {
-            fprintf(stderr, "Not a valid layer: %s!\n", argv[0]);
-            free(layers);
-            return NULL;
-        }
-
-        layers[*n_layers] = layer;
-        argc -= 2;
-        argv += 2;
-        (*n_layers)++;
-    }
-    return layers;
-}
-
 int assign_stopping(jibal_gsto *gsto, simulation *sim, sample *sample) {
     int i;
     for(i = 0; i < sample->n_isotopes; i++) {
@@ -453,7 +313,7 @@ void print_spectra(FILE *f, const global_options *global,  const simulation *sim
             fprintf(f, "\n");
         }
     }
-    for(i = 0; i < sim->n_channels; i++) {
+    for(i = 0; i < ws->n_channels; i++) {
         double sum = 0.0;
         for (j = 0; j < sim->n_reactions; j++) {
             sum += ws->histos[j]->bin[i];
@@ -474,51 +334,12 @@ void print_spectra(FILE *f, const global_options *global,  const simulation *sim
     }
 }
 
-void layers_free(jibal_layer **layers, int n_layers) {
-    int i;
-    for(i = 0; i < n_layers; i++) {
-        jibal_layer_free(layers[i]);
-    }
-    free(layers);
-}
-
-void reactions_print(FILE *f, reaction *reactions, int n_reactions) {
-    int i;
-    for (int i = 0; i < n_reactions; i++) {
-        reaction *r = &reactions[i];
-        fprintf(stderr, "Reaction %3i/%i: RBS with %5s (isotope id %3i): K = %7.5lf, max depth = %9.3lf tfu\n", i+1, n_reactions,
-                r->isotope->name, r->i_isotope,
-                r->K, r->max_depth / C_TFU);
-    }
-
-}
-
-void simulation_print(FILE *f, const simulation *sim) {
-    fprintf(stderr, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->ion.isotope->name, sim->ion.isotope->Z, sim->ion.isotope->A, sim->ion.isotope->mass/C_U);
-    fprintf(stderr, "E = %.3lf\n", sim->ion.E/C_MEV);
-    fprintf(stderr, "alpha = %.3lf deg\n", sim->alpha/C_DEG);
-    fprintf(stderr, "beta = %.3lf deg\n", sim->beta/C_DEG);
-    fprintf(stderr, "theta = %.3lf deg\n", sim->theta/C_DEG);
-    fprintf(stderr, "particles * sr = %e\n", sim->p_sr);
-    fprintf(stderr, "calibration offset = %.3lf keV\n", sim->energy_offset/C_KEV);
-    fprintf(stderr, "calibration slope = %.5lf keV\n", sim->energy_slope/C_KEV);
-    fprintf(stderr, "detector resolution = %.3lf keV FWHM\n", sqrt(sim->energy_resolution)*C_FWHM/C_KEV);
-    fprintf(stderr, "step for incident ions = %.3lf keV\n", sim->stop_step_incident/C_KEV);
-    fprintf(stderr, "step for exiting ions = %.3lf keV\n", sim->stop_step_exiting/C_KEV);
-    fprintf(stderr, "fast level = %i\n", sim->fast);
-}
-
 int main(int argc, char **argv) {
     fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version());
     fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it under certain conditions.\n\n");
     global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0};
-    simulation sim = {.alpha = ALPHA, .beta = BETA, .theta = THETA,
-                      .p_sr = PARTICLES_SR, .energy_resolution = DETECTOR_RESOLUTION*DETECTOR_RESOLUTION,
-                      .stop_step_incident = STOP_STEP_INCIDENT, .stop_step_exiting = STOP_STEP_EXITING,
-                      .fast = 0,
-                      .ion = {.E = ENERGY }};
-    sample sample;
+    simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
     if(jibal->error) {
@@ -526,24 +347,13 @@ int main(int argc, char **argv) {
         return 1;
     }
     global.jibal = jibal;
-    sim.ion.E = 2.0 * C_MEV;
-    ion_set_isotope(&sim.ion, jibal_isotope_find(jibal->isotopes, NULL, 2, 4)); /* Default: 4He */
-    ion_set_angle(&sim.ion, 0.0 * C_DEG);
-    read_options(&global, &sim, &argc, &argv);
+    ion_set_isotope(&sim->ion, jibal_isotope_find(jibal->isotopes, NULL, 2, 4)); /* Default: 4He */
+    read_options(&global, sim, &argc, &argv);
     if(argc < 2) {
         usage();
         return EXIT_FAILURE;
     }
-    if(!sim.ion.isotope) {
-        fprintf(stderr, "No valid isotope given for the beam.\n");
-    }
-    if (sim.ion.E > 1000.0*C_MEV || sim.ion.E < 10*C_KEV) {
-        fprintf(stderr, "Hmm...? Check your numbers.\n");
-        return -1;
-    }
-    sim.energy_slope = HISTOGRAM_BIN;
-    sim.energy_offset = 0.0*C_KEV;
-    sim.n_channels= ceil((1.1 * sim.ion.E - sim.energy_offset)/ sim.energy_slope);
+    sim_sanity_check(sim);
     FILE *f;
     if(global.out_filename) {
         f = fopen(global.out_filename, "w");
@@ -555,51 +365,43 @@ int main(int argc, char **argv) {
         f = stdout;
     }
 
-    int n_layers = 0;
+    size_t n_layers = 0;
     jibal_layer **layers = read_layers(jibal, argc, argv, &n_layers);
     if(!layers)
         return EXIT_FAILURE;
 
-    sample = sample_from_layers(layers, n_layers);
-    if(sample.n_isotopes == 0)
+    sample *sample = sample_from_layers(layers, n_layers);
+    if(!sample || sample->n_isotopes == 0)
         return EXIT_FAILURE;
-    sample_print(stderr, &sample);
+    sample_print(stderr, sample);
 
-    sim.p_sr_cos_alpha = sim.p_sr / cos(sim.alpha);
-    sim.ion.S = 0.0; /* TODO: initial beam broadening goes here */
-    ion_set_angle(&sim.ion, sim.alpha);
-
-    reaction *reactions = make_rbs_reactions(&sample, &sim, &sim.n_reactions);
+    reaction *reactions = make_rbs_reactions(sample, sim, &sim->n_reactions);
     fprintf(stderr, "\n");
-    reactions_print(stderr, reactions, sim.n_reactions);
+    reactions_print(stderr, reactions, sim->n_reactions);
 
-    if(assign_stopping(jibal->gsto, &sim, &sample)) {
+    if(assign_stopping(jibal->gsto, sim, sample)) {
         return EXIT_FAILURE;
     }
     jibal_gsto_print_assignments(jibal->gsto);
     jibal_gsto_load_all(jibal->gsto);
 
 
-    simulation_print(stderr, &sim);
+    simulation_print(stderr, sim);
     fprintf(stderr, "\nSTARTING SIMULATION... NOW! Hold your breath!\n");
     fflush(stderr);
     start = clock();
     for (int n = 0; n < NUMBER_OF_SIMULATIONS; n++) {
-        reaction *r = malloc(sim.n_reactions * sizeof(reaction));
-        memcpy(r, reactions, sim.n_reactions *
+        reaction *r = malloc(sim->n_reactions * sizeof(reaction));
+        memcpy(r, reactions, sim->n_reactions *
                              sizeof(reaction)); /* TODO: when we stop mutilating the reactions we can stop doing this */
-        sim_workspace *ws = sim_workspace_init(&sim, &sample, jibal->gsto);
-        if (sim.fast) {
-            ws->stopping_type = GSTO_STO_ELE;
-            ws->rk4 = 0;
-        }
-        rbs(ws, &sim, reactions, &sample);
+        sim_workspace *ws = sim_workspace_init(sim, sample, jibal->gsto);
+        rbs(ws, sim, reactions, sample);
 #if 0
         if(n == NUMBER_OF_SIMULATIONS-1)
 #else
         if(n == 0)
 #endif
-            print_spectra(f, &global, &sim, ws, &sample,     reactions);
+            print_spectra(f, &global, sim, ws, sample,     reactions);
         sim_workspace_free(ws);
         free(r);
     }
@@ -611,7 +413,8 @@ int main(int argc, char **argv) {
         fclose(f);
     }
     layers_free(layers, n_layers);
-    sample_free(&sample);
+    sim_free(sim);
+    sample_free(sample);
     jibal_free(jibal);
     return EXIT_SUCCESS;
 }
