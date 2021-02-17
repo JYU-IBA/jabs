@@ -20,7 +20,7 @@
 
 
 
-#define USAGE_STRING "Usage: jabs [-E <energy>] <material1> <thickness1> [<material2> <thickness2> ...]\n\nExample: jabs -E 2MeV --alpha 10deg --beta 0deg --theta 170deg --out spectrum.csv Au 500tfu SiO2 1000tfu Si 10000tfu\n"
+#define USAGE_STRING "Usage: jabs [-E <energy>] <material1> <thickness1> [<material2> <thickness2> ...]\n\nExample: jabs -E 2MeV --alpha=10deg --beta=0deg --theta=170deg --out=spectrum.csv Au 500tfu SiO2 1000tfu Si 10000tfu\n"
 #define COPYRIGHT_STRING "    Jaakko's Backscattering Simulator (JaBS)\n    Copyright (C) 2021 Jaakko Julin\n\n    This program is free software; you can redistribute it and/or modify \n    it under the terms of the GNU General Public License as published by\n    the Free Software Foundation; either version 2 of the License, or\n    (at your option) any later version.\n\n   See LICENSE.txt for the full license.\n\n"
 
 const char *jabs_version() {
@@ -46,7 +46,10 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"resolution",required_argument, NULL, 'R'},
             {"step_incident",required_argument, NULL, 'S'},
             {"step_exiting",required_argument, NULL, '0'},
-            {"fast", optional_argument, NULL, 'f'},
+            {"slope",     required_argument, NULL, '1'},
+            {"offset",    required_argument, NULL, '2'},
+            {"fast",      optional_argument, NULL, 'f'},
+            {"exp",       required_argument, NULL, 'e'},
             {NULL, 0,                NULL,   0}
     };
     static const char *help_texts[] = {
@@ -63,12 +66,15 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Resolution of detector (FHWM of Gaussian)",
             "Incident ion step size.",
             "Exiting particle step size.",
+            "Slope of energy calibration.",
+            "Offset of energy calibration.",
             "Make things faster, but worse.",
+            "Load experimental spectrum from file.",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:b:t:I:F:R:S:f:", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "hvVE:o:a:b:t:I:F:R:S:fe:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -80,6 +86,12 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 break;
             case '0':
                 sim->stop_step_exiting = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                break;
+            case '1':
+                sim->energy_slope = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                break;
+            case '2':
+                sim->energy_offset = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 'S':
                 sim->stop_step_incident = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
@@ -96,7 +108,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             case 'h':
                 fputs(COPYRIGHT_STRING, stderr);
                 usage();
-                fprintf(stderr, "\nThe following options (prefix with --) are supported: \n");
+                fprintf(stderr, "\nThe following options (prefix with --, e.g. --energy=2MeV) are supported: \n");
                 struct option *o = long_options;
                 const char **h = help_texts;
                 while (o->name != NULL) {
@@ -124,6 +136,9 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 break;
             case 'o':
                 global->out_filename = optarg;
+                break;
+            case 'e':
+                global->exp_filename = optarg;
                 break;
             case 'E':
                 sim->ion.E = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);

@@ -154,7 +154,6 @@ void rbs(sim_workspace *ws, const simulation *sim, reaction *reactions, const sa
         r->p.S = 0.0;
         r->stop = 0;
         ws->histos[i_reaction] = gsl_histogram_calloc_uniform(ws->n_channels, sim->energy_offset, sim->energy_offset+sim->energy_slope * ws->n_channels); /* free'd by sim_workspace_free */
-
     }
     for (x = 0.0; x < thickness;) {
         while (i_range < sample->n_ranges-1 && x >= sample->cranges[i_range+1]) {
@@ -296,16 +295,19 @@ int assign_stopping(jibal_gsto *gsto, simulation *sim, sample *sample) {
     return 0;
 }
 
-void print_spectra(FILE *f, const global_options *global,  const simulation *sim, const sim_workspace *ws, const sample *sample, const reaction *reactions) {
+void print_spectra(FILE *f, const global_options *global,  const simulation *sim, const sim_workspace *ws, const sample *sample, const reaction *reactions, const gsl_histogram *exp) {
     int i, j;
     int csv = 0;
     char sep = ' ';
     if(global->out_filename) {
         size_t l = strlen(global->out_filename);
-        if(l > 4 && strncmp(global->out_filename+l-4, ".csv", 4) == 0) {
+        if(l > 4 && strncmp(global->out_filename+l-4, ".csv", 4) == 0) { /* For CSV: print header line */
             csv = 1;
-            sep = ',';
+            sep = ','; /* and set the separator! */
             fprintf(f, "\"Channel\",\"Sum\"");
+            if(exp) {
+                fprintf(f, ",\"Experimental\"");
+            }
             for(j = 0; j < sim->n_reactions; j++) {
                 const reaction *r = &reactions[j];
                 fprintf(f, ",\"%s\"", sample->isotopes[r->i_isotope]->name);
@@ -315,13 +317,20 @@ void print_spectra(FILE *f, const global_options *global,  const simulation *sim
     }
     for(i = 0; i < ws->n_channels; i++) {
         double sum = 0.0;
-        for (j = 0; j < sim->n_reactions; j++) {
+        for (j = 0; j < sim->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
             sum += ws->histos[j]->bin[i];
         }
         if(sum == 0.0) {
-            fprintf(f, "%i%c0", i, sep);
+            fprintf(f, "%i%c0", i, sep); /* Tidier output with a clean zero */
         } else {
             fprintf(f, "%i%c%e", i, sep, sum);
+        }
+        if(exp) {
+            if(i < exp->n) {
+                fprintf(f, "%c%g", sep, exp->bin[i]);
+            } else {
+                fprintf(f, "%c0", sep);
+            }
         }
         for (j = 0; j < sim->n_reactions; j++) {
             if(ws->histos[j]->bin[i] == 0.0) {
@@ -334,12 +343,53 @@ void print_spectra(FILE *f, const global_options *global,  const simulation *sim
     }
 }
 
+gsl_histogram *read_experimental_spectrum(const char *filename, size_t n) {
+    char *line=NULL;
+    size_t line_size=0;
+    size_t ch=0, i=0;
+    double y;
+    FILE *in = fopen(filename, "r");
+    if(!in)
+        return NULL;
+    gsl_histogram *h = gsl_histogram_alloc(n);
+    size_t lineno = 0;
+    while(getline(&line, &line_size, in) > 0) {
+        lineno++;
+        line[strcspn(line, "\r\n")] = 0; /* Strips all kinds of newlines! */
+        if(line_size < 2)
+            continue;
+        int cols  = sscanf(line, "%lu %lf", &ch, &y);
+        if(cols == 2) {
+            if (ch >= n)
+                continue; /* Silently? */
+            h->bin[ch] = y;
+            i = ch;
+        } else if(cols == 1) {
+            h->bin[i] = ch;
+        } else {
+            fprintf(stderr, "Error while reading file \"%s\": line %lu garbled: \"%s\"", filename, lineno, line);
+            break;
+        }
+        i++;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Read %lu lines from \"%s\", probably %lu channels. Allocation of %lu channels.\n", lineno, filename, i, n);
+#endif
+    free(line);
+    fclose(in);
+    return h;
+}
+
+void set_experimental_spectrum_calibration(const simulation *sim) {
+
+}
+
 int main(int argc, char **argv) {
     fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version());
     fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it under certain conditions.\n"
                     "Run 'jabs -h' for more information.\n\n");
-    global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0};
+    global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0, .exp_filename = NULL};
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -354,6 +404,11 @@ int main(int argc, char **argv) {
         usage();
         return EXIT_FAILURE;
     }
+    gsl_histogram *exp = NULL;
+    if(global.exp_filename) {
+        exp = read_experimental_spectrum(global.exp_filename, 16384); /* TODO: number of channels? */
+    }
+
     sim_sanity_check(sim);
     FILE *f;
     if(global.out_filename) {
@@ -402,7 +457,7 @@ int main(int argc, char **argv) {
 #else
         if(n == 0)
 #endif
-            print_spectra(f, &global, sim, ws, sample,     reactions);
+            print_spectra(f, &global, sim, ws, sample, reactions, exp);
         sim_workspace_free(ws);
         free(r);
     }
@@ -417,5 +472,6 @@ int main(int argc, char **argv) {
     sim_free(sim);
     sample_free(sample);
     jibal_free(jibal);
+    free(exp);
     return EXIT_SUCCESS;
 }

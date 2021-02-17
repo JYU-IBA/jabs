@@ -20,6 +20,7 @@ typedef struct {
     jibal *jibal;
     int verbose;
     char *out_filename;
+    char *exp_filename;
 } global_options;
 
 #include "simulation.h"
