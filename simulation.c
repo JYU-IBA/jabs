@@ -112,7 +112,7 @@ void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *
 
 void simulation_print(FILE *f, const simulation *sim) {
     fprintf(stderr, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->ion.isotope->name, sim->ion.isotope->Z, sim->ion.isotope->A, sim->ion.isotope->mass/C_U);
-    fprintf(stderr, "E = %.3lf\n", sim->ion.E/C_MEV);
+    fprintf(stderr, "E = %.3lf MeV\n", sim->ion.E/C_MEV);
     fprintf(stderr, "alpha = %.3lf deg\n", sim->alpha/C_DEG);
     fprintf(stderr, "beta = %.3lf deg\n", sim->beta/C_DEG);
     fprintf(stderr, "theta = %.3lf deg\n", sim->theta/C_DEG);

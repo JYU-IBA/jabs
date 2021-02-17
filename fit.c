@@ -104,6 +104,11 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
     gsl_multifit_nlinear_workspace *w;
     gsl_multifit_nlinear_parameters fdf_params = gsl_multifit_nlinear_default_parameters();
+#ifdef DEBUG
+    fprintf(stderr, "read h_fvv = %g\n", fdf_params.h_fvv);
+    fdf_params.h_fvv = 0.001;
+    fprintf(stderr, "set h_fvv = %g\n", fdf_params.h_fvv);
+#endif
     fit_data->cputime_actual = 0.0;
     struct fit_params *fit_params = fit_data->fit_params;
     gsl_multifit_nlinear_fdf fdf;

@@ -134,7 +134,12 @@ sample *sample_from_layers(jibal_layer * const *layers, int n_layers) {
     s->n_isotopes = n_isotopes;
     for (i = 0; i < n_layers; i++) {
         const jibal_layer *layer = layers[i];
-        for (j = 0; j < layer->material->n_elements; ++j) {
+        for (j = 0; j < layer->material->n_elements; j++) {
+            if(layer->material->concs[j] < 0.0)
+                layer->material->concs[j] = 0.0001; /* TODO: fitting robustification */
+        }
+        jibal_material_normalize(layer->material);
+        for (j = 0; j < layer->material->n_elements; j++) {
             jibal_element *element = &layer->material->elements[j];
             for (k = 0; k < element->n_isotopes; k++) {
                 //assert(i_isotope < n_isotopes);
