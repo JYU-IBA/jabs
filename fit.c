@@ -71,10 +71,17 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
     /* compute reciprocal condition number of J(x) */
     gsl_multifit_nlinear_rcond(&rcond, w);
 
+
+
     fprintf(stderr, "iter %2zu: cond(J) = %12.6e, |f(x)| = %14.8e", iter, 1.0 / rcond, gsl_blas_dnrm2(f));
-    //   double dof = data->n - p;
+
     // double c = GSL_MAX_DBL(1, sqrt(chisq / dof));
     // fprintf(stderr, "chisq/dof = %g\n", chisq / dof);
+#ifndef NO_CHISQ
+    double chisq;
+    gsl_blas_ddot(f, f, &chisq);
+    fprintf(stderr, ", chisq/dof = %8.4lf", chisq/fit_data->dof);
+#endif
 
     size_t i;
     for(i = 0; i < fit_data->fit_params->n; i++) {
@@ -127,6 +134,7 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     gsl_vector *f;
     gsl_matrix *J;
     double chisq, chisq0;
+    fit_data->dof = fdf.n-fdf.p;
     int status, info;
     size_t i, j;
     gsl_matrix *covar = gsl_matrix_alloc (fit_params->n, fit_params->n);
@@ -178,8 +186,8 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     fprintf(stderr, "initial |f(x)| = %f\n", sqrt(chisq0));
     fprintf(stderr, "final   |f(x)| = %f\n", sqrt(chisq));
     fprintf (stderr, "status = %s\n", gsl_strerror (status));
-    double dof = fdf.n-fdf.p;
-    double c = GSL_MAX_DBL(1, sqrt(chisq / dof));
+
+    double c = GSL_MAX_DBL(1, sqrt(chisq / fit_data->dof));
     fprintf(stderr, "Final fitted parameters\n");
     for(i = 0; i < fit_params->n; i++) {
         fprintf(stderr, "    p[%zu] = %g +- %g (%.2lf%%)\n", i,
@@ -200,7 +208,7 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
         }
         fprintf(stderr, "\n");
     }
-    fprintf(stderr, "chisq/dof = %g\n", chisq / dof);
+    fprintf(stderr, "chisq/dof = %g\n", chisq / fit_data->dof);
     for(i = 0; i < fit_params->n; i++) { /* Clear all err values */
         fit_params->func_params_err[i] = 0.0;
     }

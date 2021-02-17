@@ -430,6 +430,7 @@ int main(int argc, char **argv) {
         fit_params_add_parameter(fit_params, &sim->p_sr);
         fit_params_add_parameter(fit_params, &sim->energy_resolution);
         fit_params_add_parameter(fit_params, &layers[0]->thickness);
+        fit_params_add_parameter(fit_params, &layers[1]->thickness);
         //fit_params_add_parameter(fit_params, &layers[0]->material->concs[0]);
         fit_stats = fit(exp, &fit_data);
         fprintf(stderr, "\nFinal parameters:\n");
