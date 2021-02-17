@@ -337,7 +337,8 @@ void print_spectra(FILE *f, const global_options *global,  const simulation *sim
 int main(int argc, char **argv) {
     fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version());
     fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
-                    "This is free software, and you are welcome to redistribute it under certain conditions.\n\n");
+                    "This is free software, and you are welcome to redistribute it under certain conditions.\n"
+                    "Run 'jabs -h' for more information.\n\n");
     global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0};
     simulation *sim = sim_init();
     clock_t start, end;

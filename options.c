@@ -20,7 +20,7 @@
 
 
 
-#define USAGE_STRING "Usage: jabs [-E <energy>] <material1> <thickness1> [<material2> <thickness2> ...]\n\nExample: jabs -E 2MeV --alpha 10deg --beta 0deg -theta 170deg Au 500tfu SiO2 1000tfu Si 10000tfu\n"
+#define USAGE_STRING "Usage: jabs [-E <energy>] <material1> <thickness1> [<material2> <thickness2> ...]\n\nExample: jabs -E 2MeV --alpha 10deg --beta 0deg -theta 170deg --out spectrum.csv Au 500tfu SiO2 1000tfu Si 10000tfu\n"
 #define COPYRIGHT_STRING "    Jaakko's Backscattering Simulator (JaBS)\n    Copyright (C) 2021 Jaakko Julin\n\n    This program is free software; you can redistribute it and/or modify \n    it under the terms of the GNU General Public License as published by\n    the Free Software Foundation; either version 2 of the License, or\n    (at your option) any later version.\n\n   See LICENSE.txt for the full license.\n\n"
 
 const char *jabs_version() {
@@ -49,6 +49,23 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"fast", optional_argument, NULL, 'f'},
             {NULL, 0,                NULL,   0}
     };
+    static const char *help_texts[] = {
+            "Print this message.",
+            "Print version number.",
+            "Increase or give verbosity level.",
+            "Output to file instead of standard output. For CSV use .csv suffix.",
+            "Incident ion (without charge state), e.g. 4He",
+            "Incident beam energy. Please give units as well, e.g. 2MeV or \"2 MeV\" or 2000keV",
+            "Incident angle (from sample normal).",
+            "Exit angle (from sample norma).",
+            "Scattering angle (from beam).",
+            "Fluence (or actually particles * sr).",
+            "Resolution of detector (FHWM of Gaussian)",
+            "Incident ion step size.",
+            "Exiting particle step size.",
+            "Make things faster, but worse.",
+            NULL
+    }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
         int option_index = 0;
         char c = getopt_long(*argc, *argv, "hvVE:o:a:b:t:I:F:R:S:f:", long_options, &option_index);
@@ -79,6 +96,20 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             case 'h':
                 fputs(COPYRIGHT_STRING, stderr);
                 usage();
+                fprintf(stderr, "\nThe following options (prefix with --) are supported: \n");
+                struct option *o = long_options;
+                const char **h = help_texts;
+                while (o->name != NULL) {
+                    fprintf(stderr, "  %14s  ", o->name);
+                    if (*h != NULL) {
+                        fprintf(stderr, "%s\n", *h);
+                        h++;
+                    } else {
+                        fprintf(stderr, "\n");
+                    }
+                    o++;
+                }
+                fprintf(stderr, "\nPlease note that many variables require units or they are assumed to be in relevant SI units.\n");
                 exit(EXIT_SUCCESS);
                 break;
             case 'V':
