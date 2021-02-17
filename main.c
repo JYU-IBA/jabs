@@ -41,6 +41,7 @@
 #include "brick.h"
 #include "simulation.h"
 #include "layers.h"
+#include "spectrum.h"
 
 #define CONCENTRATION_CUTOFF 1e-8
 
@@ -343,47 +344,6 @@ void print_spectra(FILE *f, const global_options *global,  const simulation *sim
     }
 }
 
-gsl_histogram *read_experimental_spectrum(const char *filename, size_t n) {
-    char *line=NULL;
-    size_t line_size=0;
-    size_t ch=0, i=0;
-    double y;
-    FILE *in = fopen(filename, "r");
-    if(!in)
-        return NULL;
-    gsl_histogram *h = gsl_histogram_alloc(n);
-    size_t lineno = 0;
-    while(getline(&line, &line_size, in) > 0) {
-        lineno++;
-        line[strcspn(line, "\r\n")] = 0; /* Strips all kinds of newlines! */
-        if(line_size < 2)
-            continue;
-        int cols  = sscanf(line, "%lu %lf", &ch, &y);
-        if(cols == 2) {
-            if (ch >= n)
-                continue; /* Silently? */
-            h->bin[ch] = y;
-            i = ch;
-        } else if(cols == 1) {
-            h->bin[i] = ch;
-        } else {
-            fprintf(stderr, "Error while reading file \"%s\": line %lu garbled: \"%s\"", filename, lineno, line);
-            break;
-        }
-        i++;
-    }
-#ifdef DEBUG
-    fprintf(stderr, "Read %lu lines from \"%s\", probably %lu channels. Allocation of %lu channels.\n", lineno, filename, i, n);
-#endif
-    free(line);
-    fclose(in);
-    return h;
-}
-
-void set_experimental_spectrum_calibration(const simulation *sim) {
-
-}
-
 int main(int argc, char **argv) {
     fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version());
     fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
@@ -404,12 +364,14 @@ int main(int argc, char **argv) {
         usage();
         return EXIT_FAILURE;
     }
+    sim_sanity_check(sim);
+
     gsl_histogram *exp = NULL;
     if(global.exp_filename) {
         exp = read_experimental_spectrum(global.exp_filename, 16384); /* TODO: number of channels? */
+        set_experimental_spectrum_calibration(exp, sim);
     }
 
-    sim_sanity_check(sim);
     FILE *f;
     if(global.out_filename) {
         f = fopen(global.out_filename, "w");
