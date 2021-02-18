@@ -77,7 +77,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Fit",
             "Fit range, low",
             "Fit range, high",
-            "Parameters to fit",
+            "Comma separated list of parameters to fit, e.g. \"calib,fluence,thickness1\"",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {

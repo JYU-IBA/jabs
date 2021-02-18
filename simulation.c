@@ -50,10 +50,11 @@ int sim_sanity_check(const simulation *sim) {
     return 0;
 }
 
-sim_workspace *sim_workspace_init(const simulation *sim, const sample *sample, jibal_gsto *gsto) {
+sim_workspace *sim_workspace_init(const simulation *sim, const sample *sample, jibal_gsto *gsto, const jibal_config *jibal_config) {
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->n_reactions = sim->n_reactions;
     ws->gsto = gsto;
+    ws->jibal_config = jibal_config;
     ws->i_range_accel = 0;
     ws->c_x = 0.0;
 

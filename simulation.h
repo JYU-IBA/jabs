@@ -17,7 +17,7 @@
 #include <gsl/gsl_histogram.h>
 #include <jibal_masses.h>
 #include <jibal_gsto.h>
-
+#include <jibal_config.h>
 
 
 #include "ion.h"
@@ -46,6 +46,7 @@ typedef struct {
     double c_x; /* at this x */
     int i_range_accel;
     jibal_gsto *gsto;
+    const jibal_config *jibal_config;
     int rk4;
     gsto_stopping_type stopping_type;
     gsl_histogram **histos; /* array of n_reactions */
@@ -57,7 +58,7 @@ typedef struct {
 simulation *sim_init();
 void sim_free(simulation *sim);
 int sim_sanity_check(const simulation *sim);
-sim_workspace *sim_workspace_init(const simulation *sim, const sample *sample, jibal_gsto *gsto);
+sim_workspace *sim_workspace_init(const simulation *sim, const sample *sample, jibal_gsto *gsto, const jibal_config *jibal_config);
 void sim_workspace_free(sim_workspace *ws);
 void sim_set_calibration(simulation *sim, double slope, double offset); /*Note that sim->ion.E needs to be set before */
 void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *sim);

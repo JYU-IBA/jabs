@@ -33,6 +33,7 @@
 #include <jibal_stop.h>
 #include <jibal_kin.h>
 #include <jibal_cs.h>
+#include <jibal_config.h>
 #include <gsl/gsl_histogram.h>
 
 #include "options.h"
@@ -229,7 +230,7 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
             }
             double c = get_conc(ws, sample, x+h/2.0, r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
             if(c > CONCENTRATION_CUTOFF && r->p.E > sim->emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
-                double sigma = jibal_cross_section_rbs(ion.isotope, r->isotope, sim->theta, E_mean, JIBAL_CS_ANDERSEN);
+                double sigma = jibal_cross_section_rbs(ion.isotope, r->isotope, sim->theta, E_mean, ws->jibal_config->cs_rbs);
                 double Q = c * ws->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
 #ifdef dfDEBUG
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf (prev %.3lf, sigma = %g mb/sr, Q = %g (c = %.4lf%%)\n",
@@ -387,10 +388,6 @@ void add_fit_params(global_options *global, simulation *sim, jibal_layer **layer
 }
 
 int main(int argc, char **argv) {
-    fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version());
-    fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
-                    "This is free software, and you are welcome to redistribute it under certain conditions.\n"
-                    "Run 'jabs -h' for more information.\n\n");
     global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0, .exp_filename = NULL,
                              .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL};
     simulation *sim = sim_init();
@@ -407,6 +404,10 @@ int main(int argc, char **argv) {
         usage();
         return EXIT_FAILURE;
     }
+    fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version());
+    fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
+                    "This is free software, and you are welcome to redistribute it under certain conditions.\n"
+                    "Run 'jabs -h' for more information.\n\n");
     sim_sanity_check(sim);
 
     gsl_histogram *exp = NULL;
@@ -445,7 +446,7 @@ int main(int argc, char **argv) {
     }
     jibal_gsto_print_assignments(jibal->gsto);
     jibal_gsto_load_all(jibal->gsto);
-
+    fprintf(stderr, "Default RBS cross section model used: %s\n", jibal_cs_rbs_name(jibal->config));
 
     simulation_print(stderr, sim);
     fprintf(stderr, "\nSTARTING SIMULATION... NOW! Hold your breath!\n");
@@ -490,7 +491,7 @@ int main(int argc, char **argv) {
         fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_data.cputime_actual/fit_stats.n_evals);
         fit_params_free(fit_data.fit_params);
     } else {
-        ws = sim_workspace_init(sim, sample, jibal->gsto);
+        ws = sim_workspace_init(sim, sample, jibal->gsto, jibal->config);
         simulate(ws, sim, reactions, sample);
     }
     if(!ws) {

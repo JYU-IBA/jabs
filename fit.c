@@ -38,7 +38,7 @@ int func_f(const gsl_vector *x, void *params, gsl_vector * f)
     memcpy(r, p->reactions, p->sim->n_reactions * sizeof(reaction)); /* TODO: when we stop mutilating the reactions we can stop doing this */
     sample_free(p->sample);
     p->sample = sample_from_layers(p->layers, p->n_layers);
-    p->ws = sim_workspace_init(p->sim, p->sample, p->jibal->gsto); /* We intentionally "leak" this */
+    p->ws = sim_workspace_init(p->sim, p->sample, p->jibal->gsto, p->jibal->config); /* We intentionally "leak" this */
     if(!p->ws) {
         gsl_vector_set_all(f, 0.0);
         free(r);
