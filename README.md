@@ -43,5 +43,12 @@ $ ./jabs -E 2MeV --alpha=10deg --beta=0deg --theta=170deg --out=spectrum.csv Au 
 
 ## Fitting
 
-There is a highly experimental fitting feature too, but the user can not choose which parameters to fit.
-Also the fit range is fixed.
+There is a highly experimental fitting feature too, activated with the `--fit` or `-F` option. The multidimensional nonlinear least-squares fitting is based on [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html).
+
+
+The user can currently give only a single range to fit. This is specified with `--fit_low` and `--fit_high`. Default values are 10% of highest channel and the highest channel, respectively.
+
+Use `--fit_vars` to give a comma separate list of variables to fit. Currently supported variables are `slope,offset,resolution` related to detector parameters, 
+`calib`which is equivalent to the previous triplet, `fluence`, and `thicknessN` where `N` is number of a layer, numbering starts from 1 (surface).
+
+Example: `jabs --fit_vars=calib,fluence,thickness1 --fit_low=250 ...`

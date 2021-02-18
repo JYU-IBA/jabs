@@ -21,7 +21,12 @@ gsl_histogram *read_experimental_spectrum(const char *filename, size_t n) {
     size_t line_size=0;
     size_t ch=0, i=0;
     double y;
-    FILE *in = fopen(filename, "r");
+    FILE *in;
+    if(strcmp(filename, "-") == 0) {
+        in = stdin;
+    } else {
+        in = fopen(filename, "r");
+    }
     if(!in)
         return NULL;
     gsl_histogram *h = gsl_histogram_alloc(n);
@@ -37,7 +42,7 @@ gsl_histogram *read_experimental_spectrum(const char *filename, size_t n) {
                 continue; /* Silently? */
             h->bin[ch] = y;
             i = ch;
-        } else if(cols == 1) {
+        } else if(cols == 1 && i < n) {
             h->bin[i] = ch;
         } else {
             fprintf(stderr, "Error while reading file \"%s\": line %lu garbled: \"%s\"", filename, lineno, line);
@@ -48,8 +53,11 @@ gsl_histogram *read_experimental_spectrum(const char *filename, size_t n) {
 #ifdef DEBUG
     fprintf(stderr, "Read %lu lines from \"%s\", probably %lu channels. Allocation of %lu channels.\n", lineno, filename, i, n);
 #endif
+    h->n = i;
     free(line);
-    fclose(in);
+    if(in != stdin) {
+        fclose(in);
+    }
     return h;
 }
 

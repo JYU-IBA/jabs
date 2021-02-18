@@ -20,8 +20,11 @@ typedef struct {
     jibal *jibal;
     int verbose;
     int fit;
+    int fit_low;
+    int fit_high;
     char *out_filename;
     char *exp_filename;
+    char *fit_vars;
 } global_options;
 
 #include "simulation.h"

@@ -117,7 +117,7 @@ sample *sample_from_layers(jibal_layer * const *layers, int n_layers) {
         jibal_material_print(stderr, layer->material);
 #endif
         s->cranges[2*i] = i?s->cranges[2*i-1]:0.0;
-        s->cranges[2*i+1] = s->cranges[2*i] + layer->thickness;
+        s->cranges[2*i+1] = s->cranges[2*i] + (layer->thickness > 0.0 ? layer->thickness : 0.0); /* negative thickness... */
         for (j = 0; j < layer->material->n_elements; ++j) {
             n_isotopes += layer->material->elements[j].n_isotopes;
         }

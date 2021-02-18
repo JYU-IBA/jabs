@@ -51,6 +51,9 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"fast",      optional_argument, NULL, 'f'},
             {"exp",       required_argument, NULL, 'e'},
             {"fit",        no_argument,      NULL, 'F'},
+            {"fit_low",   required_argument, NULL, '4'},
+            {"fit_high",   required_argument, NULL, '5'},
+            {"fit_vars",   required_argument, NULL, '6'},
             {NULL, 0,                NULL,   0}
     };
     static const char *help_texts[] = {
@@ -71,6 +74,10 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Offset of energy calibration.",
             "Make things faster, but worse.",
             "Load experimental spectrum from file.",
+            "Fit",
+            "Fit range, low",
+            "Fit range, high",
+            "Parameters to fit",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
@@ -96,6 +103,15 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 break;
             case '3':
                 sim->p_sr = strtod(optarg, NULL);
+                break;
+            case '4':
+                global->fit_low = atoi(optarg);
+                break;
+            case '5':
+                global->fit_high = atoi(optarg);
+                break;
+            case '6':
+                global->fit_vars = optarg;
                 break;
             case 'F':
                 global->fit = 1;

@@ -305,7 +305,7 @@ void print_spectra(FILE *f, const global_options *global,  const simulation *sim
         if(l > 4 && strncmp(global->out_filename+l-4, ".csv", 4) == 0) { /* For CSV: print header line */
             csv = 1;
             sep = ','; /* and set the separator! */
-            fprintf(f, "\"Channel\",\"Sum\"");
+            fprintf(f, "\"Channel\",\"Simulated\"");
             if(exp) {
                 fprintf(f, ",\"Experimental\"");
             }
@@ -344,12 +344,55 @@ void print_spectra(FILE *f, const global_options *global,  const simulation *sim
     }
 }
 
+void add_fit_params(global_options *global, simulation *sim, jibal_layer **layers, const int n_layers, fit_params *params) {
+#ifdef DEBUG
+    fprintf(stderr, "fitvars = %s\n", global->fit_vars);
+#endif
+    if(!global->fit_vars)
+        return;
+    char *token, *s, *s_orig;
+    s_orig = s = strdup(global->fit_vars);
+    assert(s != NULL);
+    while ((token = strsep(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
+#ifdef DEBUG
+        fprintf(stderr, "Thing to fit: \"%s\"\n", token);
+#endif
+        if(strcmp(token, "calib") == 0) {
+            fit_params_add_parameter(params, &sim->energy_slope); /* TODO: prevent adding already added things */
+            fit_params_add_parameter(params, &sim->energy_offset);
+            fit_params_add_parameter(params, &sim->energy_resolution);
+        }
+        if(strcmp(token, "slope") == 0) {
+            fit_params_add_parameter(params, &sim->energy_slope);
+        }
+        if(strcmp(token, "offset") == 0) {
+            fit_params_add_parameter(params, &sim->energy_offset);
+        }
+        if(strcmp(token, "reso") == 0) {
+            fit_params_add_parameter(params, &sim->energy_resolution);
+        }
+        if(strcmp(token, "fluence") == 0) {
+            fit_params_add_parameter(params, &sim->p_sr);
+        }
+        if(strncmp(token, "thickness", 9) == 0 && strlen(token) > 9) {
+            int i_layer = atoi(token+9);
+            if(i_layer >= 1 && i_layer <= n_layers) {
+                fit_params_add_parameter(params, &layers[i_layer-1]->thickness);
+            } else {
+                fprintf(stderr, "No layer %i (parsed from \"%s\")\n", i_layer, token);
+            }
+        }
+    }
+    free(s_orig);
+}
+
 int main(int argc, char **argv) {
     fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version());
     fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it under certain conditions.\n"
                     "Run 'jabs -h' for more information.\n\n");
-    global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0, .exp_filename = NULL, .fit = 0};
+    global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0, .exp_filename = NULL,
+                             .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL};
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -412,9 +455,14 @@ int main(int argc, char **argv) {
     struct fit_stats fit_stats;
     if(global.fit) {
         struct fit_data fit_data;
-        fit_data.n_iters_max = 300;
-        fit_data.low_ch = 300;
-        fit_data.high_ch = 1000;
+        fit_data.n_iters_max = 150;
+        fit_data.low_ch = global.fit_low;
+        if(fit_data.low_ch <= 0)
+            fit_data.low_ch = (int)(exp->n*0.1);
+        fit_data.high_ch = global.fit_high;
+        if(fit_data.high_ch <= 0)
+            fit_data.high_ch = exp->n-1;
+        fprintf(stderr, "Fit range [%i, %i]\n", fit_data.low_ch, fit_data.high_ch);
         fit_data.jibal = jibal;
         fit_data.sim = sim;
         fit_data.exp = exp;
@@ -424,14 +472,11 @@ int main(int argc, char **argv) {
         fit_data.reactions = reactions;
         fit_data.ws = NULL;
         fit_data.fit_params = fit_params_new();
-        fit_params *fit_params = fit_data.fit_params;
-        fit_params_add_parameter(fit_params, &sim->energy_slope);
-        fit_params_add_parameter(fit_params, &sim->energy_offset);
-        fit_params_add_parameter(fit_params, &sim->p_sr);
-        fit_params_add_parameter(fit_params, &sim->energy_resolution);
-        fit_params_add_parameter(fit_params, &layers[0]->thickness);
-        fit_params_add_parameter(fit_params, &layers[1]->thickness);
-        //fit_params_add_parameter(fit_params, &layers[0]->material->concs[0]);
+        add_fit_params(&global, sim, layers, n_layers, fit_data.fit_params);
+        if(fit_data.fit_params->n == 0) {
+            fprintf(stderr, "No parameters to fit!\n");
+            return EXIT_FAILURE;
+        }
         fit_stats = fit(exp, &fit_data);
         fprintf(stderr, "\nFinal parameters:\n");
         simulation_print(stderr, sim);
@@ -443,7 +488,7 @@ int main(int argc, char **argv) {
         ws = fit_data.ws;
         fprintf(stderr,"CPU time used for actual simulation: %.3lf s.\n", fit_data.cputime_actual);
         fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_data.cputime_actual/fit_stats.n_evals);
-        fit_params_free(fit_params);
+        fit_params_free(fit_data.fit_params);
     } else {
         ws = sim_workspace_init(sim, sample, jibal->gsto);
         simulate(ws, sim, reactions, sample);
