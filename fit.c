@@ -84,9 +84,11 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
 #endif
 
     size_t i;
+#ifdef FIT_PRINT_PARAMS
     for(i = 0; i < fit_data->fit_params->n; i++) {
         fprintf(stderr, ", p[%zu] = %12.6e", i, gsl_vector_get(w->x, i));
     }
+#endif
     fprintf(stderr, "\n");
 }
 
