@@ -50,8 +50,9 @@ typedef struct {
     ion p; /* Reaction product */
     gsl_histogram *histo;
     brick *bricks;
+    size_t n_bricks;
     int stop;
-} sim_reaction; /* Workspace for reactions */
+} sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
 
 
 typedef struct {
@@ -63,14 +64,10 @@ typedef struct {
     const jibal_config *jibal_config;
     int rk4;
     gsto_stopping_type stopping_type;
-    gsl_histogram **histos; /* array of n_reactions */
-    int n_channels; /* NEW: histogram */
-    double p_sr_cos_alpha; /* NEW: particles * sr / cos(alpha) */
-    brick **bricks; /* array (size: n_reactions) of pointers to bricks (size n_bricks) */
-    size_t n_bricks;
+    int n_channels; /* histogram */
+    double p_sr_cos_alpha; /* particles * sr / cos(alpha) */
     ion ion;
-    ion *p; /* Array of reaction products, size n_reactions */
-    sim_reaction reactions;
+    sim_reaction *reactions;
 } sim_workspace;
 
 

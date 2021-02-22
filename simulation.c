@@ -82,30 +82,29 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
         free(ws);
         return NULL;
     }
-    ws->histos = calloc(ws->n_reactions, sizeof(gsl_histogram *));
-    ws->bricks = calloc(ws->n_reactions, sizeof(brick *));
-    ws->p = calloc(ws->n_reactions, sizeof(ion));
-    if(sim->depthsteps_max) {
-        ws->n_bricks = sim->depthsteps_max;
-    } else {
-        ws->n_bricks = (int)ceil(sim->beam_E/sim->stop_step_incident+sample->n_ranges); /* This is very conservative */
-    }
-#ifdef DEBUG
-    fprintf(stderr, "Number of bricks: %lu, number of reactions: %i\n", ws->n_bricks, ws->n_reactions);
-#endif
+    ws->reactions = calloc(ws->n_reactions, sizeof (sim_reaction));
     int i_reaction;
     for(i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
-        const reaction *r = &reactions[i_reaction];
-        ion *p = &ws->p[i_reaction];
-        ws->histos[i_reaction] = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
-        gsl_histogram_set_ranges_uniform(ws->histos[i_reaction],
+        sim_reaction *r = &ws->reactions[i_reaction];
+        r->r = &reactions[i_reaction];
+        ion *p = &r->p;
+        if(sim->depthsteps_max) {
+            r->n_bricks = sim->depthsteps_max;
+        } else {
+            r->n_bricks = (int)ceil(sim->beam_E/sim->stop_step_incident+sample->n_ranges); /* This is very conservative */
+        }
+#ifdef DEBUG_VERBOSE
+        fprintf(stderr, "Number of bricks for reaction %i: %lu\n", i_reaction, r->n_bricks);
+#endif
+        r->histo = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
+        gsl_histogram_set_ranges_uniform(r->histo,
                                          sim->energy_offset,
                                          sim->energy_offset + sim->energy_slope * ws->n_channels);
-        ws->bricks[i_reaction] = calloc(ws->n_bricks, sizeof(brick));
-        if(r->type == REACTION_RBS)
+        r->bricks = calloc(r->n_bricks, sizeof(brick));
+        if(r->r->type == REACTION_RBS)
             ion_set_isotope(p, ws->ion.isotope);
-        if(r->type == REACTION_ERD)
-            ion_set_isotope(p, sample->isotopes[r->i_isotope]);
+        if(r->r->type == REACTION_ERD)
+            ion_set_isotope(p, sample->isotopes[r->r->i_isotope]);
     }
     ws->c = calloc(sample->n_isotopes, sizeof(double));
     get_concs(ws, sample, ws->c_x, ws->c);
@@ -117,18 +116,18 @@ void sim_workspace_free(sim_workspace *ws) {
         return;
     int i;
     for(i = 0; i < ws->n_reactions; i++) {
-        if(ws->histos[i]) {
-            gsl_histogram_free(ws->histos[i]);
-            ws->histos[i] = NULL;
+        sim_reaction *r = &ws->reactions[i];
+        if(r->histo) {
+            gsl_histogram_free(r->histo);
+            r->histo = NULL;
         }
-        if(ws->bricks[i]) {
-            free(ws->bricks[i]);
-            ws->bricks[i] = NULL;
+        if(r->bricks) {
+            free(r->bricks);
+            r->bricks = NULL;
         }
     }
     free(ws->c);
-    free(ws->histos);
-    free(ws->bricks);
+    free(ws->reactions);
     free(ws);
 }
 
@@ -157,9 +156,10 @@ void simulation_print(FILE *f, const simulation *sim) {
 void convolute_bricks(sim_workspace *ws, const simulation *sim) {
     int i;
     for(i = 0; i < ws->n_reactions; i++) {
-#ifdef DEBUG
+        sim_reaction *r = &ws->reactions[i];
+#ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
-        brick_int2(ws->histos[i], ws->bricks[i], ws->n_bricks, sim->energy_resolution);
+        brick_int2(r->histo, r->bricks, r->n_bricks, sim->energy_resolution);
     }
 }

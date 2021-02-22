@@ -148,20 +148,20 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
     int i_depth;
     int i_reaction;
     for(i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-        reaction *r = &reactions[i_reaction];
-        ion *p = &ws->p[i_reaction];
-        p->E = ws->ion.E * r->K;
+        sim_reaction *r = &ws->reactions[i_reaction];
+        ion *p = &r->p;
+        p->E = ws->ion.E * r->r->K;
         p->S = 0.0;
         r->stop = 0;
-        brick *b = &ws->bricks[i_reaction][0];
-        b->E = ws->ion.E * r->K;
+        brick *b = &r->bricks[0];
+        b->E = ws->ion.E * r->r->K;
         b->S = 0.0;
         b->d = 0.0;
         b->Q = 0.0;
         b->E_0 = ws->ion.E;
     }
     i_depth=1;
-    for (x = 0.0; x < thickness && i_depth < ws->n_bricks;) {
+    for (x = 0.0; x < thickness;) {
         while (i_range < sample->n_ranges-1 && x >= sample->cranges[i_range+1]) {
             i_range++;
 #ifdef DEBUG
@@ -185,33 +185,37 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
         double E_back = ws->ion.E;
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
         double E_diff = E_front-E_back;
         fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3lf keV to  %8.3lf keV (diff %6.4lf keV)\n", x/C_TFU, (x+h)/C_TFU, E_front/C_KEV, ws->ion.E/C_KEV, E_diff/C_KEV);
 #endif
         double S_back = ws->ion.S;
         double E_mean = (E_front+E_back)/2.0;
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
                         E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ws->ion.S) / C_KEV);
 #endif
         for (i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-            reaction *r = &reactions[i_reaction];
+            sim_reaction *r = &ws->reactions[i_reaction];
             if(r->stop)
                 continue;
-            brick *b = &ws->bricks[i_reaction][i_depth];
-            ion *p = &ws->p[i_reaction]; /* Reaction product */
-            ion_set_angle(p, sim->beta);
-            p->E = ws->ion.E * r->K;
-            p->S = ws->ion.S * r->K;
+            if(i_depth >= r->n_bricks) {
+                r->stop = 1;
+                continue;
+            }
+            brick *b = &r->bricks[i_depth];
+           // ion *p = &r->p; /* Reaction product */
+            ion_set_angle(&r->p, sim->beta);
+            r->p.E = ws->ion.E * r->r->K;
+            r->p.S = ws->ion.S * r->r->K;
             b->d = x+h;
             b->E_0 = ws->ion.E; /* Sort of energy just before the reaction. */
 
-            assert(p->E > 0.0);
+            assert(r->p.E > 0.0);
 
-            if(x >= r->max_depth) {
+            if(x >= r->r->max_depth) {
 #ifdef DEBUG
-                fprintf(stderr, "Reaction %i with %s stops, because maximum depth is reached.\n", i_reaction, reactions[i_reaction].isotope->name);
+                fprintf(stderr, "Reaction %i with %s stops, because maximum depth is reached at x = %.3lf tfu.\n", i_reaction, reactions[i_reaction].isotope->name, x/C_TFU);
 #endif
                 b->Q = -1.0;
                 r->stop = 1;
@@ -222,9 +226,9 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
             int i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
                 double h_out_max = sample->cranges[i_range_out] - x_out;
-                double h_out = stop_step(ws, p, sample, x_out-0.00001*C_TFU, h_out_max, sim->stop_step_exiting); /* FIXME: 0.0001*C_TFU IS A STUPID HACK */
+                double h_out = stop_step(ws, &r->p, sample, x_out-0.00001*C_TFU, h_out_max, sim->stop_step_exiting); /* FIXME: 0.0001*C_TFU IS A STUPID HACK */
                 x_out += h_out;
-                if( p->E < sim->emin) {
+                if( r->p.E < sim->emin) {
 #ifdef DEBUG
                     fprintf(stderr, "Reaction %i with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",i_reaction, reactions[i_reaction].isotope->name, (x+h)/C_TFU);
 #endif
@@ -238,26 +242,25 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
 #endif
                 }
             }
-            double c = get_conc(ws, sample, x+h/2.0, r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
-            b->E = p->E; /* Now exited from sample */
-            b->S = p->S;
-            if(c > CONCENTRATION_CUTOFF && p->E > sim->emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
-                double sigma = jibal_cross_section_rbs(ws->ion.isotope, r->isotope, sim->theta, E_mean, ws->jibal_config->cs_rbs);
+            double c = get_conc(ws, sample, x+h/2.0, r->r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
+            b->E = r->p.E; /* Now exited from sample */
+            b->S = r->p.S;
+            if(c > CONCENTRATION_CUTOFF && r->p.E > sim->emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
+                double sigma = jibal_cross_section_rbs(ws->ion.isotope, r->r->isotope, sim->theta, E_mean, ws->jibal_config->cs_rbs);
                 double Q = c * ws->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
 #ifdef dfDEBUG
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf (prev %.3lf, sigma = %g mb/sr, Q = %g (c = %.4lf%%)\n",
                         r->isotope->name, E_back * r->K/C_KEV, r->p.E/C_KEV, r->E/C_KEV, sigma/C_MB_SR, Q, c*100.0);
 #endif
                 assert(sigma > 0.0);
-                assert(p->S > 0.0);
+                assert(r->p.S > 0.0);
                 assert(Q < 1.0e7 || Q > 0.0);
-                assert(i_depth < ws->n_bricks);
+                assert(i_depth < r->n_bricks);
                 b->Q = Q;
-                //brick_int(sqrt(r->p.S + sim->energy_resolution), sqrt(r->S + sim->energy_resolution), r->p.E, r->E, ws->histos[i_reaction], Q);
             } else {
-                if(p->E < sim->emin) {
+                if(r->p.E < sim->emin) {
                     r->stop = 1;
-                    ws->bricks[i_reaction][i_depth].Q = -1.0;
+                    r->bricks[i_depth].Q = -1.0;
                 } else {
                     b->Q = 0.0;
                 }
@@ -274,7 +277,8 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
     for(i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
         if(reactions[i_reaction].stop)
             continue;
-        ws->bricks[i_reaction][i_depth].Q = -1.0;
+        if(i_depth < ws->reactions[i_reaction].n_bricks)
+            ws->reactions[i_reaction].bricks[i_depth].Q = -1.0; /* Set the last counts to negative to indicate end of calculation */
     }
 }
 
@@ -334,8 +338,9 @@ void print_spectra(FILE *f, const global_options *global,  const simulation *sim
     }
     for(i = 0; i < ws->n_channels; i++) {
         double sum = 0.0;
-        for (j = 0; j < sim->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
-            sum += ws->histos[j]->bin[i];
+        for (j = 0; j < ws->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
+            if(i < ws->reactions[j].histo->n)
+                sum += ws->reactions[j].histo->bin[i];
         }
         if(sum == 0.0) {
             fprintf(f, "%i%c0", i, sep); /* Tidier output with a clean zero */
@@ -350,10 +355,10 @@ void print_spectra(FILE *f, const global_options *global,  const simulation *sim
             }
         }
         for (j = 0; j < sim->n_reactions; j++) {
-            if(ws->histos[j]->bin[i] == 0.0) {
+            if(i < ws->reactions[j].histo->n || ws->reactions[j].histo->bin[i] == 0.0) {
                 fprintf(f,"%c0", sep);
             } else {
-                fprintf(f, "%c%e", sep, ws->histos[j]->bin[i]);
+                fprintf(f, "%c%e", sep, ws->reactions[j].histo->bin[i]);
             }
         }
         fprintf(f, "\n");
@@ -415,8 +420,9 @@ void output_bricks(const char *filename, const sim_workspace *ws) {
     if(!f)
         return;
     for(i = 0; i < ws->n_reactions; i++) {
-        for(j = 0; j < ws->n_bricks; j++) {
-            brick *b = &ws->bricks[i][j];
+        const sim_reaction *r = &ws->reactions[i];
+        for(j = 0; j < r->n_bricks; j++) {
+            brick *b = &r->bricks[j];
             if(b->Q < 0.0)
                 break;
             fprintf(f, "%2i %2i %8.3lf %8.3lf %8.3lf %8.3lf %12.3lf\n",

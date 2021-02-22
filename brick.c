@@ -59,7 +59,7 @@ void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const do
         const brick *b_high = &bricks[i-1];
         const brick *b_low = &bricks[i];
         if(b_low->Q < 0.0) {
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
             fprintf(stderr, "Reaction had %i bricks.\n", i);
 #endif
             break;

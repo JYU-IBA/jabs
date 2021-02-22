@@ -56,8 +56,9 @@ int func_f(const gsl_vector *x, void *params, gsl_vector * f)
         if(i >= p->ws->n_channels) { /* Outside range of simulated spectrum */
             gsl_vector_set(f, i-p->low_ch, exp->bin[i]);
         } else {
-            for (j = 0; j < p->sim->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
-                sum += p->ws->histos[j]->bin[i];
+            for (j = 0; j < p->ws->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
+                if(p->ws->reactions[j].histo && i < p->ws->reactions[j].histo->n)
+                    sum += p->ws->reactions[j].histo->bin[i];
             }
             gsl_vector_set(f, i-p->low_ch, exp->bin[i] - sum);
         }

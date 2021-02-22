@@ -12,6 +12,6 @@ typedef struct {
 } brick;
 
 void brick_int(double sigma_low, double  sigma_high, double E_low, double E_high, gsl_histogram *h, double Q);
-void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const double S);
+void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, double S);
 
 #endif // JABS_BRICK_H
