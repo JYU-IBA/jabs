@@ -157,28 +157,28 @@ sample *sample_from_layers(jibal_layer * const *layers, int n_layers) {
 
 void sample_print(FILE *f, const sample *sample) {
     int i,j;
-    fprintf(stderr, "DEPTH(tfu) ");
+    fprintf(f, "DEPTH(tfu) ");
     for (i = 0; i < sample->n_isotopes; i++) {
-        fprintf(stderr, "%8s ", sample->isotopes[i]->name);
+        fprintf(f, "%8s ", sample->isotopes[i]->name);
     }
-    fprintf(stderr, "\n");
+    fprintf(f, "\n");
     for (i = 0; i < sample->n_ranges; i++) {
-        fprintf(stderr, "%10.3lf", sample->cranges[i]/C_TFU);
+        fprintf(f, "%10.3lf", sample->cranges[i]/C_TFU);
         for (j = 0; j < sample->n_isotopes; j++) {
-            fprintf(stderr, " %8.4lf", sample->cbins[i * sample->n_isotopes + j]*100.0);
+            fprintf(f, " %8.4lf", sample->cbins[i * sample->n_isotopes + j]*100.0);
         }
-        fprintf(stderr, "\n");
+        fprintf(f, "\n");
     }
 #ifdef PRINT_SAMPLE_MODEL
-    fprintf(stderr, "\n");
+    fprintf(f, "\n");
     for (i = 0; i < 1000; ++i) {
         double d = 10.0*C_TFU*i;
-        fprintf(stderr, "%10.3lf", d/C_TFU);
+        fprintf(f, "%10.3lf", d/C_TFU);
         for (j = 0; j < sample->n_isotopes; j++) {
             double x = get_conc(sample, d, j);
-            fprintf(stderr, " %8.4lf", x*100.0);
+            fprintf(f, " %8.4lf", x*100.0);
         }
-        fprintf(stderr, "\n");
+        fprintf(f, "\n");
     }
 #endif
 }

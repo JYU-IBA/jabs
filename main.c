@@ -47,8 +47,6 @@
 
 #define CONCENTRATION_CUTOFF 1e-8
 
-#define NUMBER_OF_SIMULATIONS 1
-
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E) {
     double em=E/incident->mass;
     int i_isotope;
@@ -148,6 +146,7 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
     double next_crossing = sample->cranges[1];
     double h_max;
     int i_range = 0;
+    int i_depth;
     int i_reaction;
     for(i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
         reaction *r = &reactions[i_reaction];
@@ -156,8 +155,14 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
         r->S = 0.0;
         r->p.S = 0.0;
         r->stop = 0;
+        brick *b = &ws->bricks[i_reaction][0];
+        b->E = sim->ion.E * r->K;
+        b->S = 0.0;
+        b->d = 0.0;
+        b->Q = 0.0;
     }
-    for (x = 0.0; x < thickness;) {
+    i_depth=1;
+    for (x = 0.0; x < thickness && i_depth < ws->n_bricks;) {
         while (i_range < sample->n_ranges-1 && x >= sample->cranges[i_range+1]) {
             i_range++;
 #ifdef DEBUG
@@ -203,6 +208,7 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
 #ifdef DEBUG
                 fprintf(stderr, "Reaction %i with %s stops, because maximum depth is reached.\n", i_reaction, reactions[i_reaction].isotope->name);
 #endif
+                ws->bricks[i_reaction][i_depth].Q = -1.0;
                 r->stop = 1;
                 continue;
             }
@@ -215,6 +221,7 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
                 x_out += h_out;
                 if( r->p.E < sim->emin) {
                     r->stop = 1;
+                    ws->bricks[i_reaction][i_depth].Q = -1.0;
 #ifdef DEBUG
                     fprintf(stderr, "Reaction %i with %s: Energy below EMIN when surfacing from %.3lf tfu, break break. Last above was %.3lf keV\n",i_reaction, reactions[i_reaction].isotope->name, (x+h)/C_TFU, r->E/C_KEV);
 #endif
@@ -229,6 +236,7 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
                 }
             }
             double c = get_conc(ws, sample, x+h/2.0, r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
+            brick *b = &ws->bricks[i_reaction][i_depth];
             if(c > CONCENTRATION_CUTOFF && r->p.E > sim->emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 double sigma = jibal_cross_section_rbs(ion.isotope, r->isotope, sim->theta, E_mean, ws->jibal_config->cs_rbs);
                 double Q = c * ws->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
@@ -239,8 +247,13 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
                 assert(sigma > 0.0);
                 assert(r->p.S > 0.0);
                 assert(Q < 1.0e7 || Q > 0.0);
+                assert(i_depth < ws->n_bricks);
+                b->Q = Q;
                 brick_int(sqrt(r->p.S + sim->energy_resolution), sqrt(r->S + sim->energy_resolution), r->p.E, r->E, ws->histos[i_reaction], Q);
             }
+            b->E = r->p.E;
+            b->S = r->p.S;
+            b->d = x+h;
             r->E = r->p.E;
             r->S = r->p.S;
         }
@@ -255,6 +268,15 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
         x += h;
         ion.S = S_back;
         ion.E = E_back;
+        i_depth++;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Last depth bin %i\n", i_depth);
+#endif
+    for(i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
+        if(reactions[i_reaction].stop)
+            continue;
+        ws->bricks[i_reaction][i_depth].Q = -1.0;
     }
 }
 
@@ -299,12 +321,10 @@ int assign_stopping(jibal_gsto *gsto, simulation *sim, sample *sample) {
 
 void print_spectra(FILE *f, const global_options *global,  const simulation *sim, const sim_workspace *ws, const sample *sample, const reaction *reactions, const gsl_histogram *exp) {
     int i, j;
-    int csv = 0;
     char sep = ' ';
     if(global->out_filename) {
         size_t l = strlen(global->out_filename);
         if(l > 4 && strncmp(global->out_filename+l-4, ".csv", 4) == 0) { /* For CSV: print header line */
-            csv = 1;
             sep = ','; /* and set the separator! */
             fprintf(f, "\"Channel\",\"Simulated\"");
             if(exp) {
@@ -462,7 +482,7 @@ int main(int argc, char **argv) {
             fit_data.low_ch = (int)(exp->n*0.1);
         fit_data.high_ch = global.fit_high;
         if(fit_data.high_ch <= 0)
-            fit_data.high_ch = exp->n-1;
+            fit_data.high_ch = exp->n - 1;
         fprintf(stderr, "Fit range [%i, %i]\n", fit_data.low_ch, fit_data.high_ch);
         fit_data.jibal = jibal;
         fit_data.sim = sim;
@@ -499,6 +519,16 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     print_spectra(f, &global, sim, ws, sample, reactions, exp);
+#ifdef DEBUG
+    for(int i = 0; i < ws->n_reactions; i++) {
+        for(int j = 0; j < ws->n_bricks; j++) {
+            brick *b = &ws->bricks[i][j];
+            if(b->Q < 0.0)
+                break;
+            fprintf(stderr, "BRICK %2i %2i %8.3lf %8.3lf %8.3lf %12.3lf\n", i, j, b->d/C_TFU, b->E/C_KEV, sqrt(b->S)/C_KEV, b->Q);
+        }
+    }
+#endif
     sim_workspace_free(ws);
     end = clock();
     double cputime_total =(((double) (end - start)) / CLOCKS_PER_SEC);

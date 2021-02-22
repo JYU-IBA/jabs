@@ -28,7 +28,6 @@ void erf_Q_test() {
     double x;
     int i;
     double sigma = 1.0;
-    double x_0 = 100.0;
     double x_L = 10.0;
     double x_H = 15.0;
     double sum = 0.0;
@@ -45,6 +44,22 @@ void erf_Q_test() {
         double out = (fx_low-fx)/(x_H-x_L); /* One count, convolution of gaussian rectangle */
         sum += out*step; /* This is the integral! */
         fprintf(stdout, "%g %g %g %12.8lf\n", x, fx, out, sum);
+    }
+}
+
+void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const double S) {
+    int i, j;
+    for(i = 1; i < n_bricks; i++) {
+        const brick *b_high = &bricks[i-1];
+        const brick *b_low = &bricks[i];
+        for(j = 0; j < h->n; j++) {
+            double w = h->range[j + 1] - h->range[j];
+            double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
+            double sigma_low = sqrt(b_low->S + S);
+            double sigma_high = sqrt(b_high->S + S);
+            double y = (erf_Q_optim((b_low->E - E) / sigma_low) - erf_Q_optim((b_high->E - E) / sigma_high)) / (b_high->E - b_low->E);
+            h->bin[j] += y * w * b_low->Q;
+        }
     }
 }
 

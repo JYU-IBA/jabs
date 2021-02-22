@@ -11,7 +11,6 @@
     See LICENSE.txt for the full license.
 
  */
-#include <assert.h>
 #include "simulation.h"
 #include "defaults.h"
 
@@ -50,6 +49,13 @@ int sim_sanity_check(const simulation *sim) {
     return 0;
 }
 
+void sim_workspace_reset(sim_workspace *ws, const simulation *sim) {
+    ws->i_range_accel = 0;
+    ws->c_x = 0.0;
+    ws->p_sr_cos_alpha = sim->p_sr / cos(sim->alpha);
+    /* TODO: finish */
+}
+
 sim_workspace *sim_workspace_init(const simulation *sim, const sample *sample, jibal_gsto *gsto, const jibal_config *jibal_config) {
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->n_reactions = sim->n_reactions;
@@ -72,12 +78,16 @@ sim_workspace *sim_workspace_init(const simulation *sim, const sample *sample, j
         return NULL;
     }
     ws->histos = calloc(ws->n_reactions, sizeof(gsl_histogram *));
+    ws->bricks = calloc(ws->n_reactions, sizeof(brick *));
+    ws->n_bricks = 1024; /* TODO: hard coded is bad */
+
     int i_reaction;
     for(i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
         ws->histos[i_reaction] = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
         gsl_histogram_set_ranges_uniform(ws->histos[i_reaction],
                                          sim->energy_offset,
                                          sim->energy_offset + sim->energy_slope * ws->n_channels);
+        ws->bricks[i_reaction] = calloc(ws->n_bricks, sizeof(brick));
     }
     ws->c = calloc(sample->n_isotopes, sizeof(double));
     get_concs(ws, sample, ws->c_x, ws->c);
@@ -93,15 +103,15 @@ void sim_workspace_free(sim_workspace *ws) {
             gsl_histogram_free(ws->histos[i]);
             ws->histos[i] = NULL;
         }
+        if(ws->bricks[i]) {
+            free(ws->bricks[i]);
+            ws->bricks[i] = NULL;
+        }
     }
     free(ws->c);
     free(ws->histos);
+    free(ws->bricks);
     free(ws);
-}
-
-void sim_set_calibration(simulation *sim, double slope, double offset) {
-    sim->energy_slope = slope;
-    sim->energy_offset = 0.0*C_KEV;
 }
 
 void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *sim) {
@@ -112,16 +122,23 @@ void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *
 }
 
 void simulation_print(FILE *f, const simulation *sim) {
-    fprintf(stderr, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->ion.isotope->name, sim->ion.isotope->Z, sim->ion.isotope->A, sim->ion.isotope->mass/C_U);
-    fprintf(stderr, "E = %.3lf keV\n", sim->ion.E/C_KEV);
-    fprintf(stderr, "alpha = %.3lf deg\n", sim->alpha/C_DEG);
-    fprintf(stderr, "beta = %.3lf deg\n", sim->beta/C_DEG);
-    fprintf(stderr, "theta = %.3lf deg\n", sim->theta/C_DEG);
-    fprintf(stderr, "particles * sr = %e\n", sim->p_sr);
-    fprintf(stderr, "calibration offset = %.3lf keV\n", sim->energy_offset/C_KEV);
-    fprintf(stderr, "calibration slope = %.5lf keV\n", sim->energy_slope/C_KEV);
-    fprintf(stderr, "detector resolution = %.3lf keV FWHM\n", sqrt(sim->energy_resolution)*C_FWHM/C_KEV);
-    fprintf(stderr, "step for incident ions = %.3lf keV\n", sim->stop_step_incident/C_KEV);
-    fprintf(stderr, "step for exiting ions = %.3lf keV\n", sim->stop_step_exiting/C_KEV);
-    fprintf(stderr, "fast level = %i\n", sim->fast);
+    fprintf(f, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->ion.isotope->name, sim->ion.isotope->Z, sim->ion.isotope->A, sim->ion.isotope->mass/C_U);
+    fprintf(f, "E = %.3lf keV\n", sim->ion.E/C_KEV);
+    fprintf(f, "alpha = %.3lf deg\n", sim->alpha/C_DEG);
+    fprintf(f, "beta = %.3lf deg\n", sim->beta/C_DEG);
+    fprintf(f, "theta = %.3lf deg\n", sim->theta/C_DEG);
+    fprintf(f, "particles * sr = %e\n", sim->p_sr);
+    fprintf(f, "calibration offset = %.3lf keV\n", sim->energy_offset/C_KEV);
+    fprintf(f, "calibration slope = %.5lf keV\n", sim->energy_slope/C_KEV);
+    fprintf(f, "detector resolution = %.3lf keV FWHM\n", sqrt(sim->energy_resolution)*C_FWHM/C_KEV);
+    fprintf(f, "step for incident ions = %.3lf keV\n", sim->stop_step_incident/C_KEV);
+    fprintf(f, "step for exiting ions = %.3lf keV\n", sim->stop_step_exiting/C_KEV);
+    fprintf(f, "fast level = %i\n", sim->fast);
+}
+
+void convolute_bricks(sim_workspace *ws, const simulation *sim) {
+    int i;
+    for(i = 0; i < ws->n_reactions; i++) {
+        brick_int2(ws->histos[i], ws->bricks[i], ws->n_bricks, sim->energy_resolution);
+    }
 }
