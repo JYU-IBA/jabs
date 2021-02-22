@@ -129,28 +129,87 @@ sample *sample_from_layers(jibal_layer * const *layers, int n_layers) {
     fprintf(stderr, "Total %i isotopes and %i ranges\n", n_isotopes, s->n_ranges);
 #endif
     s->isotopes = calloc(n_isotopes, sizeof(jibal_isotope *));
-    s->cbins = calloc( s->n_ranges * n_isotopes, sizeof(double));
     i_isotope = 0;
-    s->n_isotopes = n_isotopes;
-    for (i = 0; i < n_layers; i++) {
+    for(i = 0; i < n_layers; i++) { /* Set isotope pointers */
         const jibal_layer *layer = layers[i];
-        for (j = 0; j < layer->material->n_elements; j++) {
-            if(layer->material->concs[j] < 0.0)
-                layer->material->concs[j] = 0.0001; /* TODO: fitting robustification */
-        }
-        jibal_material_normalize(layer->material);
-        for (j = 0; j < layer->material->n_elements; j++) {
-            jibal_element *element = &layer->material->elements[j];
-            for (k = 0; k < element->n_isotopes; k++) {
-                //assert(i_isotope < n_isotopes);
-                s->isotopes[i_isotope] = element->isotopes[k];
-                s->cbins[(2 * i)*s->n_isotopes + i_isotope] = element->concs[k] * layer->material->concs[j];
-                s->cbins[(2 * i + 1)*s->n_isotopes + i_isotope] = element->concs[k] * layer->material->concs[j];
+        for (j = 0; j < layer->material->n_elements; ++j) {
+            for (k = 0; k < layer->material->elements[j].n_isotopes; k++) {
+                assert(i_isotope < n_isotopes);
+                s->isotopes[i_isotope] = layer->material->elements[j].isotopes[k];
                 i_isotope++;
             }
         }
     }
 
+#ifndef NO_LAYER_REMOVE_DUPLICATES
+
+#ifdef DEBUG
+    for(i = 0; i < n_isotopes; i++) {
+        if(s->isotopes[i])
+            fprintf(stderr, "%i: %s\n", i, s->isotopes[i]->name);
+    }
+    fprintf(stderr, "Removing duplicates!\n");
+#endif
+    for(i = 0; i < n_isotopes; i++) { /* Set all duplicate isotope pointers to NULL */
+        if(s->isotopes[i] == NULL)
+            continue;
+        for (j = i+1; j < n_isotopes; j++) {
+            if(s->isotopes[i] == s->isotopes[j]) {
+                s->isotopes[j] = NULL;
+            }
+        }
+    }
+#ifdef DEBUG
+    for(i = 0; i < n_isotopes; i++) {
+        if(s->isotopes[i]) {
+            fprintf(stderr, "%i: %s\n", i, s->isotopes[i]->name);
+        }
+    }
+#endif
+    for(i = 0; i < n_isotopes; i++) { /* Move NULL pointers to the end of array and calculate new size */
+        if(s->isotopes[i] != NULL)
+            continue;
+#ifdef DEBUG
+        fprintf(stderr, "shuffle i=%i\n", i);
+#endif
+        for (j = i; j < n_isotopes; j++) {
+            s->isotopes[j] = s->isotopes[j+1];
+        }
+        i--;
+        n_isotopes--;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "%i non-duplicate isotopes:\n", n_isotopes);
+    for (i = 0; i < n_isotopes; i++) {
+        fprintf(stderr, "%i: %s\n", i, s->isotopes[i]->name);
+    }
+#endif
+#endif // NO_LAYER_REMOVE_DUPLICATES
+
+
+    s->cbins = calloc( s->n_ranges * n_isotopes, sizeof(double));
+    s->n_isotopes = n_isotopes;
+    /* TODO: it is possible to save a bit of memory by reallocing s->cbins and s->isotopes to match the new size (n_isotopes) */
+
+    for(i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
+        for (i = 0; i < n_layers; i++) {
+            const jibal_layer *layer = layers[i];
+            for (j = 0; j < layer->material->n_elements; j++) {
+                if (layer->material->concs[j] < 0.0)
+                    layer->material->concs[j] = 0.0001; /* TODO: fitting robustification */
+            }
+            jibal_material_normalize(layer->material);
+            for (j = 0; j < layer->material->n_elements; j++) {
+                jibal_element *element = &layer->material->elements[j];
+                for (k = 0; k < element->n_isotopes; k++) {
+                    if(layer->material->elements[j].isotopes[k] == s->isotopes[i_isotope]) {
+                        s->cbins[(2 * i) * s->n_isotopes + i_isotope] = element->concs[k] * layer->material->concs[j];
+                        s->cbins[(2 * i + 1) * s->n_isotopes + i_isotope] = element->concs[k] * layer->material->concs[j];
+                    }
+                }
+            }
+        }
+    }
     return s;
 }
 

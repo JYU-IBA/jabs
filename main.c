@@ -291,7 +291,6 @@ reaction *make_rbs_reactions(const sample *sample, const simulation *sim, int *n
         r->type = REACTION_RBS;
         r->isotope = sample->isotopes[i];
         r->i_isotope = i;
-        //ion_set_isotope(&r->p, sim->ion.isotope); /* TODO: for RBS, yes... */
         double theta_max=asin(r->isotope->mass/sim->beam_isotope->mass);
         if(sim->beam_isotope->mass >= r->isotope->mass && sim->theta > theta_max) {
 #ifdef DEBUG
