@@ -151,8 +151,6 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
     for(i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
         reaction *r = &reactions[i_reaction];
         r->p.E = sim->ion.E * r->K;
-        r->E = r->p.E;
-        r->S = 0.0;
         r->p.S = 0.0;
         r->stop = 0;
         brick *b = &ws->bricks[i_reaction][0];
@@ -221,7 +219,7 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
                 x_out += h_out;
                 if( r->p.E < sim->emin) {
 #ifdef DEBUG
-                    fprintf(stderr, "Reaction %i with %s: Energy below EMIN when surfacing from %.3lf tfu, break break. Last above was %.3lf keV\n",i_reaction, reactions[i_reaction].isotope->name, (x+h)/C_TFU, r->E/C_KEV);
+                    fprintf(stderr, "Reaction %i with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",i_reaction, reactions[i_reaction].isotope->name, (x+h)/C_TFU);
 #endif
                     break;
                 }
@@ -259,8 +257,6 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
                     b->Q = 0.0;
                 }
             }
-            r->E = r->p.E;
-            r->S = r->p.S;
         }
 #if 0
         fprintf(stderr, "Surf: from x_out = %g tfu, gives E_out = %g MeV (prev was %g MeV, diff %g keV), stragg = %g keV\n", (x-h)/C_TFU, E_out/C_MEV, E_out_prev/C_MEV, (E_diff)/C_KEV, sqrt(S_out)/C_KEV);
@@ -304,7 +300,6 @@ reaction *make_rbs_reactions(const sample *sample, const simulation *sim, int *n
         }
         r->K = jibal_kin_rbs(sim->ion.mass, r->isotope->mass, sim->theta, '+'); /* TODO: this is too hard coded for RBS right now */
         r->p.E = sim->ion.E * r->K;
-        r->E = r->p.E;
         r->p.S = 0.0;
         r->max_depth = sample_isotope_max_depth(sample, r->i_isotope);
         r->stop = 0;

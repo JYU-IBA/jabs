@@ -16,7 +16,7 @@
 
 void reactions_print(FILE *f, reaction *reactions, int n_reactions) {
     int i;
-    for (int i = 0; i < n_reactions; i++) {
+    for (i = 0; i < n_reactions; i++) {
         reaction *r = &reactions[i];
         fprintf(stderr, "Reaction %3i/%i: RBS with %5s (isotope id %3i): K = %7.5lf, max depth = %9.3lf tfu\n", i+1, n_reactions,
                 r->isotope->name, r->i_isotope,

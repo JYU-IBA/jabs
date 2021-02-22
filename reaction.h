@@ -27,8 +27,6 @@ typedef struct {
     /* TODO: type? */
     /* TODO: cross section to use? */
     /* TODO: cross sections from files */
-    double E; /* Previous energy bin, TODO: make a histogram instead! */
-    double S; /* Previous straggling bin */
     int stop;
 } reaction;
 
