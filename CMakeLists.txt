@@ -10,7 +10,7 @@
 #
 cmake_minimum_required(VERSION 3.15)
 project(jabs
-        VERSION 0.1.7
+        VERSION 0.1.8
         DESCRIPTION "Jaakko's Backscattering Simulator (JaBS)"
         LANGUAGES C
         )
