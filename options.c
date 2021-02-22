@@ -174,11 +174,11 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 global->exp_filename = optarg;
                 break;
             case 'E':
-                sim->ion.E = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                sim->beam_E = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 'I':
-                ion_set_isotope(&sim->ion, jibal_isotope_find(global->jibal->isotopes, optarg, 0, 0));
-                if(!sim->ion.isotope) {
+                sim->beam_isotope = jibal_isotope_find(global->jibal->isotopes, optarg, 0, 0);
+                if(!sim->beam_isotope) {
                     fprintf(stderr, "%s is not a valid isotope.\n", optarg);
                     exit(EXIT_FAILURE);
                 }

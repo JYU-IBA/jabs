@@ -36,11 +36,23 @@ typedef struct {
     double alpha;
     double beta;
     double theta;
-    ion ion;
+    //ion ion;
+    const jibal_isotope *beam_isotope;
+    double beam_E;
+    double beam_E_broad; /* Variance */
     int fast;
     double emin;
     size_t depthsteps_max;
 } simulation;
+
+typedef struct {
+    const reaction *r;
+    ion p; /* Reaction product */
+    gsl_histogram *histo;
+    brick *bricks;
+    int stop;
+} sim_reaction; /* Workspace for reactions */
+
 
 typedef struct {
     int n_reactions; /* Same as sim->n_reactions, but we want to keep it here too, as it is used for allocations */
@@ -56,13 +68,17 @@ typedef struct {
     double p_sr_cos_alpha; /* NEW: particles * sr / cos(alpha) */
     brick **bricks; /* array (size: n_reactions) of pointers to bricks (size n_bricks) */
     size_t n_bricks;
+    ion ion;
+    ion *p; /* Array of reaction products, size n_reactions */
+    sim_reaction reactions;
 } sim_workspace;
+
 
 #include "sample.h"
 simulation *sim_init();
 void sim_free(simulation *sim);
 int sim_sanity_check(const simulation *sim);
-sim_workspace *sim_workspace_init(const simulation *sim, const sample *sample, jibal_gsto *gsto, const jibal_config *jibal_config);
+sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactions, const sample *sample, jibal_gsto *gsto, const jibal_config *jibal_config);
 void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *sim);
 void simulation_print(FILE *f, const simulation *sim);

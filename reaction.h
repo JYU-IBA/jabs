@@ -18,15 +18,21 @@
 #include <gsl/gsl_histogram.h>
 #include "ion.h"
 
+typedef enum {
+    REACTION_RBS = 0,
+    REACTION_ERD = 1,
+    REACTION_ARB = 2
+} reaction_type;
+
 typedef struct {
     const jibal_isotope *isotope; /* target isotope */
     int i_isotope; /* location of target isotope in concentration table */
-    ion p; /* reaction product, e.g. in case of He-RBS this will be He. */
     double K;
     double max_depth;
     /* TODO: type? */
     /* TODO: cross section to use? */
     /* TODO: cross sections from files */
+    reaction_type type;
     int stop;
 } reaction;
 
