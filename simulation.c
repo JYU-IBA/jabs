@@ -59,15 +59,16 @@ void sim_workspace_reset(sim_workspace *ws, const simulation *sim) {
 
 sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactions, const sample *sample, jibal_gsto *gsto, const jibal_config *jibal_config) {
     sim_workspace *ws = malloc(sizeof(sim_workspace));
-    ws->n_reactions = sim->n_reactions;
+    ws->sim = *sim;
+    ws->n_reactions = ws->sim.n_reactions;
     ws->gsto = gsto;
     ws->jibal_config = jibal_config;
     ws->i_range_accel = 0;
     ws->c_x = 0.0;
     ion_set_isotope(&ws->ion, sim->beam_isotope);
-    ws->ion.E = sim->beam_E;
-    ws->ion.S = sim->beam_E_broad;
-    ion_set_angle(&ws->ion, sim->alpha);
+    ws->ion.E = ws->sim.beam_E;
+    ws->ion.S = ws->sim.beam_E_broad;
+    ion_set_angle(&ws->ion, ws->sim.alpha);
 
     ws->p_sr_cos_alpha = sim->p_sr / cos(sim->alpha);
     if (sim->fast) {

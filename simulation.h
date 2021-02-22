@@ -56,6 +56,7 @@ typedef struct {
 
 
 typedef struct {
+    simulation sim;
     int n_reactions; /* Same as sim->n_reactions, but we want to keep it here too, as it is used for allocations */
     double *c; /* Concentrations for n_isotopes at some arbitrary x */
     double c_x; /* at this x */

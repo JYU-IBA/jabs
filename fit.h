@@ -33,7 +33,7 @@ struct fit_data {
     reaction *reactions;
     const jibal *jibal;
     sample *sample;
-     jibal_layer * const *layers;
+    jibal_layer * const *layers;
     size_t n_layers;
     fit_params *fit_params;
     sim_workspace *ws; /* Handled by fitting function! */
