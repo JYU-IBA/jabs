@@ -1,4 +1,7 @@
 #include <math.h>
+#include <assert.h>
+#include <jibal_units.h>
+
 #ifdef ERF_Q_FROM_GSL
 #include <gsl/gsl_sf.h>
 #endif
@@ -52,13 +55,24 @@ void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const do
     for(i = 1; i < n_bricks; i++) {
         const brick *b_high = &bricks[i-1];
         const brick *b_low = &bricks[i];
+        if(b_low->Q < 0.0) {
+#ifdef DEBUG
+            fprintf(stderr, "Reaction had %i bricks.\n", i);
+#endif
+            break;
+        }
+        double sigma_low = sqrt(b_low->S + S);
+        double sigma_high = sqrt(b_high->S + S);
+        fprintf(stderr, "delta d = %.3lf, E_high = %.3lf, E_low = %.3lf), sigma_low = %.3lf, sigma_high = %.3lf, Q = %.3lf\n",
+                (b_low->d - b_high->d)/C_TFU, b_high->E/C_KEV, b_low->E/C_KEV, sigma_low/C_KEV, sigma_high/C_KEV, b_low->Q);
         for(j = 0; j < h->n; j++) {
-            double w = h->range[j + 1] - h->range[j];
             double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
-            double sigma_low = sqrt(b_low->S + S);
-            double sigma_high = sqrt(b_high->S + S);
+            double w = h->range[j + 1] - h->range[j];
             double y = (erf_Q_optim((b_low->E - E) / sigma_low) - erf_Q_optim((b_high->E - E) / sigma_high)) / (b_high->E - b_low->E);
             h->bin[j] += y * w * b_low->Q;
+            //fprintf(stderr, "i=%i, j=%i, w = %.5lf keV, E = %.3lf keV, y=%g\n", i, j, w/C_KEV, E/C_KEV, y);
+            assert(!isnan(y));
+
         }
     }
 }

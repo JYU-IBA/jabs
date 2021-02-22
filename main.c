@@ -220,8 +220,6 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
                 double h_out = stop_step(ws, &r->p, sample, x_out-0.00001*C_TFU, h_out_max, sim->stop_step_exiting); /* FIXME: 0.0001*C_TFU IS A STUPID HACK */
                 x_out += h_out;
                 if( r->p.E < sim->emin) {
-                    r->stop = 1;
-                    ws->bricks[i_reaction][i_depth].Q = -1.0;
 #ifdef DEBUG
                     fprintf(stderr, "Reaction %i with %s: Energy below EMIN when surfacing from %.3lf tfu, break break. Last above was %.3lf keV\n",i_reaction, reactions[i_reaction].isotope->name, (x+h)/C_TFU, r->E/C_KEV);
 #endif
@@ -237,6 +235,9 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
             }
             double c = get_conc(ws, sample, x+h/2.0, r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
             brick *b = &ws->bricks[i_reaction][i_depth];
+            b->E = r->p.E;
+            b->S = r->p.S;
+            b->d = x+h;
             if(c > CONCENTRATION_CUTOFF && r->p.E > sim->emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 double sigma = jibal_cross_section_rbs(ion.isotope, r->isotope, sim->theta, E_mean, ws->jibal_config->cs_rbs);
                 double Q = c * ws->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
@@ -249,11 +250,15 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
                 assert(Q < 1.0e7 || Q > 0.0);
                 assert(i_depth < ws->n_bricks);
                 b->Q = Q;
-                brick_int(sqrt(r->p.S + sim->energy_resolution), sqrt(r->S + sim->energy_resolution), r->p.E, r->E, ws->histos[i_reaction], Q);
+                //brick_int(sqrt(r->p.S + sim->energy_resolution), sqrt(r->S + sim->energy_resolution), r->p.E, r->E, ws->histos[i_reaction], Q);
+            } else {
+                if( r->p.E < sim->emin) {
+                    r->stop = 1;
+                    ws->bricks[i_reaction][i_depth].Q = -1.0;
+                } else {
+                    b->Q = 0.0;
+                }
             }
-            b->E = r->p.E;
-            b->S = r->p.S;
-            b->d = x+h;
             r->E = r->p.E;
             r->S = r->p.S;
         }
@@ -513,6 +518,7 @@ int main(int argc, char **argv) {
     } else {
         ws = sim_workspace_init(sim, sample, jibal->gsto, jibal->config);
         simulate(ws, sim, reactions, sample);
+        convolute_bricks(ws, sim);
     }
     if(!ws) {
         fprintf(stderr, "Unexpected error.\n");

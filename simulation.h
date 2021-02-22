@@ -65,5 +65,5 @@ sim_workspace *sim_workspace_init(const simulation *sim, const sample *sample, j
 void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *sim);
 void simulation_print(FILE *f, const simulation *sim);
-
+void convolute_bricks(sim_workspace *ws, const simulation *sim);
 #endif // JABS_SIMULATION_H
