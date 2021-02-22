@@ -150,14 +150,15 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
     int i_reaction;
     for(i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
         reaction *r = &reactions[i_reaction];
-        r->p.E = sim->ion.E * r->K;
+        r->p.E = ion.E * r->K;
         r->p.S = 0.0;
         r->stop = 0;
         brick *b = &ws->bricks[i_reaction][0];
-        b->E = sim->ion.E * r->K;
+        b->E = ion.E * r->K;
         b->S = 0.0;
         b->d = 0.0;
         b->Q = 0.0;
+        b->E_0 = ion.E;
     }
     i_depth=1;
     for (x = 0.0; x < thickness && i_depth < ws->n_bricks;) {
@@ -198,15 +199,18 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
             reaction *r = &reactions[i_reaction];
             if(r->stop)
                 continue;
+            brick *b = &ws->bricks[i_reaction][i_depth];
             r->p.E = ion.E * r->K;
             r->p.S = ion.S * r->K;
+            b->E_0 = ion.E; /* Sort of energy just before the reaction. */
+
             assert(r->p.E > 0.0);
 
             if(x >= r->max_depth) {
 #ifdef DEBUG
                 fprintf(stderr, "Reaction %i with %s stops, because maximum depth is reached.\n", i_reaction, reactions[i_reaction].isotope->name);
 #endif
-                ws->bricks[i_reaction][i_depth].Q = -1.0;
+                b->Q = -1.0;
                 r->stop = 1;
                 continue;
             }
@@ -232,7 +236,6 @@ void simulate(sim_workspace *ws, const simulation *sim, reaction *reactions, con
                 }
             }
             double c = get_conc(ws, sample, x+h/2.0, r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
-            brick *b = &ws->bricks[i_reaction][i_depth];
             b->E = r->p.E;
             b->S = r->p.S;
             b->d = x+h;
@@ -407,9 +410,35 @@ void add_fit_params(global_options *global, simulation *sim, jibal_layer **layer
     free(s_orig);
 }
 
+void output_bricks(const char *filename, const sim_workspace *ws) {
+    FILE *f;
+    int i, j;
+    if(!filename)
+        return;
+    if(strcmp(filename, "-") == 0)
+        f=stdout;
+    else {
+        f = fopen(filename, "w");
+    }
+    if(!f)
+        return;
+    for(int i = 0; i < ws->n_reactions; i++) {
+        for(int j = 0; j < ws->n_bricks; j++) {
+            brick *b = &ws->bricks[i][j];
+            if(b->Q < 0.0)
+                break;
+            fprintf(f, "%2i %2i %8.3lf %8.3lf %8.3lf %8.3lf %12.3lf\n",
+                    i, j, b->d/C_TFU, b->E_0/C_KEV, b->E/C_KEV, sqrt(b->S)/C_KEV, b->Q);
+        }
+        fprintf(f, "\n\n");
+    }
+    if(f != stdout)
+        fclose(f);
+}
+
 int main(int argc, char **argv) {
     global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0, .exp_filename = NULL,
-                             .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL};
+                             .bricks_filename = NULL, .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL};
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -521,16 +550,9 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     print_spectra(f, &global, sim, ws, sample, reactions, exp);
-#ifdef DEBUG
-    for(int i = 0; i < ws->n_reactions; i++) {
-        for(int j = 0; j < ws->n_bricks; j++) {
-            brick *b = &ws->bricks[i][j];
-            if(b->Q < 0.0)
-                break;
-            fprintf(stderr, "BRICK %2i %2i %8.3lf %8.3lf %8.3lf %12.3lf\n", i, j, b->d/C_TFU, b->E/C_KEV, sqrt(b->S)/C_KEV, b->Q);
-        }
-    }
-#endif
+
+    output_bricks(global.bricks_filename, ws);
+
     sim_workspace_free(ws);
     end = clock();
     double cputime_total =(((double) (end - start)) / CLOCKS_PER_SEC);

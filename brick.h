@@ -4,7 +4,8 @@
 #include <gsl/gsl_histogram.h>
 
 typedef struct {
-    double d; /* Depth */
+    double d; /* Depth (this is same for all bricks in the simulation) */
+    double E_0;
     double E; /* Energy */
     double S; /* Straggling (variance) */
     double Q; /* Counts */

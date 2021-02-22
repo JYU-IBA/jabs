@@ -24,6 +24,7 @@ typedef struct {
     int fit_high;
     char *out_filename;
     char *exp_filename;
+    char *bricks_filename;
     char *fit_vars;
 } global_options;
 

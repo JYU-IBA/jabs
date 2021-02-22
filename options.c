@@ -54,6 +54,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"fit_low",   required_argument, NULL, '4'},
             {"fit_high",   required_argument, NULL, '5'},
             {"fit_vars",   required_argument, NULL, '6'},
+            {"bricks_out", required_argument, NULL, '7'},
             {NULL, 0,                NULL,   0}
     };
     static const char *help_texts[] = {
@@ -112,6 +113,9 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 break;
             case '6':
                 global->fit_vars = optarg;
+                break;
+            case '7':
+                global->bricks_filename = optarg;
                 break;
             case 'F':
                 global->fit = 1;
