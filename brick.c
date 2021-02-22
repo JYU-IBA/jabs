@@ -63,8 +63,7 @@ void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const do
         }
         double sigma_low = sqrt(b_low->S + S);
         double sigma_high = sqrt(b_high->S + S);
-        fprintf(stderr, "delta d = %.3lf, E_high = %.3lf, E_low = %.3lf), sigma_low = %.3lf, sigma_high = %.3lf, Q = %.3lf\n",
-                (b_low->d - b_high->d)/C_TFU, b_high->E/C_KEV, b_low->E/C_KEV, sigma_low/C_KEV, sigma_high/C_KEV, b_low->Q);
+        //fprintf(stderr, "delta d = %.3lf, E_high = %.3lf, E_low = %.3lf), sigma_low = %.3lf, sigma_high = %.3lf, Q = %.3lf\n", (b_low->d - b_high->d)/C_TFU, b_high->E/C_KEV, b_low->E/C_KEV, sigma_low/C_KEV, sigma_high/C_KEV, b_low->Q);
         for(j = 0; j < h->n; j++) {
             double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
             double w = h->range[j + 1] - h->range[j];

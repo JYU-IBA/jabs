@@ -79,7 +79,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const sample *sample, j
     }
     ws->histos = calloc(ws->n_reactions, sizeof(gsl_histogram *));
     ws->bricks = calloc(ws->n_reactions, sizeof(brick *));
-    ws->n_bricks = 1024; /* TODO: hard coded is bad */
+    ws->n_bricks = DEPTH_BINS_MAX; /* TODO: hard coded is bad */
 
     int i_reaction;
     for(i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
