@@ -30,6 +30,7 @@ simulation *sim_init() {
     sim->energy_offset = 0.0*C_KEV;
     sim->emin = E_MIN;
     ion_set_angle(&sim->ion, sim->alpha);
+    sim->depthsteps_max = 0; /* Zero: automatic */
     return sim;
 }
 
@@ -79,8 +80,14 @@ sim_workspace *sim_workspace_init(const simulation *sim, const sample *sample, j
     }
     ws->histos = calloc(ws->n_reactions, sizeof(gsl_histogram *));
     ws->bricks = calloc(ws->n_reactions, sizeof(brick *));
-    ws->n_bricks = DEPTH_BINS_MAX; /* TODO: hard coded is bad */
-
+    if(sim->depthsteps_max) {
+        ws->n_bricks = sim->depthsteps_max;
+    } else {
+        ws->n_bricks = (int)ceil(sim->ion.E/sim->stop_step_incident+sample->n_ranges); /* This is very conservative */
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Number of bricks: %lu\n", ws->n_bricks);
+#endif
     int i_reaction;
     for(i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
         ws->histos[i_reaction] = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */

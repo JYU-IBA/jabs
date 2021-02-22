@@ -55,6 +55,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"fit_high",   required_argument, NULL, '5'},
             {"fit_vars",   required_argument, NULL, '6'},
             {"bricks_out", required_argument, NULL, '7'},
+            {"depthsteps", required_argument, NULL, '8'},
             {NULL, 0,                NULL,   0}
     };
     static const char *help_texts[] = {
@@ -65,7 +66,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Incident ion (without charge state), e.g. 4He",
             "Incident beam energy. Please give units as well, e.g. 2MeV or \"2 MeV\" or 2000keV",
             "Incident angle (from sample normal).",
-            "Exit angle (from sample norma).",
+            "Exit angle (from sample normal).",
             "Scattering angle (from beam).",
             "Fluence (or actually particles * sr).",
             "Resolution of detector (FHWM of Gaussian)",
@@ -79,6 +80,8 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Fit range, low",
             "Fit range, high",
             "Comma separated list of parameters to fit, e.g. \"calib,fluence,thickness1\"",
+            "Save intermediate raw data to file",
+            "Maximum number of depth steps",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
@@ -116,6 +119,9 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 break;
             case '7':
                 global->bricks_filename = optarg;
+                break;
+            case '8':
+                sim->depthsteps_max = atoi(optarg);
                 break;
             case 'F':
                 global->fit = 1;

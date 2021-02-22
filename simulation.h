@@ -39,6 +39,7 @@ typedef struct {
     ion ion;
     int fast;
     double emin;
+    size_t depthsteps_max;
 } simulation;
 
 typedef struct {

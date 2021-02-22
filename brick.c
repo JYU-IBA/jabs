@@ -7,11 +7,14 @@
 #endif
 #include "brick.h"
 
+extern inline double erfc_fast(double);
+
 inline double erfc_fast(double x) {
     return exp(-1.0950081470333*x-0.75651138383854*x*x);
     /* Tsay, WJ., Huang, C.J., Fu, TT. et al. J Prod Anal 39, 259–269 (2013). https://doi.org/10.1007/s11123-012-0283-1 */
 }
-extern inline double erf_Q(double x);
+
+extern inline double erf_Q(double);
 
 inline double erf_Q(double x) {
     return x < 0.0 ? 1.0-0.5*erfc_fast(-1.0*x/M_SQRT2) : 0.5*erfc_fast(x/M_SQRT2);
