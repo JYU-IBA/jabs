@@ -26,7 +26,7 @@ void simulate(sim_workspace *ws, const sample *sample); /* TODO: move this funct
 
 int func_f(const gsl_vector *x, void *params, gsl_vector * f)
 {
-    clock_t start, intermediate, end;
+    clock_t start, end;
     struct fit_data *p = (struct fit_data *) params;
     gsl_histogram *exp = p->exp;
     size_t i, j;
@@ -46,11 +46,8 @@ int func_f(const gsl_vector *x, void *params, gsl_vector * f)
     }
     start = clock();
     simulate(p->ws, p->sample);
-    intermediate = clock();
-    convolute_bricks(p->ws, p->sim);
     end = clock();
     p->cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
-    p->cputime_conv += (((double) (end - intermediate)) / CLOCKS_PER_SEC);
     for(i = p->low_ch; i <= p->high_ch; i++) {
         double sum = 0.0;
         if(i >= p->ws->n_channels) { /* Outside range of simulated spectrum */

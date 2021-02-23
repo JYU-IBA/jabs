@@ -168,24 +168,25 @@ void simulate(sim_workspace *ws, const sample *sample) {
     ion_set_angle(&ws->ion, ws->sim.alpha);
     double theta = ws->sim.theta;
     for (x = 0.0; x < thickness;) {
-        while (i_range < sample->n_ranges-1 && x >= sample->cranges[i_range+1]) {
+        while (i_range < sample->n_ranges - 1 && x >= sample->cranges[i_range + 1]) {
             i_range++;
 #ifdef DEBUG
             fprintf(stderr, "Crossing to range %i = [%g, %g)\n", i_range, sample->cranges[i_range]/C_TFU, sample->cranges[i_range+1]/C_TFU);
 #endif
-            next_crossing = sample->cranges[i_range+1];
+            next_crossing = sample->cranges[i_range + 1];
         }
-        if(ws->ion.E < ws->sim.emin) {
-            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %i.\n", ws->ion.E, ws->sim.emin, x, i_range);
+        if (ws->ion.E < ws->sim.emin) {
+            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %i.\n", ws->ion.E,
+                    ws->sim.emin, x, i_range);
             break;
         }
+
         h_max = next_crossing - x;
-        if(h_max < 0.0001*C_TFU) {
-            x += 0.0001*C_TFU;
-            fprintf(stderr, "Step too small. Let's nudge forward! x=%lf tfu\n", x/C_TFU);
+        if (h_max < 0.0001 * C_TFU) {
+            x += 0.0001 * C_TFU;
+            fprintf(stderr, "Step too small. Let's nudge forward! x=%lf tfu\n", x / C_TFU);
             continue;
         }
-
         double E_front = ws->ion.E;
         double h = stop_step(ws, &ws->ion, sample, x, h_max, ws->sim.stop_step_incident);
         assert(h > 0.0);
@@ -196,30 +197,30 @@ void simulate(sim_workspace *ws, const sample *sample) {
         fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3lf keV to  %8.3lf keV (diff %6.4lf keV)\n", x/C_TFU, (x+h)/C_TFU, E_front/C_KEV, ws->ion.E/C_KEV, E_diff/C_KEV);
 #endif
         double S_back = ws->ion.S;
-        double E_mean = (E_front+E_back)/2.0;
+        double E_mean = (E_front + E_back) / 2.0;
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
                         E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ws->ion.S) / C_KEV);
 #endif
         for (i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
             sim_reaction *r = &ws->reactions[i_reaction];
-            if(r->stop)
+            if (r->stop)
                 continue;
-            if(i_depth >= r->n_bricks) {
+            if (i_depth >= r->n_bricks) {
                 r->stop = 1;
                 continue;
             }
             brick *b = &r->bricks[i_depth];
-           // ion *p = &r->p; /* Reaction product */
-            ion_set_angle(&r->p, ws->sim.beta);
+            // ion *p = &r->p; /* Reaction product */
+            ion_set_angle(&r->p, 180.0 * C_DEG - ws->sim.beta);
             r->p.E = ws->ion.E * r->r->K;
             r->p.S = ws->ion.S * r->r->K;
-            b->d = x+h;
+            b->d = x + h;
             b->E_0 = ws->ion.E; /* Sort of energy just before the reaction. */
 
             assert(r->p.E > 0.0);
 
-            if(x >= r->r->max_depth) {
+            if (x >= r->r->max_depth) {
 #ifdef DEBUG
                 fprintf(stderr, "Reaction %i with %s stops, because maximum depth is reached at x = %.3lf tfu.\n", i_reaction, r->r->isotope->name, x/C_TFU); /* TODO: give reactions a name */
 #endif
@@ -232,9 +233,10 @@ void simulate(sim_workspace *ws, const sample *sample) {
             int i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
                 double h_out_max = sample->cranges[i_range_out] - x_out;
-                double h_out = stop_step(ws, &r->p, sample, x_out-0.00001*C_TFU, h_out_max, ws->sim.stop_step_exiting); /* FIXME: 0.0001*C_TFU IS A STUPID HACK */
+                double h_out = stop_step(ws, &r->p, sample, x_out - 0.00001 * C_TFU, h_out_max,
+                                         ws->sim.stop_step_exiting); /* FIXME: 0.0001*C_TFU IS A STUPID HACK */
                 x_out += h_out;
-                if( r->p.E < ws->sim.emin) {
+                if (r->p.E < ws->sim.emin) {
 #ifdef DEBUG
                     fprintf(stderr, "Reaction %i with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",i_reaction, r->r->isotope->name, (x+h)/C_TFU);
 #endif
@@ -248,15 +250,15 @@ void simulate(sim_workspace *ws, const sample *sample) {
 #endif
                 }
             }
-            double c = get_conc(ws, sample, x+h/2.0, r->r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
+            double c = get_conc(ws, sample, x + (h / 2.0), r->r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
-            if(c > CONCENTRATION_CUTOFF && r->p.E > ws->sim.emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
+            if (c > CONCENTRATION_CUTOFF && r->p.E > ws->sim.emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 double sigma = jibal_cross_section_rbs(ws->ion.isotope, r->r->isotope, theta, E_mean, ws->jibal_config->cs_rbs);
-                double Q = c * ws->sim.p_sr*ws->ion.inverse_cosine * sigma * h; /* TODO: worst possible approximation... */
+                double Q = c * ws->sim.p_sr * ws->ion.inverse_cosine * sigma * h; /* TODO: worst possible approximation... */
 #ifdef dfDEBUG
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf (prev %.3lf, sigma = %g mb/sr, Q = %g (c = %.4lf%%)\n",
-                        r->isotope->name, E_back * r->K/C_KEV, r->p.E/C_KEV, r->E/C_KEV, sigma/C_MB_SR, Q, c*100.0);
+                            r->isotope->name, E_back * r->K/C_KEV, r->p.E/C_KEV, r->E/C_KEV, sigma/C_MB_SR, Q, c*100.0);
 #endif
                 assert(sigma > 0.0);
                 assert(r->p.S > 0.0);
@@ -264,7 +266,7 @@ void simulate(sim_workspace *ws, const sample *sample) {
                 assert(i_depth < r->n_bricks);
                 b->Q = Q;
             } else {
-                if(r->p.E < ws->sim.emin) {
+                if (r->p.E < ws->sim.emin) {
                     r->stop = 1;
                     r->bricks[i_depth].Q = -1.0;
                 } else {
@@ -278,14 +280,15 @@ void simulate(sim_workspace *ws, const sample *sample) {
         i_depth++;
     }
 #ifdef DEBUG
-    fprintf(stderr, "Last depth bin %i\n", i_depth);
+        fprintf(stderr, "Last depth bin %i\n", i_depth);
 #endif
-    for(i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
-        if(ws->reactions[i_reaction].stop)
-            continue;
-        if(i_depth < ws->reactions[i_reaction].n_bricks)
-            ws->reactions[i_reaction].bricks[i_depth].Q = -1.0; /* Set the last counts to negative to indicate end of calculation */
-    }
+        for (i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
+            if (ws->reactions[i_reaction].stop)
+                continue;
+            if (i_depth < ws->reactions[i_reaction].n_bricks)
+                ws->reactions[i_reaction].bricks[i_depth].Q = -1.0; /* Set the last counts to negative to indicate end of calculation */
+        }
+        convolute_bricks(ws);
 }
 
 reaction *make_rbs_reactions(const sample *sample, const simulation *sim, int *n_reactions) { /* Note that sim->ion needs to be set! */
@@ -543,7 +546,6 @@ int main(int argc, char **argv) {
     } else {
         ws = sim_workspace_init(sim, reactions, sample, jibal);
         simulate(ws, sample);
-        convolute_bricks(ws, sim);
     }
     if(!ws) {
         fprintf(stderr, "Unexpected error.\n");

@@ -164,13 +164,13 @@ void simulation_print(FILE *f, const simulation *sim) {
     fprintf(f, "fast level = %i\n", sim->fast);
 }
 
-void convolute_bricks(sim_workspace *ws, const simulation *sim) {
+void convolute_bricks(sim_workspace *ws) {
     int i;
     for(i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
-        brick_int2(r->histo, r->bricks, r->n_bricks, sim->energy_resolution);
+        brick_int2(r->histo, r->bricks, r->n_bricks, ws->sim.energy_resolution);
     }
 }

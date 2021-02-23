@@ -16,7 +16,7 @@
 
 #include <gsl/gsl_histogram.h>
 #include <jibal.h>
-
+#include <time.h>
 
 #include "ion.h"
 #include "reaction.h"
@@ -78,5 +78,5 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
 void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *sim);
 void simulation_print(FILE *f, const simulation *sim);
-void convolute_bricks(sim_workspace *ws, const simulation *sim);
+void convolute_bricks(sim_workspace *ws);
 #endif // JABS_SIMULATION_H
