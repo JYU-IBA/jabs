@@ -56,11 +56,15 @@ double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample,
     get_concs(ws, sample, x, ws->c);
     for(i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
         if(ws->c[i_isotope] < CONCENTRATION_CUTOFF)
-             continue;
-        if(type == GSTO_STO_TOT) {
+            continue;
+        if (type == GSTO_STO_TOT) {
             S1 += ws->c[i_isotope] * (
                     jibal_gsto_get_em(ws->gsto, GSTO_STO_ELE, incident->Z, sample->isotopes[i_isotope]->Z, em)
+#ifdef NUCLEAR_STOPPING_FROM_JIBAL
                     +jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, sample->isotopes[i_isotope]->Z, sample->isotopes[i_isotope]->mass)
+#else
+                    + ion_nuclear_stop(incident, sample->isotopes[i_isotope], ws->isotopes)
+#endif
             );
         } else {
             S1 += ws->c[i_isotope] * (
@@ -161,6 +165,8 @@ void simulate(sim_workspace *ws, const sample *sample) {
         b->E_0 = ws->ion.E;
     }
     i_depth=1;
+    ion_set_angle(&ws->ion, ws->sim.alpha);
+    double theta = ws->sim.theta;
     for (x = 0.0; x < thickness;) {
         while (i_range < sample->n_ranges-1 && x >= sample->cranges[i_range+1]) {
             i_range++;
@@ -246,8 +252,8 @@ void simulate(sim_workspace *ws, const sample *sample) {
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
             if(c > CONCENTRATION_CUTOFF && r->p.E > ws->sim.emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
-                double sigma = jibal_cross_section_rbs(ws->ion.isotope, r->r->isotope, ws->sim.theta, E_mean, ws->jibal_config->cs_rbs);
-                double Q = c * ws->p_sr_cos_alpha * sigma * h; /* TODO: worst possible approximation... */
+                double sigma = jibal_cross_section_rbs(ws->ion.isotope, r->r->isotope, theta, E_mean, ws->jibal_config->cs_rbs);
+                double Q = c * ws->sim.p_sr*ws->ion.inverse_cosine * sigma * h; /* TODO: worst possible approximation... */
 #ifdef dfDEBUG
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf (prev %.3lf, sigma = %g mb/sr, Q = %g (c = %.4lf%%)\n",
                         r->isotope->name, E_back * r->K/C_KEV, r->p.E/C_KEV, r->E/C_KEV, sigma/C_MB_SR, Q, c*100.0);
@@ -354,7 +360,7 @@ void print_spectra(FILE *f, const global_options *global,  const simulation *sim
             }
         }
         for (j = 0; j < sim->n_reactions; j++) {
-            if(i < ws->reactions[j].histo->n || ws->reactions[j].histo->bin[i] == 0.0) {
+            if(i >= ws->reactions[j].histo->n || ws->reactions[j].histo->bin[i] == 0.0) {
                 fprintf(f,"%c0", sep);
             } else {
                 fprintf(f, "%c%e", sep, ws->reactions[j].histo->bin[i]);
@@ -529,16 +535,13 @@ int main(int argc, char **argv) {
         simulation_print(stderr, sim);
         fprintf(stderr, "\nFinal composition:\n");
         sample_print(stderr, fit_data.sample);
-        if (fit_data.ws) {
-            print_spectra(f, &global, sim, fit_data.ws, sample, reactions, exp);
-        }
         ws = fit_data.ws;
         fprintf(stderr,"CPU time used for actual simulation: %.3lf s.\n", fit_data.cputime_actual);
         fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_data.cputime_actual/fit_stats.n_evals);
         fprintf(stderr,"Of which spectrum generation and convolution: %.3lf ms.\n", 1000.0*fit_data.cputime_conv/fit_stats.n_evals);
         fit_params_free(fit_data.fit_params);
     } else {
-        ws = sim_workspace_init(sim, reactions, sample, jibal->gsto, jibal->config);
+        ws = sim_workspace_init(sim, reactions, sample, jibal);
         simulate(ws, sample);
         convolute_bricks(ws, sim);
     }

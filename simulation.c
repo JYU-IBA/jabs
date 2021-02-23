@@ -29,7 +29,6 @@ simulation *sim_init() {
     sim->energy_slope = ENERGY_SLOPE;
     sim->energy_offset = 0.0*C_KEV;
     sim->emin = E_MIN;
-    //ion_set_angle(&sim->ion, sim->alpha);
     sim->depthsteps_max = 0; /* Zero: automatic */
     return sim;
 }
@@ -53,29 +52,34 @@ int sim_sanity_check(const simulation *sim) {
 void sim_workspace_reset(sim_workspace *ws, const simulation *sim) {
     ws->i_range_accel = 0;
     ws->c_x = 0.0;
-    ws->p_sr_cos_alpha = sim->p_sr / cos(sim->alpha);
     /* TODO: finish */
 }
 
-sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactions, const sample *sample, jibal_gsto *gsto, const jibal_config *jibal_config) {
+sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactions, const sample *sample, const jibal *jibal) {
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->sim = *sim;
     ws->n_reactions = ws->sim.n_reactions;
-    ws->gsto = gsto;
-    ws->jibal_config = jibal_config;
+    ws->gsto = jibal->gsto;
+    ws->jibal_config = jibal->config;
+    ws->isotopes = jibal->isotopes;
     ws->i_range_accel = 0;
     ws->c_x = 0.0;
     ion_set_isotope(&ws->ion, sim->beam_isotope);
     ws->ion.E = ws->sim.beam_E;
     ws->ion.S = ws->sim.beam_E_broad;
-    ion_set_angle(&ws->ion, ws->sim.alpha);
 
-    ws->p_sr_cos_alpha = sim->p_sr / cos(sim->alpha);
+
+    int n_isotopes=0; /* TODO: calculate this somewhere else */
+    jibal_isotope *isotope;
+    for(isotope=jibal->isotopes; isotope->A != 0; isotope++) {
+        n_isotopes++;
+    }
+
+    ion_nuclear_stop_fill_params(&ws->ion, jibal->isotopes, n_isotopes);
+    ws->stopping_type = GSTO_STO_TOT;
     if (sim->fast) {
-        ws->stopping_type = GSTO_STO_ELE;
         ws->rk4 = 0;
     } else {
-        ws->stopping_type = GSTO_STO_TOT;
         ws->rk4 = 1;
     }
     sim_workspace_recalculate_calibration(ws, sim);
@@ -102,10 +106,15 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
                                          sim->energy_offset,
                                          sim->energy_offset + sim->energy_slope * ws->n_channels);
         r->bricks = calloc(r->n_bricks, sizeof(brick));
-        if(r->r->type == REACTION_RBS)
+        if(r->r->type == REACTION_RBS) {
             ion_set_isotope(p, ws->ion.isotope);
-        if(r->r->type == REACTION_ERD)
+            p->nucl_stop_isotopes = ws->ion.nucl_stop_isotopes;
+            p->nucl_stop = ws->ion.nucl_stop; /* Shallow copy! Shared. */
+        }
+        if(r->r->type == REACTION_ERD) {
             ion_set_isotope(p, sample->isotopes[r->r->i_isotope]);
+            /* TODO: ion_nuclear_stop_fill_params */
+        }
     }
     ws->c = calloc(sample->n_isotopes, sizeof(double));
     get_concs(ws, sample, ws->c_x, ws->c);
@@ -127,6 +136,7 @@ void sim_workspace_free(sim_workspace *ws) {
             r->bricks = NULL;
         }
     }
+    free(ws->ion.nucl_stop);
     free(ws->c);
     free(ws->reactions);
     free(ws);

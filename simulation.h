@@ -15,9 +15,7 @@
 #define JABS_SIMULATION_H
 
 #include <gsl/gsl_histogram.h>
-#include <jibal_masses.h>
-#include <jibal_gsto.h>
-#include <jibal_config.h>
+#include <jibal.h>
 
 
 #include "ion.h"
@@ -66,9 +64,9 @@ typedef struct {
     int rk4;
     gsto_stopping_type stopping_type;
     int n_channels; /* histogram */
-    double p_sr_cos_alpha; /* particles * sr / cos(alpha) */
     ion ion;
     sim_reaction *reactions;
+    const jibal_isotope *isotopes;
 } sim_workspace;
 
 
@@ -76,7 +74,7 @@ typedef struct {
 simulation *sim_init();
 void sim_free(simulation *sim);
 int sim_sanity_check(const simulation *sim);
-sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactions, const sample *sample, jibal_gsto *gsto, const jibal_config *jibal_config);
+sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactions, const sample *sample, const jibal *jibal);
 void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *sim);
 void simulation_print(FILE *f, const simulation *sim);

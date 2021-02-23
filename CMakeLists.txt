@@ -10,7 +10,7 @@
 #
 cmake_minimum_required(VERSION 3.15)
 project(jabs
-        VERSION 0.1.8
+        VERSION 0.1.9
         DESCRIPTION "Jaakko's Backscattering Simulator (JaBS)"
         LANGUAGES C
         )
@@ -42,5 +42,8 @@ target_link_libraries(jabs
     PRIVATE GSL::gsl
     PRIVATE "$<$<BOOL:${UNIX}>:m>" ${GETOPT_LIBRARY}
     )
+
+#add_executable(test test.c ion.c)
+#target_link_libraries(test PRIVATE Jibal)
 
 install(TARGETS jabs RUNTIME DESTINATION bin)
