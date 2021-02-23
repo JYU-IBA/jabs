@@ -121,7 +121,6 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     fprintf(stderr, "set h_fvv = %g\n", fdf_params.h_fvv);
 #endif
     fit_data->cputime_actual = 0.0;
-    fit_data->cputime_conv = 0.0;
     struct fit_params *fit_params = fit_data->fit_params;
     gsl_multifit_nlinear_fdf fdf;
     fdf.params = fit_data;

@@ -41,7 +41,6 @@ struct fit_data {
     int high_ch;
     size_t n_iters_max;
     double cputime_actual; /* Statistics! */
-    double cputime_conv;
     double dof;
 };
 
