@@ -10,7 +10,7 @@
 #
 cmake_minimum_required(VERSION 3.15)
 project(jabs
-        VERSION 0.1.9
+        VERSION 0.1.10
         DESCRIPTION "Jaakko's Backscattering Simulator (JaBS)"
         LANGUAGES C
         )
@@ -33,8 +33,8 @@ if(DEBUG_OUTPUT_ENABLE)
     add_compile_options(-DDEBUG)
 endif()
 
-add_executable(jabs main.c sample.c sample.h brick.c ion.c ion.h simulation.c simulation.h
-        reaction.c reaction.h layers.c layers.h options.c options.h spectrum.c spectrum.h fit.c fit.h)
+add_executable(jabs main.c sample.c sample.h brick.c ion.c ion.h simulation.c simulation.h reaction.c reaction.h
+        layers.c layers.h options.c options.h spectrum.c spectrum.h fit.c fit.h rotate.c rotate.h)
 target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
 
 target_link_libraries(jabs
@@ -43,7 +43,7 @@ target_link_libraries(jabs
     PRIVATE "$<$<BOOL:${UNIX}>:m>" ${GETOPT_LIBRARY}
     )
 
-#add_executable(test test.c ion.c)
-#target_link_libraries(test PRIVATE Jibal)
+add_executable(angle_calc angle_calc.c ion.c rotate.c)
+target_link_libraries(angle_calc PRIVATE Jibal)
 
 install(TARGETS jabs RUNTIME DESTINATION bin)

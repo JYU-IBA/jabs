@@ -53,7 +53,7 @@ void erf_Q_test() {
     }
 }
 
-void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const double S) {
+void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const double S, const double scale) {
     int i, j;
     for(i = 1; i < n_bricks; i++) {
         const brick *b_high = &bricks[i-1];
@@ -71,7 +71,7 @@ void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const do
             double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
             double w = h->range[j + 1] - h->range[j];
             double y = (erf_Q_optim((b_low->E - E) / sigma_low) - erf_Q_optim((b_high->E - E) / sigma_high)) / (b_high->E - b_low->E);
-            h->bin[j] += y * w * b_low->Q;
+            h->bin[j] += scale * y * w * b_low->Q;
             //fprintf(stderr, "i=%i, j=%i, w = %.5lf keV, E = %.3lf keV, y=%g\n", i, j, w/C_KEV, E/C_KEV, y);
             assert(!isnan(y));
 

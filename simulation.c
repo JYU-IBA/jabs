@@ -13,12 +13,17 @@
  */
 #include "simulation.h"
 #include "defaults.h"
+#include "rotate.h"
 
 simulation *sim_init() {
     simulation *sim = malloc(sizeof(simulation));
+    sim->sample_theta = ALPHA; /* These defaults are for IBM geometry */
+    sim->sample_phi = 0.0;
     sim->alpha = ALPHA;
-    sim->beta = BETA;
+    sim->detector_theta = THETA;
+    sim->detector_phi = 0.0;
     sim->theta = THETA;
+    sim->beta = 180.0*C_DEG-THETA-ALPHA; /* Note: check if this is sane is defaults are changed. This should be (is) recalculated before running simulations. */
     sim->p_sr = PARTICLES_SR;
     sim->energy_resolution = (DETECTOR_RESOLUTION*DETECTOR_RESOLUTION);
     sim->stop_step_incident = STOP_STEP_INCIDENT;
@@ -35,6 +40,15 @@ simulation *sim_init() {
 
 void sim_free(simulation *sim) {
     free(sim);
+}
+
+void sim_calculate_geometry(simulation *sim) {
+    double theta, phi; /* Temporary variables */
+    rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */
+    sim->alpha = theta; /* SimNRA convention, alpha has no sign. */
+    rotate(sim->detector_theta, sim->detector_phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Detector in sample coordinate system, angles are detector in sample system. Note that for Cornell geometry phi = 90.0 deg! */
+    sim->beta = C_PI - theta;
+    sim->theta = sim->detector_theta;
 }
 
 int sim_sanity_check(const simulation *sim) {
@@ -64,10 +78,11 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
     ws->isotopes = jibal->isotopes;
     ws->i_range_accel = 0;
     ws->c_x = 0.0;
+
+    ion_reset(&ws->ion);
     ion_set_isotope(&ws->ion, sim->beam_isotope);
     ws->ion.E = ws->sim.beam_E;
     ws->ion.S = ws->sim.beam_E_broad;
-
 
     int n_isotopes=0; /* TODO: calculate this somewhere else */
     jibal_isotope *isotope;
@@ -76,6 +91,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
     }
 
     ion_nuclear_stop_fill_params(&ws->ion, jibal->isotopes, n_isotopes);
+
     ws->stopping_type = GSTO_STO_TOT;
     if (sim->fast) {
         ws->rk4 = 0;
@@ -83,6 +99,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
         ws->rk4 = 1;
     }
     sim_workspace_recalculate_calibration(ws, sim);
+
     if(ws->n_channels == 0) {
         free(ws);
         return NULL;
@@ -171,6 +188,6 @@ void convolute_bricks(sim_workspace *ws) {
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
-        brick_int2(r->histo, r->bricks, r->n_bricks, ws->sim.energy_resolution);
+        brick_int2(r->histo, r->bricks, r->n_bricks, ws->sim.energy_resolution, ws->sim.p_sr);
     }
 }

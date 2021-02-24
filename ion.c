@@ -13,7 +13,33 @@
  */
 #include <stdlib.h>
 #include <assert.h>
+#include <math.h>
 #include "ion.h"
+#include "rotate.h"
+
+#ifndef M_PI
+#define M_PI (3.14159265358979323846264338327950288)
+#endif
+
+#ifndef TWO_PI
+#define TWO_PI (2.0*M_PI)
+#endif
+
+void ion_reset(ion *ion) {
+    ion->isotope = NULL;
+    ion->E = 0.0;
+    ion->S = 0.0;
+    ion->Z = 0;
+    ion->mass = 0.0;
+    ion->theta = 0.0;
+    ion->phi = 0.0;
+    ion->cosine_theta = 1.0;
+    ion->cosine_phi = 1.0;
+    ion->inverse_cosine_theta = 1.0; /* These need to be set matching to the angles */
+    ion->inverse_cosine_phi = 1.0;
+    ion->nucl_stop_isotopes = 0;
+    ion->nucl_stop = NULL;
+}
 
 void ion_set_isotope(ion *ion, const jibal_isotope *isotope) {
     if(!isotope)
@@ -23,12 +49,22 @@ void ion_set_isotope(ion *ion, const jibal_isotope *isotope) {
     ion->Z = isotope->Z;
 }
 
-void ion_set_angle(ion *ion, double angle) {
+void ion_set_angle(ion *ion, double theta, double phi) {
     if(!ion)
         return;
-    ion->angle = angle;
-    ion->cosine = cos(angle);
-    ion->inverse_cosine = 1.0/ion->cosine;
+    if(theta == ion->theta && phi == ion->phi) {
+        return;
+    }
+    ion->theta = fmod(theta, TWO_PI);
+    if(ion->theta > M_PI) { /* Limit theta to [0, pi] */
+        ion->theta = TWO_PI - ion->theta;
+        phi += M_PI;
+    }
+    ion->phi = fmod(phi, TWO_PI);
+    ion->cosine_theta = cos(ion->theta);
+    ion->cosine_phi = cos(ion->phi);
+    ion->inverse_cosine_theta = 1.0/ion->cosine_theta;
+    ion->inverse_cosine_phi = 1.0/ion->cosine_phi;
 }
 
 double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, const jibal_isotope *isotopes) {
@@ -64,4 +100,15 @@ void ion_nuclear_stop_fill_params(ion *ion, const jibal_isotope *isotopes, int n
         i++;
     }
     ion->nucl_stop_isotopes = n_isotopes; /* This is somewhat redundant, but it is there to remind us. */
+}
+
+void ion_rotate(ion *ion, double theta2, double phi2) { /* Wrapper for rotate() */
+    double theta, phi;
+    rotate(theta2, phi2, ion->theta, ion->phi, &theta, &phi);
+    ion_set_angle(ion, theta, phi);
+}
+
+void ion_print(FILE *f, ion *ion) {
+    fprintf(f, "ion %s (Z=%i, mass=%.3lf u), E = %.3lf keV, theta = %.3lf deg (1/cos_theta = %0.3lf), phi = %.3lf deg\n",
+            ion->isotope->name, ion->Z, ion->mass/C_U, ion->E/C_KEV,  ion->theta/C_DEG, ion->inverse_cosine_theta, ion->phi/C_DEG);
 }

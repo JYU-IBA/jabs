@@ -44,6 +44,7 @@
 #include "layers.h"
 #include "spectrum.h"
 #include "fit.h"
+#include "rotate.h"
 
 #define CONCENTRATION_CUTOFF 1e-8
 
@@ -76,8 +77,7 @@ double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample,
     return S1;
 }
 
-double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double x, double h_max, double step) {
-    /* positive max depth step (h_max) also gives the direction. Energy step (step) should be negative if regular stopping is done. */
+double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double x, double h_max, double step) { /* h_max should always be positive */
     double k1, k2, k3, k4, stop, dE, E, h_max_orig = h_max;
     int maxstep = 0;
     /* k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
@@ -89,7 +89,7 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
 #endif
         return 0.0;
     }
-    h_max *=  incident->inverse_cosine; /* h_max is the perpendicular distance, but we can take bigger steps (note scaling elsewhere) */
+    h_max *=  incident->inverse_cosine_theta; /* h_max is the perpendicular distance, but we can take bigger steps (note scaling elsewhere). Note that inverse_cosine_theta can be negative! */
     double h = (step / k1); /* step should always be positive, as well as k1  */
     if(h >= fabs(h_max)) {
         maxstep = 1;
@@ -99,7 +99,7 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
     assert(h_abs > 0.0);
     h = copysign(h, h_max); /* h is positive when going deeper, i.e. h + x is deeper than x . */
 
-    double h_perp = h*incident->cosine; /* x + h_perp is the actual perpendicular depth */
+    double h_perp = h*incident->cosine_theta; /* x + h_perp is the actual perpendicular depth */
     if(ws->rk4) {
         k2 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h_abs / 2.0) * k1);
         k3 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h_abs / 2.0) * k2);
@@ -137,7 +137,7 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
         return h_max_orig;
     } else {
         incident->E += dE;
-        return h*incident->cosine;
+        return h*incident->cosine_theta;
     }
       /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
@@ -165,8 +165,11 @@ void simulate(sim_workspace *ws, const sample *sample) {
         b->E_0 = ws->ion.E;
     }
     i_depth=1;
-    ion_set_angle(&ws->ion, ws->sim.alpha);
-    double theta = ws->sim.theta;
+    ion_set_angle(&ws->ion, 0.0, 0.0);
+    ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi); /* This is largely untested... */
+#ifdef DEBUG
+    ion_print(stderr, &ws->ion);
+#endif
     for (x = 0.0; x < thickness;) {
         while (i_range < sample->n_ranges - 1 && x >= sample->cranges[i_range + 1]) {
             i_range++;
@@ -202,6 +205,9 @@ void simulate(sim_workspace *ws, const sample *sample) {
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
                         E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ws->ion.S) / C_KEV);
 #endif
+        double theta, phi;
+
+        rotate(ws->sim.detector_theta, ws->sim.detector_phi, ws->sim.sample_theta, ws->sim.sample_phi, &theta, &phi); /* Theta and phi are now the angles of the reaction product(s) going towards the detector. */
         for (i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
             sim_reaction *r = &ws->reactions[i_reaction];
             if (r->stop)
@@ -212,7 +218,7 @@ void simulate(sim_workspace *ws, const sample *sample) {
             }
             brick *b = &r->bricks[i_depth];
             // ion *p = &r->p; /* Reaction product */
-            ion_set_angle(&r->p, 180.0 * C_DEG - ws->sim.beta);
+            ion_set_angle(&r->p, theta, phi); /* TODO: it is not necessary to set this always */
             r->p.E = ws->ion.E * r->r->K;
             r->p.S = ws->ion.S * r->r->K;
             b->d = x + h;
@@ -254,8 +260,8 @@ void simulate(sim_workspace *ws, const sample *sample) {
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
             if (c > CONCENTRATION_CUTOFF && r->p.E > ws->sim.emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
-                double sigma = jibal_cross_section_rbs(ws->ion.isotope, r->r->isotope, theta, E_mean, ws->jibal_config->cs_rbs);
-                double Q = c * ws->sim.p_sr * ws->ion.inverse_cosine * sigma * h; /* TODO: worst possible approximation... */
+                double sigma = jibal_cross_section_rbs(ws->ion.isotope, r->r->isotope, ws->sim.detector_theta, E_mean, ws->jibal_config->cs_rbs);
+                double Q = c * fabs(ws->ion.inverse_cosine_theta) * sigma * h; /* TODO: worst possible approximation... */
 #ifdef dfDEBUG
                 fprintf(stderr, "    %s: E_scatt = %.3lf, E_out = %.3lf (prev %.3lf, sigma = %g mb/sr, Q = %g (c = %.4lf%%)\n",
                             r->isotope->name, E_back * r->K/C_KEV, r->p.E/C_KEV, r->E/C_KEV, sigma/C_MB_SR, Q, c*100.0);
@@ -503,6 +509,7 @@ int main(int argc, char **argv) {
     jibal_gsto_load_all(jibal->gsto);
     fprintf(stderr, "Default RBS cross section model used: %s\n", jibal_cs_rbs_name(jibal->config));
 
+    sim_calculate_geometry(sim);
     simulation_print(stderr, sim);
     fprintf(stderr, "\nSTARTING SIMULATION... NOW! Hold your breath!\n");
     fflush(stderr);

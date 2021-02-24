@@ -40,8 +40,8 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"ion",       required_argument, NULL, 'I'},
             {"energy",    required_argument, NULL, 'E'},
             {"alpha",     required_argument, NULL, 'a'},
-            {"beta",      required_argument, NULL, 'b'},
             {"theta",     required_argument, NULL, 't'},
+            {"phi",       required_argument, NULL, 'p'},
             {"fluence",   required_argument, NULL, '3'},
             {"resolution",required_argument, NULL, 'R'},
             {"step_incident",required_argument, NULL, 'S'},
@@ -66,8 +66,8 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Incident ion (without charge state), e.g. 4He",
             "Incident beam energy. Please give units as well, e.g. 2MeV or \"2 MeV\" or 2000keV",
             "Incident angle (from sample normal).",
-            "Exit angle (from sample normal).",
-            "Scattering angle (from beam).",
+            "Detector or scattering angle (from beam).",
+            "Detector azimuthal angle (0 deg or 180 deg = IBM, +/-90 deg or 270 deg = Cornell).",
             "Fluence (or actually particles * sr).",
             "Resolution of detector (FHWM of Gaussian)",
             "Incident ion step size.",
@@ -86,7 +86,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:b:t:I:R:S:fe:F", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:p:I:R:S:fe:F", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -130,13 +130,13 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 sim->stop_step_incident = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 'a':
-                sim->alpha = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
-                break;
-            case 'b':
-                sim->beta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                sim->sample_theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 't':
-                sim->theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                sim->detector_theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                break;
+            case 'p':
+                sim->detector_phi = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 'h':
                 fputs(COPYRIGHT_STRING, stderr);
