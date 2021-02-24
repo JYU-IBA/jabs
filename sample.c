@@ -15,10 +15,7 @@
 #include <assert.h>
 #include "sample.h"
 
-
-inline double *sample_conc_bin(const sample *s, int i_range, int i_isotope) {
-    return s->cbins + i_range * s->n_isotopes + i_isotope;
-}
+extern inline double *sample_conc_bin(const sample *s, int i_range, int i_isotope);
 
 int get_range_bin(const sample *s, double x) {
     int lo, mi, hi;

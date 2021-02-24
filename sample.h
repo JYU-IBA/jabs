@@ -38,5 +38,8 @@ sample *sample_from_layers(jibal_layer * const *layers, int n_layers);
 void sample_print(FILE *f, const sample *sample);
 void sample_free(sample *sample);
 double sample_isotope_max_depth(const sample *sample, int i_isotope);
-extern inline double *sample_conc_bin(const sample *s, int i_range, int i_isotope);
+inline double *sample_conc_bin(const sample *s, int i_range, int i_isotope) {
+    return s->cbins + i_range * s->n_isotopes + i_isotope;
+}
+
 #endif /* JABS_SAMPLE_H */

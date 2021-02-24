@@ -44,6 +44,6 @@ target_link_libraries(jabs
     )
 
 add_executable(angle_calc angle_calc.c ion.c rotate.c)
-target_link_libraries(angle_calc PRIVATE Jibal)
+target_link_libraries(angle_calc PRIVATE Jibal  PRIVATE "$<$<BOOL:${UNIX}>:m>")
 
 install(TARGETS jabs RUNTIME DESTINATION bin)
