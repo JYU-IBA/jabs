@@ -22,7 +22,7 @@
 
 #include "fit.h"
 
-void simulate(sim_workspace *ws, const sample *sample); /* TODO: move this function away from main so we don't have to give the prototype here */
+void no_ds(sim_workspace *ws, const sample *sample); /* TODO: move this function away from main so we don't have to give the prototype here */
 
 int func_f(const gsl_vector *x, void *params, gsl_vector * f)
 {
@@ -45,7 +45,7 @@ int func_f(const gsl_vector *x, void *params, gsl_vector * f)
         return GSL_FAILURE;
     }
     start = clock();
-    simulate(p->ws, p->sample);
+    no_ds(p->ws, p->sample);
     end = clock();
     p->cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
     for(i = p->low_ch; i <= p->high_ch; i++) {

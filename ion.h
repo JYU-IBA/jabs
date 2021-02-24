@@ -30,5 +30,5 @@ void ion_set_angle(ion *ion, double theta, double phi);
 double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, const jibal_isotope *isotopes);
 void ion_nuclear_stop_fill_params(ion *ion, const jibal_isotope *isotopes, int n_isotopes); /* allocates ion->nucl_stop, must be free'd */
 void ion_rotate(ion *ion, double theta2, double phi2);
-void ion_print(FILE *f, ion *ion);
+void ion_print(FILE *f, const ion *ion);
 #endif // JABS_ION_H

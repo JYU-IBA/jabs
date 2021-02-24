@@ -108,7 +108,7 @@ void ion_rotate(ion *ion, double theta2, double phi2) { /* Wrapper for rotate() 
     ion_set_angle(ion, theta, phi);
 }
 
-void ion_print(FILE *f, ion *ion) {
+void ion_print(FILE *f, const ion *ion) {
     fprintf(f, "ion %s (Z=%i, mass=%.3lf u), E = %.3lf keV, theta = %.3lf deg (1/cos_theta = %0.3lf), phi = %.3lf deg\n",
             ion->isotope->name, ion->Z, ion->mass/C_U, ion->E/C_KEV,  ion->theta/C_DEG, ion->inverse_cosine_theta, ion->phi/C_DEG);
 }

@@ -43,6 +43,10 @@ typedef struct {
     int fast;
     double emin;
     size_t depthsteps_max;
+    int ds;
+    int ds_steps_azi;
+    int ds_steps_polar;
+    int n_ds;
 } simulation;
 
 typedef struct {

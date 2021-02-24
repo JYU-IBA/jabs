@@ -35,6 +35,10 @@ simulation *sim_init() {
     sim->energy_offset = 0.0*C_KEV;
     sim->emin = E_MIN;
     sim->depthsteps_max = 0; /* Zero: automatic */
+    sim->ds = 1;
+    sim->ds_steps_polar = 10;
+    sim->ds_steps_azi = 12;
+    sim->n_ds = sim->ds_steps_polar * sim->ds_steps_azi;
     return sim;
 }
 
@@ -110,6 +114,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
         sim_reaction *r = &ws->reactions[i_reaction];
         r->r = &reactions[i_reaction];
         ion *p = &r->p;
+        ion_reset(p);
         if(sim->depthsteps_max) {
             r->n_bricks = sim->depthsteps_max;
         } else {
