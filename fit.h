@@ -12,20 +12,26 @@
 
  */
 
+#ifndef JABS_FIT_H
+#define JABS_FIT_H
+
 #include <gsl/gsl_multifit.h>
 #include <gsl/gsl_multifit_nlinear.h>
 #include <gsl/gsl_histogram.h>
 #include <gsl/gsl_vector.h>
 #include <jibal.h>
-#include "simulation.h"
-#include "reaction.h"
-#include "sample.h"
 
 typedef struct fit_params {
     size_t n; /* Number of function parameters */
     double **func_params; /* Function parameters array. Size is n. The contents can be modified. */
     double *func_params_err; /* Error estimates of parameters after fit. */
 } fit_params;
+
+#include "simulation.h"
+#include "reaction.h"
+#include "sample.h"
+
+
 
 struct fit_data {
     gsl_histogram *exp; /* experimental data to be fitted */
@@ -55,3 +61,5 @@ void fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspac
 fit_params *fit_params_new();
 void fit_params_add_parameter(fit_params *p, double *value);
 void fit_params_free(fit_params *p);
+
+#endif // JABS_FIT_H

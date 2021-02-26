@@ -1,6 +1,9 @@
 #ifndef JABS_DEFAULTS_H
 #define JABS_DEFAULTS_H
 
+/* Hard coded stuff */
+#define CONCENTRATION_CUTOFF 1e-8
+
 /* Defaults for new simulations */
 #define ENERGY (2.0*C_MEV)
 #define ALPHA (0.0*C_DEG)
@@ -12,5 +15,6 @@
 #define ENERGY_SLOPE (1.0*C_KEV)
 #define STOP_STEP_INCIDENT (10.0*C_KEV)
 #define STOP_STEP_EXITING (30.0*C_KEV)
+
 
 #endif // JABS_DEFAULTS_H
