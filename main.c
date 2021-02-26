@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Unexpected error.\n");
         return EXIT_FAILURE;
     }
-    print_spectra(f, &global, sim, ws, sample, reactions, exp);
+    print_spectra(f, &global, ws, sample, exp);
 
     output_bricks(global.bricks_filename, ws);
 

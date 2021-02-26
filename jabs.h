@@ -23,7 +23,7 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
 void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sample *sample);
 reaction *make_rbs_reactions(const sample *sample, const simulation *sim, int *n_reactions);/* Note that sim->ion needs to be set! */
 int assign_stopping(jibal_gsto *gsto, simulation *sim, sample *sample);
-void print_spectra(FILE *f, const global_options *global,  const simulation *sim, const sim_workspace *ws, const sample *sample, const reaction *reactions, const gsl_histogram *exp);
+void print_spectra(FILE *f, const global_options *global, const sim_workspace *ws, const sample *sample, const gsl_histogram *exp);
 void add_fit_params(global_options *global, simulation *sim, jibal_layer **layers, const int n_layers, fit_params *params);
 void output_bricks(const char *filename, const sim_workspace *ws);
 void no_ds(sim_workspace *ws, const sample *sample);
