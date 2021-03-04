@@ -20,7 +20,7 @@
 
 
 
-#define USAGE_STRING "Usage: jabs [-E <energy>] <material1> <thickness1> [<material2> <thickness2> ...]\n\nExample: jabs -E 2MeV --alpha=10deg --beta=0deg --theta=170deg --out=spectrum.csv Au 500tfu SiO2 1000tfu Si 10000tfu\n"
+#define USAGE_STRING "Usage: jabs [-E <energy>] <material1> <thickness1> [<material2> <thickness2> ...]\n\nExample: jabs -E 2MeV --alpha=10deg --theta=170deg --out=spectrum.csv Au 500tfu SiO2 1000tfu Si 10000tfu\n"
 #define COPYRIGHT_STRING "    Jaakko's Backscattering Simulator (JaBS)\n    Copyright (C) 2021 Jaakko Julin\n\n    This program is free software; you can redistribute it and/or modify \n    it under the terms of the GNU General Public License as published by\n    the Free Software Foundation; either version 2 of the License, or\n    (at your option) any later version.\n\n   See LICENSE.txt for the full license.\n\n"
 
 const char *jabs_version() {
@@ -56,6 +56,8 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"fit_vars",   required_argument, NULL, '6'},
             {"bricks_out", required_argument, NULL, '7'},
             {"depthsteps", required_argument, NULL, '8'},
+            {"norbs",     no_argument, NULL, '#'},
+            {"noerd",        no_argument, NULL, '9'},
             {NULL, 0,                NULL,   0}
     };
     static const char *help_texts[] = {
@@ -82,6 +84,8 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Comma separated list of parameters to fit, e.g. \"calib,fluence,thickness1\"",
             "Save intermediate raw data to file",
             "Maximum number of depth steps",
+            "Don't make an RBS spectrum",
+            "Don't make an ERD spectrum",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
@@ -122,6 +126,12 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 break;
             case '8':
                 sim->depthsteps_max = atoi(optarg);
+                break;
+            case '9':
+                global->erd = 0;
+                break;
+            case '#':
+                global->rbs = 0;
                 break;
             case 'F':
                 global->fit = 1;

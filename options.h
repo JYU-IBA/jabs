@@ -19,6 +19,8 @@
 typedef struct {
     jibal *jibal;
     int verbose;
+    int rbs;
+    int erd;
     int fit;
     int fit_low;
     int fit_high;

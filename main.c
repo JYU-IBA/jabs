@@ -40,7 +40,8 @@
 
 int main(int argc, char **argv) {
     global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0, .exp_filename = NULL,
-                             .bricks_filename = NULL, .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL};
+                             .bricks_filename = NULL, .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL,
+                             .rbs = 1, .erd = 1};
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -89,7 +90,10 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     sample_print(stderr, sample);
 
-    reaction *reactions = make_rbs_reactions(sample, sim);
+    sim_calculate_geometry(sim);
+    reaction *reactions = NULL;
+    reactions = make_reactions(sample, sim, global.rbs, global.erd);
+
     fprintf(stderr, "\n");
     reactions_print(stderr, reactions);
     if(reactions[0].type == REACTION_NONE) {
@@ -97,14 +101,12 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    if(assign_stopping(jibal->gsto, sim, sample)) {
+    if(assign_stopping(jibal->gsto, sim, sample, reactions)) {
         return EXIT_FAILURE;
     }
     jibal_gsto_print_assignments(jibal->gsto);
     jibal_gsto_load_all(jibal->gsto);
     fprintf(stderr, "Default RBS cross section model used: %s\n", jibal_cs_rbs_name(jibal->config));
-
-    sim_calculate_geometry(sim);
     simulation_print(stderr, sim);
     fprintf(stderr, "\nSTARTING SIMULATION... NOW! Hold your breath!\n");
     fflush(stderr);
@@ -149,7 +151,7 @@ int main(int argc, char **argv) {
         no_ds(ws, sample);
     }
     if(!ws) {
-        fprintf(stderr, "Unexpected error.\n");
+        fprintf(stderr, "Simulation workspace does not exist after the simulation. This is highly unusual.\n");
         return EXIT_FAILURE;
     }
     print_spectra(f, &global, ws, sample, exp);
@@ -164,6 +166,7 @@ int main(int argc, char **argv) {
     if(f != stdout) {
         fclose(f);
     }
+    free(reactions);
     layers_free(layers, n_layers);
     sim_free(sim);
     sample_free(sample);
