@@ -1,8 +1,6 @@
 #ifndef JABS_DEFAULTS_H
 #define JABS_DEFAULTS_H
 
-/* Hard coded stuff */
-#define CONCENTRATION_CUTOFF 1e-8
 
 /* Defaults for new simulations */
 #define ENERGY (2.0*C_MEV)

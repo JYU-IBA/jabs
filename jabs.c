@@ -4,7 +4,6 @@
 #include <jibal_kin.h>
 
 #include "defaults.h"
-#include "options.h"
 #include "jabs.h"
 
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E) {
@@ -15,7 +14,7 @@ double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample,
 
     get_concs(ws, sample, x, ws->c);
     for(i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
-        if(ws->c[i_isotope] < CONCENTRATION_CUTOFF)
+        if(ws->c[i_isotope] < ABUNDANCE_THRESHOLD)
             continue;
         if (type == GSTO_STO_TOT) {
             S1 += ws->c[i_isotope] * (
@@ -224,7 +223,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             double c = get_conc(ws, sample, x + (h / 2.0), r->r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
-            if (c > CONCENTRATION_CUTOFF && r->p.E > ws->sim.emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
+            if (c > ABUNDANCE_THRESHOLD && r->p.E > ws->sim.emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
                 double sigma = jibal_cross_section_rbs(ws->ion.isotope, r->r->isotope, ion2.theta, E_mean, ws->jibal_config->cs_rbs);
                 double Q = c * fabs(incident->inverse_cosine_theta) * sigma * h; /* TODO: worst possible approximation... */ /* Note that ion is not the same as incident anymore. Incident has the original angles. */
 #ifdef dfDEBUG
@@ -267,7 +266,7 @@ reaction *make_rbs_reactions(const sample *sample, const simulation *sim, int *n
     *n_reactions = 0; /* we calculate this */
     reaction * reactions = malloc(sample->n_isotopes*sizeof(reaction)); /* TODO: possible memory leak */
     for(i = 0; i < sample->n_isotopes; i++) {
-        reaction *r = &reactions[sim->n_reactions];
+        reaction *r = &reactions[*n_reactions];
         r->type = REACTION_RBS;
         r->isotope = sample->isotopes[i];
         r->i_isotope = i;
