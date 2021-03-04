@@ -21,15 +21,15 @@ configure_file(version.h.in version.h @ONLY)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 find_package(GSL 2.6 REQUIRED)
-find_package(Jibal 0.2.8 REQUIRED)
+find_package(Jibal 0.2.9 REQUIRED)
 
 if(WIN32)
     find_path(GETOPT_INCLUDE_DIR getopt.h)
     find_library(GETOPT_LIBRARY getopt)
 endif()
 
-option(DEBUG_MODE_ENABLED "Enable debug mode (more output, warnings are errors)" OFF)
-if(DEBUG_MODE_ENABLED)
+option(DEBUG_MODE_ENABLE "Enable debug mode" OFF)
+if(DEBUG_MODE_ENABLE)
     if (MSVC)
         add_compile_options(/W4 /WX /DDEBUG)
     else()
