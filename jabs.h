@@ -22,7 +22,7 @@
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E);
 double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double x, double h_max, double step);
 void simulate(const ion *incident, double x_0, sim_workspace *ws, const sample *sample);
-reaction *make_rbs_reactions(const sample *sample, const simulation *sim, int *n_reactions);/* Note that sim->ion needs to be set! */
+reaction *make_rbs_reactions(const sample *sample, const simulation *sim);/* Note that sim->ion needs to be set! */
 int assign_stopping(jibal_gsto *gsto, simulation *sim, sample *sample);
 void print_spectra(FILE *f, const global_options *global, const sim_workspace *ws, const sample *sample, const gsl_histogram *exp);
 void add_fit_params(global_options *global, simulation *sim, jibal_layer **layers, int n_layers, fit_params *params);

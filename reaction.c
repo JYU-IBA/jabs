@@ -14,13 +14,28 @@
 
 #include "reaction.h"
 
-void reactions_print(FILE *f, reaction *reactions, int n_reactions) {
-    int i;
-    for (i = 0; i < n_reactions; i++) {
-        reaction *r = &reactions[i];
-        fprintf(stderr, "Reaction %3i/%i: RBS with %5s (isotope id %3i): K = %7.5lf, max depth = %9.3lf tfu\n", i+1, n_reactions,
-                r->isotope->name, r->i_isotope,
-                r->K, r->max_depth / C_TFU);
+void reactions_print(FILE *f, const reaction *reactions) {
+    const reaction *r;
+    int i = 1;
+    for (r = reactions; r->type != REACTION_NONE; r++) {
+        fprintf(stderr, "Reaction %3i: %s with %5s (isotope id %3i): K = %7.5lf, max depth = %9.3lf tfu\n",
+                i++, reaction_name(r), r->isotope->name, r->i_isotope, r->K, r->max_depth / C_TFU);
     }
+}
 
+const char *reaction_name(const reaction *r) {
+    if(!r)
+        return "NULL";
+    switch (r->type) {
+        case REACTION_NONE:
+            return "NONE";
+        case REACTION_RBS:
+            return "RBS";
+        case REACTION_ERD:
+            return "ERD";
+        case REACTION_ARB:
+            return "ARB";
+        default:
+            return "???";
+    }
 }

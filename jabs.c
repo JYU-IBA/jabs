@@ -261,12 +261,11 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     convolute_bricks(ws);
 }
 
-reaction *make_rbs_reactions(const sample *sample, const simulation *sim, int *n_reactions) { /* Note that sim->ion needs to be set! */
+reaction *make_rbs_reactions(const sample *sample, const simulation *sim) { /* Note that sim->ion needs to be set! */
     int i;
-    *n_reactions = 0; /* we calculate this */
-    reaction * reactions = malloc(sample->n_isotopes*sizeof(reaction)); /* TODO: possible memory leak */
+    reaction *reactions = malloc((sample->n_isotopes+1)*sizeof(reaction)); /* TODO: possible memory leak */
+    reaction *r = reactions;
     for(i = 0; i < sample->n_isotopes; i++) {
-        reaction *r = &reactions[*n_reactions];
         r->type = REACTION_RBS;
         r->isotope = sample->isotopes[i];
         r->i_isotope = i;
@@ -279,9 +278,9 @@ reaction *make_rbs_reactions(const sample *sample, const simulation *sim, int *n
         }
         r->K = jibal_kin_rbs(sim->beam_isotope->mass, r->isotope->mass, sim->theta, '+'); /* TODO: this is too hard coded for RBS right now */
         r->max_depth = sample_isotope_max_depth(sample, r->i_isotope);
-        r->stop = 0;
-        (*n_reactions)++;
+        r++;
     };
+    r->type = REACTION_NONE; /* Last reaction is a dummy one */
     return reactions;
 }
 

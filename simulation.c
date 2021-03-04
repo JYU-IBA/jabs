@@ -76,7 +76,10 @@ void sim_workspace_reset(sim_workspace *ws, const simulation *sim) {
 sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactions, const sample *sample, const jibal *jibal) {
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->sim = *sim;
-    ws->n_reactions = ws->sim.n_reactions;
+    ws->n_reactions = 0;
+    for(const reaction *r = reactions; r->type != REACTION_NONE; r++) {
+        ws->n_reactions++;
+    }
     ws->gsto = jibal->gsto;
     ws->jibal_config = jibal->config;
     ws->isotopes = jibal->isotopes;
@@ -135,7 +138,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
         }
         if(r->r->type == REACTION_ERD) {
             ion_set_isotope(p, sample->isotopes[r->r->i_isotope]);
-            /* TODO: ion_nuclear_stop_fill_params */
+            ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes); /* This allocates memory */
         }
     }
     ws->c = calloc(sample->n_isotopes, sizeof(double));
@@ -156,6 +159,9 @@ void sim_workspace_free(sim_workspace *ws) {
         if(r->bricks) {
             free(r->bricks);
             r->bricks = NULL;
+        }
+        if(r->r->type != REACTION_RBS) {
+            free(r->p.nucl_stop); /* RBS ions share nuclear stopping table. Others needs to free the memory. */
         }
     }
     free(ws->ion.nucl_stop);

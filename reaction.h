@@ -19,9 +19,10 @@
 #include "ion.h"
 
 typedef enum {
-    REACTION_RBS = 0,
-    REACTION_ERD = 1,
-    REACTION_ARB = 2
+    REACTION_NONE = 0,
+    REACTION_RBS = 1,
+    REACTION_ERD = 2,
+    REACTION_ARB = 3 /* TODO: types of reactions */
 } reaction_type;
 
 typedef struct {
@@ -29,12 +30,11 @@ typedef struct {
     int i_isotope; /* location of target isotope in concentration table */
     double K;
     double max_depth;
-    /* TODO: type? */
     /* TODO: cross section to use? */
     /* TODO: cross sections from files */
     reaction_type type;
-    int stop;
 } reaction;
 
-void reactions_print(FILE *f, reaction *reactions, int n_reactions);
+void reactions_print(FILE *f, const reaction *reactions);
+const char *reaction_name(const reaction *r);
 #endif //JABS_REACTION_H

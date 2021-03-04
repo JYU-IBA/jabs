@@ -65,7 +65,7 @@ int main(int argc, char **argv) {
     gsl_histogram *exp = NULL;
     if(global.exp_filename) {
         exp = read_experimental_spectrum(global.exp_filename, 16384); /* TODO: number of channels? */
-        set_experimental_spectrum_calibration(exp, sim);
+        set_experimental_spectrum_calibration(exp, sim); /* TODO: this is not really used anywhere. If it is used with fits etc it needs to be updated. */
     }
 
     FILE *f;
@@ -89,9 +89,9 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     sample_print(stderr, sample);
 
-    reaction *reactions = make_rbs_reactions(sample, sim, &sim->n_reactions);
+    reaction *reactions = make_rbs_reactions(sample, sim);
     fprintf(stderr, "\n");
-    reactions_print(stderr, reactions, sim->n_reactions);
+    reactions_print(stderr, reactions);
 
     if(assign_stopping(jibal->gsto, sim, sample)) {
         return EXIT_FAILURE;
@@ -143,7 +143,6 @@ int main(int argc, char **argv) {
     } else {
         ws = sim_workspace_init(sim, reactions, sample, jibal);
         no_ds(ws, sample);
-        //simulate(ws, sample);
     }
     if(!ws) {
         fprintf(stderr, "Unexpected error.\n");

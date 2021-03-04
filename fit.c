@@ -34,14 +34,11 @@ int func_f(const gsl_vector *x, void *params, gsl_vector * f)
         *(p->fit_params->func_params[i]) = gsl_vector_get(x, i); /* TODO: set some parameters to fit! */
     }
     sim_workspace_free(p->ws);
-    reaction *r = malloc(p->sim->n_reactions * sizeof(reaction));
-    memcpy(r, p->reactions, p->sim->n_reactions * sizeof(reaction)); /* TODO: when we stop mutilating the reactions we can stop doing this */
     sample_free(p->sample);
     p->sample = sample_from_layers(p->layers, p->n_layers);
     p->ws = sim_workspace_init(p->sim, p->reactions, p->sample, p->jibal); /* We intentionally "leak" this */
     if(!p->ws) {
         gsl_vector_set_all(f, 0.0);
-        free(r);
         return GSL_FAILURE;
     }
     start = clock();
@@ -60,7 +57,6 @@ int func_f(const gsl_vector *x, void *params, gsl_vector * f)
             gsl_vector_set(f, i-p->low_ch, exp->bin[i] - sum);
         }
     }
-    free(r);
     return GSL_SUCCESS;
 }
 
@@ -72,20 +68,14 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
     /* compute reciprocal condition number of J(x) */
     gsl_multifit_nlinear_rcond(&rcond, w);
 
-
-
     fprintf(stderr, "iter %2zu: cond(J) = %12.6e, |f(x)| = %14.8e", iter, 1.0 / rcond, gsl_blas_dnrm2(f));
-
-    // double c = GSL_MAX_DBL(1, sqrt(chisq / dof));
-    // fprintf(stderr, "chisq/dof = %g\n", chisq / dof);
 #ifndef NO_CHISQ
     double chisq;
     gsl_blas_ddot(f, f, &chisq);
     fprintf(stderr, ", chisq/dof = %8.4lf", chisq/fit_data->dof);
 #endif
-
-    size_t i;
 #ifdef FIT_PRINT_PARAMS
+    size_t i;
     for(i = 0; i < fit_data->fit_params->n; i++) {
         fprintf(stderr, ", p[%zu] = %12.6e", i, gsl_vector_get(w->x, i));
     }

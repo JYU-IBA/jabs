@@ -23,8 +23,6 @@
 #include "brick.h"
 
 typedef struct {
-    //int n_channels;
-    int n_reactions;
     double energy_slope;
     double energy_offset;
     double energy_resolution; /* Stored as variance, i.e. energy squared (in SI-units J^2) */
