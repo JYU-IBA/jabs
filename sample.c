@@ -43,8 +43,8 @@ int get_range_bin(const sample *s, double x) {
     return lo;
 }
 
-double get_conc(sim_workspace *ws, const sample *s, double x, int i_isotope) {
-    int i_range, i;
+double get_conc(sim_workspace *ws, const sample *s, double x, size_t i_isotope) {
+    size_t i_range, i;
 
     if(x >= s->cranges[ws->i_range_accel] && x < s->cranges[ws->i_range_accel+1]) { /* Use saved bin. We'll probably receive a lot of repeated calls to the same bin, so this avoid cost of other range checking and binary searches. */
         i = ws->i_range_accel * s->n_isotopes + i_isotope;
@@ -69,7 +69,7 @@ double get_conc(sim_workspace *ws, const sample *s, double x, int i_isotope) {
 }
 
 int get_concs(sim_workspace *ws, const sample *s, double x, double *out) {
-    int i_range, i;
+    size_t i_range, i;
 
     if(x >= s->cranges[ws->i_range_accel] && x < s->cranges[ws->i_range_accel+1]) { /* Use saved bin. */
         i_range = ws->i_range_accel;
@@ -100,17 +100,17 @@ int get_concs(sim_workspace *ws, const sample *s, double x, double *out) {
     }
 }
 
-sample *sample_from_layers(jibal_layer * const *layers, int n_layers) {
-    int i, j, k;
+sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers) {
+    size_t i, j, k;
     sample *s = malloc(sizeof(sample));
     s->n_isotopes = 0;
     s->n_ranges = 2*n_layers;
     s->cranges = malloc(s->n_ranges*sizeof(double));
-    int i_isotope, n_isotopes=0;
+    size_t i_isotope, n_isotopes=0;
     for(i = 0; i < n_layers; i++) {
         const jibal_layer *layer = layers[i];
 #ifdef DEBUG
-        fprintf(stderr, "Layer %i/%i. Thickness %g tfu\n", i+1, n_layers, layer->thickness/C_TFU);
+        fprintf(stderr, "Layer %lu/%lu. Thickness %g tfu\n", i+1, n_layers, layer->thickness/C_TFU);
         jibal_material_print(stderr, layer->material);
 #endif
         s->cranges[2*i] = i?s->cranges[2*i-1]:0.0;
@@ -121,9 +121,9 @@ sample *sample_from_layers(jibal_layer * const *layers, int n_layers) {
     }
 #ifdef DEBUG
     for (i = 0; i < s->n_ranges; i++) {
-        fprintf(stderr, "ranges[%i]  = %g\n", i, s->cranges[i]);
+        fprintf(stderr, "ranges[%lu]  = %g\n", i, s->cranges[i]);
     }
-    fprintf(stderr, "Total %i isotopes and %i ranges\n", n_isotopes, s->n_ranges);
+    fprintf(stderr, "Total %lu isotopes and %lu ranges\n", n_isotopes, s->n_ranges);
 #endif
     s->isotopes = calloc(n_isotopes, sizeof(jibal_isotope *));
     i_isotope = 0;
@@ -143,7 +143,7 @@ sample *sample_from_layers(jibal_layer * const *layers, int n_layers) {
 #ifdef DEBUG
     for(i = 0; i < n_isotopes; i++) {
         if(s->isotopes[i])
-            fprintf(stderr, "%i: %s\n", i, s->isotopes[i]->name);
+            fprintf(stderr, "%lu: %s\n", i, s->isotopes[i]->name);
     }
     fprintf(stderr, "Removing duplicates!\n");
 #endif
@@ -159,7 +159,7 @@ sample *sample_from_layers(jibal_layer * const *layers, int n_layers) {
 #ifdef DEBUG
     for(i = 0; i < n_isotopes; i++) {
         if(s->isotopes[i]) {
-            fprintf(stderr, "%i: %s\n", i, s->isotopes[i]->name);
+            fprintf(stderr, "%lu: %s\n", i, s->isotopes[i]->name);
         }
     }
 #endif
@@ -167,7 +167,7 @@ sample *sample_from_layers(jibal_layer * const *layers, int n_layers) {
         if(s->isotopes[i] != NULL)
             continue;
 #ifdef DEBUG
-        fprintf(stderr, "shuffle i=%i\n", i);
+        fprintf(stderr, "shuffle i=%lu\n", i);
 #endif
         for (j = i; j < n_isotopes; j++) {
             s->isotopes[j] = s->isotopes[j+1];
@@ -176,9 +176,9 @@ sample *sample_from_layers(jibal_layer * const *layers, int n_layers) {
         n_isotopes--;
     }
 #ifdef DEBUG
-    fprintf(stderr, "%i non-duplicate isotopes:\n", n_isotopes);
+    fprintf(stderr, "%lu non-duplicate isotopes:\n", n_isotopes);
     for (i = 0; i < n_isotopes; i++) {
-        fprintf(stderr, "%i: %s\n", i, s->isotopes[i]->name);
+        fprintf(stderr, "%lu: %s\n", i, s->isotopes[i]->name);
     }
 #endif
 #endif // NO_LAYER_REMOVE_DUPLICATES
@@ -212,15 +212,14 @@ sample *sample_from_layers(jibal_layer * const *layers, int n_layers) {
 
 
 void sample_print(FILE *f, const sample *sample) {
-    int i,j;
     fprintf(f, "DEPTH(tfu) ");
-    for (i = 0; i < sample->n_isotopes; i++) {
+    for (size_t i = 0; i < sample->n_isotopes; i++) {
         fprintf(f, "%8s ", sample->isotopes[i]->name);
     }
     fprintf(f, "\n");
-    for (i = 0; i < sample->n_ranges; i++) {
+    for (size_t i = 0; i < sample->n_ranges; i++) {
         fprintf(f, "%10.3lf", sample->cranges[i]/C_TFU);
-        for (j = 0; j < sample->n_isotopes; j++) {
+        for (size_t j = 0; j < sample->n_isotopes; j++) {
             fprintf(f, " %8.4lf", sample->cbins[i * sample->n_isotopes + j]*100.0);
         }
         fprintf(f, "\n");

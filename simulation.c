@@ -67,19 +67,18 @@ int sim_sanity_check(const simulation *sim) {
     return 0;
 }
 
+#if 0
 void sim_workspace_reset(sim_workspace *ws, const simulation *sim) {
     ws->i_range_accel = 0;
     ws->c_x = 0.0;
     /* TODO: finish */
 }
+#endif
 
 sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactions, const sample *sample, const jibal *jibal) {
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->sim = *sim;
-    ws->n_reactions = 0;
-    for(const reaction *r = reactions; r->type != REACTION_NONE; r++) {
-        ws->n_reactions++;
-    }
+    ws->n_reactions = reaction_count(reactions);
     ws->gsto = jibal->gsto;
     ws->jibal_config = jibal->config;
     ws->isotopes = jibal->isotopes;
@@ -112,8 +111,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
         return NULL;
     }
     ws->reactions = calloc(ws->n_reactions, sizeof (sim_reaction));
-    int i_reaction;
-    for(i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
+    for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
         sim_reaction *r = &ws->reactions[i_reaction];
         r->r = &reactions[i_reaction];
         ion *p = &r->p;
@@ -149,8 +147,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
 void sim_workspace_free(sim_workspace *ws) {
     if(!ws)
         return;
-    int i;
-    for(i = 0; i < ws->n_reactions; i++) {
+    for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
         if(r->histo) {
             gsl_histogram_free(r->histo);
@@ -193,8 +190,7 @@ void simulation_print(FILE *f, const simulation *sim) {
 }
 
 void convolute_bricks(sim_workspace *ws) {
-    int i;
-    for(i = 0; i < ws->n_reactions; i++) {
+    for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);

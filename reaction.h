@@ -37,4 +37,5 @@ typedef struct {
 
 void reactions_print(FILE *f, const reaction *reactions);
 const char *reaction_name(const reaction *r);
+size_t reaction_count(const reaction *reactions);
 #endif //JABS_REACTION_H

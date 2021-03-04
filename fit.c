@@ -29,8 +29,7 @@ int func_f(const gsl_vector *x, void *params, gsl_vector * f)
     clock_t start, end;
     struct fit_data *p = (struct fit_data *) params;
     gsl_histogram *exp = p->exp;
-    size_t i, j;
-    for(i = 0; i < p->fit_params->n; i++) {
+    for(size_t i = 0; i < p->fit_params->n; i++) {
         *(p->fit_params->func_params[i]) = gsl_vector_get(x, i); /* TODO: set some parameters to fit! */
     }
     sim_workspace_free(p->ws);
@@ -45,12 +44,12 @@ int func_f(const gsl_vector *x, void *params, gsl_vector * f)
     no_ds(p->ws, p->sample);
     end = clock();
     p->cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
-    for(i = p->low_ch; i <= p->high_ch; i++) {
+    for(size_t i = p->low_ch; i <= p->high_ch; i++) {
         double sum = 0.0;
         if(i >= p->ws->n_channels) { /* Outside range of simulated spectrum */
             gsl_vector_set(f, i-p->low_ch, exp->bin[i]);
         } else {
-            for (j = 0; j < p->ws->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
+            for (size_t j = 0; j < p->ws->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
                 if(p->ws->reactions[j].histo && i < p->ws->reactions[j].histo->n)
                     sum += p->ws->reactions[j].histo->bin[i];
             }

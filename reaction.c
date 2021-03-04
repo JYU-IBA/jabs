@@ -15,10 +15,9 @@
 #include "reaction.h"
 
 void reactions_print(FILE *f, const reaction *reactions) {
-    const reaction *r;
     int i = 1;
-    for (r = reactions; r->type != REACTION_NONE; r++) {
-        fprintf(stderr, "Reaction %3i: %s with %5s (isotope id %3i): K = %7.5lf, max depth = %9.3lf tfu\n",
+    for (const reaction *r = reactions; r->type != REACTION_NONE; r++) {
+        fprintf(f, "Reaction %3i: %s with %5s (isotope id %3i): K = %7.5lf, max depth = %9.3lf tfu\n",
                 i++, reaction_name(r), r->isotope->name, r->i_isotope, r->K, r->max_depth / C_TFU);
     }
 }
@@ -38,4 +37,14 @@ const char *reaction_name(const reaction *r) {
         default:
             return "???";
     }
+}
+
+size_t reaction_count(const reaction *reactions) {
+    size_t n=0;
+    if(!reactions)
+        return 0;
+    for (const reaction *r = reactions; r->type != REACTION_NONE; r++) {
+        n++;
+    }
+    return n;
 }

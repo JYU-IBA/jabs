@@ -8,12 +8,10 @@
 
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E) {
     double em=E/incident->mass;
-    int i_isotope;
-
     double S1 = 0.0;
 
     get_concs(ws, sample, x, ws->c);
-    for(i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
+    for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
         if(ws->c[i_isotope] < ABUNDANCE_THRESHOLD)
             continue;
         if (type == GSTO_STO_TOT) {
@@ -106,12 +104,11 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     double thickness = sample->cranges[sample->n_ranges-1];
     double next_crossing = sample->cranges[1];
     double h_max;
-    int i_range = 0;
-    int i_depth;
-    int i_reaction;
+    size_t i_range = 0;
+    size_t i_depth;
     ion ion1 = *incident;
-    for(i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
-        sim_reaction *r = &ws->reactions[i_reaction];
+    for(size_t i = 0; i < ws->n_reactions; i++) {
+        sim_reaction *r = &ws->reactions[i];
         ion *p = &r->p;
         p->E = ion1.E * r->r->K;
         p->S = 0.0;
@@ -133,13 +130,13 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         while (i_range < sample->n_ranges - 1 && x >= sample->cranges[i_range + 1]) {
             i_range++;
 #ifdef DEBUG
-            fprintf(stderr, "Crossing to range %i = [%g, %g)\n", i_range, sample->cranges[i_range] / C_TFU,
+            fprintf(stderr, "Crossing to range %lu = [%g, %g)\n", i_range, sample->cranges[i_range] / C_TFU,
                     sample->cranges[i_range + 1] / C_TFU);
 #endif
             next_crossing = sample->cranges[i_range + 1];
         }
         if (ws->ion.E < ws->sim.emin) {
-            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %i.\n", ws->ion.E,
+            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %lu.\n", ws->ion.E,
                     ws->sim.emin, x, i_range);
             break;
         }
@@ -168,8 +165,8 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
 
         ion ion2 = *incident; /* Make a shallow copy of ion */
         ion_rotate(&ion2, ws->sim.detector_theta, ws->sim.detector_phi); /* Rotate to detector (the angle is relative to lab so we still stay in sample coordinates. This rotation should actually be: 1) rotate to lab, 2) rotate to detector, 3) rotate to sample, but steps 1 and 3 cancel each other out, so we just do step 2.) */
-        for (i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
-            sim_reaction *r = &ws->reactions[i_reaction];
+        for (size_t i = 0; i < ws->n_reactions; i++) {
+            sim_reaction *r = &ws->reactions[i];
             if (r->stop)
                 continue;
             if (i_depth >= r->n_bricks) {
@@ -177,7 +174,6 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                 continue;
             }
             brick *b = &r->bricks[i_depth];
-            ion *p = &r->p; /* Reaction product */
             // ion_set_angle(&r->p, theta_after_second, phi_after_second);
 
             r->p.E = ion2.E * r->r->K;
@@ -189,8 +185,8 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
 
             if (x >= r->r->max_depth) {
 #ifdef DEBUG
-                fprintf(stderr, "Reaction %i with %s stops, because maximum depth is reached at x = %.3lf tfu.\n",
-                        i_reaction, r->r->isotope->name, x / C_TFU); /* TODO: give reactions a name */
+                fprintf(stderr, "Reaction %lu with %s stops, because maximum depth is reached at x = %.3lf tfu.\n",
+                        i, r->r->isotope->name, x / C_TFU); /* TODO: give reactions a name */
 #endif
                 b->Q = -1.0;
                 r->stop = 1;
@@ -207,8 +203,8 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                 if (r->p.E < ws->sim.emin) {
 #ifdef DEBUG
                     fprintf(stderr,
-                            "Reaction %i with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
-                            i_reaction, r->r->isotope->name, (x + h) / C_TFU);
+                            "Reaction %lu with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
+                            i, r->r->isotope->name, (x + h) / C_TFU);
 #endif
                     break;
                 }
@@ -250,22 +246,21 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         i_depth++;
     }
 #ifdef DEBUG
-    fprintf(stderr, "Last depth bin %i\n", i_depth);
+    fprintf(stderr, "Last depth bin %lu\n", i_depth);
 #endif
-    for (i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
-        if (ws->reactions[i_reaction].stop)
+    for (size_t i = 0; i < ws->n_reactions; i++) {
+        if (ws->reactions[i].stop)
             continue;
-        if (i_depth < ws->reactions[i_reaction].n_bricks)
-            ws->reactions[i_reaction].bricks[i_depth].Q = -1.0; /* Set the last counts to negative to indicate end of calculation */
+        if (i_depth < ws->reactions[i].n_bricks)
+            ws->reactions[i].bricks[i_depth].Q = -1.0; /* Set the last counts to negative to indicate end of calculation */
     }
     convolute_bricks(ws);
 }
 
 reaction *make_rbs_reactions(const sample *sample, const simulation *sim) { /* Note that sim->ion needs to be set! */
-    int i;
     reaction *reactions = malloc((sample->n_isotopes+1)*sizeof(reaction)); /* TODO: possible memory leak */
     reaction *r = reactions;
-    for(i = 0; i < sample->n_isotopes; i++) {
+    for(size_t i = 0; i < sample->n_isotopes; i++) {
         r->type = REACTION_RBS;
         r->isotope = sample->isotopes[i];
         r->i_isotope = i;
@@ -285,8 +280,7 @@ reaction *make_rbs_reactions(const sample *sample, const simulation *sim) { /* N
 }
 
 int assign_stopping(jibal_gsto *gsto, simulation *sim, sample *sample) {
-    int i;
-    for(i = 0; i < sample->n_isotopes; i++) {
+    for(size_t i = 0; i < sample->n_isotopes; i++) {
         if (!jibal_gsto_auto_assign(gsto, sim->beam_isotope->Z, sample->isotopes[i]->Z)) { /* TODO: this is only for RBS */
             fprintf(stderr, "Can not assign stopping.\n");
             return 1;
@@ -296,7 +290,6 @@ int assign_stopping(jibal_gsto *gsto, simulation *sim, sample *sample) {
 }
 
 void print_spectra(FILE *f, const global_options *global, const sim_workspace *ws, const sample *sample, const gsl_histogram *exp) {
-    int i, j;
     char sep = ' ';
     if(global->out_filename) {
         size_t l = strlen(global->out_filename);
@@ -306,23 +299,23 @@ void print_spectra(FILE *f, const global_options *global, const sim_workspace *w
             if(exp) {
                 fprintf(f, ",\"Experimental\"");
             }
-            for(j = 0; j < ws->n_reactions; j++) {
+            for(size_t j = 0; j < ws->n_reactions; j++) {
                 const reaction *r = ws->reactions[j].r;
                 fprintf(f, ",\"%s\"", sample->isotopes[r->i_isotope]->name);
             }
             fprintf(f, "\n");
         }
     }
-    for(i = 0; i < ws->n_channels; i++) {
+    for(size_t i = 0; i < ws->n_channels; i++) {
         double sum = 0.0;
-        for (j = 0; j < ws->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
+        for (size_t j = 0; j < ws->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
             if(i < ws->reactions[j].histo->n)
                 sum += ws->reactions[j].histo->bin[i];
         }
         if(sum == 0.0) {
-            fprintf(f, "%i%c0", i, sep); /* Tidier output with a clean zero */
+            fprintf(f, "%lu%c0", i, sep); /* Tidier output with a clean zero */
         } else {
-            fprintf(f, "%i%c%e", i, sep, sum);
+            fprintf(f, "%lu%c%e", i, sep, sum);
         }
         if(exp) {
             if(i < exp->n) {
@@ -331,7 +324,7 @@ void print_spectra(FILE *f, const global_options *global, const sim_workspace *w
                 fprintf(f, "%c0", sep);
             }
         }
-        for (j = 0; j < ws->n_reactions; j++) {
+        for (size_t j = 0; j < ws->n_reactions; j++) {
             if(i >= ws->reactions[j].histo->n || ws->reactions[j].histo->bin[i] == 0.0) {
                 fprintf(f,"%c0", sep);
             } else {
@@ -386,7 +379,6 @@ void add_fit_params(global_options *global, simulation *sim, jibal_layer **layer
 
 void output_bricks(const char *filename, const sim_workspace *ws) {
     FILE *f;
-    int i, j;
     if(!filename)
         return;
     if(strcmp(filename, "-") == 0)
@@ -396,13 +388,13 @@ void output_bricks(const char *filename, const sim_workspace *ws) {
     }
     if(!f)
         return;
-    for(i = 0; i < ws->n_reactions; i++) {
+    for(size_t i = 0; i < ws->n_reactions; i++) {
         const sim_reaction *r = &ws->reactions[i];
-        for(j = 0; j < r->n_bricks; j++) {
+        for(size_t j = 0; j < r->n_bricks; j++) {
             brick *b = &r->bricks[j];
             if(b->Q < 0.0)
                 break;
-            fprintf(f, "%2i %2i %8.3lf %8.3lf %8.3lf %8.3lf %12.3lf\n",
+            fprintf(f, "%2lu %2lu %8.3lf %8.3lf %8.3lf %8.3lf %12.3lf\n",
                     i, j, b->d/C_TFU, b->E_0/C_KEV, b->E/C_KEV, sqrt(b->S)/C_KEV, b->Q);
         }
         fprintf(f, "\n\n");
@@ -426,9 +418,9 @@ void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is mo
     ion_set_angle(&ws->ion, 0.0, 0.0);
     ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
     ion ion1 = ws->ion;
-    int i_range = 0;
+    size_t i_range = 0;
     double next_crossing = 0.0;
-    for(x=0.0; x < thickness;) {
+    for(x = 0.0; x < thickness;) {
         /* Go deeper and at every step start making new spectra. */
         while (i_range < sample->n_ranges - 1 && x >= sample->cranges[i_range + 1]) {
             i_range++;

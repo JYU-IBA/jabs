@@ -28,9 +28,13 @@ if(WIN32)
     find_library(GETOPT_LIBRARY getopt)
 endif()
 
-option(DEBUG_OUTPUT_ENABLE "Enable debug output" OFF)
-if(DEBUG_OUTPUT_ENABLE)
-    add_compile_options(-DDEBUG)
+option(DEBUG_MODE_ENABLED "Enable debug mode (more output, warnings are errors)" OFF)
+if(DEBUG_MODE_ENABLED)
+    if (MSVC)
+        add_compile_options(/W4 /WX /DDEBUG)
+    else()
+        add_compile_options(-Wall -Wextra -pedantic -Werror -DDEBUG)
+    endif()
 endif()
 
 add_executable(jabs main.c sample.c sample.h brick.c ion.c ion.h simulation.c simulation.h reaction.c reaction.h

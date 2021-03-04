@@ -54,8 +54,7 @@ void erf_Q_test() {
 }
 
 void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const double S, const double scale) {
-    int i, j;
-    for(i = 1; i < n_bricks; i++) {
+    for(size_t i = 1; i < n_bricks; i++) {
         const brick *b_high = &bricks[i-1];
         const brick *b_low = &bricks[i];
         if(b_low->Q < 0.0) {
@@ -67,7 +66,7 @@ void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const do
         double sigma_low = sqrt(b_low->S + S);
         double sigma_high = sqrt(b_high->S + S);
         //fprintf(stderr, "delta d = %.3lf, E_high = %.3lf, E_low = %.3lf), sigma_low = %.3lf, sigma_high = %.3lf, Q = %.3lf\n", (b_low->d - b_high->d)/C_TFU, b_high->E/C_KEV, b_low->E/C_KEV, sigma_low/C_KEV, sigma_high/C_KEV, b_low->Q);
-        for(j = 0; j < h->n; j++) {
+        for(size_t j = 0; j < h->n; j++) {
             double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
             double w = h->range[j + 1] - h->range[j];
             double y = (erf_Q_optim((b_low->E - E) / sigma_low) - erf_Q_optim((b_high->E - E) / sigma_high)) / (b_high->E - b_low->E);
@@ -80,7 +79,6 @@ void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const do
 }
 
 void brick_int(double sigma_low, double sigma_high, double E_low, double E_high, gsl_histogram *h, double Q) { /* Energy spectrum h, integrate over rectangular brick convoluted with a gaussian */
-    int i;
 #ifdef OPTIMIZE_BRICK
     size_t lo;
     size_t hi;
@@ -105,9 +103,9 @@ void brick_int(double sigma_low, double sigma_high, double E_low, double E_high,
         hi = h->n;
     else
         hi += n;
-    for(i = lo; i <= hi; i++) {
+    for(size_t i = lo; i <= hi; i++) {
 #else
-        for(i = 0; i < h->n; i++) {
+        for(size_t i = 0; i < h->n; i++) {
 #endif
         double w = h->range[i+1] - h->range[i];
         double E = (h->range[i] + h->range[i+1])/2.0; /* Approximate gaussian at center bin */

@@ -43,8 +43,8 @@ struct fit_data {
     size_t n_layers;
     fit_params *fit_params;
     sim_workspace *ws; /* Handled by fitting function! */
-    int low_ch;
-    int high_ch;
+    size_t low_ch;
+    size_t high_ch;
     size_t n_iters_max;
     double cputime_actual; /* Statistics! */
     double dof;

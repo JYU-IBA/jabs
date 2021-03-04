@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
         fit_data.high_ch = global.fit_high;
         if(fit_data.high_ch <= 0)
             fit_data.high_ch = exp->n - 1;
-        fprintf(stderr, "Fit range [%i, %i]\n", fit_data.low_ch, fit_data.high_ch);
+        fprintf(stderr, "Fit range [%lu, %lu]\n", fit_data.low_ch, fit_data.high_ch);
         fit_data.jibal = jibal;
         fit_data.sim = sim;
         fit_data.exp = exp;

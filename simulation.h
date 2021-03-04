@@ -59,7 +59,7 @@ typedef struct {
 
 typedef struct {
     simulation sim;
-    int n_reactions; /* Same as sim->n_reactions, but we want to keep it here too, as it is used for allocations */
+    size_t n_reactions; /* Number of reactions is counted on init. */
     double *c; /* Concentrations for n_isotopes at some arbitrary x */
     double c_x; /* at this x */
     int i_range_accel;
@@ -67,7 +67,7 @@ typedef struct {
     const jibal_config *jibal_config;
     int rk4;
     gsto_stopping_type stopping_type;
-    int n_channels; /* histogram */
+    size_t n_channels; /* histogram */
     ion ion;
     sim_reaction *reactions;
     const jibal_isotope *isotopes;
