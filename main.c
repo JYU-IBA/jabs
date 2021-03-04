@@ -92,6 +92,10 @@ int main(int argc, char **argv) {
     reaction *reactions = make_rbs_reactions(sample, sim);
     fprintf(stderr, "\n");
     reactions_print(stderr, reactions);
+    if(reactions[0].type == REACTION_NONE) {
+        fprintf(stderr, "No reactions, nothing to do.\n");
+        return EXIT_FAILURE;
+    }
 
     if(assign_stopping(jibal->gsto, sim, sample)) {
         return EXIT_FAILURE;

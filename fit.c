@@ -105,11 +105,6 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     gsl_multifit_nlinear_workspace *w;
     gsl_multifit_nlinear_parameters fdf_params = gsl_multifit_nlinear_default_parameters();
     fdf_params.trs = gsl_multifit_nlinear_trs_lmaccel;
-#ifdef DEBUG
-    fprintf(stderr, "read h_fvv = %g\n", fdf_params.h_fvv);
-    fdf_params.h_fvv = 0.001;
-    fprintf(stderr, "set h_fvv = %g\n", fdf_params.h_fvv);
-#endif
     fit_data->cputime_actual = 0.0;
     struct fit_params *fit_params = fit_data->fit_params;
     gsl_multifit_nlinear_fdf fdf;
@@ -146,9 +141,9 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     }
     gsl_vector_view wts = gsl_vector_view_array(weights, fit_data->high_ch-fit_data->low_ch+1);
 
-    const double xtol = 1e-8;
-    const double gtol = 1e-8;
-    const double ftol = 1e-8;
+    const double xtol = 1e-6;
+    const double gtol = 1e-6;
+    const double ftol = 1e-6;
 
 /* allocate workspace with default parameters */
     w = gsl_multifit_nlinear_alloc (T, &fdf_params, fdf.n, fdf.p);
