@@ -21,7 +21,7 @@ configure_file(version.h.in version.h @ONLY)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 find_package(GSL 2.6 REQUIRED)
-find_package(Jibal 0.2.9 REQUIRED)
+find_package(Jibal 0.3.0 REQUIRED)
 
 if(WIN32)
     find_path(GETOPT_INCLUDE_DIR getopt.h)
@@ -33,7 +33,7 @@ if(DEBUG_MODE_ENABLE)
     if (MSVC)
         add_compile_options(/W4 /WX /DDEBUG)
     else()
-        add_compile_options(-Wall -Wextra -pedantic -Werror -DDEBUG)
+        add_compile_options(-Wall -Wextra -pedantic -DDEBUG)
     endif()
 endif()
 
@@ -42,12 +42,12 @@ add_executable(jabs main.c sample.c sample.h brick.c ion.c ion.h simulation.c si
 target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
 
 target_link_libraries(jabs
-    PRIVATE Jibal 
+    PRIVATE jibal
     PRIVATE GSL::gsl
     PRIVATE "$<$<BOOL:${UNIX}>:m>" ${GETOPT_LIBRARY}
     )
 
 add_executable(angle_calc angle_calc.c ion.c rotate.c)
-target_link_libraries(angle_calc PRIVATE Jibal  PRIVATE "$<$<BOOL:${UNIX}>:m>")
+target_link_libraries(angle_calc PRIVATE jibal  PRIVATE "$<$<BOOL:${UNIX}>:m>")
 
 install(TARGETS jabs RUNTIME DESTINATION bin)

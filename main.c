@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version());
-    fprintf(stderr, "Compiled using JIBAL %s, current library version %s.\n", jibal_VERSION, jibal_version());
+    fprintf(stderr, "Compiled using JIBAL %s, current library version %s.\n", JIBAL_VERSION, jibal_version());
     fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
                     "This is free software, and you are welcome to redistribute it under certain conditions.\n"
                     "Run 'jabs -h' for more information.\n\n");
