@@ -14,30 +14,32 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include "defaults.h"
 #include "sample.h"
+
 
 extern inline double *sample_conc_bin(const sample *s, int i_range, int i_isotope);
 
 inline int depth_is_almost_inside(double x, double low, double high) { /* Almost is good enough for us! */
-    static const double abs_tol = 1e-6*C_TFU;
+    static const double abs_tol = DEPTH_TOLERANCE; /* we consider x to be in range [low, high] with this tolerance */
     return (x >= low-abs_tol && x <= high+abs_tol);
 }
 
 size_t get_range_bin(const sample *s, double x, size_t *range_hint) {
     int lo, mi, hi;
     if(range_hint) {
-        if(*range_hint < s->n_ranges && depth_is_almost_inside(x, s->cranges[*range_hint], s->cranges[*range_hint+1])) { /* TODO: add a bit of floating point "relative accuracy is enough" testing here */
+        if(*range_hint < s->n_ranges-1 && depth_is_almost_inside(x, s->cranges[*range_hint], s->cranges[*range_hint+1])) { /* TODO: add a bit of floating point "relative accuracy is enough" testing here */
             return *range_hint;
-        } else {
-            fprintf(stderr, "FALSE RANGE HINTING at depth = %g tfu. Hint was %lu (pointer %p). ", x/C_TFU, *range_hint, range_hint);
+        } else { /* Shouldn't happen */
+            fprintf(stderr, "WARNING!!! FALSE RANGE HINTING at depth = %g tfu. Hint was %lu (pointer %p). ", x/C_TFU, *range_hint, range_hint);
             if(*range_hint >= s->n_ranges) {
                 fprintf(stderr, "This is unacceptable because %lu should be < %lu.\n", *range_hint, s->n_ranges);
             } else {
                 fprintf(stderr, "This is unacceptable because %g should be >= %g and <= %g.\n", x/C_TFU, s->cranges[*range_hint]/C_TFU, s->cranges[*range_hint+1]/C_TFU);
             }
         }
-    } else {
-        fprintf(stderr, "Warning: no range hinting, depth = %g tfu\n", x/C_TFU);
+    } else { /* Shouldn't happen. Not wrong usage as such. */
+        fprintf(stderr, "Mild warning: no range hinting, depth = %g tfu\n", x/C_TFU);
     }
     hi = s->n_ranges;
     lo = 0;
@@ -171,7 +173,7 @@ sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers) {
             const jibal_layer *layer = layers[i];
             for (j = 0; j < layer->material->n_elements; j++) {
                 if (layer->material->concs[j] < 0.0)
-                    layer->material->concs[j] = 0.0001; /* TODO: fitting robustification */
+                    layer->material->concs[j] = DEPTH_TOLERANCE*10.0; /* TODO: fitting robustification */
             }
             jibal_material_normalize(layer->material);
             for (j = 0; j < layer->material->n_elements; j++) {

@@ -142,11 +142,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         }
 
         h_max = next_crossing - x;
-        if (h_max < 0.0001 * C_TFU) {
-            x += 0.0001 * C_TFU;
-            fprintf(stderr, "Step too small. Let's nudge forward! x=%lf tfu\n", x / C_TFU);
-            continue;
-        }
+        assert(h_max > 0.001 * C_TFU);
         double E_front = ion1.E;
         double h = stop_step(ws, &ion1, sample, x, h_max, ws->sim.stop_step_incident, &i_range);
         assert(h > 0.0);
