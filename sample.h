@@ -19,7 +19,6 @@
 #include <jibal_material.h>
 #include <jibal_layer.h>
 
-
 typedef struct {
     size_t n_isotopes;
     size_t n_ranges;
@@ -28,11 +27,9 @@ typedef struct {
     double *cbins; /* 2D-table: size is n_isotopes * n_ranges  */
 } sample;
 
-#include "simulation.h"
-
-double get_conc(sim_workspace *ws, const sample *s, double x, size_t i_isotope, size_t *range_hint);
-int get_concs(sim_workspace *ws, const sample *s, double x, double *out, size_t *range_hint);
-int get_range_bin(const sample *s, double x);
+double get_conc(const sample *s, double x, size_t i_isotope, size_t *range_hint);
+int get_concs(const sample *s, double x, double *out, size_t *range_hint);
+size_t get_range_bin(const sample *s, double x, size_t *range_hint);
 
 sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers);
 void sample_print(FILE *f, const sample *sample);

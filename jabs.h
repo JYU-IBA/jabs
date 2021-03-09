@@ -20,7 +20,7 @@
 #include "options.h"
 
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E, size_t *range_hint);
-double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double x, double h_max, double step);
+double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double x, double h_max, double step, size_t *range_hint);
 void simulate(const ion *incident, double x_0, sim_workspace *ws, const sample *sample);
 reaction make_reaction(const sample *sample, const simulation *sim, size_t i_isotope, reaction_type type);
 reaction *make_reactions(const sample *sample, const simulation *sim, int rbs, int erd);/* Note that sim->ion needs to be set and geometry has to be correct */

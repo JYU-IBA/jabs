@@ -13,23 +13,32 @@
  */
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 #include "sample.h"
 
 extern inline double *sample_conc_bin(const sample *s, int i_range, int i_isotope);
 
-int get_range_bin(const sample *s, double x) {
+inline int depth_is_almost_inside(double x, double low, double high) { /* Almost is good enough for us! */
+    static const double abs_tol = 1e-6*C_TFU;
+    return (x >= low-abs_tol && x <= high+abs_tol);
+}
+
+size_t get_range_bin(const sample *s, double x, size_t *range_hint) {
     int lo, mi, hi;
-#ifdef RANGE_PEDANTIC
-    if(x < s->cranges[0] || x >= s->cranges[s->n_ranges-1]) { /* Out of bounds concentration is zero. Maybe the execution doesn't go here if all goes as planned, so this could be changed to an assert. */
-        return -1;
+    if(range_hint) {
+        if(*range_hint < s->n_ranges && depth_is_almost_inside(x, s->cranges[*range_hint], s->cranges[*range_hint+1])) { /* TODO: add a bit of floating point "relative accuracy is enough" testing here */
+            return *range_hint;
+        } else {
+            fprintf(stderr, "FALSE RANGE HINTING at depth = %g tfu. Hint was %lu (pointer %p). ", x/C_TFU, *range_hint, range_hint);
+            if(*range_hint >= s->n_ranges) {
+                fprintf(stderr, "This is unacceptable because %lu should be < %lu.\n", *range_hint, s->n_ranges);
+            } else {
+                fprintf(stderr, "This is unacceptable because %g should be >= %g and <= %g.\n", x/C_TFU, s->cranges[*range_hint]/C_TFU, s->cranges[*range_hint+1]/C_TFU);
+            }
+        }
+    } else {
+        fprintf(stderr, "Warning: no range hinting, depth = %g tfu\n", x/C_TFU);
     }
-#else
-    if(x < s->cranges[0])
-        return 0;
-    if(x >= s->cranges[s->n_ranges-1]) { /* Out of bounds concentration is zero. Maybe the execution doesn't go here if all goes as planned, so this could be changed to an assert. */
-        return -1;
-    }
-#endif
     hi = s->n_ranges;
     lo = 0;
     while (hi - lo > 1) {
@@ -43,49 +52,26 @@ int get_range_bin(const sample *s, double x) {
     return lo;
 }
 
-double get_conc(sim_workspace *ws, const sample *s, double x, size_t i_isotope, size_t *range_hint) {
-    size_t i_range, i;
-    if(range_hint) { /* We are hinted to a range, let's check validity of it. */
-        if(*range_hint < s->n_ranges && x >= s->cranges[*range_hint] && x < s->cranges[*range_hint+1]) {
-            i_range = *range_hint; /* Valid */
-        } else {
-            i_range = get_range_bin(s, x);
-#ifdef DEBUG
-            fprintf(stderr, "False range hinting at depth = %g tfu (was %lu, is %lu)\n", x, *range_hint, i_range);
-#endif
-            *range_hint = i_range; /* Correct it. Can be used as output. */
-        }
-    } else {
-#ifdef DEBUG
-        fprintf(stderr, "No range hinting at depth = %g tfu (was %lu, is %lu)\n", x, *range_hint, i_range);
-#endif
-        i_range = get_range_bin(s, x);
-    }
+double get_conc(const sample *s, double x, size_t i_isotope, size_t *range_hint) {
     assert(i_isotope < s->n_isotopes);
-    i = i_range * s->n_isotopes + i_isotope;
+    size_t i_range = get_range_bin(s, x, range_hint);
+    size_t i = i_range * s->n_isotopes + i_isotope;
     if(s->cranges[i_range+1] - s->cranges[i_range] == 0) /* Zero width. Return value of left side. */
         return s->cbins[i];
     return s->cbins[i] + ((s->cbins[i+s->n_isotopes] - s->cbins[i])/(s->cranges[i_range+1] - s->cranges[i_range])) * (x - s->cranges[i_range]);
 }
 
-int get_concs(sim_workspace *ws, const sample *s, double x, double *out, size_t *range_hint) {
-    size_t i_range, i;
-    if(range_hint && *range_hint < s->n_ranges && x >= s->cranges[*range_hint] && x < s->cranges[*range_hint+1]) {
-        i_range = *range_hint;
-    } else {
-        i_range = get_range_bin(s, x);
-    }
+int get_concs(const sample *s, double x, double *out, size_t *range_hint) {
+    size_t i_range = get_range_bin(s, x, range_hint);
     double *bins_low = &s->cbins[i_range * s->n_isotopes];
     double *bins_high = &s->cbins[(i_range+1) * s->n_isotopes];
     if(s->cranges[i_range] == s->cranges[i_range+1]) {
-        for(i = 0; i < s->n_isotopes; i++) {
-            out[i] = bins_low[i]; /* TODO: memcpy? */
-        }
+        memcpy(out, bins_low, s->n_isotopes*sizeof(double));
         return 1;
     } else {
         double dx = (s->cranges[i_range+1] - s->cranges[i_range]);
         double deltax = (x - s->cranges[i_range]);
-        for (i = 0; i < s->n_isotopes; i++) {
+        for (size_t i = 0; i < s->n_isotopes; i++) {
             out[i] = bins_low[i] + ((bins_high[i] - bins_low[i])/dx) * deltax;
         }
         return 2;

@@ -12,7 +12,7 @@
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E, size_t *range_hint) {
     double em=E/incident->mass;
     double S1 = 0.0;
-    get_concs(ws, sample, x, ws->c, range_hint);
+    get_concs(sample, x, ws->c, range_hint);
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
         if(ws->c[i_isotope] < ABUNDANCE_THRESHOLD)
             continue;
@@ -35,32 +35,35 @@ double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample,
     return S1;
 }
 
-double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double x, double h_max, double step) {
+double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double x, double h_max, double step, size_t *range_hint) {
     double k1, k2, k3, k4, stop, dE, E, h_max_orig = h_max;
-    int maxstep = 0;
     /* k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
     E = incident->E;
-    size_t i_range = get_range_bin(sample, x);
-    k1 = stop_sample(ws, incident, sample, ws->stopping_type, x, E, &i_range);
+    k1 = stop_sample(ws, incident, sample, ws->stopping_type, x, E, range_hint);
     if(k1 < 0.001*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
 #ifdef DEBUG
         fprintf(stderr, "stop_step returns 0.0, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)\n", k1/C_EV_TFU, x/C_TFU, E/C_KEV);
 #endif
         return 0.0;
     }
-    h_max *=  incident->inverse_cosine_theta; /* h_max is the perpendicular distance, but we can take bigger steps (note scaling elsewhere). Note that inverse_cosine_theta can be negative and in this case h_max should also be negativem so h_max is positive! */
+    h_max *=  incident->inverse_cosine_theta; /* h_max was the perpendicular distance, but we can take bigger steps (note scaling elsewhere). Note that inverse_cosine_theta can be negative and in this case h_max should also be negativem so h_max is positive! */
     assert(h_max > 0.0);
     double h = (step / k1); /* step should always be positive, as well as k1, so h is always positive  */
     assert(h > 0.0);
+    double h_perp;
+    int maxstep;
     if(h >= h_max) {
+        h = h_max;
+        h_perp = h_max_orig;
         maxstep = 1;
-        h = h_max * 0.99999;
+    } else {
+        h_perp = h*incident->cosine_theta; /* x + h_perp is the actual perpendicular depth */
+        maxstep = 0;
     }
-    double h_perp = h*incident->cosine_theta; /* x + h_perp is the actual perpendicular depth */
     if(ws->rk4) {
-        k2 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k1, &i_range);
-        k3 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k2, &i_range);
-        k4 = stop_sample(ws, incident, sample, ws->stopping_type, x + h_perp, E - h * k3, &i_range);
+        k2 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k1, range_hint);
+        k3 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k2, range_hint);
+        k4 = stop_sample(ws, incident, sample, ws->stopping_type, x + h_perp, E - h * k3, range_hint);
         stop = (k1 + 2 * k2 + 2 * k3 + k4) / 6;
     } else {
         stop = k1;
@@ -77,7 +80,7 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
     }
 #endif
 #ifndef STATISTICAL_STRAGGLING
-    double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, x, E + dE, &i_range) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
+    double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, x, E + dE, range_hint) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
 #ifdef DEBUG
     //if((s_ratio)*(s_ratio) < 0.9 || (s_ratio)*(s_ratio) > 1.1) { /* Non-statistical broadening. */
     //   fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
@@ -85,18 +88,11 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
 #endif
     incident->S *= (s_ratio)*(s_ratio);
 #endif
-    incident->S += h* stop_sample(ws, incident, sample, GSTO_STO_STRAGG, x + (h_perp / 2.0), (E + dE / 2), NULL); /* Straggling, calculate at mid-energy */
+    incident->S += h* stop_sample(ws, incident, sample, GSTO_STO_STRAGG, x + (h_perp / 2.0), (E + dE / 2), range_hint); /* Straggling, calculate at mid-energy */
 
     assert(isnormal(incident->S));
-
-    if(maxstep) {
-        incident->E += dE/0.99999;
-        return h_max_orig;
-    } else {
-        incident->E += dE;
-        return h_perp;
-    }
-    /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
+    incident->E += dE;
+    return h_perp; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
 void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sample *sample) {
@@ -152,7 +148,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             continue;
         }
         double E_front = ion1.E;
-        double h = stop_step(ws, &ion1, sample, x, h_max, ws->sim.stop_step_incident);
+        double h = stop_step(ws, &ion1, sample, x, h_max, ws->sim.stop_step_incident, &i_range);
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
         double E_back = ion1.E;
@@ -201,11 +197,10 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             }
 
             double x_out;
-            int i_range_out = i_range;
+            size_t i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
                 double h_out_max = sample->cranges[i_range_out] - x_out;
-                double h_out = stop_step(ws, &r->p, sample, x_out - 0.0001 * C_TFU, h_out_max,
-                                         ws->sim.stop_step_exiting); /* FIXME: 0.0001*C_TFU IS A STUPID HACK */
+                double h_out = stop_step(ws, &r->p, sample, x_out, h_out_max, ws->sim.stop_step_exiting, &i_range_out);
                 x_out += h_out;
                 if (r->p.E < ws->sim.emin) {
 #ifdef DEBUG
@@ -223,7 +218,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
 #endif
                 }
             }
-            double c = get_conc(ws, sample, x + (h / 2.0), r->r->i_isotope, &i_range); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
+            double c = get_conc(sample, x + (h / 2.0), r->r->i_isotope, &i_range); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
             if (c > ABUNDANCE_THRESHOLD && r->p.E > ws->sim.emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
@@ -497,7 +492,7 @@ void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is mo
             next_crossing = sample->cranges[i_range + 1];
         }
         double h_max = next_crossing - x;
-        double h = stop_step(ws, &ws->ion, sample, x, h_max, ws->sim.stop_step_incident);
+        double h = stop_step(ws, &ws->ion, sample, x, h_max, ws->sim.stop_step_incident, &i_range);
         ion ion2 = ion1;
 
         int i_ds;
