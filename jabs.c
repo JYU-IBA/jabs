@@ -35,35 +35,45 @@ double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample,
     return S1;
 }
 
-double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double x, double h_max, double step, size_t *range_hint) {
-    double k1, k2, k3, k4, stop, dE, E, h_max_orig = h_max;
+double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double x, double step, const size_t range_hint) {
+    double k1, k2, k3, k4, stop, dE, E;
+    double h_max_perp;
+    assert(range_hint < sample->n_ranges-1);
+    if(incident->inverse_cosine_theta < 0.0) {
+        h_max_perp = sample->cranges[range_hint] - x;
+    } else {
+        h_max_perp = sample->cranges[range_hint + 1] - x;
+    }
+#if 0
+    if(h_max_perp != h_max_orig) {
+        fprintf(stderr, "h_max_orig = %g, h_max_perp = %g\n", h_max_orig, h_max_perp);
+    }
+#endif
+    size_t range = range_hint;
     /* k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
     E = incident->E;
-    k1 = stop_sample(ws, incident, sample, ws->stopping_type, x, E, range_hint);
+    k1 = stop_sample(ws, incident, sample, ws->stopping_type, x, E, &range);
     if(k1 < 0.001*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
 #ifdef DEBUG
         fprintf(stderr, "stop_step returns 0.0, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)\n", k1/C_EV_TFU, x/C_TFU, E/C_KEV);
 #endif
         return 0.0;
     }
-    h_max *=  incident->inverse_cosine_theta; /* h_max was the perpendicular distance, but we can take bigger steps (note scaling elsewhere). Note that inverse_cosine_theta can be negative and in this case h_max should also be negativem so h_max is positive! */
+    double h_max = h_max_perp * incident->inverse_cosine_theta; /*  we can take bigger steps since we are going sideways. Note that inverse_cosine_theta can be negative and in this case h_max should also be negative so h_max is always positive! */
     assert(h_max > 0.0);
     double h = (step / k1); /* step should always be positive, as well as k1, so h is always positive  */
     assert(h > 0.0);
-    double h_perp;
-    int maxstep;
+    double h_perp; /* has a sign (same as h_max_perp ) */
     if(h >= h_max) {
         h = h_max;
-        h_perp = h_max_orig;
-        maxstep = 1;
+        h_perp = h_max_perp;
     } else {
         h_perp = h*incident->cosine_theta; /* x + h_perp is the actual perpendicular depth */
-        maxstep = 0;
     }
     if(ws->rk4) {
-        k2 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k1, range_hint);
-        k3 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k2, range_hint);
-        k4 = stop_sample(ws, incident, sample, ws->stopping_type, x + h_perp, E - h * k3, range_hint);
+        k2 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k1, &range);
+        k3 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k2, &range);
+        k4 = stop_sample(ws, incident, sample, ws->stopping_type, x + h_perp, E - h * k3, &range);
         stop = (k1 + 2 * k2 + 2 * k3 + k4) / 6;
     } else {
         stop = k1;
@@ -80,7 +90,7 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
     }
 #endif
 #ifndef STATISTICAL_STRAGGLING
-    double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, x, E + dE, range_hint) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
+    double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, x, E + dE, &range) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
 #ifdef DEBUG
     //if((s_ratio)*(s_ratio) < 0.9 || (s_ratio)*(s_ratio) > 1.1) { /* Non-statistical broadening. */
     //   fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
@@ -88,7 +98,7 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
 #endif
     incident->S *= (s_ratio)*(s_ratio);
 #endif
-    incident->S += h* stop_sample(ws, incident, sample, GSTO_STO_STRAGG, x + (h_perp / 2.0), (E + dE / 2), range_hint); /* Straggling, calculate at mid-energy */
+    incident->S += h* stop_sample(ws, incident, sample, GSTO_STO_STRAGG, x + (h_perp / 2.0), (E + dE / 2), &range); /* Straggling, calculate at mid-energy */
 
     assert(isnormal(incident->S));
     incident->E += dE;
@@ -144,7 +154,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         h_max = next_crossing - x;
         assert(h_max > 0.001 * C_TFU);
         double E_front = ion1.E;
-        double h = stop_step(ws, &ion1, sample, x, h_max, ws->sim.stop_step_incident, &i_range);
+        double h = stop_step(ws, &ion1, sample, x, ws->sim.stop_step_incident, i_range);
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
         double E_back = ion1.E;
@@ -196,7 +206,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             size_t i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
                 double h_out_max = sample->cranges[i_range_out] - x_out;
-                double h_out = stop_step(ws, &r->p, sample, x_out, h_out_max, ws->sim.stop_step_exiting, &i_range_out);
+                double h_out = stop_step(ws, &r->p, sample, x_out, ws->sim.stop_step_exiting, i_range_out);
                 x_out += h_out;
                 if (r->p.E < ws->sim.emin) {
 #ifdef DEBUG
@@ -488,7 +498,7 @@ void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is mo
             next_crossing = sample->cranges[i_range + 1];
         }
         double h_max = next_crossing - x;
-        double h = stop_step(ws, &ws->ion, sample, x, h_max, ws->sim.stop_step_incident, &i_range);
+        double h = stop_step(ws, &ws->ion, sample, x, ws->sim.stop_step_incident, i_range);
         ion ion2 = ion1;
 
         int i_ds;

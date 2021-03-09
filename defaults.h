@@ -11,8 +11,9 @@
 #define PARTICLES_SR (1.0e12)
 #define E_MIN (100.0*C_KEV)
 #define ENERGY_SLOPE (1.0*C_KEV)
-#define STOP_STEP_INCIDENT (10.0*C_KEV)
+#define STOP_STEP_INCIDENT (8.0*C_KEV)
 #define STOP_STEP_EXITING (30.0*C_KEV)
 
-
+/* Other constants */
+#define DEPTH_TOLERANCE (1.0e-6 * C_TFU)
 #endif // JABS_DEFAULTS_H
