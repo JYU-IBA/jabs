@@ -62,7 +62,6 @@ typedef struct {
     size_t n_reactions; /* Number of reactions is counted on init. */
     double *c; /* Concentrations for n_isotopes at some arbitrary x */
     double c_x; /* at this x */
-    int i_range_accel;
     jibal_gsto *gsto;
     const jibal_config *jibal_config;
     int rk4;

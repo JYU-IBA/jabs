@@ -19,7 +19,7 @@
 #include "fit.h"
 #include "options.h"
 
-double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E);
+double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E, size_t *range_hint);
 double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double x, double h_max, double step);
 void simulate(const ion *incident, double x_0, sim_workspace *ws, const sample *sample);
 reaction make_reaction(const sample *sample, const simulation *sim, size_t i_isotope, reaction_type type);

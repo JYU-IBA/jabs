@@ -9,11 +9,10 @@
 #include "rotate.h"
 #include "jabs.h"
 
-double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E) {
+double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E, size_t *range_hint) {
     double em=E/incident->mass;
     double S1 = 0.0;
-
-    get_concs(ws, sample, x, ws->c);
+    get_concs(ws, sample, x, ws->c, range_hint);
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
         if(ws->c[i_isotope] < ABUNDANCE_THRESHOLD)
             continue;
@@ -41,7 +40,8 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
     int maxstep = 0;
     /* k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
     E = incident->E;
-    k1 = stop_sample(ws, incident, sample, ws->stopping_type, x, E);
+    size_t i_range = get_range_bin(sample, x);
+    k1 = stop_sample(ws, incident, sample, ws->stopping_type, x, E, &i_range);
     if(k1 < 0.001*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
 #ifdef DEBUG
         fprintf(stderr, "stop_step returns 0.0, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)\n", k1/C_EV_TFU, x/C_TFU, E/C_KEV);
@@ -58,9 +58,9 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
     }
     double h_perp = h*incident->cosine_theta; /* x + h_perp is the actual perpendicular depth */
     if(ws->rk4) {
-        k2 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k1);
-        k3 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k2);
-        k4 = stop_sample(ws, incident, sample, ws->stopping_type, x + h_perp, E - h * k3);
+        k2 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k1, &i_range);
+        k3 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k2, &i_range);
+        k4 = stop_sample(ws, incident, sample, ws->stopping_type, x + h_perp, E - h * k3, &i_range);
         stop = (k1 + 2 * k2 + 2 * k3 + k4) / 6;
     } else {
         stop = k1;
@@ -77,7 +77,7 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
     }
 #endif
 #ifndef STATISTICAL_STRAGGLING
-    double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, x, E+dE)/k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
+    double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, x, E + dE, &i_range) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
 #ifdef DEBUG
     //if((s_ratio)*(s_ratio) < 0.9 || (s_ratio)*(s_ratio) > 1.1) { /* Non-statistical broadening. */
     //   fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
@@ -85,7 +85,7 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
 #endif
     incident->S *= (s_ratio)*(s_ratio);
 #endif
-    incident->S += h*stop_sample(ws, incident, sample, GSTO_STO_STRAGG, x + (h_perp/2.0), (E+dE/2)); /* Straggling, calculate at mid-energy */
+    incident->S += h* stop_sample(ws, incident, sample, GSTO_STO_STRAGG, x + (h_perp / 2.0), (E + dE / 2), NULL); /* Straggling, calculate at mid-energy */
 
     assert(isnormal(incident->S));
 
@@ -223,7 +223,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
 #endif
                 }
             }
-            double c = get_conc(ws, sample, x + (h / 2.0), r->r->i_isotope); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
+            double c = get_conc(ws, sample, x + (h / 2.0), r->r->i_isotope, &i_range); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
             if (c > ABUNDANCE_THRESHOLD && r->p.E > ws->sim.emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/

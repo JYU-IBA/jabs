@@ -82,7 +82,6 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
     ws->gsto = jibal->gsto;
     ws->jibal_config = jibal->config;
     ws->isotopes = jibal->isotopes;
-    ws->i_range_accel = 0;
     ws->c_x = 0.0;
 
     ion_reset(&ws->ion);
@@ -140,7 +139,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
         }
     }
     ws->c = calloc(sample->n_isotopes, sizeof(double));
-    get_concs(ws, sample, ws->c_x, ws->c);
+    get_concs(ws, sample, ws->c_x, ws->c, NULL);
     return ws;
 }
 

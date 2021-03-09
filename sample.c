@@ -43,23 +43,23 @@ int get_range_bin(const sample *s, double x) {
     return lo;
 }
 
-double get_conc(sim_workspace *ws, const sample *s, double x, size_t i_isotope) {
+double get_conc(sim_workspace *ws, const sample *s, double x, size_t i_isotope, size_t *range_hint) {
     size_t i_range, i;
-
-    if(x >= s->cranges[ws->i_range_accel] && x < s->cranges[ws->i_range_accel+1]) { /* Use saved bin. We'll probably receive a lot of repeated calls to the same bin, so this avoid cost of other range checking and binary searches. */
-        i = ws->i_range_accel * s->n_isotopes + i_isotope;
-        if(s->cranges[ws->i_range_accel] == s->cranges[ws->i_range_accel+1]) /* Constant */
-            return s->cbins[i];
-        else /* Linear interpolation */
-            return s->cbins[i] + ((s->cbins[i+s->n_isotopes] - s->cbins[i])/(s->cranges[ws->i_range_accel+1] - s->cranges[ws->i_range_accel])) * (x - s->cranges[ws->i_range_accel]);
-    }
-    i_range = get_range_bin(s, x);
-    ws->i_range_accel = i_range;
-    if(i_range < 0) {
+    if(range_hint) { /* We are hinted to a range, let's check validity of it. */
+        if(*range_hint < s->n_ranges && x >= s->cranges[*range_hint] && x < s->cranges[*range_hint+1]) {
+            i_range = *range_hint; /* Valid */
+        } else {
+            i_range = get_range_bin(s, x);
 #ifdef DEBUG
-        fprintf(stderr, "No depth range found for x = %.5lf\n", x/C_TFU);
+            fprintf(stderr, "False range hinting at depth = %g tfu (was %lu, is %lu)\n", x, *range_hint, i_range);
 #endif
-        return 0.0;
+            *range_hint = i_range; /* Correct it. Can be used as output. */
+        }
+    } else {
+#ifdef DEBUG
+        fprintf(stderr, "No range hinting at depth = %g tfu (was %lu, is %lu)\n", x, *range_hint, i_range);
+#endif
+        i_range = get_range_bin(s, x);
     }
     assert(i_isotope < s->n_isotopes);
     i = i_range * s->n_isotopes + i_isotope;
@@ -68,20 +68,12 @@ double get_conc(sim_workspace *ws, const sample *s, double x, size_t i_isotope) 
     return s->cbins[i] + ((s->cbins[i+s->n_isotopes] - s->cbins[i])/(s->cranges[i_range+1] - s->cranges[i_range])) * (x - s->cranges[i_range]);
 }
 
-int get_concs(sim_workspace *ws, const sample *s, double x, double *out) {
+int get_concs(sim_workspace *ws, const sample *s, double x, double *out, size_t *range_hint) {
     size_t i_range, i;
-
-    if(x >= s->cranges[ws->i_range_accel] && x < s->cranges[ws->i_range_accel+1]) { /* Use saved bin. */
-        i_range = ws->i_range_accel;
+    if(range_hint && *range_hint < s->n_ranges && x >= s->cranges[*range_hint] && x < s->cranges[*range_hint+1]) {
+        i_range = *range_hint;
     } else {
         i_range = get_range_bin(s, x);
-        ws->i_range_accel = i_range;
-    }
-    if(i_range < 0) {
-#ifdef DEBUG
-        fprintf(stderr, "No depth range found for x = %.5lf\n", x/C_TFU);
-#endif
-        return 0;
     }
     double *bins_low = &s->cbins[i_range * s->n_isotopes];
     double *bins_high = &s->cbins[(i_range+1) * s->n_isotopes];

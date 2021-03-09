@@ -30,8 +30,8 @@ typedef struct {
 
 #include "simulation.h"
 
-double get_conc(sim_workspace *ws, const sample *s, double x, size_t i_isotope);
-int get_concs(sim_workspace *ws, const sample *s, double x, double *out);
+double get_conc(sim_workspace *ws, const sample *s, double x, size_t i_isotope, size_t *range_hint);
+int get_concs(sim_workspace *ws, const sample *s, double x, double *out, size_t *range_hint);
 int get_range_bin(const sample *s, double x);
 
 sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers);
