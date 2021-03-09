@@ -72,7 +72,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Detector azimuthal angle (0 deg or 180 deg = IBM, +/-90 deg or 270 deg = Cornell).",
             "Fluence (or actually particles * sr).",
             "Resolution of detector (FHWM of Gaussian)",
-            "Incident ion step size.",
+            "Incident ion step size. Zero is automatic.",
             "Exiting particle step size.",
             "Slope of energy calibration.",
             "Offset of energy calibration.",
@@ -85,7 +85,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Save intermediate raw data to file",
             "Maximum number of depth steps",
             "Don't make an RBS spectrum",
-            "Don't make an ERD spectrum",
+            "Don't make an ERD spectrum (ERD automatically turns on forward angles)",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {

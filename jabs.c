@@ -22,9 +22,9 @@ double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample,
                     #ifdef NUCLEAR_STOPPING_FROM_JIBAL
                     +jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, sample->isotopes[i_isotope]->Z, sample->isotopes[i_isotope]->mass)
                     #else
-                    + ion_nuclear_stop(incident, sample->isotopes[i_isotope], ws->isotopes)
-#endif
-            );
+                    + ion_nuclear_stop(incident, sample->isotopes[i_isotope], ws->isotopes, ws->nucl_stop_accurate)
+                    #endif
+                    );
         } else {
             S1 += ws->c[i_isotope] * (
                     jibal_gsto_get_em(ws->gsto, type, incident->Z, sample->isotopes[i_isotope]->Z, em)
@@ -61,7 +61,7 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
     }
     double h_max = h_max_perp * incident->inverse_cosine_theta; /*  we can take bigger steps since we are going sideways. Note that inverse_cosine_theta can be negative and in this case h_max should also be negative so h_max is always positive! */
     assert(h_max > 0.0);
-    double h = (step / k1); /* step should always be positive, as well as k1, so h is always positive  */
+    double h =  (step / k1); /* (energy) step should always be positive, as well as k1, so depth step h (not perpendicular, but "real" depth) is always positive  */
     assert(h > 0.0);
     double h_perp; /* has a sign (same as h_max_perp ) */
     if(h >= h_max) {
@@ -116,7 +116,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     ion ion1 = *incident; /* Shallow copy of the incident ion */
     double theta, phi;
     rotate(ws->sim.detector_theta, ws->sim.detector_phi, ws->sim.sample_theta, ws->sim.sample_phi, &theta, &phi); /* Detector in sample coordinate system */
-
+    double K_min = 1.0;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
         ion *p = &r->p;
@@ -130,7 +130,10 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         b->d = 0.0;
         b->Q = 0.0;
         b->E_0 = ion1.E;
+        if(r->r->K < K_min)
+            K_min = r->r->K;
     }
+    assert(K_min > 0.0);
     i_depth=1;
 
 #ifdef DEBUG
@@ -146,15 +149,16 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             next_crossing = sample->cranges[i_range + 1];
         }
         if (ion1.E < ws->sim.emin) {
-            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %lu.\n", ion1.E,
-                    ws->sim.emin, x, i_range);
+#ifdef DEBUG
+            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %lu.\n", ion1.E/C_KEV, ws->sim.emin/C_KEV, x/C_TFU, i_range);
+#endif
             break;
         }
 
         h_max = next_crossing - x;
         assert(h_max > 0.001 * C_TFU);
         double E_front = ion1.E;
-        double h = stop_step(ws, &ion1, sample, x, ws->sim.stop_step_incident, i_range);
+        double h = stop_step(ws, &ion1, sample, x, ws->sim.stop_step_incident == 0.0?sqrt(ws->sim.energy_resolution+K_min*(ion1.S)):ws->sim.stop_step_incident, i_range);
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
         double E_back = ion1.E;
@@ -205,8 +209,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             double x_out;
             size_t i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
-                double h_out_max = sample->cranges[i_range_out] - x_out;
-                double h_out = stop_step(ws, &r->p, sample, x_out, ws->sim.stop_step_exiting, i_range_out);
+                double h_out = stop_step(ws, &r->p, sample, x_out, ws->sim.stop_step_exiting == 0.0?r->p.E*0.1+sqrt(r->p.S):ws->sim.stop_step_exiting, i_range_out); /* TODO: 10% of energy plus straggling is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
                 x_out += h_out;
                 if (r->p.E < ws->sim.emin) {
 #ifdef DEBUG
@@ -461,6 +464,7 @@ void output_bricks(const char *filename, const sim_workspace *ws) {
         return;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const sim_reaction *r = &ws->reactions[i];
+        fprintf(f, "#%s %s\n", reaction_name(r->r), r->r->isotope->name);
         for(size_t j = 0; j < r->n_bricks; j++) {
             brick *b = &r->bricks[j];
             if(b->Q < 0.0)
@@ -490,14 +494,11 @@ void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is mo
     ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
     ion ion1 = ws->ion;
     size_t i_range = 0;
-    double next_crossing = 0.0;
     for(x = 0.0; x < thickness;) {
         /* Go deeper and at every step start making new spectra. */
         while (i_range < sample->n_ranges - 1 && x >= sample->cranges[i_range + 1]) {
             i_range++;
-            next_crossing = sample->cranges[i_range + 1];
         }
-        double h_max = next_crossing - x;
         double h = stop_step(ws, &ws->ion, sample, x, ws->sim.stop_step_incident, i_range);
         ion ion2 = ion1;
 

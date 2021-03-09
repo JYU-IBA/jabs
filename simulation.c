@@ -100,8 +100,10 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
     ws->stopping_type = GSTO_STO_TOT;
     if (sim->fast) {
         ws->rk4 = 0;
+        ws->nucl_stop_accurate = 0;
     } else {
         ws->rk4 = 1;
+        ws->nucl_stop_accurate = 1;
     }
     sim_workspace_recalculate_calibration(ws, sim);
 
@@ -118,7 +120,11 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
         if(sim->depthsteps_max) {
             r->n_bricks = sim->depthsteps_max;
         } else {
-            r->n_bricks = (int)ceil(sim->beam_E/sim->stop_step_incident+sample->n_ranges); /* This is very conservative */
+            if(sim->stop_step_incident == 0.0) { /* Automatic incident step size */
+                r->n_bricks = (int) ceil(sim->beam_E / sqrt(sim->energy_resolution) + sample->n_ranges); /* This is conservative */
+            } else {
+                r->n_bricks = (int) ceil(sim->beam_E / sim->stop_step_incident + sample->n_ranges); /* This is conservative */
+            }
         }
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Number of bricks for reaction %i: %lu\n", i_reaction, r->n_bricks);

@@ -20,7 +20,7 @@
 
 extern inline double *sample_conc_bin(const sample *s, int i_range, int i_isotope);
 
-inline int depth_is_almost_inside(double x, double low, double high) { /* Almost is good enough for us! */
+extern inline int depth_is_almost_inside(double x, double low, double high) { /* Almost is good enough for us! */
     static const double abs_tol = DEPTH_TOLERANCE; /* we consider x to be in range [low, high] with this tolerance */
     return (x >= low-abs_tol && x <= high+abs_tol);
 }
@@ -31,7 +31,7 @@ size_t get_range_bin(const sample *s, double x, size_t *range_hint) {
         if(*range_hint < s->n_ranges-1 && depth_is_almost_inside(x, s->cranges[*range_hint], s->cranges[*range_hint+1])) { /* TODO: add a bit of floating point "relative accuracy is enough" testing here */
             return *range_hint;
         } else { /* Shouldn't happen */
-            fprintf(stderr, "WARNING!!! FALSE RANGE HINTING at depth = %g tfu. Hint was %lu (pointer %p). ", x/C_TFU, *range_hint, range_hint);
+            fprintf(stderr, "WARNING!!! FALSE RANGE HINTING at depth = %g tfu. Hint was %lu (pointer %p). ", x/C_TFU, *range_hint, (void *)range_hint);
             if(*range_hint >= s->n_ranges) {
                 fprintf(stderr, "This is unacceptable because %lu should be < %lu.\n", *range_hint, s->n_ranges);
             } else {

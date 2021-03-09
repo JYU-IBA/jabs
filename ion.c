@@ -67,20 +67,20 @@ void ion_set_angle(ion *ion, double theta, double phi) {
     ion->inverse_cosine_phi = 1.0/ion->cosine_phi;
 }
 
-double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, const jibal_isotope *isotopes) {
+double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, const jibal_isotope *isotopes, int accurate) {
     size_t i = (isotope-isotopes);
     assert(i < ion->nucl_stop_isotopes);
     const double epsilon = ion->nucl_stop[i].eps0 * ion->E;
-#ifdef ACCURATE_NUCLEAR_STOPPING
-    if(epsilon <= 30.0) {
-        return ion->nucl_stop[i].k*log(1+1.1383*epsilon)/(2*(epsilon+0.01321*pow(epsilon, 0.21226)+0.19593*pow(epsilon, 0.5)));
-#else
-    if(epsilon <= M_E) {
-        return ion->nucl_stop[i].k/(2.0*M_E); /* Below the maximum (of the else-branch) return maximum. The approximation is bad, but better than nothing. */
-#endif
+    if(accurate) {
+        if(epsilon <= 30.0) {
+            return ion->nucl_stop[i].k * log(1 + 1.1383 * epsilon) / (2 * (epsilon + 0.01321 * pow(epsilon, 0.21226) + 0.19593 * pow(epsilon, 0.5)));
+        }
     } else {
-        return ion->nucl_stop[i].k*log(epsilon)/(2.0*epsilon);
+        if (epsilon <= M_E) {
+            return ion->nucl_stop[i].k / (2.0 * M_E); /* Below the maximum (of the else-branch) return maximum. The approximation is bad, but better than nothing. */
+        }
     }
+    return ion->nucl_stop[i].k*log(epsilon)/(2.0*epsilon);
 }
 void ion_nuclear_stop_fill_params(ion *ion, const jibal_isotope *isotopes, int n_isotopes) {
     const jibal_isotope *isotope;
