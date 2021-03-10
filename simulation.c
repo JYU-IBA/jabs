@@ -175,7 +175,7 @@ void sim_workspace_free(sim_workspace *ws) {
 
 void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *sim) {
     ws->n_channels = ceil((1.1 * sim->beam_E - sim->energy_offset) / sim->energy_slope);
-    if(ws->n_channels < 0 || ws->n_channels > 100000) {
+    if(ws->n_channels > 100000) {
         ws->n_channels = 0;
     }
 }

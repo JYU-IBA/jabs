@@ -23,7 +23,7 @@ void exit_calculator(double detector_theta, double detector_phi, double sample_t
 }
 
 void ds_test(ion *ion, double detector_theta, double detector_phi, double sample_theta, double sample_phi) {
-    double theta, phi;
+    //double theta, phi;
     ion_print(stdout, ion);
 
     ion_print(stdout, ion);
