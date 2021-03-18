@@ -422,7 +422,7 @@ void add_fit_params(global_options *global, simulation *sim, jibal_layer **layer
 #ifdef DEBUG
         fprintf(stderr, "Thing to fit: \"%s\"\n", token);
 #endif
-        if(strcmp(token, "calib") == 0) {
+        if(strncmp(token, "calib", 5) == 0) {
             fit_params_add_parameter(params, &sim->det.slope); /* TODO: prevent adding already added things */
             fit_params_add_parameter(params, &sim->det.offset);
             fit_params_add_parameter(params, &sim->det.resolution);
@@ -433,7 +433,7 @@ void add_fit_params(global_options *global, simulation *sim, jibal_layer **layer
         if(strcmp(token, "offset") == 0) {
             fit_params_add_parameter(params, &sim->det.offset);
         }
-        if(strcmp(token, "reso") == 0) {
+        if(strncmp(token, "reso", 4) == 0) {
             fit_params_add_parameter(params, &sim->det.resolution);
         }
         if(strcmp(token, "fluence") == 0) {
