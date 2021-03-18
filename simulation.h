@@ -21,19 +21,16 @@
 #include "ion.h"
 #include "reaction.h"
 #include "brick.h"
+#include "detector.h"
 
 typedef struct {
-    double energy_slope;
-    double energy_offset;
-    double energy_resolution; /* Stored as variance, i.e. energy squared (in SI-units J^2) */
+    detector det;
     double stop_step_incident;
     double stop_step_exiting;
     double p_sr;
     double sample_theta; /* Polar angle. Kind of. Zero is sample perpendicular to beam. */
     double sample_phi; /* Typically one uses a zero here, unless doing channeling stuff. Note that this is an azimuthal angle. */
     double alpha, beta, theta; /*  These are for convenience and follow the SimNRA conventions! Don't use them for any physics if you can avoid them. Well, theta *is* very convenient... */
-    double detector_theta; /* Polar angle [0, pi] */
-    double detector_phi; /* Azimuthal angle [0, 2pi] */
     //ion ion;
     const jibal_isotope *beam_isotope;
     double beam_E;

@@ -20,19 +20,21 @@ simulation *sim_init() {
     sim->sample_theta = ALPHA; /* These defaults are for IBM geometry */
     sim->sample_phi = 0.0;
     sim->alpha = ALPHA;
-    sim->detector_theta = THETA;
-    sim->detector_phi = 0.0;
+
     sim->theta = THETA;
     sim->beta = 180.0*C_DEG-THETA-ALPHA; /* Note: check if this is sane is defaults are changed. This should be (is) recalculated before running simulations. */
     sim->p_sr = PARTICLES_SR;
-    sim->energy_resolution = (DETECTOR_RESOLUTION*DETECTOR_RESOLUTION);
+    sim->det.theta = THETA;
+    sim->det.phi = 0.0;
+    sim->det.resolution = (DETECTOR_RESOLUTION*DETECTOR_RESOLUTION);
+    sim->det.slope = ENERGY_SLOPE;
+    sim->det.offset = 0.0*C_KEV;
     sim->stop_step_incident = STOP_STEP_INCIDENT;
     sim->stop_step_exiting = STOP_STEP_EXITING;
     sim->fast = 0;
     sim->beam_E = ENERGY;
     sim->beam_E_broad = 0.0;
-    sim->energy_slope = ENERGY_SLOPE;
-    sim->energy_offset = 0.0*C_KEV;
+
     sim->emin = E_MIN;
     sim->depthsteps_max = 0; /* Zero: automatic */
     sim->ds = 1;
@@ -50,9 +52,9 @@ void sim_calculate_geometry(simulation *sim) {
     double theta, phi; /* Temporary variables */
     rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */
     sim->alpha = theta; /* SimNRA convention, alpha has no sign. */
-    rotate(sim->detector_theta, sim->detector_phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Detector in sample coordinate system, angles are detector in sample system. Note that for Cornell geometry phi = 90.0 deg! */
+    rotate(sim->det.theta, sim->det.phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Detector in sample coordinate system, angles are detector in sample system. Note that for Cornell geometry phi = 90.0 deg! */
     sim->beta = C_PI - theta;
-    sim->theta = sim->detector_theta;
+    sim->theta = sim->det.theta;
 }
 
 int sim_sanity_check(const simulation *sim) {
@@ -121,7 +123,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
             r->n_bricks = sim->depthsteps_max;
         } else {
             if(sim->stop_step_incident == 0.0) { /* Automatic incident step size */
-                r->n_bricks = (int) ceil(sim->beam_E / sqrt(sim->energy_resolution) + sample->n_ranges); /* This is conservative */
+                r->n_bricks = (int) ceil(sim->beam_E / sqrt(sim->det.resolution) + sample->n_ranges); /* This is conservative */
             } else {
                 r->n_bricks = (int) ceil(sim->beam_E / sim->stop_step_incident + sample->n_ranges); /* This is conservative */
             }
@@ -131,8 +133,8 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
 #endif
         r->histo = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
         gsl_histogram_set_ranges_uniform(r->histo,
-                                         sim->energy_offset,
-                                         sim->energy_offset + sim->energy_slope * ws->n_channels);
+                                         detector_calibrated(&sim->det, 0),
+                                         detector_calibrated(&sim->det, ws->n_channels));
         r->bricks = calloc(r->n_bricks, sizeof(brick));
         if(r->r->type == REACTION_RBS) {
             ion_set_isotope(p, ws->ion.isotope);
@@ -174,7 +176,7 @@ void sim_workspace_free(sim_workspace *ws) {
 }
 
 void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *sim) {
-    ws->n_channels = ceil((1.1 * sim->beam_E - sim->energy_offset) / sim->energy_slope);
+    ws->n_channels = ceil((1.1 * sim->beam_E - sim->det.offset) / sim->det.slope);
     if(ws->n_channels > 100000) {
         ws->n_channels = 0;
     }
@@ -187,9 +189,9 @@ void simulation_print(FILE *f, const simulation *sim) {
     fprintf(f, "beta = %.3lf deg\n", sim->beta/C_DEG);
     fprintf(f, "theta = %.3lf deg\n", sim->theta/C_DEG);
     fprintf(f, "particles * sr = %e\n", sim->p_sr);
-    fprintf(f, "calibration offset = %.3lf keV\n", sim->energy_offset/C_KEV);
-    fprintf(f, "calibration slope = %.5lf keV\n", sim->energy_slope/C_KEV);
-    fprintf(f, "detector resolution = %.3lf keV FWHM\n", sqrt(sim->energy_resolution)*C_FWHM/C_KEV);
+    fprintf(f, "detector calibration offset = %.3lf keV\n", sim->det.offset/C_KEV);
+    fprintf(f, "detector calibration slope = %.5lf keV\n", sim->det.slope/C_KEV);
+    fprintf(f, "detector resolution = %.3lf keV FWHM\n", sqrt(sim->det.resolution)*C_FWHM/C_KEV);
     fprintf(f, "step for incident ions = %.3lf keV\n", sim->stop_step_incident/C_KEV);
     fprintf(f, "step for exiting ions = %.3lf keV\n", sim->stop_step_exiting/C_KEV);
     fprintf(f, "fast level = %i\n", sim->fast);
@@ -201,6 +203,6 @@ void convolute_bricks(sim_workspace *ws) {
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
-        brick_int2(r->histo, r->bricks, r->n_bricks, ws->sim.energy_resolution, ws->sim.p_sr);
+        brick_int2(r->histo, r->bricks, r->n_bricks, ws->sim.det.resolution, ws->sim.p_sr);
     }
 }

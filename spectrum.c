@@ -66,6 +66,6 @@ gsl_histogram *read_experimental_spectrum(const char *filename, size_t n) {
 void set_experimental_spectrum_calibration(gsl_histogram *h, const simulation *sim) {
     size_t i;
     for(i = 0; i < h->n + 1; i++) {
-        h->range[i] = sim->energy_offset + i*sim->energy_slope;
+        h->range[i] = detector_calibrated(&sim->det, i);
     }
 }

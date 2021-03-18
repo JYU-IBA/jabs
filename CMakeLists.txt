@@ -38,7 +38,8 @@ if(DEBUG_MODE_ENABLE)
 endif()
 
 add_executable(jabs main.c sample.c sample.h brick.c ion.c ion.h simulation.c simulation.h reaction.c reaction.h
-        layers.c layers.h options.c options.h spectrum.c spectrum.h fit.c fit.h rotate.c rotate.h jabs.c jabs.h)
+        layers.c layers.h options.c options.h spectrum.c spectrum.h fit.c fit.h rotate.c rotate.h detector.c detector.h
+        jabs.c jabs.h)
 target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
 
 target_link_libraries(jabs

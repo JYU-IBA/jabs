@@ -104,10 +104,10 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 sim->stop_step_exiting = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case '1':
-                sim->energy_slope = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                sim->det.slope = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case '2':
-                sim->energy_offset = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                sim->det.offset = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case '3':
                 sim->p_sr = strtod(optarg, NULL);
@@ -143,10 +143,10 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 sim->sample_theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 't':
-                sim->detector_theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                sim->det.theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 'p':
-                sim->detector_phi = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                sim->det.phi = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 'h':
                 fputs(COPYRIGHT_STRING, stderr);
@@ -194,8 +194,8 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 }
                 break;
             case 'R':
-                sim->energy_resolution = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg)/C_FWHM;
-                sim->energy_resolution *= sim->energy_resolution; /* square */
+                sim->det.resolution = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg)/C_FWHM;
+                sim->det.resolution *= sim->det.resolution; /* square */
                 break;
             default:
                 usage();

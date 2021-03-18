@@ -115,7 +115,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
     double theta, phi;
-    rotate(ws->sim.detector_theta, ws->sim.detector_phi, ws->sim.sample_theta, ws->sim.sample_phi, &theta, &phi); /* Detector in sample coordinate system */
+    rotate(ws->sim.det.theta, ws->sim.det.theta, ws->sim.sample_theta, ws->sim.sample_phi, &theta, &phi); /* Detector in sample coordinate system */
     double K_min = 1.0;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
@@ -158,7 +158,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         h_max = next_crossing - x;
         assert(h_max > 0.001 * C_TFU);
         double E_front = ion1.E;
-        double h = stop_step(ws, &ion1, sample, x, ws->sim.stop_step_incident == 0.0?sqrt(ws->sim.energy_resolution+K_min*(ion1.S)):ws->sim.stop_step_incident, i_range);
+        double h = stop_step(ws, &ion1, sample, x, ws->sim.stop_step_incident == 0.0?sqrt(ws->sim.det.resolution+K_min*(ion1.S)):ws->sim.stop_step_incident, i_range);
         assert(h > 0.0);
         /* DEPTH BIN [x, x+h) */
         double E_back = ion1.E;
@@ -423,18 +423,18 @@ void add_fit_params(global_options *global, simulation *sim, jibal_layer **layer
         fprintf(stderr, "Thing to fit: \"%s\"\n", token);
 #endif
         if(strcmp(token, "calib") == 0) {
-            fit_params_add_parameter(params, &sim->energy_slope); /* TODO: prevent adding already added things */
-            fit_params_add_parameter(params, &sim->energy_offset);
-            fit_params_add_parameter(params, &sim->energy_resolution);
+            fit_params_add_parameter(params, &sim->det.slope); /* TODO: prevent adding already added things */
+            fit_params_add_parameter(params, &sim->det.offset);
+            fit_params_add_parameter(params, &sim->det.resolution);
         }
         if(strcmp(token, "slope") == 0) {
-            fit_params_add_parameter(params, &sim->energy_slope);
+            fit_params_add_parameter(params, &sim->det.slope);
         }
         if(strcmp(token, "offset") == 0) {
-            fit_params_add_parameter(params, &sim->energy_offset);
+            fit_params_add_parameter(params, &sim->det.offset);
         }
         if(strcmp(token, "reso") == 0) {
-            fit_params_add_parameter(params, &sim->energy_resolution);
+            fit_params_add_parameter(params, &sim->det.resolution);
         }
         if(strcmp(token, "fluence") == 0) {
             fit_params_add_parameter(params, &sim->p_sr);
