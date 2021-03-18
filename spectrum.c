@@ -22,6 +22,8 @@ gsl_histogram *read_experimental_spectrum(const char *filename, size_t n) {
     size_t ch=0, i=0;
     double y;
     FILE *in;
+    if(!filename)
+        return NULL;
     if(strcmp(filename, "-") == 0) {
         in = stdin;
     } else {

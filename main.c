@@ -66,6 +66,10 @@ int main(int argc, char **argv) {
     gsl_histogram *exp = NULL;
     if(global.exp_filename) {
         exp = read_experimental_spectrum(global.exp_filename, 16384); /* TODO: number of channels? */
+        if(!exp) {
+            fprintf(stderr, "Error! Can not open file \"%s\".\n", global.exp_filename);
+            return EXIT_FAILURE;
+        }
         set_experimental_spectrum_calibration(exp, sim); /* TODO: this is not really used anywhere. If it is used with fits etc it needs to be updated. */
     }
 
