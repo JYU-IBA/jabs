@@ -26,5 +26,5 @@ typedef struct detector {
 } detector;
 
 inline double detector_calibrated(const detector *det, size_t ch) {return det->offset + det->slope * ch;}
-
+int detector_sanity_check(const detector *det);
 #endif //JABS_DETECTOR_H

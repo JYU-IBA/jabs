@@ -11,6 +11,7 @@
     See LICENSE.txt for the full license.
 
  */
+#include <assert.h>
 #include "simulation.h"
 #include "defaults.h"
 #include "rotate.h"
@@ -64,6 +65,14 @@ int sim_sanity_check(const simulation *sim) {
     }
     if (sim->beam_E > 1000.0*C_MEV || sim->beam_E < 10*C_KEV) {
         fprintf(stderr, "Hmm...? Check your numbers. Your energy is %.5lf MeV!\n", sim->beam_E);
+        return -1;
+    }
+    if(sim->p_sr < 0.0) {
+        fprintf(stderr, "Fluence is negative (%g).\n", sim->p_sr);
+        return -1;
+    }
+    if(detector_sanity_check(&sim->det)) {
+        fprintf(stderr, "Detector failed sanity check.\n");
         return -1;
     }
     return 0;
@@ -128,6 +137,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
                 r->n_bricks = (int) ceil(sim->beam_E / sim->stop_step_incident + sample->n_ranges); /* This is conservative */
             }
         }
+        assert(r->n_bricks > 0 && r->n_bricks < 10000);
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Number of bricks for reaction %i: %lu\n", i_reaction, r->n_bricks);
 #endif

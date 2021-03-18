@@ -109,7 +109,10 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     jibal_gsto_print_assignments(jibal->gsto);
+    jibal_gsto_print_files(jibal->gsto, 1);
     jibal_gsto_load_all(jibal->gsto);
+
+
     fprintf(stderr, "Default RBS cross section model used: %s\n", jibal_cs_rbs_name(jibal->config));
     simulation_print(stderr, sim);
     fprintf(stderr, "\nSTARTING SIMULATION... NOW! Hold your breath!\n");
@@ -155,7 +158,7 @@ int main(int argc, char **argv) {
         no_ds(ws, sample);
     }
     if(!ws) {
-        fprintf(stderr, "Simulation workspace does not exist after the simulation. This is highly unusual.\n");
+        fprintf(stderr, "ERROR! Simulation workspace does not exist after the simulation. This implies something failed spectacularly.\nNo output generated.\n");
         return EXIT_FAILURE;
     }
     print_spectra(f, &global, ws, sample, exp);

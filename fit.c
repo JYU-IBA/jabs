@@ -35,7 +35,11 @@ int func_f(const gsl_vector *x, void *params, gsl_vector * f)
     sim_workspace_free(p->ws);
     sample_free(p->sample);
     p->sample = sample_from_layers(p->layers, p->n_layers);
-    p->ws = sim_workspace_init(p->sim, p->reactions, p->sample, p->jibal); /* We intentionally "leak" this */
+    if(sim_sanity_check(p->sim)) {
+        p->ws = NULL; /* Workspace has not been allocated yet. */
+    } else {
+        p->ws = sim_workspace_init(p->sim, p->reactions, p->sample, p->jibal); /* We intentionally "leak" this */
+    }
     if(!p->ws) {
         gsl_vector_set_all(f, 0.0);
         return GSL_FAILURE;
