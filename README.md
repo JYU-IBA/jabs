@@ -37,13 +37,13 @@ Simulates RBS spectra rapidly.
 Several parameters can be set from the command line. See `jabs -h` and try something like this:
 
 ~~~~
-$ ./jabs -E 2MeV --alpha=10deg --beta=0deg --theta=170deg --out=spectrum.csv Au 500tfu SiO2 1000tfu Si 10000tfu
+$ ./jabs -E 2MeV --alpha=10deg --theta=170deg --out=spectrum.csv Au 500tfu SiO2 1000tfu Si 10000tfu
 ~~~~
 
 
 ## Fitting
 
-There is a highly experimental fitting feature too, activated with the `--fit` or `-F` option. The multidimensional nonlinear least-squares fitting is based on [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html).
+There is an experimental fitting feature too, activated with the `--fit` or `-F` option. The multidimensional nonlinear least-squares fitting is based on [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html).
 
 
 The user can currently give only a single range to fit. This is specified with `--fit_low` and `--fit_high`. Default values are 10% of highest channel and the highest channel, respectively.
