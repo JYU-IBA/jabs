@@ -60,7 +60,6 @@ void detector_print(FILE *f, const detector *det) {
     fprintf(f, "slope = %g keV\n", det->slope/C_KEV);
     fprintf(f, "offset = %g keV\n", det->offset/C_KEV);
     fprintf(f, "resolution = %g keV\n", C_FWHM*sqrt(det->resolution)/C_KEV);
-    fprintf(f, "slope = %g keV\n", det->slope/C_KEV);
     fprintf(f, "theta = %g deg\n", det->theta/C_DEG);
     fprintf(f, "phi = %g deg\n", det->phi/C_DEG);
     fprintf(f, "number = %zu\n", det->number);
