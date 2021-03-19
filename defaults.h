@@ -1,6 +1,6 @@
 #ifndef JABS_DEFAULTS_H
 #define JABS_DEFAULTS_H
-
+#include <jibal_units.h>
 
 /* Defaults for new simulations */
 #define ENERGY (2.0*C_MEV)

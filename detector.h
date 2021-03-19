@@ -22,9 +22,12 @@ typedef struct detector {
     double resolution; /* Stored as variance, i.e. energy squared (in SI-units J^2) */
     double theta; /* Polar angle [0, pi] */
     double phi; /* Azimuthal angle [0, 2pi] */
-    size_t column;
+    size_t number;
 } detector;
 
 inline double detector_calibrated(const detector *det, size_t ch) {return det->offset + det->slope * ch;}
 int detector_sanity_check(const detector *det);
+detector detector_from_file(const jibal_units *units, const char *filename);
+detector detector_default();
+void detector_print(const struct jibal_units *units, FILE *f, const detector *det);
 #endif //JABS_DETECTOR_H

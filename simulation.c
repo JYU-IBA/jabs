@@ -25,11 +25,7 @@ simulation *sim_init() {
     sim->theta = THETA;
     sim->beta = 180.0*C_DEG-THETA-ALPHA; /* Note: check if this is sane is defaults are changed. This should be (is) recalculated before running simulations. */
     sim->p_sr = PARTICLES_SR;
-    sim->det.theta = THETA;
-    sim->det.phi = 0.0;
-    sim->det.resolution = (DETECTOR_RESOLUTION*DETECTOR_RESOLUTION);
-    sim->det.slope = ENERGY_SLOPE;
-    sim->det.offset = 0.0*C_KEV;
+    sim->det = detector_default();
     sim->stop_step_incident = STOP_STEP_INCIDENT;
     sim->stop_step_exiting = STOP_STEP_EXITING;
     sim->fast = 0;

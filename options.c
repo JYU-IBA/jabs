@@ -46,6 +46,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"resolution",required_argument, NULL, 'R'},
             {"step_incident",required_argument, NULL, 'S'},
             {"step_exiting",required_argument, NULL, '0'},
+            {"detector",  required_argument, NULL, 'd'},
             {"slope",     required_argument, NULL, '1'},
             {"offset",    required_argument, NULL, '2'},
             {"fast",      optional_argument, NULL, 'f'},
@@ -74,6 +75,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Resolution of detector (FHWM of Gaussian)",
             "Incident ion step size. Zero is automatic.",
             "Exiting particle step size.",
+            "Detector file.",
             "Slope of energy calibration.",
             "Offset of energy calibration.",
             "Make things faster, but worse.",
@@ -90,7 +92,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:p:I:R:S:fe:F", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:p:I:R:S:fe:Fd:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -196,6 +198,9 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             case 'R':
                 sim->det.resolution = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg)/C_FWHM;
                 sim->det.resolution *= sim->det.resolution; /* square */
+                break;
+            case 'd':
+                sim->det = detector_from_file(global->jibal->units, optarg);
                 break;
             default:
                 usage();

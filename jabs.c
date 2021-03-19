@@ -115,7 +115,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
     double theta, phi;
-    rotate(ws->sim.det.theta, ws->sim.det.theta, ws->sim.sample_theta, ws->sim.sample_phi, &theta, &phi); /* Detector in sample coordinate system */
+    rotate(ws->sim.det.theta, ws->sim.det.phi, ws->sim.sample_theta, ws->sim.sample_phi, &theta, &phi); /* Detector in sample coordinate system */
     double K_min = 1.0;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
