@@ -15,9 +15,10 @@
 #ifndef JABS_SPECTRUM_H
 #define JABS_SPECTRUM_H
 
+#include "detector.h"
 #include "simulation.h"
 
-gsl_histogram *read_experimental_spectrum(const char *filename, size_t n);
+gsl_histogram *read_experimental_spectrum(const char *filename, const detector *det);
 void set_experimental_spectrum_calibration(gsl_histogram *h, const simulation *sim);
 
 #endif // JABS_SPECTRUM_H

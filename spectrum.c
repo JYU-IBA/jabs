@@ -16,11 +16,9 @@
 #include <string.h>
 
 
-gsl_histogram *read_experimental_spectrum(const char *filename, size_t n) {
+gsl_histogram *read_experimental_spectrum(const char *filename, const detector *det) {
     char *line=NULL;
     size_t line_size=0;
-    size_t ch=0, i=0;
-    double y;
     FILE *in;
     if(!filename)
         return NULL;
@@ -31,32 +29,82 @@ gsl_histogram *read_experimental_spectrum(const char *filename, size_t n) {
     }
     if(!in)
         return NULL;
-    gsl_histogram *h = gsl_histogram_alloc(n);
+    gsl_histogram *h = gsl_histogram_alloc(det->channels);
+    h->n = 0; /* We will calculate the real number of channels based on input. */
     size_t lineno = 0;
+    size_t n_columns = 0; /* Number of columns (largest in file) */
+    char **columns = NULL; /* Will be (re)allocated later */
+#ifdef DEBUG
+    fprintf(stderr, "Reading experimental spectrum from file %s. Detector number is %lu and it can have up to %lu channels.\n", filename, det->number, det->channels);
+#endif
     while(getline(&line, &line_size, in) > 0) {
         lineno++;
         line[strcspn(line, "\r\n")] = 0; /* Strips all kinds of newlines! */
-        if(line_size < 2)
+        if(strlen(line) >= 1 && *line == '#') /* Comment */
             continue;
-        int cols  = sscanf(line, "%lu %lf", &ch, &y);
-        if(cols == 2) {
-            if (ch >= n)
-                continue; /* Silently? */
-            h->bin[ch] = y;
-            i = ch;
-        } else if(cols == 1 && i < n) {
-            h->bin[i] = ch;
+        char *line_split = line;
+        char *col;
+        size_t n = 0; /* Number of columns on this row */
+        while ((col = strsep(&line_split, " \t")) != NULL) {
+            if(*col == '\0') /* Multiple separators are treated as one */
+                continue;
+            if(n == n_columns) {
+                n_columns++;
+#ifdef DEBUG
+                fprintf(stderr, "(Re)allocating columns. New number %lu.\n", n_columns);
+#endif
+                columns = realloc(columns, n_columns*sizeof(char *));
+                if(!columns) {
+                    break;
+                }
+            }
+            columns[n] = col;
+            n++;
+        }
+        size_t ch;
+        size_t column;
+        char *end;
+        if(det->number == 0) {
+            ch = lineno-1;
+            column = 0;
         } else {
-            fprintf(stderr, "Error while reading file \"%s\": line %lu garbled: \"%s\"", filename, lineno, line);
+            ch = strtoul(columns[0], &end, 10);
+            if(end == columns[0]) {
+                fprintf(stderr, "Error converting %s to channel number. Issue on line %lu of file %s.\n", columns[0], lineno, filename);
+                break;
+            }
+            column = det->number;
+        }
+        if(n < column) {
+            fprintf(stderr, "Not enough columns in experimental spectra on line %lu. Expected %lu, got %lu.\n", lineno, column, n);
+        }
+
+        if(ch >= det->channels) {
+            fprintf(stderr, "Channel %lu is too large for detector (%lu channels). Issue on line %lu of file %s.\n", ch, det->channels, lineno, filename);
             break;
         }
-        i++;
+        double y = strtod(columns[column], &end);
+        if(end == columns[column]) {
+            fprintf(stderr, "Error converting column %lu \"%s\" to histogram value. Issue on line %lu of file %s.\n", column, columns[column], lineno, filename);
+            break;
+        }
+        h->bin[ch] = y;
+        if(ch > h->n)
+            h->n = ch;
     }
+    if(h->n == 0) {
+        fprintf(stderr, "Experimental spectrum could be read from file \"%s\". Read %lu lines before stopping.\n", filename, lineno);
+        gsl_histogram_free(h);
+        h = NULL;
+    } else {
+        h->n++;
 #ifdef DEBUG
-    fprintf(stderr, "Read %lu lines from \"%s\", probably %lu channels. Allocation of %lu channels.\n", lineno, filename, i, n);
+        fprintf(stderr, "Read %lu lines from \"%s\", probably %lu channels. Allocation of %lu channels.\n",
+                lineno, filename, h->n, det->channels);
 #endif
-    h->n = i;
+    }
     free(line);
+    free(columns);
     if(in != stdin) {
         fclose(in);
     }

@@ -15,6 +15,7 @@
 #ifndef JABS_DETECTOR_H
 #define JABS_DETECTOR_H
 #include <ctype.h>
+#include <jibal_units.h>
 
 typedef struct detector {
     double slope;
@@ -23,11 +24,12 @@ typedef struct detector {
     double theta; /* Polar angle [0, pi] */
     double phi; /* Azimuthal angle [0, 2pi] */
     size_t number;
+    size_t channels;
 } detector;
 
 inline double detector_calibrated(const detector *det, size_t ch) {return det->offset + det->slope * ch;}
 int detector_sanity_check(const detector *det);
 detector detector_from_file(const jibal_units *units, const char *filename);
 detector detector_default();
-void detector_print(const struct jibal_units *units, FILE *f, const detector *det);
+void detector_print(FILE *f, const detector *det);
 #endif //JABS_DETECTOR_H

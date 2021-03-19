@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <jibal_config.h>
-#include <jibal_units.h>
 #include "defaults.h"
 #include "detector.h"
 extern inline double detector_calibrated(const detector *det, size_t ch);
@@ -32,6 +31,7 @@ detector detector_from_file(const jibal_units *units, const char *filename) {
             {JIBAL_CONFIG_VAR_UNIT, "theta", &det.theta,           NULL},
             {JIBAL_CONFIG_VAR_UNIT, "phi", &det.phi,               NULL},
             {JIBAL_CONFIG_VAR_INT,  "number", &det.number,         NULL},
+            {JIBAL_CONFIG_VAR_INT,  "channels", &det.channels,         NULL},
             {JIBAL_CONFIG_VAR_NONE, NULL, NULL,            NULL}
     };
     jibal_config_var_read(units, f, filename, vars);
@@ -39,7 +39,7 @@ detector detector_from_file(const jibal_units *units, const char *filename) {
     det.resolution *= det.resolution;
 #ifdef DEBUG
     fprintf(stderr, "Read detector from \"%s\":\n", filename);
-    detector_print(units, stderr, &det);
+    detector_print(stderr, &det);
 #endif
     return det;
 }
@@ -51,11 +51,12 @@ detector detector_default() {
     det.resolution = (DETECTOR_RESOLUTION*DETECTOR_RESOLUTION);
     det.slope = ENERGY_SLOPE;
     det.offset = 0.0*C_KEV;
-    det.number = 0;
+    det.number = 1; /* This implies default file format has channel numbers. Values are in the second column (number 1). */
+    det.channels = 16384;
     return det;
 }
 
-void detector_print(const struct jibal_units *units, FILE *f, const detector *det) {
+void detector_print(FILE *f, const detector *det) {
     fprintf(f, "slope = %g keV\n", det->slope/C_KEV);
     fprintf(f, "offset = %g keV\n", det->offset/C_KEV);
     fprintf(f, "resolution = %g keV\n", C_FWHM*sqrt(det->resolution)/C_KEV);

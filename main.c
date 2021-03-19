@@ -65,7 +65,7 @@ int main(int argc, char **argv) {
 
     gsl_histogram *exp = NULL;
     if(global.exp_filename) {
-        exp = read_experimental_spectrum(global.exp_filename, 16384); /* TODO: number of channels? */
+        exp = read_experimental_spectrum(global.exp_filename, &sim->det);
         if(!exp) {
             fprintf(stderr, "Error! Can not open file \"%s\".\n", global.exp_filename);
             return EXIT_FAILURE;
