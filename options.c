@@ -47,6 +47,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"step_incident",required_argument, NULL, 'S'},
             {"step_exiting",required_argument, NULL, '0'},
             {"detector",  required_argument, NULL, 'd'},
+            {"detector_out", required_argument, NULL, 'D'},
             {"slope",     required_argument, NULL, '1'},
             {"offset",    required_argument, NULL, '2'},
             {"fast",      optional_argument, NULL, 'f'},
@@ -92,7 +93,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:p:I:R:S:fe:Fd:", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:p:I:R:S:fe:Fd:D:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -201,6 +202,9 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 break;
             case 'd':
                 sim->det = detector_from_file(global->jibal->units, optarg);
+                break;
+            case 'D':
+                global->detector_out_filename = optarg;
                 break;
             default:
                 usage();

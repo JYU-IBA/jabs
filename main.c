@@ -41,7 +41,7 @@
 int main(int argc, char **argv) {
     global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0, .exp_filename = NULL,
                              .bricks_filename = NULL, .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL,
-                             .rbs = 1, .erd = 1};
+                             .rbs = 1, .erd = 1, .detector_out_filename = NULL};
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -165,6 +165,14 @@ int main(int argc, char **argv) {
 
     output_bricks(global.bricks_filename, ws);
 
+    if(global.detector_out_filename) {
+        FILE *f_det;
+        if((f_det = fopen(global.detector_out_filename, "w"))) {
+            detector_print(f_det, &ws->sim.det);
+        } else {
+            fprintf(stderr, "Could not write detector to file \"%s\".\n", global.detector_out_filename);
+        }
+    }
     sim_workspace_free(ws);
     end = clock();
     double cputime_total =(((double) (end - start)) / CLOCKS_PER_SEC);
