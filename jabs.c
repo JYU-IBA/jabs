@@ -409,7 +409,7 @@ void print_spectra(FILE *f, const global_options *global, const sim_workspace *w
     }
 }
 
-void add_fit_params(global_options *global, simulation *sim, jibal_layer **layers, const int n_layers, fit_params *params) {
+void add_fit_params(global_options *global, simulation *sim, jibal_layer **layers, const size_t n_layers, fit_params *params) {
 #ifdef DEBUG
     fprintf(stderr, "fitvars = %s\n", global->fit_vars);
 #endif
@@ -440,11 +440,19 @@ void add_fit_params(global_options *global, simulation *sim, jibal_layer **layer
             fit_params_add_parameter(params, &sim->p_sr);
         }
         if(strncmp(token, "thickness", 9) == 0 && strlen(token) > 9) {
-            int i_layer = atoi(token+9);
+            size_t i_layer = strtoul(token+9, NULL, 10);
             if(i_layer >= 1 && i_layer <= n_layers) {
                 fit_params_add_parameter(params, &layers[i_layer-1]->thickness);
             } else {
-                fprintf(stderr, "No layer %i (parsed from \"%s\")\n", i_layer, token);
+                fprintf(stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
+            }
+        }
+        size_t i,j;
+        if(sscanf(token, "conc%lu_%lu", &i, &j) == 2) {
+            if (i >= 1 && i <= n_layers && j >= 1  && j <= layers[i]->material->n_elements) {
+                fit_params_add_parameter(params, &layers[i-1]->material->concs[j-1]);
+            } else {
+                fprintf(stderr, "No element %lu in layer %lu\n", j, i);
             }
         }
     }
