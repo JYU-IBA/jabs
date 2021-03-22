@@ -24,6 +24,7 @@ typedef struct {
     int fit;
     int fit_low;
     int fit_high;
+    int print_isotopes;
     char *out_filename;
     char *exp_filename;
     char *bricks_filename;

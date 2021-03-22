@@ -32,11 +32,14 @@ int get_concs(const sample *s, double x, double *out, size_t *range_hint);
 size_t get_range_bin(const sample *s, double x, size_t *range_hint);
 
 sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers);
-void sample_print(FILE *f, const sample *sample);
+void sample_print(FILE *f, const sample *sample, int print_isotopes); /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
 void sample_free(sample *sample);
 double sample_isotope_max_depth(const sample *sample, int i_isotope);
 inline double *sample_conc_bin(const sample *s, int i_range, int i_isotope) {
     return s->cbins + i_range * s->n_isotopes + i_isotope;
 }
+
+void sample_sort_isotopes(sample *sample); /* Sort isotopes. Note that you can screw up concentrations tables if you call this at the wrong time! */
+int isotope_compar(const void *, const void *); /* compares jibal_isotopes */
 
 #endif /* JABS_SAMPLE_H */

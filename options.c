@@ -14,6 +14,7 @@
 
 #include <getopt.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "version.h"
 #include "options.h"
@@ -33,33 +34,34 @@ void usage() {
 
 void read_options(global_options *global, simulation *sim, int *argc, char ***argv) {
     static struct option long_options[] = {
-            {"help",      no_argument,       NULL, 'h'},
-            {"version",   no_argument,       NULL, 'V'},
-            {"verbose",   optional_argument, NULL, 'v'},
-            {"out",       required_argument, NULL, 'o'},
-            {"ion",       required_argument, NULL, 'I'},
-            {"energy",    required_argument, NULL, 'E'},
-            {"alpha",     required_argument, NULL, 'a'},
-            {"theta",     required_argument, NULL, 't'},
-            {"phi",       required_argument, NULL, 'p'},
-            {"fluence",   required_argument, NULL, '3'},
-            {"resolution",required_argument, NULL, 'R'},
-            {"step_incident",required_argument, NULL, 'S'},
-            {"step_exiting",required_argument, NULL, '0'},
-            {"detector",  required_argument, NULL, 'd'},
-            {"detector_out", required_argument, NULL, 'D'},
-            {"slope",     required_argument, NULL, '1'},
-            {"offset",    required_argument, NULL, '2'},
-            {"fast",      optional_argument, NULL, 'f'},
-            {"exp",       required_argument, NULL, 'e'},
-            {"fit",        no_argument,      NULL, 'F'},
-            {"fit_low",   required_argument, NULL, '4'},
-            {"fit_high",   required_argument, NULL, '5'},
-            {"fit_vars",   required_argument, NULL, '6'},
-            {"bricks_out", required_argument, NULL, '7'},
-            {"depthsteps", required_argument, NULL, '8'},
-            {"norbs",     no_argument, NULL, '#'},
-            {"noerd",        no_argument, NULL, '9'},
+            {"help",          no_argument,       NULL, 'h'},
+            {"version",       no_argument,       NULL, 'V'},
+            {"verbose",       optional_argument, NULL, 'v'},
+            {"out",           required_argument, NULL, 'o'},
+            {"ion",           required_argument, NULL, 'I'},
+            {"energy",        required_argument, NULL, 'E'},
+            {"alpha",         required_argument, NULL, 'a'},
+            {"theta",         required_argument, NULL, 't'},
+            {"phi",           required_argument, NULL, 'p'},
+            {"fluence",       required_argument, NULL, '3'},
+            {"resolution",    required_argument, NULL, 'R'},
+            {"step_incident", required_argument, NULL, 'S'},
+            {"step_exiting",  required_argument, NULL, '0'},
+            {"detector",      required_argument, NULL, 'd'},
+            {"detector_out",  required_argument, NULL, 'D'},
+            {"slope",         required_argument, NULL, '1'},
+            {"offset",        required_argument, NULL, '2'},
+            {"fast",          optional_argument, NULL, 'f'},
+            {"exp",           required_argument, NULL, 'e'},
+            {"fit",           no_argument,       NULL, 'F'},
+            {"fit_low",       required_argument, NULL, '4'},
+            {"fit_high",      required_argument, NULL, '5'},
+            {"fit_vars",      required_argument, NULL, '6'},
+            {"bricks_out",    required_argument, NULL, '7'},
+            {"depthsteps",    required_argument, NULL, '8'},
+            {"norbs",         no_argument,       NULL, '#'},
+            {"noerd",         no_argument,       NULL, '9'},
+            {"isotopes",      no_argument,       NULL, 0},
             {NULL, 0,                NULL,   0}
     };
     static const char *help_texts[] = {
@@ -89,6 +91,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Maximum number of depth steps",
             "Don't make an RBS spectrum",
             "Don't make an ERD spectrum (ERD automatically turns on forward angles)",
+            "Print isotopes (in concentration table)",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
@@ -97,6 +100,10 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
         if (c == -1)
             break;
         switch (c) {
+            case 0:
+                if(strcmp(long_options[option_index].name, "isotopes") == 0) {
+                    global->print_isotopes = TRUE;
+                }
             case 'f':
                 if (optarg)
                     sim->fast = atoi(optarg);

@@ -87,7 +87,7 @@ sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers) {
     s->n_ranges = 2*n_layers;
     s->cranges = malloc(s->n_ranges*sizeof(double));
     size_t i_isotope, n_isotopes=0;
-    for(i = 0; i < n_layers; i++) {
+    for(i = 0; i < n_layers; i++) { /* Turn layers to point-by-point profiles first by setting the X-axis (ranges) values and counting the number of isotopes */
         const jibal_layer *layer = layers[i];
 #ifdef DEBUG
         fprintf(stderr, "Layer %lu/%lu. Thickness %g tfu\n", i+1, n_layers, layer->thickness/C_TFU);
@@ -168,7 +168,9 @@ sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers) {
     s->n_isotopes = n_isotopes;
     /* TODO: it is possible to save a bit of memory by reallocing s->cbins and s->isotopes to match the new size (n_isotopes) */
 
-    for(i_isotope = 0; i_isotope < n_isotopes; i_isotope++) {
+    sample_sort_isotopes(s); /* TODO: removing duplicates is easier after this step */
+
+    for(i_isotope = 0; i_isotope < n_isotopes; i_isotope++) { /* Now the Y-values (bins) of the point-by-point profile */
         for (i = 0; i < n_layers; i++) {
             const jibal_layer *layer = layers[i];
             for (j = 0; j < layer->material->n_elements; j++) {
@@ -191,16 +193,29 @@ sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers) {
 }
 
 
-void sample_print(FILE *f, const sample *sample) {
+void sample_print(FILE *f, const sample *sample, int print_isotopes) {
     fprintf(f, "DEPTH(tfu) ");
+    int Z = 0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
-        fprintf(f, "%8s ", sample->isotopes[i]->name);
+        if(print_isotopes) {
+            fprintf(f, "%8s ", sample->isotopes[i]->name);
+        } else if(Z != sample->isotopes[i]->Z){
+            const char *s = sample->isotopes[i]->name;
+            while(*s >= '0' && *s <= '9') {s++;} /* Skip numbers, e.g. 28Si -> Si */
+            fprintf(f, "%8s", s);
+            Z = sample->isotopes[i]->Z; /* New element */
+        }
     }
     fprintf(f, "\n");
     for (size_t i = 0; i < sample->n_ranges; i++) {
         fprintf(f, "%10.3lf", sample->cranges[i]/C_TFU);
+        double sum = 0.0;
         for (size_t j = 0; j < sample->n_isotopes; j++) {
-            fprintf(f, " %8.4lf", sample->cbins[i * sample->n_isotopes + j]*100.0);
+            sum += sample->cbins[i * sample->n_isotopes + j];
+            if (print_isotopes || j == sample->n_isotopes-1 || sample->isotopes[j]->Z != sample->isotopes[j+1]->Z) { /* Last isotope or next isotope belongs to another element, print. */
+                fprintf(f, " %8.4lf", sum * 100.0);
+                sum = 0.0;
+            }
         }
         fprintf(f, "\n");
     }
@@ -235,4 +250,18 @@ double sample_isotope_max_depth(const sample *sample, int i_isotope) {
             break;
     }
     return sample->cranges[i];
+}
+
+void sample_sort_isotopes(sample *sample) {
+    qsort(sample->isotopes, sample->n_isotopes, sizeof(jibal_isotope *), &isotope_compar);
+}
+
+int isotope_compar(const void *a, const void *b) {
+    const jibal_isotope *isotope_a = *((const jibal_isotope **)a);
+    const jibal_isotope *isotope_b = *((const jibal_isotope **)b);
+    if(isotope_a->Z == isotope_b->Z) { /* Same Z, compare by A */
+        return isotope_a->A - isotope_b->A;
+    } else {
+        return isotope_a->Z - isotope_b->Z;
+    }
 }

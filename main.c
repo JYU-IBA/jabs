@@ -39,9 +39,9 @@
 #include "jabs.h"
 
 int main(int argc, char **argv) {
-    global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = 0, .exp_filename = NULL,
+    global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = FALSE, .exp_filename = NULL,
                              .bricks_filename = NULL, .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL,
-                             .rbs = 1, .erd = 1, .detector_out_filename = NULL};
+                             .rbs = TRUE, .erd = TRUE, .detector_out_filename = NULL, .print_isotopes = FALSE};
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
     sample *sample = sample_from_layers(layers, n_layers);
     if(!sample || sample->n_isotopes == 0)
         return EXIT_FAILURE;
-    sample_print(stderr, sample);
+    sample_print(stderr, sample, global.print_isotopes);
 
     sim_calculate_geometry(sim);
     reaction *reactions = NULL;
@@ -148,7 +148,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\nFinal parameters:\n");
         simulation_print(stderr, sim);
         fprintf(stderr, "\nFinal composition:\n");
-        sample_print(stderr, fit_data.sample);
+        sample_print(stderr, fit_data.sample, global.print_isotopes);
         ws = fit_data.ws;
         fprintf(stderr,"CPU time used for actual simulation: %.3lf s.\n", fit_data.cputime_actual);
         fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_data.cputime_actual/fit_stats.n_evals);
