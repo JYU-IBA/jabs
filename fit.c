@@ -144,9 +144,9 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     }
     gsl_vector_view wts = gsl_vector_view_array(weights, fit_data->high_ch-fit_data->low_ch+1);
 
-    const double xtol = 1e-6;
-    const double gtol = 1e-6;
-    const double ftol = 1e-6;
+    const double xtol = 1e-8;
+    const double gtol = 1e-8;
+    const double ftol = 1e-8;
 
 /* allocate workspace with default parameters */
     w = gsl_multifit_nlinear_alloc (T, &fdf_params, fdf.n, fdf.p);
