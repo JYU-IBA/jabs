@@ -105,22 +105,25 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
     return h_perp; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
-void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sample *sample) {
+void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample system at depth x_0 */
     double x;
     assert(sample->n_ranges);
     double thickness = sample->cranges[sample->n_ranges-1];
     size_t i_range = 0;
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
-    double theta, phi;
+    double theta, phi; /* Generic polar and azimuth angles */
+    double scatter_theta, scatter_phi;
     rotate(ws->sim.det.theta, ws->sim.det.phi, ws->sim.sample_theta, ws->sim.sample_phi, &theta, &phi); /* Detector in sample coordinate system */
+    rotate(ws->sim.det.theta, ws->sim.det.phi, ion1.theta, ion1.phi, &scatter_theta, &scatter_phi); /* Detector in ion system */
+    rotate(scatter_theta, scatter_phi, -ws->sim.sample_theta, -ws->sim.sample_phi, &scatter_theta, &scatter_phi); /* Counter sample rotation. Detector in lab (usually). If ion was somehow "deflected" then this is the real scattering angle. Compare to sim->theta.  */
     double K_min = 1.0;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
         ion *p = &r->p;
         p->E = ion1.E * r->r->K;
         p->S = 0.0;
-        ion_set_angle(p, theta, phi);
+        ion_set_angle(p, theta, phi); /* Reaction products travel towards the detector (in the sample system), calculated above */
         r->stop = 0;
         brick *b = &r->bricks[0];
         b->E = ion1.E * r->r->K;
@@ -136,6 +139,8 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
 
 #ifdef DEBUG
     ion_print(stderr, incident);
+    fprintf(stderr, "Reaction product angles in sample system: (%g deg, %g deg)\n", theta/C_DEG, phi/C_DEG);
+    fprintf(stderr, "Detector angles in ion system: (%g deg, %g deg). Sim theta is %g deg\n", scatter_theta/C_DEG, scatter_phi/C_DEG, ws->sim.theta/C_DEG);
 #endif
     for (x = x_0; x < thickness;) {
         while (i_range < sample->n_ranges - 1 && x >= sample->cranges[i_range + 1]) {
@@ -167,12 +172,6 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
                         E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ion1.S) / C_KEV);
 #endif
-
-        //ion ion2 = *incident; /* Make a shallow copy of ion */
-        //ion_rotate(&ion2, -ws->sim.sample_theta, -ws->sim.sample_phi); /* Rotate to lab TODO: all this rotating is unnecessary, angles stay fixed */
-        //ion_rotate(&ion2, ws->sim.detector_theta, ws->sim.detector_phi); /* Rotate to detector (we can determine the scattering angle from this!) */
-
-
         for (size_t i = 0; i < ws->n_reactions; i++) {
             sim_reaction *r = &ws->reactions[i];
             if (r->stop)
@@ -182,15 +181,11 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                 continue;
             }
             brick *b = &r->bricks[i_depth];
-            //ion_set_angle(&r->p, theta_after_second, phi_after_second);
-
             r->p.E = ion1.E * r->r->K;
             r->p.S = ion1.S * r->r->K;
             b->d = x + h;
             b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
-
             assert(r->p.E > 0.0);
-
             if (x >= r->r->max_depth) {
 #ifdef DEBUG
                 fprintf(stderr, "Reaction %lu with %s stops, because maximum depth is reached at x = %.3lf tfu.\n",
@@ -200,7 +195,6 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                 r->stop = 1;
                 continue;
             }
-
             double x_out;
             size_t i_range_out = i_range;
             for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
@@ -229,10 +223,10 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                 double sigma;
                 switch (r->r->type) {
                     case REACTION_RBS:
-                        sigma = jibal_cross_section_rbs(ion1.isotope, r->r->isotope, ws->sim.theta, E_mean, ws->jibal_config->cs_rbs);
+                        sigma = jibal_cross_section_rbs(ion1.isotope, r->r->isotope, scatter_theta, E_mean, ws->jibal_config->cs_rbs);
                         break;
                     case REACTION_ERD:
-                        sigma = jibal_cross_section_erd(ion1.isotope, r->r->isotope, ws->sim.theta, E_mean, ws->jibal_config->cs_erd);
+                        sigma = jibal_cross_section_erd(ion1.isotope, r->r->isotope, scatter_theta, E_mean, ws->jibal_config->cs_erd);
                         break;
                     default:
                         sigma = 0.0;
