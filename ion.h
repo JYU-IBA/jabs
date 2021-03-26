@@ -13,7 +13,6 @@ typedef struct {
     double S;
     double mass;
     int Z;
-    //double angle; /* Traversing matter "straight on" when angle = 0, getting stuck sideways if angle = 90.0*C_DEG */
     double theta; /* polar angle. theta = 0 is along the z axis (deeper into sample, perpendicular to surface) */
     double phi; /* azimuthal angle. phi = 0 is x-axis, phi = 90deg is y-axis. */
     double cosine_theta;
@@ -22,7 +21,6 @@ typedef struct {
     double inverse_cosine_phi;
     nucl_stop_pair *nucl_stop;
     size_t nucl_stop_isotopes;
-    size_t i_range;
 } ion;
 
 void ion_reset(ion *ion);
