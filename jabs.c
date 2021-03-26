@@ -109,8 +109,6 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     double x;
     assert(sample->n_ranges);
     double thickness = sample->cranges[sample->n_ranges-1];
-    double next_crossing = sample->cranges[1];
-    double h_max;
     size_t i_range = 0;
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
@@ -146,7 +144,6 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             fprintf(stderr, "Crossing to range %lu = [%g, %g)\n", i_range, sample->cranges[i_range] / C_TFU,
                     sample->cranges[i_range + 1] / C_TFU);
 #endif
-            next_crossing = sample->cranges[i_range + 1];
         }
         if (ion1.E < ws->sim.emin) {
 #ifdef DEBUG
@@ -155,8 +152,6 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             break;
         }
 
-        h_max = next_crossing - x;
-        assert(h_max > 0.001 * C_TFU);
         double E_front = ion1.E;
         double h = stop_step(ws, &ion1, sample, x, ws->sim.stop_step_incident == 0.0?sqrt(ws->sim.det.resolution+K_min*(ion1.S)):ws->sim.stop_step_incident, i_range);
         assert(h > 0.0);
