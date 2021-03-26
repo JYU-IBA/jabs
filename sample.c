@@ -17,7 +17,56 @@
 #include "defaults.h"
 #include "sample.h"
 
+depth depth_seek(const sample *sample, double x) {
+    depth depth;
+    for(size_t i = 0; i < sample->n_ranges - 1; i++) {
+        if(x < sample->cranges[i + 1]) {
+            depth.x = x;
+            depth.i = i;
+            return depth;
+        }
+    }
+    depth.i = sample->n_ranges-1;
+    depth.x = sample->cranges[sample->n_ranges-1];
+    return depth;
+}
 
+extern inline double depth_diff(depth a, depth b);
+
+depth depth_add(const sample *sample, const depth in, double dx) {
+    depth out;
+    out.x = in.x + dx;
+    size_t i = in.i;
+    if(dx >= 0.0) {
+        while(i < sample->n_ranges - 1) {
+            if(out.x < sample->cranges[i+1]) {
+                //fprintf(stderr, "POS dx=%g tfu, %g tfu < %g tfu\n", dx/C_TFU, out.x/C_TFU, sample->cranges[i+1]/C_TFU);
+                out.i = i;
+                return out;
+            }
+            i++;
+        }
+        out.i = i;
+#ifdef DEBUG
+        if(i == sample->n_ranges-1) {
+            fprintf(stderr, "Whoop! Time for the last depth bin! X = %g tfu, last known depth %g tfu.\n", out.x/C_TFU, sample->cranges[sample->n_ranges-1]/C_TFU);
+        }
+#endif
+        return out;
+    } else { /* negative */
+        while(i > 0) {
+            if(out.x < sample->cranges[i-1]) {
+                fprintf(stderr, "NEG dx=%g tfu, %g tfu < %g tfu, i=%zu (from %zu, %g tfu)\n", dx/C_TFU, out.x/C_TFU, sample->cranges[i+1]/C_TFU, i, in.i, in.x/C_TFU);
+                out.i = i;
+                return out;
+            }
+            i--;
+        }
+        out.i = i;
+        return out;
+    }
+    /* No execution path reaches here */
+}
 extern inline double *sample_conc_bin(const sample *s, int i_range, int i_isotope);
 
 extern inline int depth_is_almost_inside(double x, double low, double high) { /* Almost is good enough for us! */
@@ -54,17 +103,25 @@ size_t get_range_bin(const sample *s, double x, size_t *range_hint) {
     return lo;
 }
 
-double get_conc(const sample *s, double x, size_t i_isotope, size_t *range_hint) {
+double get_conc(const sample *s, const depth depth, size_t i_isotope) {
     assert(i_isotope < s->n_isotopes);
-    size_t i_range = get_range_bin(s, x, range_hint);
+    size_t i_range = depth.i;
+    double x = depth.x;
+    assert(i_range < s->n_ranges-1);
+    assert(x >= s->cranges[i_range]);
+    assert(x <= s->cranges[i_range+1]);
     size_t i = i_range * s->n_isotopes + i_isotope;
     if(s->cranges[i_range+1] - s->cranges[i_range] == 0) /* Zero width. Return value of left side. */
         return s->cbins[i];
     return s->cbins[i] + ((s->cbins[i+s->n_isotopes] - s->cbins[i])/(s->cranges[i_range+1] - s->cranges[i_range])) * (x - s->cranges[i_range]);
 }
 
-int get_concs(const sample *s, double x, double *out, size_t *range_hint) {
-    size_t i_range = get_range_bin(s, x, range_hint);
+int get_concs(const sample *s, const depth depth, double *out) {
+    size_t i_range = depth.i;
+    double x = depth.x;
+    assert(i_range < s->n_ranges-1);
+    assert(x >= s->cranges[i_range]);
+    assert(x <= s->cranges[i_range+1]);
     double *bins_low = &s->cbins[i_range * s->n_isotopes];
     double *bins_high = &s->cbins[(i_range+1) * s->n_isotopes];
     if(s->cranges[i_range] == s->cranges[i_range+1]) {

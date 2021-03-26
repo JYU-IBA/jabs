@@ -154,7 +154,10 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
     }
     ws->c = calloc(sample->n_isotopes, sizeof(double));
     size_t i = 0;
-    get_concs(sample, ws->c_x, ws->c, &i);
+    depth d;
+    d.x = ws->c_x;
+    d.i = 0;
+    get_concs(sample, d, ws->c);
     return ws;
 }
 

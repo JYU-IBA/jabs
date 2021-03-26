@@ -22,6 +22,7 @@ typedef struct {
     double inverse_cosine_phi;
     nucl_stop_pair *nucl_stop;
     size_t nucl_stop_isotopes;
+    size_t i_range;
 } ion;
 
 void ion_reset(ion *ion);

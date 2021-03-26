@@ -9,10 +9,10 @@
 #include "rotate.h"
 #include "jabs.h"
 
-double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, double x, double E, size_t *range_hint) {
+double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
     double em=E/incident->mass;
     double S1 = 0.0;
-    get_concs(sample, x, ws->c, range_hint);
+    get_concs(sample, depth, ws->c);
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
         if(ws->c[i_isotope] < ABUNDANCE_THRESHOLD)
             continue;
@@ -35,32 +35,41 @@ double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample,
     return S1;
 }
 
-double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double x, double step, const size_t range_hint) {
-    double k1, k2, k3, k4, stop, dE, E;
-    double h_max_perp;
-    assert(range_hint < sample->n_ranges-1);
-    if(incident->inverse_cosine_theta < 0.0) {
-        h_max_perp = sample->cranges[range_hint] - x;
+double next_crossing(const ion *incident, const sample  *sample, depth *depth) { /* This will also update the depth to the right bin! */
+    if(incident->inverse_cosine_theta > 0) { /* Going deeper */
+        while(depth->i < sample->n_ranges - 1 && depth->x >= sample->cranges[depth->i + 1]) {
+            depth->i++;
+        }
+        assert(depth->i < sample->n_ranges - 1); /* There is a bug elsewhere in the code if you try to go this deep (deeper than last depth bin). */
+        return sample->cranges[depth->i + 1] - depth->x;
+    } else if(incident->inverse_cosine_theta < 0.0) { /* Going towards the surface */
+        while(depth->i > 0 && depth->x <= sample->cranges[depth->i]) {
+            depth->i--;
+        }
+        return sample->cranges[depth->i] - depth->x;
     } else {
-        h_max_perp = sample->cranges[range_hint + 1] - x;
-    }
-#if 0
-    if(h_max_perp != h_max_orig) {
-        fprintf(stderr, "h_max_orig = %g, h_max_perp = %g\n", h_max_orig, h_max_perp);
-    }
-#endif
-    size_t range = range_hint;
-    /* k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
-    E = incident->E;
-    k1 = stop_sample(ws, incident, sample, ws->stopping_type, x, E, &range);
-    if(k1 < 0.001*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
-#ifdef DEBUG
-        fprintf(stderr, "stop_step returns 0.0, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)\n", k1/C_EV_TFU, x/C_TFU, E/C_KEV);
-#endif
+        fprintf(stderr, "WARNING: Inverse cosine is exactly zero. This is an issue!\n");
         return 0.0;
     }
+}
+
+depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, depth depth, double step) {
+    double k1, k2, k3, k4, stop, dE, E;
+    double h_max_perp = next_crossing(incident, sample, &depth);
+#ifdef DEBUG
+    fprintf(stderr, "stop_step depth %g tfu (i=%zu) distance to next crossing %g tfu.\n", depth.x/C_TFU, depth.i, h_max_perp/C_TFU);
+#endif
+    /* k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
+    E = incident->E;
+    k1 = stop_sample(ws, incident, sample, ws->stopping_type, depth, E);
+    if(k1 < 0.001*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
+#ifdef DEBUG
+        fprintf(stderr, "stop_step returns no progress, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)\n", k1/C_EV_TFU, depth.x/C_TFU, E/C_KEV);
+#endif
+        return depth;
+    }
     double h_max = h_max_perp * incident->inverse_cosine_theta; /*  we can take bigger steps since we are going sideways. Note that inverse_cosine_theta can be negative and in this case h_max should also be negative so h_max is always positive! */
-    assert(h_max > 0.0);
+    assert(h_max >= 0.0);
     double h =  (step / k1); /* (energy) step should always be positive, as well as k1, so depth step h (not perpendicular, but "real" depth) is always positive  */
     assert(h > 0.0);
     double h_perp; /* has a sign (same as h_max_perp ) */
@@ -70,10 +79,12 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
     } else {
         h_perp = h*incident->cosine_theta; /* x + h_perp is the actual perpendicular depth */
     }
+    const struct depth halfdepth = {.x = depth.x + h_perp/2, .i = depth.i};
+    const struct depth fulldepth = {.x = depth.x + h_perp, .i = depth.i};
     if(ws->rk4) {
-        k2 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k1, &range);
-        k3 = stop_sample(ws, incident, sample, ws->stopping_type, x + (h_perp / 2.0), E - (h / 2.0) * k2, &range);
-        k4 = stop_sample(ws, incident, sample, ws->stopping_type, x + h_perp, E - h * k3, &range);
+        k2 = stop_sample(ws, incident, sample, ws->stopping_type, halfdepth, E - (h / 2.0) * k1);
+        k3 = stop_sample(ws, incident, sample, ws->stopping_type, halfdepth, E - (h / 2.0) * k2);
+        k4 = stop_sample(ws, incident, sample, ws->stopping_type, fulldepth, E - h * k3);
         stop = (k1 + 2 * k2 + 2 * k3 + k4) / 6;
     } else {
         stop = k1;
@@ -86,11 +97,11 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
 #ifdef DEBUG
     if(fabs(stop) < 0.1*C_EV_TFU) {
         fprintf(stderr, "Not good!\n");
-        return 0.0;
+        return depth;
     }
 #endif
 #ifndef STATISTICAL_STRAGGLING
-    double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, x, E + dE, &range) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
+    double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, depth, E + dE) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
 #ifdef DEBUG
     //if((s_ratio)*(s_ratio) < 0.9 || (s_ratio)*(s_ratio) > 1.1) { /* Non-statistical broadening. */
     //   fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
@@ -98,18 +109,16 @@ double stop_step(sim_workspace *ws, ion *incident, const sample *sample, double 
 #endif
     incident->S *= (s_ratio)*(s_ratio);
 #endif
-    incident->S += h* stop_sample(ws, incident, sample, GSTO_STO_STRAGG, x + (h_perp / 2.0), (E + dE / 2), &range); /* Straggling, calculate at mid-energy */
+    incident->S += h* stop_sample(ws, incident, sample, GSTO_STO_STRAGG, halfdepth, (E + dE / 2)); /* Straggling, calculate at mid-energy */
 
     assert(isnormal(incident->S));
     incident->E += dE;
-    return h_perp; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
+    return fulldepth; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
 void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample system at depth x_0 */
-    double x;
     assert(sample->n_ranges);
     double thickness = sample->cranges[sample->n_ranges-1];
-    size_t i_range = 0;
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
     double theta, phi; /* Generic polar and azimuth angles */
@@ -118,6 +127,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     rotate(ws->sim.det.theta, ws->sim.det.phi, ion1.theta, ion1.phi, &scatter_theta, &scatter_phi); /* Detector in ion system */
     rotate(scatter_theta, scatter_phi, -ws->sim.sample_theta, -ws->sim.sample_phi, &scatter_theta, &scatter_phi); /* Counter sample rotation. Detector in lab (usually). If ion was somehow "deflected" then this is the real scattering angle. Compare to sim->theta.  */
     double K_min = 1.0;
+    depth d_before = depth_seek(sample, x_0);
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
         ion *p = &r->p;
@@ -128,7 +138,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         brick *b = &r->bricks[0];
         b->E = ion1.E * r->r->K;
         b->S = 0.0;
-        b->d = 0.0;
+        b->d = d_before;
         b->Q = 0.0;
         b->E_0 = ion1.E;
         if(r->r->K < K_min)
@@ -142,24 +152,24 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     fprintf(stderr, "Reaction product angles in sample system: (%g deg, %g deg)\n", theta/C_DEG, phi/C_DEG);
     fprintf(stderr, "Detector angles in ion system: (%g deg, %g deg). Sim theta is %g deg\n", scatter_theta/C_DEG, scatter_phi/C_DEG, ws->sim.theta/C_DEG);
 #endif
-    for (x = x_0; x < thickness;) {
-        while (i_range < sample->n_ranges - 1 && x >= sample->cranges[i_range + 1]) {
-            i_range++;
-#ifdef DEBUG
-            fprintf(stderr, "Crossing to range %lu = [%g, %g)\n", i_range, sample->cranges[i_range] / C_TFU,
-                    sample->cranges[i_range + 1] / C_TFU);
-#endif
-        }
+    while(d_before.x < thickness) {
         if (ion1.E < ws->sim.emin) {
 #ifdef DEBUG
-            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %lu.\n", ion1.E/C_KEV, ws->sim.emin/C_KEV, x/C_TFU, i_range);
+            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %lu.\n", ion1.E/C_KEV, ws->sim.emin/C_KEV, d_before.x/C_TFU, d_before.i);
 #endif
             break;
         }
 
         double E_front = ion1.E;
-        double h = stop_step(ws, &ion1, sample, x, ws->sim.stop_step_incident == 0.0?sqrt(ws->sim.det.resolution+K_min*(ion1.S)):ws->sim.stop_step_incident, i_range);
-        assert(h > 0.0);
+        depth d_after = stop_step(ws, &ion1, sample, d_before, ws->sim.stop_step_incident == 0.0?sqrt(ws->sim.det.resolution+K_min*(ion1.S)):ws->sim.stop_step_incident);
+#ifdef DEBUG
+        fprintf(stderr, "After:  %g tfu in range %zu\n", d_after.x/C_TFU, d_after.i);
+#endif
+        if(d_after.x == d_before.x) {
+            fprintf(stderr, "Error: no progress was made (E = %g keV, depth = %g tfu), check stopping.\n", ion1.E/C_KEV, d_before.x/C_TFU);
+            break;
+        }
+        const depth d_halfdepth = {.x = (d_before.x + d_after.x)/2.0, .i = d_after.i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         /* DEPTH BIN [x, x+h) */
         double E_back = ion1.E;
 #ifdef DEBUG_VERBOSE
@@ -177,46 +187,50 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             if (r->stop)
                 continue;
             if (i_depth >= r->n_bricks) {
+                fprintf(stderr, "Too many bricks. Data partial.\n");
                 r->stop = 1;
                 continue;
             }
             brick *b = &r->bricks[i_depth];
             r->p.E = ion1.E * r->r->K;
             r->p.S = ion1.S * r->r->K;
-            b->d = x + h;
+            b->d = d_after;
             b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
             assert(r->p.E > 0.0);
-            if (x >= r->r->max_depth) {
+            if (d_before.x >= r->r->max_depth) {
 #ifdef DEBUG
                 fprintf(stderr, "Reaction %lu with %s stops, because maximum depth is reached at x = %.3lf tfu.\n",
-                        i, r->r->isotope->name, x / C_TFU); /* TODO: give reactions a name */
+                        i, r->r->isotope->name, d_before.x / C_TFU); /* TODO: give reactions a name */
 #endif
                 b->Q = -1.0;
                 r->stop = 1;
                 continue;
             }
-            double x_out;
-            size_t i_range_out = i_range;
-            for (x_out = x + h; x_out > 0.0;) { /* Calculate energy and straggling of backside of slab */
-                double h_out = stop_step(ws, &r->p, sample, x_out, ws->sim.stop_step_exiting == 0.0?r->p.E*0.1+sqrt(r->p.S):ws->sim.stop_step_exiting, i_range_out); /* TODO: 10% of energy plus straggling is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
-                x_out += h_out;
-                if (r->p.E < ws->sim.emin) {
+            depth d = d_after;
+            depth d_exit;
+#ifdef DEBUG
+            fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->isotope->name);
+#endif
+            while(1) {
+#ifdef DEBUG
+                fprintf(stderr, "  Exiting... depth = %g tfu (i = %zu)\n", d.x, d.i);
+#endif
+                d_exit = stop_step(ws, &r->p, sample, d, ws->sim.stop_step_exiting == 0.0?r->p.E*0.1+sqrt(r->p.S):ws->sim.stop_step_exiting); /* TODO: 10% of energy plus straggling is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
+                if(r->p.E < ws->sim.emin) {
 #ifdef DEBUG
                     fprintf(stderr,
-                            "Reaction %lu with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
-                            i, r->r->isotope->name, (x + h) / C_TFU);
+                            "  Reaction %lu with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
+                            i, r->r->isotope->name, d_after.x / C_TFU);
 #endif
                     break;
                 }
-                assert(h_out < 0.0);
-                while (i_range_out > 0 && x_out <= sample->cranges[i_range_out]) {
-                    i_range_out--;
-#ifdef DEBUG_VERBOSE
-                    fprintf(stderr, "Outgoing from reaction %i crossing to range %i = [%g, %g) when x_out = %g tfu.\n", i_reaction, i_range_out, sample->cranges[i_range_out]/C_TFU, sample->cranges[i_range_out+1]/C_TFU, x_out/C_TFU);
-#endif
+                assert(d_exit.x < d.x /*|| (d_exit.x == d.x && d_exit.i != d.i)*/); /* Going towards the surface */
+                if(d_exit.x <= 0.0) {
+                    break;
                 }
+                d = d_exit;
             }
-            double c = get_conc(sample, x + (h / 2.0), r->r->i_isotope, &i_range); /* TODO: x+h/2.0 is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
+            double c = get_conc(sample, d_halfdepth, r->r->i_isotope); /* TODO: concentration at half depth (x+step/2.0) is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
             if (c > ABUNDANCE_THRESHOLD && r->p.E > ws->sim.emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
@@ -231,10 +245,10 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                     default:
                         sigma = 0.0;
                 }
-                double Q = c * fabs(incident->inverse_cosine_theta) * sigma * h; /* TODO: worst possible approximation... */ /* Note that ion is not the same as incident anymore. Incident has the original angles. */
+                double Q = c * fabs(incident->inverse_cosine_theta) * sigma * depth_diff(d_before, d_after); /* TODO: worst possible approximation... */ /* Note that ion is not the same as incident anymore. Incident has the original angles. */
 #ifdef DEBUG
-                fprintf(stderr, "    %s: type=%i, E_mean = %.3lf, E_after = %.3lf, E_out = %.3lf (sigma = %g mb/sr, Q = %g (c = %.4lf%%)\n",
-                                 r->r->isotope->name, r->r->type, E_mean/C_KEV, (ion1.E * r->r->K)/C_KEV, r->p.E/C_KEV, sigma/C_MB_SR, Q, c*100.0);
+                fprintf(stderr, "    %s: type=%i, E_mean = %.3lf, E_after = %.3lf, E_out = %.3lf (sigma = %g mb/sr, Q = %g (c = %.4lf%%, thickness = %.4lf tfu)\n",
+                                 r->r->isotope->name, r->r->type, E_mean/C_KEV, (ion1.E * r->r->K)/C_KEV, r->p.E/C_KEV, sigma/C_MB_SR, Q, c*100.0, depth_diff(d_before, d_after)/C_TFU);
 #endif
                 assert(sigma > 0.0);
                 assert(r->p.S > 0.0);
@@ -245,18 +259,21 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                 if (r->p.E < ws->sim.emin) {
                     r->stop = 1;
                     r->bricks[i_depth].Q = -1.0;
+#ifdef DEBUG
+                    fprintf(stderr, "This was last depth for this reaction (and it didn't count anymore)\n");
+#endif
                 } else {
                     b->Q = 0.0;
                 }
             }
         }
-        x += h;
+        d_before = d_after;
         ion1.S = S_back;
         ion1.E = E_back;
         i_depth++;
     }
 #ifdef DEBUG
-    fprintf(stderr, "Last depth bin %lu\n", i_depth);
+    fprintf(stderr, "Last depth bin (brick) i_depth = %lu\n", i_depth);
 #endif
     for (size_t i = 0; i < ws->n_reactions; i++) {
         if (ws->reactions[i].stop)
@@ -467,7 +484,7 @@ void output_bricks(const char *filename, const sim_workspace *ws) {
             if(b->Q < 0.0)
                 break;
             fprintf(f, "%2lu %2lu %8.3lf %8.3lf %8.3lf %8.3lf %12.3lf\n",
-                    i, j, b->d/C_TFU, b->E_0/C_KEV, b->E/C_KEV, sqrt(b->S)/C_KEV, b->Q * ws->sim.p_sr);
+                    i, j, b->d.x/C_TFU, b->E_0/C_KEV, b->E/C_KEV, sqrt(b->S)/C_KEV, b->Q * ws->sim.p_sr);
         }
         fprintf(f, "\n\n");
     }
@@ -484,19 +501,12 @@ void no_ds(sim_workspace *ws, const sample *sample) {
 }
 
 void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is more pseudocode at this stage... */
-    double thickness = sample->cranges[sample->n_ranges-1];
-    /* Go deeper */
-    double x;
     ion_set_angle(&ws->ion, 0.0, 0.0);
     ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
     ion ion1 = ws->ion;
-    size_t i_range = 0;
-    for(x = 0.0; x < thickness;) {
-        /* Go deeper and at every step start making new spectra. */
-        while (i_range < sample->n_ranges - 1 && x >= sample->cranges[i_range + 1]) {
-            i_range++;
-        }
-        double h = stop_step(ws, &ws->ion, sample, x, ws->sim.stop_step_incident, i_range);
+    depth d = depth_seek(sample, 0.0);
+    while(1) {
+        depth d_after = stop_step(ws, &ws->ion, sample, d, ws->sim.stop_step_incident);
         ion ion2 = ion1;
 
         int i_ds;
@@ -511,11 +521,13 @@ void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is mo
             /*TODO: is this correct ?*/
 
             /* TODO: reset/init ws? */
-            simulate(&ion2, x, ws, sample); /*
+            simulate(&ion2, d.x, ws, sample); /* d.x or d_after.x?
  * TODO: simulate() cannot handle something that goes towards the surface. Improve stop_step() to handle both cases and remove i_range magic from elsewhere.
  * TODO: ion_rotate(ion, -ds_polar, -ds_azi); aka Undo scattering rotation. Is simulate() able to figure out where the detector is? */
             convolute_bricks(ws); /* TODO: does this work */
         }
-        x += h;
+        if(depth_diff(d,d_after) == 0.0)
+            break;
+        d = d_after;
     }
 }

@@ -27,8 +27,18 @@ typedef struct {
     double *cbins; /* 2D-table: size is n_isotopes * n_ranges  */
 } sample;
 
-double get_conc(const sample *s, double x, size_t i_isotope, size_t *range_hint);
-int get_concs(const sample *s, double x, double *out, size_t *range_hint);
+typedef struct depth {
+    double x;
+    size_t i; /* index in sample */
+} depth;
+
+depth depth_seek(const sample *sample, double x);
+inline double depth_diff(const depth a, const depth b) {
+    return b.x - a.x;
+}
+depth depth_add(const sample *sample, depth in, double dx); /* Create a new depth by adding (or substracting, if negative) thickness to depth "in") */
+double get_conc(const sample *s, depth depth, size_t i_isotope);
+int get_concs(const sample *s, depth depth, double *out);
 size_t get_range_bin(const sample *s, double x, size_t *range_hint);
 
 sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers);

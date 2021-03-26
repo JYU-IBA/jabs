@@ -2,9 +2,10 @@
 #define JABS_BRICK_H
 
 #include <gsl/gsl_histogram.h>
+#include "sample.h"
 
 typedef struct {
-    double d; /* Depth (this is same for all bricks in the simulation) */
+    depth d;
     double E_0;
     double E; /* Energy */
     double S; /* Straggling (variance) */
