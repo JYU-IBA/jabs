@@ -67,7 +67,7 @@ depth depth_add(const sample *sample, const depth in, double dx) {
     }
     /* No execution path reaches here */
 }
-extern inline double *sample_conc_bin(const sample *s, int i_range, int i_isotope);
+extern inline double *sample_conc_bin(const sample *s, size_t i_range, size_t i_isotope);
 
 extern inline int depth_is_almost_inside(double x, double low, double high) { /* Almost is good enough for us! */
     static const double abs_tol = DEPTH_TOLERANCE; /* we consider x to be in range [low, high] with this tolerance */
@@ -249,23 +249,39 @@ sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers) {
     return s;
 }
 
+void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes) {
+    fprintf(f, "AREAL D(tfu)");
+    double sum = 0.0;
+    for (size_t i = 0; i < sample->n_isotopes; i++) {
+        for (size_t j = 1; j < sample->n_ranges; j++) {
+            double thickness = (sample->cranges[j] - sample->cranges[j-1]);
+            sum += 0.5 * ( *(sample_conc_bin(sample, j, i)) + *(sample_conc_bin(sample, j-1, i))) * thickness;
+        }
+        if (print_isotopes || i == sample->n_isotopes-1 || sample->isotopes[i]->Z != sample->isotopes[i+1]->Z) {
+            fprintf(f, " %8.2lf", sum/C_TFU);
+            sum = 0.0;
+        }
+    }
+    fprintf(f, "\n");
+}
+
 
 void sample_print(FILE *f, const sample *sample, int print_isotopes) {
-    fprintf(f, "DEPTH(tfu) ");
+    fprintf(f, "  DEPTH(tfu)");
     int Z = 0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         if(print_isotopes) {
-            fprintf(f, "%8s ", sample->isotopes[i]->name);
+            fprintf(f, " %8s", sample->isotopes[i]->name);
         } else if(Z != sample->isotopes[i]->Z){
             const char *s = sample->isotopes[i]->name;
             while(*s >= '0' && *s <= '9') {s++;} /* Skip numbers, e.g. 28Si -> Si */
-            fprintf(f, "%8s", s);
+            fprintf(f, " %8s", s);
             Z = sample->isotopes[i]->Z; /* New element */
         }
     }
     fprintf(f, "\n");
     for (size_t i = 0; i < sample->n_ranges; i++) {
-        fprintf(f, "%10.3lf", sample->cranges[i]/C_TFU);
+        fprintf(f, "%12.3lf", sample->cranges[i]/C_TFU);
         double sum = 0.0;
         for (size_t j = 0; j < sample->n_isotopes; j++) {
             sum += sample->cbins[i * sample->n_isotopes + j];

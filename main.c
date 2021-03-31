@@ -148,6 +148,7 @@ int main(int argc, char **argv) {
         simulation_print(stderr, sim);
         fprintf(stderr, "\nFinal composition:\n");
         sample_print(stderr, fit_data.sample, global.print_isotopes);
+        sample_areal_densities_print(stderr, fit_data.sample, global.print_isotopes);
         ws = fit_data.ws;
         fprintf(stderr,"CPU time used for actual simulation: %.3lf s.\n", fit_data.cputime_actual);
         fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_data.cputime_actual/fit_stats.n_evals);
