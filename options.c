@@ -51,6 +51,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"detector_out",  required_argument, NULL, 'D'},
             {"slope",         required_argument, NULL, '1'},
             {"offset",        required_argument, NULL, '2'},
+            {"compress",      required_argument, NULL, 'c'},
             {"fast",          optional_argument, NULL, 'f'},
             {"exp",           required_argument, NULL, 'e'},
             {"fit",           no_argument,       NULL, 'F'},
@@ -79,8 +80,10 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Incident ion step size. Zero is automatic.",
             "Exiting particle step size.",
             "Detector file.",
+            "Detector file (output).",
             "Slope of energy calibration.",
             "Offset of energy calibration.",
+            "Compress channels in spectra by an integer factor.",
             "Make things faster, but worse.",
             "Load experimental spectrum from file.",
             "Fit",
@@ -96,7 +99,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:p:I:R:S:fe:Fd:D:", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:p:I:R:S:fe:Fd:D:c:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -118,6 +121,9 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 break;
             case '2':
                 sim->det.offset = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                break;
+            case 'c':
+                sim->det.compress = atoi(optarg);
                 break;
             case '3':
                 sim->p_sr = strtod(optarg, NULL);
