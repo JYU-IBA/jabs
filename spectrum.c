@@ -30,6 +30,7 @@ gsl_histogram *read_experimental_spectrum(const char *filename, const detector *
     if(!in)
         return NULL;
     gsl_histogram *h = gsl_histogram_alloc(det->channels);
+    gsl_histogram_reset(h);
     h->n = 0; /* We will calculate the real number of channels based on input. */
     size_t lineno = 0;
     size_t n_columns = 0; /* Number of columns (largest in file) */
@@ -89,7 +90,7 @@ gsl_histogram *read_experimental_spectrum(const char *filename, const detector *
             fprintf(stderr, "Error converting column %lu \"%s\" to histogram value. Issue on line %lu of file %s.\n", column, columns[column], lineno, filename);
             break;
         }
-        h->bin[ch] = y;
+        h->bin[ch] += y;
         if(ch > h->n)
             h->n = ch;
     }
