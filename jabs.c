@@ -377,7 +377,7 @@ void print_spectra(FILE *f, const global_options *global, const sim_workspace *w
             sep = ','; /* and set the separator! */
             fprintf(f, "\"Channel\",\"Simulated\"");
             if(exp) {
-                fprintf(f, ",\"Experimental\"");
+                fprintf(f, ",\"Experimental\",\"Energy (keV)\"");
             }
             for(size_t j = 0; j < ws->n_reactions; j++) {
                 const reaction *r = ws->reactions[j].r;
@@ -403,6 +403,7 @@ void print_spectra(FILE *f, const global_options *global, const sim_workspace *w
             } else {
                 fprintf(f, "%c0", sep);
             }
+            fprintf(f,"%c%g", sep, exp->range[i]/C_KEV);
         }
         for (size_t j = 0; j < ws->n_reactions; j++) {
             if(i >= ws->reactions[j].histo->n || ws->reactions[j].histo->bin[i] == 0.0) {

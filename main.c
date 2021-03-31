@@ -70,7 +70,6 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Error! Can not open file \"%s\".\n", global.exp_filename);
             return EXIT_FAILURE;
         }
-        set_experimental_spectrum_calibration(exp, sim); /* TODO: this is not really used anywhere. If it is used with fits etc it needs to be updated. */
     }
 
     FILE *f;
@@ -160,6 +159,9 @@ int main(int argc, char **argv) {
     if(!ws) {
         fprintf(stderr, "ERROR! Simulation workspace does not exist after the simulation. This implies something failed spectacularly.\nNo output generated.\n");
         return EXIT_FAILURE;
+    }
+    if(exp) {
+        set_spectrum_calibration(exp, &ws->sim.det); /* Update the experimental spectra to final calibration */
     }
     print_spectra(f, &global, ws, sample, exp);
 

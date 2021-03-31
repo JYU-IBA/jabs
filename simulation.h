@@ -78,7 +78,7 @@ void sim_calculate_geometry(simulation *sim);
 int sim_sanity_check(const simulation *sim);
 sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactions, const sample *sample, const jibal *jibal);
 void sim_workspace_free(sim_workspace *ws);
-void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *sim);
+void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);
 void simulation_print(FILE *f, const simulation *sim);
 void convolute_bricks(sim_workspace *ws);
 #endif // JABS_SIMULATION_H

@@ -15,6 +15,7 @@
 #include "simulation.h"
 #include "defaults.h"
 #include "rotate.h"
+#include "spectrum.h"
 
 simulation *sim_init() {
     simulation *sim = malloc(sizeof(simulation));
@@ -112,7 +113,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
         ws->rk4 = 1;
         ws->nucl_stop_accurate = 1;
     }
-    sim_workspace_recalculate_calibration(ws, sim);
+    sim_workspace_recalculate_n_channels(ws, sim);
 
     if(ws->n_channels == 0) {
         free(ws);
@@ -138,9 +139,8 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
         fprintf(stderr, "Number of bricks for reaction %i: %lu\n", i_reaction, r->n_bricks);
 #endif
         r->histo = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
-        gsl_histogram_set_ranges_uniform(r->histo,
-                                         detector_calibrated(&sim->det, 0),
-                                         detector_calibrated(&sim->det, ws->n_channels));
+        set_spectrum_calibration(r->histo, &ws->sim.det);
+        gsl_histogram_reset(r->histo);
         r->bricks = calloc(r->n_bricks, sizeof(brick));
         if(r->r->type == REACTION_RBS) {
             ion_set_isotope(p, ws->ion.isotope);
@@ -179,11 +179,13 @@ void sim_workspace_free(sim_workspace *ws) {
     free(ws);
 }
 
-void sim_workspace_recalculate_calibration(sim_workspace *ws, const simulation *sim) {
-    ws->n_channels = ceil((1.1 * sim->beam_E - sim->det.offset) / sim->det.slope);
-    if(ws->n_channels > 100000) {
-        ws->n_channels = 0;
-    }
+void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim) { /* TODO: assumes calibration function is increasing */
+    size_t i=0;
+    while(detector_calibrated(&sim->det, i) < 1.1*sim->beam_E) {i++;}
+#ifdef DEBUG
+    fprintf(stderr, "Simulating %i channels\n", i);
+#endif
+    ws->n_channels = i;
 }
 
 void simulation_print(FILE *f, const simulation *sim) {

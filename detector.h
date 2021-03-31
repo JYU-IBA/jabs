@@ -25,9 +25,10 @@ typedef struct detector {
     double phi; /* Azimuthal angle [0, 2pi] */
     size_t number;
     size_t channels;
+    size_t compress;
 } detector;
 
-inline double detector_calibrated(const detector *det, size_t ch) {return det->offset + det->slope * ch;}
+inline double detector_calibrated(const detector *det, size_t ch) {return det->offset + det->slope * (unsigned int)(ch*det->compress);}
 int detector_sanity_check(const detector *det);
 detector detector_from_file(const jibal_units *units, const char *filename);
 detector detector_default();

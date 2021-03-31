@@ -32,6 +32,7 @@ detector detector_from_file(const jibal_units *units, const char *filename) {
             {JIBAL_CONFIG_VAR_UNIT, "phi", &det.phi,               NULL},
             {JIBAL_CONFIG_VAR_INT,  "number", &det.number,         NULL},
             {JIBAL_CONFIG_VAR_INT,  "channels", &det.channels,         NULL},
+            {JIBAL_CONFIG_VAR_INT,  "compress", &det.compress,         NULL},
             {JIBAL_CONFIG_VAR_NONE, NULL, NULL,            NULL}
     };
     jibal_config_var_read(units, f, filename, vars);
@@ -53,6 +54,7 @@ detector detector_default() {
     det.offset = 0.0*C_KEV;
     det.number = 1; /* This implies default file format has channel numbers. Values are in the second column (number 1). */
     det.channels = 16384;
+    det.compress = 1;
     return det;
 }
 

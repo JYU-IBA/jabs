@@ -83,6 +83,7 @@ gsl_histogram *read_experimental_spectrum(const char *filename, const detector *
             fprintf(stderr, "Channel %lu is too large for detector (%lu channels). Issue on line %lu of file %s.\n", ch, det->channels, lineno, filename);
             break;
         }
+        ch /= det->compress;
         double y = strtod(columns[column], &end);
         if(end == columns[column]) {
             fprintf(stderr, "Error converting column %lu \"%s\" to histogram value. Issue on line %lu of file %s.\n", column, columns[column], lineno, filename);
@@ -111,9 +112,8 @@ gsl_histogram *read_experimental_spectrum(const char *filename, const detector *
     return h;
 }
 
-void set_experimental_spectrum_calibration(gsl_histogram *h, const simulation *sim) {
-    size_t i;
-    for(i = 0; i < h->n + 1; i++) {
-        h->range[i] = detector_calibrated(&sim->det, i);
+void set_spectrum_calibration(gsl_histogram *h, const detector *det) {
+    for(size_t i = 0; i < h->n + 1; i++) {
+        h->range[i] = detector_calibrated(det, i);
     }
 }
