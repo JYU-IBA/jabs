@@ -42,6 +42,7 @@ typedef struct {
     int ds_steps_azi;
     int ds_steps_polar;
     int n_ds;
+    double channeling; /* a very ad-hoc channeling yield correction */
 } simulation;
 
 typedef struct {

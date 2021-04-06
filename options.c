@@ -63,6 +63,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"norbs",         no_argument,       NULL, '#'},
             {"noerd",         no_argument,       NULL, '9'},
             {"isotopes",      no_argument,       NULL, 0},
+            {"channeling",    required_argument, NULL, 'C'},
             {NULL, 0,                NULL,   0}
     };
     static const char *help_texts[] = {
@@ -95,11 +96,12 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Don't make an RBS spectrum",
             "Don't make an ERD spectrum (ERD automatically turns on forward angles)",
             "Print isotopes (in concentration table)",
+            "Ad-hoc substrate channeling yield correction",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:p:I:R:S:fe:Fd:D:c:", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:p:I:R:S:fe:Fd:D:c:C:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -124,6 +126,9 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 break;
             case 'c':
                 sim->det.compress = atoi(optarg);
+                break;
+            case 'C':
+                sim->channeling = strtod(optarg, NULL);
                 break;
             case '3':
                 sim->p_sr = strtod(optarg, NULL);

@@ -231,6 +231,9 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                 d = d_exit;
             }
             double c = get_conc(sample, d_halfdepth, r->r->i_isotope); /* TODO: concentration at half depth (x+step/2.0) is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
+            if(d_halfdepth.i == sample->n_ranges-2) {
+                c *= ws->sim.channeling;
+            }
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
             if (c > ABUNDANCE_THRESHOLD && r->p.E > ws->sim.emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
@@ -445,6 +448,9 @@ void add_fit_params(global_options *global, simulation *sim, jibal_layer **layer
         }
         if(strcmp(token, "fluence") == 0) {
             fit_params_add_parameter(params, &sim->p_sr);
+        }
+        if(strcmp(token, "channeling") == 0) {
+            fit_params_add_parameter(params, &sim->channeling);
         }
         if(strncmp(token, "thickness", 9) == 0 && strlen(token) > 9) {
             size_t i_layer = strtoul(token+9, NULL, 10);

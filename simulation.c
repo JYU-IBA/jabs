@@ -39,6 +39,7 @@ simulation *sim_init() {
     sim->ds_steps_polar = 10;
     sim->ds_steps_azi = 12;
     sim->n_ds = sim->ds_steps_polar * sim->ds_steps_azi;
+    sim->channeling = 1.0;
     return sim;
 }
 
@@ -66,6 +67,10 @@ int sim_sanity_check(const simulation *sim) {
     }
     if(sim->p_sr < 0.0) {
         fprintf(stderr, "Fluence is negative (%g).\n", sim->p_sr);
+        return -1;
+    }
+    if(sim->channeling > 1.0) {
+        fprintf(stderr, "Channeling correction is above 1.0 (%g)\n", sim->channeling);
         return -1;
     }
     if(detector_sanity_check(&sim->det)) {
@@ -201,6 +206,9 @@ void simulation_print(FILE *f, const simulation *sim) {
     fprintf(f, "step for incident ions = %.3lf keV\n", sim->stop_step_incident/C_KEV);
     fprintf(f, "step for exiting ions = %.3lf keV\n", sim->stop_step_exiting/C_KEV);
     fprintf(f, "fast level = %i\n", sim->fast);
+    if(sim->channeling != 1.0) {
+        fprintf(f, "substrate channeling yield correction = %.5lf\n", sim->channeling);
+    }
 }
 
 void convolute_bricks(sim_workspace *ws) {
