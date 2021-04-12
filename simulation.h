@@ -52,6 +52,7 @@ typedef struct {
     brick *bricks;
     size_t n_bricks;
     int stop;
+    double max_depth;
 } sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
 
 

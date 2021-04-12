@@ -17,8 +17,8 @@
 void reactions_print(FILE *f, const reaction *reactions) {
     int i = 1;
     for (const reaction *r = reactions; r->type != REACTION_NONE; r++) {
-        fprintf(f, "Reaction %3i: %s with %5s (isotope id %3i): K = %7.5lf, max depth = %9.3lf tfu\n",
-                i++, reaction_name(r), r->isotope->name, r->i_isotope, r->K, r->max_depth / C_TFU);
+        fprintf(f, "Reaction %3i: %s with %5s (isotope id %3i): K = %7.5lf\n",
+                i++, reaction_name(r), r->isotope->name, r->i_isotope, r->K);
     }
 }
 

@@ -19,11 +19,12 @@
 #include <jibal_material.h>
 #include <jibal_layer.h>
 
-typedef struct {
+typedef struct sample {
     size_t n_isotopes;
     size_t n_ranges;
     const jibal_isotope **isotopes; /* table, size is n_isotopes */
     double *cranges;
+    double *crange_roughness;
     double *cbins; /* 2D-table: size is n_isotopes * n_ranges  */
 } sample;
 
@@ -41,7 +42,9 @@ double get_conc(const sample *s, depth depth, size_t i_isotope);
 int get_concs(const sample *s, depth depth, double *out);
 size_t get_range_bin(const sample *s, double x, size_t *range_hint);
 
+sample *sample_alloc(size_t n_isotopes, size_t n_ranges);
 sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers);
+sample *sample_copy(const sample *sample); /* Deep copy */
 void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes);
 void sample_print(FILE *f, const sample *sample, int print_isotopes); /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
 void sample_free(sample *sample);

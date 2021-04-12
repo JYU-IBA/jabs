@@ -29,7 +29,6 @@ typedef struct {
     const jibal_isotope *isotope; /* target isotope */
     int i_isotope; /* location of target isotope in concentration table */
     double K;
-    double max_depth;
     /* TODO: cross section to use? */
     /* TODO: cross sections from files */
     reaction_type type;

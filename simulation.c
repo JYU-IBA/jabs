@@ -130,6 +130,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
         r->r = &reactions[i_reaction];
         ion *p = &r->p;
         ion_reset(p);
+        r->max_depth = 0.0;
         if(sim->depthsteps_max) {
             r->n_bricks = sim->depthsteps_max;
         } else {
@@ -188,7 +189,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
     size_t i=0;
     while(detector_calibrated(&sim->det, i) < 1.1*sim->beam_E) {i++;}
 #ifdef DEBUG
-    fprintf(stderr, "Simulating %i channels\n", i);
+    fprintf(stderr, "Simulating %zu channels\n", i);
 #endif
     ws->n_channels = i;
 }

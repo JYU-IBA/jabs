@@ -88,6 +88,7 @@ int main(int argc, char **argv) {
     if(!layers)
         return EXIT_FAILURE;
 
+    layers[0]->roughness = 50.0*C_TFU; /* TODO: Remove */
     sample *sample = sample_from_layers(layers, n_layers);
     if(!sample || sample->n_isotopes == 0)
         return EXIT_FAILURE;

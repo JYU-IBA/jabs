@@ -7,6 +7,7 @@
 
 #include "defaults.h"
 #include "rotate.h"
+#include "roughness.h"
 #include "jabs.h"
 
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
@@ -133,6 +134,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         ion *p = &r->p;
         p->E = ion1.E * r->r->K;
         p->S = 0.0;
+        r->max_depth = sample_isotope_max_depth(sample, r->r->i_isotope);
         ion_set_angle(p, theta, phi); /* Reaction products travel towards the detector (in the sample system), calculated above */
         r->stop = 0;
         brick *b = &r->bricks[0];
@@ -197,7 +199,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             b->d = d_after;
             b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
             assert(r->p.E > 0.0);
-            if (d_before.x >= r->r->max_depth) {
+            if (d_before.x >= r->max_depth) {
 #ifdef DEBUG
                 fprintf(stderr, "Reaction %lu with %s stops, because maximum depth is reached at x = %.3lf tfu.\n",
                         i, r->r->isotope->name, d_before.x / C_TFU); /* TODO: give reactions a name */
@@ -319,7 +321,6 @@ reaction make_reaction(const sample *sample, const simulation *sim, const size_t
         r.type = REACTION_NONE;
         return r;
     }
-    r.max_depth = sample_isotope_max_depth(sample, r.i_isotope);
     return r;
 }
 
@@ -502,9 +503,67 @@ void output_bricks(const char *filename, const sim_workspace *ws) {
 
 
 void no_ds(sim_workspace *ws, const sample *sample) {
-    ion_set_angle(&ws->ion, 0.0, 0.0);
-    ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
-    simulate(&ws->ion, 0.0, ws, sample);
+    double p_sr = ws->sim.p_sr;
+    size_t n_rl = 0;
+    for(size_t i = 0; i < sample->n_ranges; i++) {
+        if(sample->crange_roughness[i] > 0.0)
+            n_rl++;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "%zu rough layers\n", n_rl);
+#endif
+    if(!n_rl) {
+        simulate(&ws->ion, 0.0, ws, sample);
+        return;
+    }
+    struct sample *sample_rough = sample_copy(sample);
+    size_t *index = malloc(sizeof(size_t) * n_rl);
+    size_t *modulos = malloc(sizeof(size_t) * n_rl);
+    size_t j = 0;
+    thick_prob_dist **tpd = malloc(sizeof(thick_prob_dist *) * n_rl);
+    for(size_t i = 0; i < sample->n_ranges; i++) {
+        if(sample->crange_roughness[i] > 0.0) {
+            size_t n_step = ROUGHNESS_STEPS;
+            tpd[j] = thickness_probability_table_gen(sample->cranges[i], sample->crange_roughness[i], n_step);
+            index[j] = i;
+            if(j)
+                modulos[j] = modulos[j-1] *  tpd[j-1]->n;
+            else
+                modulos[j] = 1;
+            j++;
+        }
+    }
+    size_t iter_total = modulos[n_rl-1] * tpd[n_rl-1]->n;
+    for(size_t i_iter = 0; i_iter < iter_total; i_iter++) {
+        //fprintf(stderr, "%zu", i_iter);
+        double p = 1.0;
+        for(size_t i_range = 0; i_range < sample->n_ranges; i_range++) { /* Reset ranges for every iter */
+            sample_rough->cranges[i_range] = sample->cranges[i_range];
+        }
+        for(size_t i = 0; i < n_rl; i++) {
+            j = (i_iter / modulos[i]) % tpd[i]->n; /* "j"th roughness element */
+            //fprintf(stderr, " %zu", j);
+
+            size_t i_range = index[i];
+            p *= tpd[i]->p[j].prob; /* Probability is multiplied by the "i"th roughness, element "j" */
+            double x_diff = tpd[i]->p[j].x - sample->cranges[i_range]; /* Amount to change thickness of this and and all subsequent layers */
+            //fprintf(stderr, "(%g, %.3lf%%) ", x_diff/C_TFU, tpd[i]->p[j].prob*100.0);
+            for(; i_range < sample->n_ranges; i_range++) {
+                sample_rough->cranges[i_range] += x_diff;
+            }
+        }
+        //fprintf(stderr, "\n");
+        ws->sim.p_sr = p * p_sr;
+        ion_set_angle(&ws->ion, 0.0, 0.0);
+        ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
+        simulate(&ws->ion, 0.0, ws, sample_rough);
+    }
+    for(size_t i = 0; i < n_rl; i++) {
+        thickness_probability_table_free(tpd[i]);
+    }
+    free(modulos);
+    free(index);
+    free(tpd);
 }
 
 void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is more pseudocode at this stage... */

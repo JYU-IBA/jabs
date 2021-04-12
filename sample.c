@@ -80,7 +80,7 @@ size_t get_range_bin(const sample *s, double x, size_t *range_hint) {
         if(*range_hint < s->n_ranges-1 && depth_is_almost_inside(x, s->cranges[*range_hint], s->cranges[*range_hint+1])) { /* TODO: add a bit of floating point "relative accuracy is enough" testing here */
             return *range_hint;
         } else { /* Shouldn't happen */
-            fprintf(stderr, "WARNING!!! FALSE RANGE HINTING at depth = %g tfu. Hint was %lu (pointer %p). ", x/C_TFU, *range_hint, (void *)range_hint);
+            fprintf(stderr, "WARNING!!! FALSE RANGE HINTING at depth = %g tfu. Hint was %lu (pointer %prob). ", x/C_TFU, *range_hint, (void *)range_hint);
             if(*range_hint >= s->n_ranges) {
                 fprintf(stderr, "This is unacceptable because %lu should be < %lu.\n", *range_hint, s->n_ranges);
             } else {
@@ -137,12 +137,26 @@ int get_concs(const sample *s, const depth depth, double *out) {
     }
 }
 
+sample *sample_alloc(size_t n_isotopes, size_t n_ranges) {
+    sample *s = malloc(sizeof(sample));
+    if(!s)
+        return NULL;
+    s->n_ranges = n_ranges;
+    s->n_isotopes = n_isotopes;
+    s->isotopes = calloc(n_isotopes, sizeof(jibal_isotope *));
+    s->cbins = calloc( n_ranges * n_isotopes, sizeof(double));
+    s->cranges = malloc(n_ranges*sizeof(double));
+    s->crange_roughness = malloc(n_ranges*sizeof(double));
+    return s;
+}
+
 sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers) {
     size_t i, j, k;
     sample *s = malloc(sizeof(sample));
     s->n_isotopes = 0;
     s->n_ranges = 2*n_layers;
     s->cranges = malloc(s->n_ranges*sizeof(double));
+    s->crange_roughness = malloc(s->n_ranges*sizeof(double));
     size_t i_isotope, n_isotopes=0;
     for(i = 0; i < n_layers; i++) { /* Turn layers to point-by-point profiles first by setting the X-axis (ranges) values and counting the number of isotopes */
         const jibal_layer *layer = layers[i];
@@ -152,6 +166,8 @@ sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers) {
 #endif
         s->cranges[2*i] = i?s->cranges[2*i-1]:0.0;
         s->cranges[2*i+1] = s->cranges[2*i] + (layer->thickness > 0.0 ? layer->thickness : 0.0); /* negative thickness... */
+        s->crange_roughness[2*i] = 0.0;
+        s->crange_roughness[2*i+1] = layer->roughness;
         for (j = 0; j < layer->material->n_elements; ++j) {
             n_isotopes += layer->material->elements[j].n_isotopes;
         }
@@ -249,6 +265,17 @@ sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers) {
     return s;
 }
 
+sample *sample_copy(const sample *s_in) {
+    sample *s_out = sample_alloc(s_in->n_isotopes, s_in->n_ranges);
+    if(!s_out)
+        return NULL;
+    memcpy(s_out->isotopes, s_in->isotopes, sizeof(jibal_isotope *) * s_out->n_isotopes);
+    memcpy(s_out->cranges, s_in->cranges, sizeof (double) * s_out->n_ranges);
+    memcpy(s_out->crange_roughness, s_in->crange_roughness, sizeof (double) * s_out->n_ranges);
+    memcpy(s_out->cbins, s_in->cbins, sizeof (double) * s_out->n_isotopes * s_out->n_ranges);
+    return s_out;
+}
+
 void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes) {
     fprintf(f, "AREAL D(tfu)");
     double sum = 0.0;
@@ -267,7 +294,7 @@ void sample_areal_densities_print(FILE *f, const sample *sample, int print_isoto
 
 
 void sample_print(FILE *f, const sample *sample, int print_isotopes) {
-    fprintf(f, "  DEPTH(tfu)");
+    fprintf(f, "  DEPTH(tfu)   ROUGH(tfu)");
     int Z = 0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         if(print_isotopes) {
@@ -282,6 +309,7 @@ void sample_print(FILE *f, const sample *sample, int print_isotopes) {
     fprintf(f, "\n");
     for (size_t i = 0; i < sample->n_ranges; i++) {
         fprintf(f, "%12.3lf", sample->cranges[i]/C_TFU);
+        fprintf(f, " %12.3lf", sample->crange_roughness[i]/C_TFU);
         double sum = 0.0;
         for (size_t j = 0; j < sample->n_isotopes; j++) {
             sum += sample->cbins[i * sample->n_isotopes + j];
@@ -310,6 +338,7 @@ void sample_free(sample *sample) {
     if(!sample)
         return;
     free(sample->cranges);
+    free(sample->crange_roughness);
     free(sample->isotopes);
     free(sample->cbins);
     free(sample);

@@ -79,7 +79,7 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
 #ifdef FIT_PRINT_PARAMS
     size_t i;
     for(i = 0; i < fit_data->fit_params->n; i++) {
-        fprintf(stderr, ", p[%zu] = %12.6e", i, gsl_vector_get(w->x, i));
+        fprintf(stderr, ", prob[%zu] = %12.6e", i, gsl_vector_get(w->x, i));
     }
 #endif
     fprintf(stderr, "\n");
@@ -181,7 +181,7 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     double c = GSL_MAX_DBL(1, sqrt(chisq / fit_data->dof));
     fprintf(stderr, "Final fitted parameters\n");
     for(i = 0; i < fit_params->n; i++) {
-        fprintf(stderr, "    p[%zu] = %g +- %g (%.2lf%%)\n", i,
+        fprintf(stderr, "    prob[%zu] = %g +- %g (%.2lf%%)\n", i,
                 gsl_vector_get(w->x, i),
                 c * sqrt(gsl_matrix_get(covar, i, i)),
                 100.0*(c * sqrt(gsl_matrix_get(covar, i, i)))/gsl_vector_get(w->x, i)
@@ -189,11 +189,11 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     }
     fprintf(stderr, "Correlation coefficients table:\n     ");
     for(j = 0; j < fit_params->n; j++) {
-        fprintf(stderr, "  p[%zu]   ", j);
+        fprintf(stderr, "  prob[%zu]   ", j);
     }
     fprintf(stderr, "\n");
     for(i = 0; i < fit_params->n; i++) {
-        fprintf(stderr, "p[%zu] ", i);
+        fprintf(stderr, "prob[%zu] ", i);
         for (j = 0; j <= i; j++) {
             fprintf(stderr, " %8.5f", gsl_matrix_get(covar, i, j)/sqrt(gsl_matrix_get(covar, i, i)*gsl_matrix_get(covar, j, j)));
         }
