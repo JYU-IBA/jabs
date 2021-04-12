@@ -453,6 +453,14 @@ void add_fit_params(global_options *global, simulation *sim, jibal_layer **layer
         if(strcmp(token, "channeling") == 0) {
             fit_params_add_parameter(params, &sim->channeling);
         }
+        if(strncmp(token, "rough", 5) == 0 && strlen(token) > 5) {
+            size_t i_layer = strtoul(token+5, NULL, 10);
+            if(i_layer >= 1 && i_layer <= n_layers) {
+                fit_params_add_parameter(params, &layers[i_layer-1]->roughness);
+            } else {
+                fprintf(stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
+            }
+        }
         if(strncmp(token, "thickness", 9) == 0 && strlen(token) > 9) {
             size_t i_layer = strtoul(token+9, NULL, 10);
             if(i_layer >= 1 && i_layer <= n_layers) {

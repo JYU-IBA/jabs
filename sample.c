@@ -277,7 +277,7 @@ sample *sample_copy(const sample *s_in) {
 }
 
 void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes) {
-    fprintf(f, "AREAL D(tfu)");
+    fprintf(f, "AREAL D(tfu)             ");
     double sum = 0.0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         for (size_t j = 1; j < sample->n_ranges; j++) {

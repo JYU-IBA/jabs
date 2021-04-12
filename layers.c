@@ -12,8 +12,9 @@
 
  */
 
-#include "layers.h"
 #include <stdlib.h>
+#include <string.h>
+#include "layers.h"
 
 jibal_layer **read_layers(jibal *jibal, int argc, char **argv, size_t *n_layers) {
     size_t n = 0; /* How many layers have been allocated */
@@ -33,18 +34,22 @@ jibal_layer **read_layers(jibal *jibal, int argc, char **argv, size_t *n_layers)
             if(!layers)
                 return NULL;
         }
-        jibal_layer *layer = jibal_layer_new(jibal_material_create(jibal->elements, argv[0]),
-                                             jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]));
-        if (!layer) {
-            fprintf(stderr, "Not a valid layer: %s!\n", argv[0]);
-            free(layers);
-            return NULL;
+        if(*n_layers && strcmp(argv[0], "rough") == 0) {
+            layers[*n_layers - 1]->roughness = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]);
+        } else {
+            jibal_layer *layer = jibal_layer_new(jibal_material_create(jibal->elements, argv[0]),
+                                                 jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]));
+            if(!layer) {
+                fprintf(stderr, "Not a valid layer: %s!\n", argv[0]);
+                free(layers);
+                return NULL;
+            }
+            layers[*n_layers] = layer;
+            (*n_layers)++;
         }
-
-        layers[*n_layers] = layer;
         argc -= 2;
         argv += 2;
-        (*n_layers)++;
+
     }
     return layers;
 }

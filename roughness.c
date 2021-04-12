@@ -6,7 +6,7 @@
 
 double thickness_gamma_pdf(double x, double thickness, double sigma) {
     const double a = (thickness*thickness)/(sigma*sigma);
-    const double b = 1.0/(thickness/(sigma*sigma));
+    const double b = (sigma*sigma)/thickness;
 
     return gsl_cdf_gamma_P(x, a, b);
     //return gsl_ran_gamma_pdf(x, a, b);
