@@ -83,6 +83,10 @@ int main(int argc, char **argv) {
         f = stdout;
     }
 
+    //sample  *sample2 = sample_from_file(jibal, "../sample.dat");
+    //if(sample2)
+    //    return EXIT_SUCCESS;
+
     size_t n_layers = 0;
     jibal_layer **layers = read_layers(jibal, argc, argv, &n_layers);
     if(!layers)

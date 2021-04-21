@@ -38,16 +38,16 @@ double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample,
 
 double next_crossing(const ion *incident, const sample  *sample, depth *depth) { /* This will also update the depth to the right bin! */
     if(incident->inverse_cosine_theta > 0) { /* Going deeper */
-        while(depth->i < sample->n_ranges - 1 && depth->x >= sample->cranges[depth->i + 1]) {
+        while(depth->i < sample->n_ranges - 1 && depth->x >= sample->ranges[depth->i + 1].x) {
             depth->i++;
         }
         assert(depth->i < sample->n_ranges - 1); /* There is a bug elsewhere in the code if you try to go this deep (deeper than last depth bin). */
-        return sample->cranges[depth->i + 1] - depth->x;
+        return sample->ranges[depth->i + 1].x - depth->x;
     } else if(incident->inverse_cosine_theta < 0.0) { /* Going towards the surface */
-        while(depth->i > 0 && depth->x <= sample->cranges[depth->i]) {
+        while(depth->i > 0 && depth->x <= sample->ranges[depth->i].x) {
             depth->i--;
         }
-        return sample->cranges[depth->i] - depth->x;
+        return sample->ranges[depth->i].x - depth->x;
     } else {
         fprintf(stderr, "WARNING: Inverse cosine is exactly zero. This is an issue!\n");
         return 0.0;
@@ -119,7 +119,7 @@ depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, depth de
 
 void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample system at depth x_0 */
     assert(sample->n_ranges);
-    double thickness = sample->cranges[sample->n_ranges-1];
+    double thickness = sample->ranges[sample->n_ranges-1].x;
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
     double theta, phi; /* Generic polar and azimuth angles */
@@ -512,9 +512,9 @@ void output_bricks(const char *filename, const sim_workspace *ws) {
 
 void no_ds(sim_workspace *ws, const sample *sample) {
     double p_sr = ws->sim.p_sr;
-    size_t n_rl = 0;
+    size_t n_rl = 0; /* Number of rough layers */
     for(size_t i = 0; i < sample->n_ranges; i++) {
-        if(sample->crange_roughness[i] > 0.0)
+        if(sample->ranges[i].rough.x > 0.0)
             n_rl++;
     }
 #ifdef DEBUG
@@ -530,9 +530,9 @@ void no_ds(sim_workspace *ws, const sample *sample) {
     size_t j = 0;
     thick_prob_dist **tpd = malloc(sizeof(thick_prob_dist *) * n_rl);
     for(size_t i = 0; i < sample->n_ranges; i++) {
-        if(sample->crange_roughness[i] > 0.0) {
+        if(sample->ranges[i].rough.x > 0.0) {
             size_t n_step = ROUGHNESS_STEPS;
-            tpd[j] = thickness_probability_table_gen(sample->cranges[i], sample->crange_roughness[i], n_step);
+            tpd[j] = thickness_probability_table_gen(sample->ranges[i].x, sample->ranges[i].rough.x, n_step);
             index[j] = i;
             if(j)
                 modulos[j] = modulos[j-1] *  tpd[j-1]->n;
@@ -546,7 +546,7 @@ void no_ds(sim_workspace *ws, const sample *sample) {
         //fprintf(stderr, "%zu", i_iter);
         double p = 1.0;
         for(size_t i_range = 0; i_range < sample->n_ranges; i_range++) { /* Reset ranges for every iter */
-            sample_rough->cranges[i_range] = sample->cranges[i_range];
+            sample_rough->ranges[i_range].x = sample->ranges[i_range].x;
         }
         for(size_t i = 0; i < n_rl; i++) {
             j = (i_iter / modulos[i]) % tpd[i]->n; /* "j"th roughness element */
@@ -554,10 +554,10 @@ void no_ds(sim_workspace *ws, const sample *sample) {
 
             size_t i_range = index[i];
             p *= tpd[i]->p[j].prob; /* Probability is multiplied by the "i"th roughness, element "j" */
-            double x_diff = tpd[i]->p[j].x - sample->cranges[i_range]; /* Amount to change thickness of this and and all subsequent layers */
+            double x_diff = tpd[i]->p[j].x - sample->ranges[i_range].x; /* Amount to change thickness of this and and all subsequent layers */
             //fprintf(stderr, "(%g, %.3lf%%) ", x_diff/C_TFU, tpd[i]->p[j].prob*100.0);
             for(; i_range < sample->n_ranges; i_range++) {
-                sample_rough->cranges[i_range] += x_diff;
+                sample_rough->ranges[i_range].x += x_diff;
             }
         }
         //fprintf(stderr, "\n");

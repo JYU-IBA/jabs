@@ -18,13 +18,19 @@
 #include <jibal_masses.h>
 #include <jibal_material.h>
 #include <jibal_layer.h>
+#include <jibal.h>
+#include "roughness.h"
+
+typedef struct sample_range {
+    double x;
+    roughness rough;
+} sample_range;
 
 typedef struct sample {
     size_t n_isotopes;
     size_t n_ranges;
     const jibal_isotope **isotopes; /* table, size is n_isotopes */
-    double *cranges;
-    double *crange_roughness;
+    sample_range *ranges; /* size is n_ranges */
     double *cbins; /* 2D-table: size is n_isotopes * n_ranges  */
 } sample;
 
@@ -32,6 +38,8 @@ typedef struct depth {
     double x;
     size_t i; /* index in sample */
 } depth;
+
+sample *sample_from_file(jibal *jibal, const char *filename);
 
 depth depth_seek(const sample *sample, double x);
 inline double depth_diff(const depth a, const depth b) {
@@ -54,6 +62,7 @@ inline double *sample_conc_bin(const sample *s, size_t i_range, size_t i_isotope
 }
 
 void sample_sort_isotopes(sample *sample); /* Sort isotopes. Note that you can screw up concentrations tables if you call this at the wrong time! */
+void sample_sort_and_remove_duplicate_isotopes(sample *s);
 int isotope_compar(const void *, const void *); /* compares jibal_isotopes */
 
 #endif /* JABS_SAMPLE_H */
