@@ -39,7 +39,14 @@ typedef struct depth {
     size_t i; /* index in sample */
 } depth;
 
+typedef enum sample_model_type {
+    SAMPLE_MODEL_NONE = 0,
+    SAMPLE_MODEL_POINT_BY_POINT = 1,
+    SAMPLE_MODEL_LAYERED = 2
+} sample_model_type;
+
 typedef struct sample_model {
+    sample_model_type type;
     size_t n_materials;
     size_t n_ranges;
     jibal_material **materials;
@@ -47,8 +54,14 @@ typedef struct sample_model {
     double *cbins; /* 2D-table: size is n_materials * n_ranges  */
 } sample_model;
 
+sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges);
+sample_model *sample_model_copy(const sample_model *sm);
 sample_model *sample_model_from_file(jibal *jibal, const char *filename);
+sample_model *sample_model_from_argv(jibal *jibal, int argc, char **argv);
+sample_model *sample_model_to_point_by_point(const sample_model *sm);
+void sample_model_free(sample_model *sm);
 sample *sample_from_sample_model(const sample_model *sm);
+void sample_model_print(FILE *f, const sample_model *sm);
 
 
 depth depth_seek(const sample *sample, double x);

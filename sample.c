@@ -68,6 +68,7 @@ depth depth_add(const sample *sample, const depth in, double dx) {
     /* No execution path reaches here */
 }
 extern inline double *sample_conc_bin(const sample *s, size_t i_range, size_t i_isotope);
+extern inline double *sample_model_conc_bin(const sample_model *sm, size_t i_range, size_t i_material);
 
 extern inline int depth_is_almost_inside(double x, double low, double high) { /* Almost is good enough for us! */
     static const double abs_tol = DEPTH_TOLERANCE; /* we consider x to be in range [low, high] with this tolerance */
@@ -262,9 +263,74 @@ sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers) {
     }
     return s;
 }
+
+sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
+    sample_model *sm = malloc(sizeof(sample_model));
+    if(!sm)
+        return NULL;
+    sm->n_ranges = n_ranges;
+    sm->n_materials = n_materials;
+    sm->materials = calloc(n_materials, sizeof(jibal_material *));
+    sm->cbins = calloc( n_ranges * n_materials, sizeof(double));
+    sm->ranges = malloc(n_ranges*sizeof(struct sample_range));
+    return sm;
+}
+
+sample_model *sample_model_copy(const sample_model *sm) {
+    if(!sm)
+        return NULL;
+    sample_model *sm_copy = sample_model_alloc(sm->n_materials, sm->n_ranges);
+    if(!sm_copy)
+        return NULL;
+//    memcpy(sm_copy->materials, )
+    /* TODO */
+    return sm_copy;
+}
+
+
+sample_model *sample_model_to_point_by_point(const sample_model *sm) { /* Converts a layered model to a point-by-point, allocates space and doesn't share data with the original (deep copy) */
+    sample_model *sm_out = NULL;
+    if(sm->type == SAMPLE_MODEL_LAYERED) { /* From layer model, make two points from one layer with the same concentration, i.e. no concentration gradient */
+        sm_out = sample_model_alloc(sm->n_materials, sm->n_ranges*2);
+        for(size_t i = 0; i < sm->n_materials; i++) {
+            sm_out->materials[i] = jibal_material_copy(sm->materials[i]);
+        }
+        for(size_t i = sm->n_ranges; i--;) {
+            sm_out->ranges[2*i] = sm->ranges[i];
+            sm_out->ranges[2*i+1] = sm->ranges[i];
+            for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+                *(sample_model_conc_bin(sm_out, 2*i, i_mat)) = *(sample_model_conc_bin(sm, i, i_mat));
+                *(sample_model_conc_bin(sm_out, 2*i+1, i_mat)) = *(sample_model_conc_bin(sm, i, i_mat));
+            }
+        }
+        for(size_t i = 0; i < sm_out->n_ranges; i += 2) {
+            sm_out->ranges[i].rough.x = 0.0; /* First points are not rough, the second point carries this information */
+            if(i) {
+                sm_out->ranges[i].x = sm_out->ranges[i-1].x; /* In layer models, the first point has the same depth as the second point of previous layer */
+                sm_out->ranges[i+1].x += sm_out->ranges[i].x; /* And the second point is naturally deeper by thickness, which was stored as "depth" temporarily */
+            } else {
+                sm_out->ranges[i].x = 0.0;
+            }
+        }
+    }
+    return sm_out;
+}
+
 sample *sample_from_sample_model(const sample_model *sm) {
     if(!sm)
         return NULL;
+#ifdef DEBUG
+    fprintf(stderr, "Sample model is type %i, it has %zu materials and %zu ranges.\n", sm->type, sm->n_materials, sm->n_ranges);
+#endif
+    sample_model *sm_copy;
+    if(sm->type == SAMPLE_MODEL_LAYERED) {
+        sm_copy = sample_model_to_point_by_point(sm);
+        if(!sm_copy)
+            return NULL;
+        sm = sm_copy;
+    } else {
+        sm_copy = NULL;
+    }
     size_t n_isotopes = 0;
     for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
         for(size_t i_elem = 0; i_elem < sm->materials[i_mat]->n_elements; i_elem++) {
@@ -292,7 +358,6 @@ sample *sample_from_sample_model(const sample_model *sm) {
     s->cbins = calloc(s->n_ranges * s->n_isotopes, sizeof(double));
     memcpy(s->ranges, sm->ranges, sizeof (struct sample_range) * sm->n_ranges);
 
-
     for(i = 0; i < s->n_isotopes; i++) { /* Build table of isotopic concentrations by looping over all isotopes in all elements in all materials and ranges*/
         for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
             for(size_t i_elem = 0; i_elem < sm->materials[i_mat]->n_elements; i_elem++) {
@@ -307,7 +372,36 @@ sample *sample_from_sample_model(const sample_model *sm) {
         }
     }
     sample_print(stderr, s, 0);
+    free(sm_copy);
     return s;
+}
+
+void sample_model_print(FILE *f, const sample_model *sm) {
+    switch(sm->type) {
+        case SAMPLE_MODEL_NONE:
+            fprintf(stderr, "Sample model is none.\n");
+            return;
+            break;
+        case SAMPLE_MODEL_POINT_BY_POINT:
+            fprintf(f, "       depth");
+            break;
+        case SAMPLE_MODEL_LAYERED:
+            fprintf(f, "       thick");
+            break;
+    }
+    fprintf(f, "        rough");
+    for (size_t i = 0; i < sm->n_materials; i++) {
+        fprintf(f, " %8s", sm->materials[i]->name);
+    }
+    fprintf(f, "\n");
+    for (size_t i = 0; i < sm->n_ranges; i++) {
+        fprintf(f, "%12.3lf", sm->ranges[i].x/C_TFU);
+        fprintf(f, " %12.3lf", sm->ranges[i].rough.x/C_TFU);
+        for (size_t j = 0; j < sm->n_materials; j++) {
+            fprintf(f, " %8.4lf", *sample_model_conc_bin(sm, i, j) * 100.0);
+        }
+        fprintf(f, "\n");
+    }
 }
 
 sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
@@ -323,6 +417,7 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
     sm->ranges = NULL;
     sm->materials = NULL;
     sm->cbins = NULL;
+    sm->type = SAMPLE_MODEL_NONE;
 
     char *line = NULL;
     size_t line_size = 0;
@@ -330,7 +425,6 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
 
     size_t i_depth = 0, i_rough = 0;
 
-    int layer_mode = 1;
     int headers = 1;
 
     while(getline(&line, &line_size, in) > 0) {
@@ -352,11 +446,11 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
                 }
                 else if(strncmp(col, "thick", 5) == 0) {
                     i_depth = n;
-                    layer_mode = 1;
+                    sm->type = SAMPLE_MODEL_LAYERED;
                 }
                 else if(strncmp(col, "depth", 5) == 0) {
                     i_depth = n;
-                    layer_mode = 0;
+                    sm->type = SAMPLE_MODEL_POINT_BY_POINT;
                 } else {
                     sm->materials = realloc(sm->materials, sizeof (jibal_material *) * (sm->n_materials + 1)); /* TODO: check allocation */
                     sm->materials[sm->n_materials] = jibal_material_create(jibal->elements, col);
@@ -372,7 +466,7 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
             if(n == 0) {
                 sm->ranges = realloc(sm->ranges, sizeof(sample_range) * (sm->n_ranges + 1));
                 sm->cbins = realloc(sm->cbins, sizeof(double) * (sm->n_ranges + 1) * sm->n_materials);
-                assert(sm->concs && sm->ranges);
+                assert(sm->cbins && sm->ranges);
                 sm->ranges[sm->n_ranges].x = 0.0;
                 sm->ranges[sm->n_ranges].rough.x = 0.0;
                 sm->n_ranges++;
@@ -410,30 +504,24 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
             *(sample_model_conc_bin(sm, i_range, i_mat)) /= sum;
         }
     }
-
-    if(layer_mode) { /* In layer mode, make two points from one layer with the same concentration, i.e. no concentration gradient */
-        sm->n_ranges *= 2;
-        sm->ranges = realloc(sm->ranges, sm->n_ranges*sizeof(struct sample_range));
-        sm->cbins = realloc(sm->cbins, sizeof(double) * sm->n_ranges * sm->n_materials); /* TODO: size! */
-        for(size_t i = sm->n_ranges/2; i--;) { /* For every second point, reverse order */
-            sm->ranges[2*i] = sm->ranges[i];
-            sm->ranges[2*i+1] = sm->ranges[i];
-            for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
-                *(sample_model_conc_bin(sm, 2*i, i_mat)) = *(sample_model_conc_bin(sm, i, i_mat));
-                *(sample_model_conc_bin(sm, 2*i+1, i_mat)) = *(sample_model_conc_bin(sm, i, i_mat));
-            }
-        }
-        for(size_t i = 0; i < sm->n_ranges; i += 2) {
-            sm->ranges[i].rough.x = 0.0; /* First points are not rough, the second point carries this information */
-            if(i) {
-                sm->ranges[i].x = sm->ranges[i-1].x; /* In layer models, the first point has the same depth as the second point of previous layer */
-                sm->ranges[i+1].x += sm->ranges[i].x; /* And the second point is naturally deeper by thickness, which was stored as "depth" temporarily */
-            } else {
-                sm->ranges[i].x = 0.0;
-            }
-        }
-    }
     return sm;
+}
+
+void sample_model_free(sample_model *sm) {
+    if(!sm)
+        return;
+
+    for(size_t i = 0; i < sm->n_materials; i++) {
+        jibal_material_free(sm->materials[i]);
+    }
+    free(sm->ranges);
+    free(sm->materials);
+    free(sm->cbins);
+    free(sm);
+}
+
+sample_model *sample_model_from_argv(jibal *jibal, int argc, char **argv) {
+    return NULL; /* TODO */
 }
 
 sample *sample_copy(const sample *s_in) {

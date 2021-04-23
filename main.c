@@ -85,11 +85,14 @@ int main(int argc, char **argv) {
 
     if(global.sample_filename) {
         sample_model *sm = sample_model_from_file(jibal, global.sample_filename);
+        sample_model_print(stderr, sm);
         sample *sample2 = sample_from_sample_model(sm);
-        if(sample2)
+        if(sample2) {
+            sample_model_free(sm);
             return EXIT_SUCCESS;
-        else
+        } else {
             return EXIT_FAILURE;
+        }
     }
 
     size_t n_layers = 0;
