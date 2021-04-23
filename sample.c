@@ -262,29 +262,77 @@ sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers) {
     }
     return s;
 }
+sample *sample_from_sample_model(const sample_model *sm) {
+    if(!sm)
+        return NULL;
+    size_t n_isotopes = 0;
+    for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+        for(size_t i_elem = 0; i_elem < sm->materials[i_mat]->n_elements; i_elem++) {
+            n_isotopes += sm->materials[i_mat]->elements[i_elem].n_isotopes;
+        }
+    }
+    size_t i = 0;
+    const jibal_isotope **isotopes = malloc(n_isotopes * sizeof(jibal_isotope *));
+    for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+        for(size_t i_elem = 0; i_elem < sm->materials[i_mat]->n_elements; i_elem++) {
+            for(size_t i_isotope = 0; i_isotope < sm->materials[i_mat]->elements[i_elem].n_isotopes; i_isotope++) {
+                assert(i < n_isotopes);
+                isotopes[i] = sm->materials[i_mat]->elements[i_elem].isotopes[i_isotope];
+                i++;
+            }
+        }
+    }
+    sample *s = malloc(sizeof(sample));
+    s->n_isotopes = n_isotopes;
+    s->n_ranges = sm->n_ranges;
+    s->isotopes = isotopes;
+    sample_sort_and_remove_duplicate_isotopes(s);
+    n_isotopes = s->n_isotopes;
+    s->ranges = malloc(s->n_ranges * sizeof(struct sample_range));
+    s->cbins = calloc(s->n_ranges * s->n_isotopes, sizeof(double));
+    memcpy(s->ranges, sm->ranges, sizeof (struct sample_range) * sm->n_ranges);
 
-sample *sample_from_file(jibal *jibal, const char *filename) {
 
+    for(i = 0; i < s->n_isotopes; i++) { /* Build table of isotopic concentrations by looping over all isotopes in all elements in all materials and ranges*/
+        for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+            for(size_t i_elem = 0; i_elem < sm->materials[i_mat]->n_elements; i_elem++) {
+                for(size_t i_isotope = 0; i_isotope < sm->materials[i_mat]->elements[i_elem].n_isotopes; i_isotope++) {
+                    if(s->isotopes[i] != sm->materials[i_mat]->elements[i_elem].isotopes[i_isotope])
+                        continue;
+                    for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
+                        double *c = sample_conc_bin(s, i_range, i);
+                        *c += sm->concs[i_range][i_mat] * sm->materials[i_mat]->elements[i_elem].concs[i_isotope] * sm->materials[i_mat]->concs[i_elem];
+                    }
+                }
+            }
+        }
+    }
+    sample_print(stderr, s, 0);
+    return s;
+}
+
+sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
     FILE *in;
     if(!filename)
         return NULL;
     in = fopen(filename, "r");
     if(!in)
         return NULL;
+    sample_model *sm = malloc(sizeof(sample_model));
+    sm->n_ranges = 0;
+    sm->n_materials = 0;
+    sm->ranges = NULL;
+    sm->materials = NULL;
+    sm->concs = NULL;
+
     char *line = NULL;
     size_t line_size = 0;
     size_t lineno = 0;
-
-    sample_range *ranges = NULL;
-    size_t n_ranges = 0;
-    jibal_material **materials = NULL;
-    size_t n_materials = 0;
 
     size_t i_depth = 0, i_rough = 0;
 
     int layer_mode = 1;
     int headers = 1;
-    double **concs = NULL;
 
     while(getline(&line, &line_size, in) > 0) {
         lineno++;
@@ -311,125 +359,82 @@ sample *sample_from_file(jibal *jibal, const char *filename) {
                     i_depth = n;
                     layer_mode = 0;
                 } else {
-                    materials = realloc(materials, sizeof (jibal_material *) * (n_materials + 1)); /* TODO: check allocation */
-                    materials[n_materials] = jibal_material_create(jibal->elements, col);
-                    if(!materials[n_materials]) {
+                    sm->materials = realloc(sm->materials, sizeof (jibal_material *) * (sm->n_materials + 1)); /* TODO: check allocation */
+                    sm->materials[sm->n_materials] = jibal_material_create(jibal->elements, col);
+                    if(!sm->materials[sm->n_materials]) {
                         fprintf(stderr, "Could not create material %s, ignoring it!\n", col);
                     } else {
-                        n_materials++;
+                        sm->n_materials++;
                     }
                 }
                 n++;
                 continue;
             }
             if(n == 0) {
-                ranges = realloc(ranges, sizeof(sample_range) * (n_ranges + 1));
-                concs = realloc(concs, sizeof(double *) * (n_ranges + 1));
-                concs[n_ranges] = calloc(n_materials, sizeof(double)); /* TODO: check allocation */
-                assert(concs[n_ranges]);
-                ranges[n_ranges].x = 0.0;
-                ranges[n_ranges].rough.x = 0.0;
-                n_ranges++;
+                sm->ranges = realloc(sm->ranges, sizeof(sample_range) * (sm->n_ranges + 1));
+                sm->concs = realloc(sm->concs, sizeof(double *) * (sm->n_ranges + 1));
+                sm->concs[sm->n_ranges] = calloc(sm->n_materials, sizeof(double)); /* TODO: check allocation */
+                assert(sm->concs[sm->n_ranges]);
+                sm->ranges[sm->n_ranges].x = 0.0;
+                sm->ranges[sm->n_ranges].rough.x = 0.0;
+                sm->n_ranges++;
 #ifdef DEBUG
-                fprintf(stderr, "Sample from file: NEW POINT, n = %zu, n_ranges = %zu, n_materials=%zu\n", n, n_ranges, n_materials);
+                fprintf(stderr, "Sample from file: NEW POINT, n = %zu, n_ranges = %zu, n_materials=%zu\n", n, sm->n_ranges, sm->n_materials);
 #endif
                 i_material = 0;
                 /* TODO: invalidate layer if not loaded properly */
             }
-            sample_range *r = &ranges[n_ranges-1];
+            sample_range *r = &sm->ranges[sm->n_ranges-1];
 
             double x = strtod(col, NULL);
             if(n == i_depth) {
                 r->x += x*C_TFU; /* Will be corrected later in case of a layer model*/
                 /* TODO: for p by p profile, check depth monotonicity */
             } else if (n == i_rough) {
-                r->rough.x = x;
-            } else if(i_material < n_materials) {
-                concs[n_ranges-1][i_material] = x;
+                r->rough.x = x*C_TFU;
+            } else if(i_material < sm->n_materials) {
+                sm->concs[sm->n_ranges-1][i_material] = x;
                 i_material++;
             }
             n++;
         }
         headers = 0;
     }
-    size_t n_isotopes = 0;
-    for(size_t i_mat = 0; i_mat < n_materials; i_mat++) {
-        for(size_t i_elem = 0; i_elem < materials[i_mat]->n_elements; i_elem++) {
-            n_isotopes += materials[i_mat]->elements[i_elem].n_isotopes;
-        }
-    }
-    size_t i = 0;
-    const jibal_isotope **isotopes = malloc(n_isotopes * sizeof(jibal_isotope *));
-    for(size_t i_mat = 0; i_mat < n_materials; i_mat++) {
-        for(size_t i_elem = 0; i_elem < materials[i_mat]->n_elements; i_elem++) {
-            for(size_t i_isotope = 0; i_isotope < materials[i_mat]->elements[i_elem].n_isotopes; i_isotope++) {
-                assert(i < n_isotopes);
-                isotopes[i] = materials[i_mat]->elements[i_elem].isotopes[i_isotope];
-                i++;
-            }
-        }
-    }
 
-    sample *s = malloc(sizeof(sample));
-    s->n_isotopes = n_isotopes;
-    s->n_ranges = n_ranges;
-    s->isotopes = isotopes;
-    //sample_sort_isotopes(&ss);
-    sample_sort_and_remove_duplicate_isotopes(s);
-    n_isotopes = s->n_isotopes;
-    s->cbins = calloc( n_ranges * n_isotopes, sizeof(double));
-    s->ranges = ranges;
-
-    for(size_t i_range = 0; i_range < n_ranges; i_range++) { /* Normalize concs */
+    for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Normalize concs */
         double sum = 0.0;
-        for(size_t i_mat = 0; i_mat < n_materials; i_mat++) {
-            sum += concs[i_range][i_mat];
+        for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+            sum += sm->concs[i_range][i_mat];
         }
         if(sum == 0.0)
             continue;
-        for(size_t i_mat = 0; i_mat < n_materials; i_mat++) {
-            concs[i_range][i_mat] /= sum;
+        for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+            sm->concs[i_range][i_mat] /= sum;
         }
     }
-    for(i = 0; i < s->n_isotopes; i++) { /* Build table of isotopic concentrations by looping over all isotopes in all elements in all materials and ranges*/
-        for(size_t i_mat = 0; i_mat < n_materials; i_mat++) {
-            for(size_t i_elem = 0; i_elem < materials[i_mat]->n_elements; i_elem++) {
-                for(size_t i_isotope = 0; i_isotope < materials[i_mat]->elements[i_elem].n_isotopes; i_isotope++) {
-                    if(s->isotopes[i] != materials[i_mat]->elements[i_elem].isotopes[i_isotope])
-                        continue;
-                    for(size_t i_range = 0; i_range < n_ranges; i_range++) {
-                        double *c = sample_conc_bin(s, i_range, i);
-                        *c += concs[i_range][i_mat] * materials[i_mat]->elements[i_elem].concs[i_isotope] * materials[i_mat]->concs[i_elem];
-                    }
-                }
-            }
-        }
-    }
-    sample_print(stderr, s, 0);
-
-
 
     if(layer_mode) { /* In layer mode, make two points from one layer with the same concentration, i.e. no concentration gradient */
-        s->n_ranges *= 2;
-        s->ranges = realloc(s->ranges, s->n_ranges*sizeof(struct sample_range));
-        for(i = 0; i < s->n_ranges/2; i++) {
-            s->ranges[2*i] = s->ranges[i];
-            s->ranges[2*i+1] = s->ranges[i];
+        sm->n_ranges *= 2;
+        sm->ranges = realloc(sm->ranges, sm->n_ranges*sizeof(struct sample_range));
+        sm->concs = realloc(sm->concs, sizeof(double *) * (sm->n_ranges));
+        for(size_t i = sm->n_ranges/2; i--;) { /* For every second point, reverse order */
+            sm->ranges[2*i] = sm->ranges[i];
+            sm->ranges[2*i+1] = sm->ranges[i];
+            sm->concs[2*i] = sm->concs[i]; /* TODO: memcpy */
+            sm->concs[2*i+1] = sm->concs[i];
         }
-        for(i = 0; i < s->n_ranges; i += 2) {
-            s->ranges[i].rough.x = 0.0; /* First points are not rough, the second point carries this information */
+        for(size_t i = 0; i < sm->n_ranges; i += 2) {
+            sm->ranges[i].rough.x = 0.0; /* First points are not rough, the second point carries this information */
             if(i) {
-                s->ranges[i].x = s->ranges[i-1].x; /* In layer models, the first point has the same depth as the second point of previous layer */
-                s->ranges[i+1].x += s->ranges[i].x; /* And the second point is naturally deeper by thickness, which was stored as "depth" temporarily */
+                sm->ranges[i].x = sm->ranges[i-1].x; /* In layer models, the first point has the same depth as the second point of previous layer */
+                sm->ranges[i+1].x += sm->ranges[i].x; /* And the second point is naturally deeper by thickness, which was stored as "depth" temporarily */
             } else {
-                s->ranges[i].x = 0.0;
+                sm->ranges[i].x = 0.0;
             }
         }
     }
-    return s;
+    return sm;
 }
-
-
 
 sample *sample_copy(const sample *s_in) {
     sample *s_out = sample_alloc(s_in->n_isotopes, s_in->n_ranges);

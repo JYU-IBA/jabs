@@ -39,7 +39,17 @@ typedef struct depth {
     size_t i; /* index in sample */
 } depth;
 
-sample *sample_from_file(jibal *jibal, const char *filename);
+typedef struct sample_model {
+    size_t n_materials;
+    size_t n_ranges;
+    jibal_material **materials;
+    sample_range *ranges ;
+    double **concs;
+} sample_model;
+
+sample_model *sample_model_from_file(jibal *jibal, const char *filename);
+sample *sample_from_sample_model(const sample_model *sm);
+
 
 depth depth_seek(const sample *sample, double x);
 inline double depth_diff(const depth a, const depth b) {

@@ -30,6 +30,7 @@ typedef struct {
     char *bricks_filename;
     char *fit_vars;
     char *detector_out_filename;
+    char *sample_filename;
 } global_options;
 
 #include "simulation.h"

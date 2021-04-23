@@ -41,7 +41,7 @@
 int main(int argc, char **argv) {
     global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = FALSE, .exp_filename = NULL,
                              .bricks_filename = NULL, .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL,
-                             .rbs = TRUE, .erd = TRUE, .detector_out_filename = NULL, .print_isotopes = FALSE};
+                             .rbs = TRUE, .erd = TRUE, .detector_out_filename = NULL, .print_isotopes = FALSE, .sample_filename = NULL};
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -83,9 +83,14 @@ int main(int argc, char **argv) {
         f = stdout;
     }
 
-    //sample  *sample2 = sample_from_file(jibal, "../sample.dat");
-    //if(sample2)
-    //    return EXIT_SUCCESS;
+    if(global.sample_filename) {
+        sample_model *sm = sample_model_from_file(jibal, global.sample_filename);
+        sample *sample2 = sample_from_sample_model(sm);
+        if(sample2)
+            return EXIT_SUCCESS;
+        else
+            return EXIT_FAILURE;
+    }
 
     size_t n_layers = 0;
     jibal_layer **layers = read_layers(jibal, argc, argv, &n_layers);
