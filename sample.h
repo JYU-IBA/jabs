@@ -43,8 +43,8 @@ typedef struct sample_model {
     size_t n_materials;
     size_t n_ranges;
     jibal_material **materials;
-    sample_range *ranges ;
-    double **concs;
+    sample_range *ranges;
+    double *cbins; /* 2D-table: size is n_materials * n_ranges  */
 } sample_model;
 
 sample_model *sample_model_from_file(jibal *jibal, const char *filename);
@@ -67,6 +67,9 @@ void sample_areal_densities_print(FILE *f, const sample *sample, int print_isoto
 void sample_print(FILE *f, const sample *sample, int print_isotopes); /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
 void sample_free(sample *sample);
 double sample_isotope_max_depth(const sample *sample, int i_isotope);
+inline double *sample_model_conc_bin(const sample_model *sm, size_t i_range, size_t i_material) {
+    return sm->cbins + i_range * sm->n_materials + i_material;
+}
 inline double *sample_conc_bin(const sample *s, size_t i_range, size_t i_isotope) {
     return s->cbins + i_range * s->n_isotopes + i_isotope;
 }

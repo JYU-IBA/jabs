@@ -300,8 +300,7 @@ sample *sample_from_sample_model(const sample_model *sm) {
                     if(s->isotopes[i] != sm->materials[i_mat]->elements[i_elem].isotopes[i_isotope])
                         continue;
                     for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
-                        double *c = sample_conc_bin(s, i_range, i);
-                        *c += sm->concs[i_range][i_mat] * sm->materials[i_mat]->elements[i_elem].concs[i_isotope] * sm->materials[i_mat]->concs[i_elem];
+                        *(sample_conc_bin(s, i_range, i)) += *(sample_model_conc_bin(sm, i_range, i_mat))  * sm->materials[i_mat]->elements[i_elem].concs[i_isotope] * sm->materials[i_mat]->concs[i_elem];
                     }
                 }
             }
@@ -323,7 +322,7 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
     sm->n_materials = 0;
     sm->ranges = NULL;
     sm->materials = NULL;
-    sm->concs = NULL;
+    sm->cbins = NULL;
 
     char *line = NULL;
     size_t line_size = 0;
@@ -372,9 +371,8 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
             }
             if(n == 0) {
                 sm->ranges = realloc(sm->ranges, sizeof(sample_range) * (sm->n_ranges + 1));
-                sm->concs = realloc(sm->concs, sizeof(double *) * (sm->n_ranges + 1));
-                sm->concs[sm->n_ranges] = calloc(sm->n_materials, sizeof(double)); /* TODO: check allocation */
-                assert(sm->concs[sm->n_ranges]);
+                sm->cbins = realloc(sm->cbins, sizeof(double) * (sm->n_ranges + 1) * sm->n_materials);
+                assert(sm->concs && sm->ranges);
                 sm->ranges[sm->n_ranges].x = 0.0;
                 sm->ranges[sm->n_ranges].rough.x = 0.0;
                 sm->n_ranges++;
@@ -393,7 +391,7 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
             } else if (n == i_rough) {
                 r->rough.x = x*C_TFU;
             } else if(i_material < sm->n_materials) {
-                sm->concs[sm->n_ranges-1][i_material] = x;
+                *(sample_model_conc_bin(sm, sm->n_ranges-1, i_material)) = x;
                 i_material++;
             }
             n++;
@@ -404,24 +402,26 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
     for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Normalize concs */
         double sum = 0.0;
         for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
-            sum += sm->concs[i_range][i_mat];
+            sum += *(sample_model_conc_bin(sm, i_range, i_mat));
         }
         if(sum == 0.0)
             continue;
         for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
-            sm->concs[i_range][i_mat] /= sum;
+            *(sample_model_conc_bin(sm, i_range, i_mat)) /= sum;
         }
     }
 
     if(layer_mode) { /* In layer mode, make two points from one layer with the same concentration, i.e. no concentration gradient */
         sm->n_ranges *= 2;
         sm->ranges = realloc(sm->ranges, sm->n_ranges*sizeof(struct sample_range));
-        sm->concs = realloc(sm->concs, sizeof(double *) * (sm->n_ranges));
+        sm->cbins = realloc(sm->cbins, sizeof(double) * sm->n_ranges * sm->n_materials); /* TODO: size! */
         for(size_t i = sm->n_ranges/2; i--;) { /* For every second point, reverse order */
             sm->ranges[2*i] = sm->ranges[i];
             sm->ranges[2*i+1] = sm->ranges[i];
-            sm->concs[2*i] = sm->concs[i]; /* TODO: memcpy */
-            sm->concs[2*i+1] = sm->concs[i];
+            for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+                *(sample_model_conc_bin(sm, 2*i, i_mat)) = *(sample_model_conc_bin(sm, i, i_mat));
+                *(sample_model_conc_bin(sm, 2*i+1, i_mat)) = *(sample_model_conc_bin(sm, i, i_mat));
+            }
         }
         for(size_t i = 0; i < sm->n_ranges; i += 2) {
             sm->ranges[i].rough.x = 0.0; /* First points are not rough, the second point carries this information */
