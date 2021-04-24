@@ -64,7 +64,7 @@ size_t sample_model_element_count(const sample_model *sm);
 void sample_model_free(sample_model *sm);
 sample *sample_from_sample_model(const sample_model *sm);
 void sample_model_print(FILE *f, const sample_model *sm);
-
+size_t sample_model_number_of_rough_ranges(const sample_model *sm);
 
 depth depth_seek(const sample *sample, double x);
 inline double depth_diff(const depth a, const depth b) {

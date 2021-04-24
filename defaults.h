@@ -16,5 +16,5 @@
 
 /* Other constants */
 #define DEPTH_TOLERANCE (1.0e-6 * C_TFU)
-#define ROUGHNESS_STEPS 21
+#define GAMMA_ROUGHNESS_STEPS 21
 #endif // JABS_DEFAULTS_H

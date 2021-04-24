@@ -74,7 +74,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    FILE *f;
     sample_model *sm;
     if(global.sample_filename) {
         sm = sample_model_from_file(jibal, global.sample_filename);
@@ -197,9 +196,6 @@ int main(int argc, char **argv) {
     double cputime_total =(((double) (end - start)) / CLOCKS_PER_SEC);
     fprintf(stderr, "...finished!\n\n");
     fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
-    if(f != stdout) {
-        fclose(f);
-    }
     free(reactions);
     sample_model_free(sm);
     sim_free(sim);

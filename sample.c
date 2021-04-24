@@ -346,6 +346,8 @@ sample_model *sample_model_to_point_by_point(const sample_model *sm) { /* Conver
         }
         for(size_t i = 0; i < sm_out->n_ranges; i += 2) {
             sm_out->ranges[i].rough.x = 0.0; /* First points are not rough, the second point carries this information */
+            sm_out->ranges[i].rough.model = ROUGHNESS_NONE;
+            sm_out->ranges[i].rough.n = 0;
             if(i) {
                 sm_out->ranges[i].x = sm_out->ranges[i-1].x; /* In layer models, the first point has the same depth as the second point of previous layer */
                 sm_out->ranges[i+1].x += sm_out->ranges[i].x; /* And the second point is naturally deeper by thickness, which was stored as "depth" temporarily */
@@ -412,6 +414,18 @@ sample *sample_from_sample_model(const sample_model *sm) {
             }
         }
     }
+
+    for(size_t i_range = 0; i_range < s->n_ranges; i_range++) { /* Set defaults for roughness */
+        sample_range *r = &s->ranges[i_range];
+        if(r->rough.model == ROUGHNESS_GAMMA && r->rough.n == 0) { /* Zero is not valid number, but it means "auto" */
+            /* TODO: implement variable number of spectra based on absolute and relative roughness. */
+            r->rough.n = GAMMA_ROUGHNESS_STEPS;
+#ifdef DEBUG
+            fprintf(stderr, "Range %zu roughness is gamma, number of steps is automatic and set to %zu\n", i_range, r->rough.n);
+#endif
+        }
+    }
+
 #ifdef DEBUG
     sample_print(stderr, s, 0);
 #endif
@@ -422,6 +436,7 @@ sample *sample_from_sample_model(const sample_model *sm) {
 void sample_model_print(FILE *f, const sample_model *sm) {
     if(!sm)
         return;
+    size_t n_rl = sample_model_number_of_rough_ranges(sm);
     switch(sm->type) {
         case SAMPLE_MODEL_NONE:
             fprintf(stderr, "Sample model is none.\n");
@@ -434,19 +449,36 @@ void sample_model_print(FILE *f, const sample_model *sm) {
             fprintf(f, "       thick");
             break;
     }
-    fprintf(f, "        rough");
+    if(n_rl) {
+        fprintf(f, "        rough");
+        fprintf(f, " n_rough");
+    }
     for (size_t i = 0; i < sm->n_materials; i++) {
         fprintf(f, " %8s", sm->materials[i]->name);
     }
     fprintf(f, "\n");
     for (size_t i = 0; i < sm->n_ranges; i++) {
         fprintf(f, "%12.3lf", sm->ranges[i].x/C_TFU);
-        fprintf(f, " %12.3lf", sm->ranges[i].rough.x/C_TFU);
+        if(n_rl) {
+            fprintf(f, " %12.3lf", sm->ranges[i].rough.x / C_TFU);
+            fprintf(f, " %7zu", sm->ranges[i].rough.n);
+        }
         for (size_t j = 0; j < sm->n_materials; j++) {
             fprintf(f, " %8.4lf", *sample_model_conc_bin(sm, i, j) * 100.0);
         }
         fprintf(f, "\n");
     }
+}
+
+size_t sample_model_number_of_rough_ranges(const sample_model *sm) {
+    if(!sm)
+        return 0;
+    size_t n = 0;
+    for(size_t i = 0; i < sm->n_ranges; i++) {
+        if(sm->ranges[i].rough.model != ROUGHNESS_NONE)
+            n++;
+    }
+    return n;
 }
 
 sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
@@ -468,7 +500,7 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
     size_t line_size = 0;
     size_t lineno = 0;
 
-    size_t i_depth = 0, i_rough = 0;
+    size_t i_depth = 0, i_rough = 0, i_nrough = 0;
 
     int headers = 1;
 
@@ -488,6 +520,9 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
             if(headers) { /* Headers */
                 if(strncmp(col, "rough", 5) == 0) {
                     i_rough = n;
+                } else
+                if(strncmp(col, "n_rough", 7) == 0) {
+                    i_nrough = n;
                 }
                 else if(strncmp(col, "thick", 5) == 0) {
                     i_depth = n;
@@ -514,6 +549,8 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
                 assert(sm->cbins && sm->ranges);
                 sm->ranges[sm->n_ranges].x = 0.0;
                 sm->ranges[sm->n_ranges].rough.x = 0.0;
+                sm->ranges[sm->n_ranges].rough.model = ROUGHNESS_NONE;
+                sm->ranges[sm->n_ranges].rough.n = 0;
                 sm->n_ranges++;
 #ifdef DEBUG
                 fprintf(stderr, "Sample from file: NEW POINT, n = %zu, n_ranges = %zu, n_materials=%zu\n", n, sm->n_ranges, sm->n_materials);
@@ -529,7 +566,9 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
                 /* TODO: for p by p profile, check depth monotonicity */
             } else if (n == i_rough) {
                 r->rough.x = x*C_TFU;
-            } else if(i_material < sm->n_materials) {
+            } else if (n == i_nrough) {
+                r->rough.n = floor(x);
+            }else if(i_material < sm->n_materials) {
                 *(sample_model_conc_bin(sm, sm->n_ranges-1, i_material)) = x;
                 i_material++;
             }
@@ -538,7 +577,7 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
         headers = 0;
     }
 
-    for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Normalize concs */
+    for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Normalize concs and set defaults for roughness*/
         double sum = 0.0;
         for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
             sum += *(sample_model_conc_bin(sm, i_range, i_mat));
@@ -547,6 +586,13 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
             continue;
         for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
             *(sample_model_conc_bin(sm, i_range, i_mat)) /= sum;
+        }
+        sample_range *r = &sm->ranges[i_range];
+        if(r->rough.x > 0.1*C_TFU) {
+            r->rough.model = ROUGHNESS_GAMMA; /* TODO: other models */
+        } else {
+            r->rough.model = ROUGHNESS_NONE;
+            r->rough.x = 0.0;
         }
     }
     return sm;
