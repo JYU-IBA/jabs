@@ -56,9 +56,11 @@ typedef struct sample_model {
 
 sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges);
 sample_model *sample_model_copy(const sample_model *sm);
+sample_model *sample_model_split_elements(const struct sample_model *sm);
 sample_model *sample_model_from_file(jibal *jibal, const char *filename);
 sample_model *sample_model_from_argv(jibal *jibal, int argc, char **argv);
 sample_model *sample_model_to_point_by_point(const sample_model *sm);
+size_t sample_model_element_count(const sample_model *sm);
 void sample_model_free(sample_model *sm);
 sample *sample_from_sample_model(const sample_model *sm);
 void sample_model_print(FILE *f, const sample_model *sm);

@@ -40,13 +40,14 @@
 
 int main(int argc, char **argv) {
     global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = FALSE, .exp_filename = NULL,
-                             .bricks_filename = NULL, .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL,
-                             .rbs = TRUE, .erd = TRUE, .detector_out_filename = NULL, .print_isotopes = FALSE, .sample_filename = NULL};
+            .bricks_filename = NULL, .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL,
+            .rbs = TRUE, .erd = TRUE, .detector_out_filename = NULL, .print_isotopes = FALSE, .sample_filename = NULL};
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
     if(jibal->error) {
-        fprintf(stderr, "Initializing JIBAL failed with error code %i (%s)\n", jibal->error, jibal_error_string(jibal->error));
+        fprintf(stderr, "Initializing JIBAL failed with error code %i (%s)\n", jibal->error,
+                jibal_error_string(jibal->error));
         return 1;
     }
     global.jibal = jibal;
@@ -75,25 +76,30 @@ int main(int argc, char **argv) {
     FILE *f;
     if(global.out_filename) {
         f = fopen(global.out_filename, "w");
-        if (!f) {
+        if(!f) {
             fprintf(stderr, "Can't open file \"%s\" for output.\n", global.out_filename);
             return EXIT_FAILURE;
         }
     } else {
         f = stdout;
     }
-
+    sample_model *sm;
     if(global.sample_filename) {
-        sample_model *sm = sample_model_from_file(jibal, global.sample_filename);
-        sample_model_print(stderr, sm);
-        sample *sample2 = sample_from_sample_model(sm);
-        if(sample2) {
-            sample_model_free(sm);
-            return EXIT_SUCCESS;
-        } else {
-            return EXIT_FAILURE;
-        }
+        sm = sample_model_from_file(jibal, global.sample_filename);
+    } else {
+        sample_model *sm_raw  = sample_model_from_argv(jibal, argc, argv);
+#ifdef DEBUG
+        fprintf(stderr, "Sample model, as read from command line.\n");
+        sample_model_print(stderr, sm_raw);
+#endif
+        sm = sample_model_split_elements(sm_raw);
+        sample_model_free(sm_raw);
     }
+    if(!sm)
+        return EXIT_FAILURE;
+    sample_model_print(stderr, sm);
+    sample *sample2 = sample_from_sample_model(sm);
+
 
     size_t n_layers = 0;
     jibal_layer **layers = read_layers(jibal, argc, argv, &n_layers);

@@ -268,6 +268,7 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
     sample_model *sm = malloc(sizeof(sample_model));
     if(!sm)
         return NULL;
+    sm->type = SAMPLE_MODEL_NONE;
     sm->n_ranges = n_ranges;
     sm->n_materials = n_materials;
     sm->materials = calloc(n_materials, sizeof(jibal_material *));
@@ -287,6 +288,43 @@ sample_model *sample_model_copy(const sample_model *sm) {
     return sm_copy;
 }
 
+sample_model *sample_model_split_elements(const sample_model *sm) {
+    sample_model *out = sample_model_alloc(sample_model_element_count(sm), sm->n_ranges);
+    out->type = sm->type;
+#ifdef DEBUG
+    fprintf(stderr, "Splitting sample model with %zu ranges and %zu materials to one with %zu materials (=elements).\n", sm->n_ranges, sm->n_materials, out->n_materials);
+#endif
+    size_t i = 0; /* Material index in output */
+    for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+        for(size_t i_elem = 0; i_elem < sm->materials[i_mat]->n_elements; i_elem++) {
+            jibal_element *e = jibal_element_copy(&sm->materials[i_mat]->elements[i_elem], 0);
+            out->materials[i] = malloc(sizeof(jibal_material));
+            jibal_material *mat = out->materials[i];
+            mat->elements = malloc(sizeof(jibal_element));
+            mat->elements[0] = *e;
+            mat->name = strdup(e->name);
+            mat->n_elements = 1;
+            mat->concs = malloc(sizeof(double));
+            mat->concs[0] = 1.0;
+            for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
+                *sample_model_conc_bin(out, i_range, i) += *sample_model_conc_bin(sm, i_range, i_mat) * sm->materials[i_mat]->concs[i_elem];
+            }
+            i++;
+        }
+    }
+    for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
+        out->ranges[i_range] = sm->ranges[i_range];
+    }
+    return out;
+}
+
+size_t sample_model_element_count(const sample_model *sm) {
+    size_t n_elements = 0;
+    for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+        n_elements += sm->materials[i_mat]->n_elements;
+    }
+    return n_elements;
+}
 
 sample_model *sample_model_to_point_by_point(const sample_model *sm) { /* Converts a layered model to a point-by-point, allocates space and doesn't share data with the original (deep copy) */
     sample_model *sm_out = NULL;
@@ -377,6 +415,8 @@ sample *sample_from_sample_model(const sample_model *sm) {
 }
 
 void sample_model_print(FILE *f, const sample_model *sm) {
+    if(!sm)
+        return;
     switch(sm->type) {
         case SAMPLE_MODEL_NONE:
             fprintf(stderr, "Sample model is none.\n");
@@ -521,7 +561,45 @@ void sample_model_free(sample_model *sm) {
 }
 
 sample_model *sample_model_from_argv(jibal *jibal, int argc, char **argv) {
-    return NULL; /* TODO */
+    sample_model *sm = malloc(sizeof(sample_model));
+    sm->type = SAMPLE_MODEL_LAYERED;
+    size_t n = 0;
+    sm->n_ranges = 0;
+    sm->n_materials = 0;
+    sm->materials = NULL;
+    sm->ranges = NULL;
+
+    while (argc >= 2) {
+        if(sm->n_ranges == n) {
+            if(n == 0) {
+                n = 8;
+            } else {
+                n *= 2;
+            }
+#ifdef DEBUG
+            fprintf(stderr, "(Re)allocating space for up to %lu ranges.\n", n);
+#endif
+            sm->ranges = realloc(sm->ranges, n*sizeof(sample_range));
+            sm->materials = realloc(sm->materials, n*sizeof(jibal_material *));
+            if(!sm->ranges)
+                return NULL;
+        }
+        if(sm->n_ranges && strcmp(argv[0], "rough") == 0) {
+            sm->ranges[sm->n_ranges - 1].rough.x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]);
+        } else {
+            sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, argv[0]);
+            sm->ranges[sm->n_ranges].x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]);
+            sm->n_ranges++;
+            sm->n_materials++;
+        }
+        argc -= 2;
+        argv += 2;
+    }
+    sm->cbins = calloc(sm->n_ranges * sm->n_ranges, sizeof(double));
+    for(size_t i = 0; i < sm->n_ranges; i++) {
+        *sample_model_conc_bin(sm, i, i) = 1.0;
+    }
+    return sm;
 }
 
 sample *sample_copy(const sample *s_in) {
