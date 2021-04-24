@@ -33,7 +33,7 @@ int func_f(const gsl_vector *x, void *params, gsl_vector * f)
     }
     sim_workspace_free(p->ws);
     sample_free(p->sample);
-    p->sample = sample_from_layers(p->layers, p->n_layers);
+    p->sample = sample_from_sample_model(p->sm);
     if(sim_sanity_check(p->sim)) {
         p->ws = NULL; /* Workspace has not been allocated yet. */
     } else {
@@ -82,6 +82,9 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
         fprintf(stderr, ", prob[%zu] = %12.6e", i, gsl_vector_get(w->x, i));
     }
 #endif
+    if(fit_data->print_iters) {
+        print_spectra(NULL, fit_data->ws, fit_data->exp);
+    }
     fprintf(stderr, "\n");
 }
 

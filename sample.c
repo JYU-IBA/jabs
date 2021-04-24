@@ -412,7 +412,9 @@ sample *sample_from_sample_model(const sample_model *sm) {
             }
         }
     }
+#ifdef DEBUG
     sample_print(stderr, s, 0);
+#endif
     free(sm_copy);
     return s;
 }

@@ -25,12 +25,14 @@ typedef struct {
     int fit_low;
     int fit_high;
     int print_isotopes;
+    int print_iters;
     char *out_filename;
     char *exp_filename;
     char *bricks_filename;
     char *fit_vars;
     char *detector_out_filename;
     char *sample_filename;
+    char *sample_out_filename;
 } global_options;
 
 #include "simulation.h"

@@ -45,9 +45,10 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"phi",           required_argument, NULL, 'p'},
             {"fluence",       required_argument, NULL, '3'},
             {"resolution",    required_argument, NULL, 'R'},
-            {"step_incident", required_argument, NULL, 'S'},
-            {"step_exiting",  required_argument, NULL, '0'},
+            {"step_incident", required_argument, NULL, 2  },
+            {"step_exiting",  required_argument, NULL, 1  },
             {"sample",        required_argument, NULL, 's'},
+            {"sample_out",    required_argument, NULL, 'S'},
             {"detector",      required_argument, NULL, 'd'},
             {"detector_out",  required_argument, NULL, 'D'},
             {"slope",         required_argument, NULL, '1'},
@@ -65,6 +66,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"noerd",         no_argument,       NULL, '9'},
             {"isotopes",      no_argument,       NULL, 0},
             {"channeling",    required_argument, NULL, 'C'},
+            {"print_iters",   no_argument,       NULL, 0},
             {NULL, 0,                NULL,   0}
     };
     static const char *help_texts[] = {
@@ -82,6 +84,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Incident ion step size. Zero is automatic.",
             "Exiting particle step size.",
             "Sample file.",
+            "Sample file (output).",
             "Detector file.",
             "Detector file (output).",
             "Slope of energy calibration.",
@@ -99,6 +102,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Don't make an ERD spectrum (ERD automatically turns on forward angles)",
             "Print isotopes (in concentration table)",
             "Ad-hoc substrate channeling yield correction",
+            "Print fits to standard output on every iteration",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
@@ -110,14 +114,17 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             case 0:
                 if(strcmp(long_options[option_index].name, "isotopes") == 0) {
                     global->print_isotopes = TRUE;
+                } else if(strcmp(long_options[option_index].name, "print_iters") == 0) {
+                    global->print_iters = TRUE;
                 }
+                break;
             case 'f':
                 if (optarg)
                     sim->fast = atoi(optarg);
                 else
                     sim->fast++;
                 break;
-            case '0':
+            case 1:
                 sim->stop_step_exiting = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case '1':
@@ -159,11 +166,14 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             case 'F':
                 global->fit = 1;
                 break;
-            case 'S':
+            case 2:
                 sim->stop_step_incident = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 's':
                 global->sample_filename = optarg;
+                break;
+            case 'S':
+                global->sample_out_filename = optarg;
                 break;
             case 'a':
                 sim->sample_theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);

@@ -373,11 +373,17 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim, const sample *sampl
     return 0;
 }
 
-void print_spectra(FILE *f, const global_options *global, const sim_workspace *ws, const gsl_histogram *exp) {
+int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histogram *exp) {
     char sep = ' ';
-    if(global->out_filename) {
-        size_t l = strlen(global->out_filename);
-        if(l > 4 && strncmp(global->out_filename+l-4, ".csv", 4) == 0) { /* For CSV: print header line */
+    FILE *f;
+    if(filename) {
+        f = fopen(filename, "w");
+        if(!f) {
+            fprintf(stderr, "Can't open file \"%s\" for output.\n", filename);
+            return EXIT_FAILURE;
+        }
+        size_t l = strlen(filename);
+        if(l > 4 && strncmp(filename+l-4, ".csv", 4) == 0) { /* For CSV: print header line */
             sep = ','; /* and set the separator! */
             fprintf(f, "\"Channel\",\"Simulated\"");
             if(exp) {
@@ -389,6 +395,8 @@ void print_spectra(FILE *f, const global_options *global, const sim_workspace *w
             }
             fprintf(f, "\n");
         }
+    } else {
+        f = stdout;
     }
     for(size_t i = 0; i < ws->n_channels; i++) {
         double sum = 0.0;
@@ -418,9 +426,15 @@ void print_spectra(FILE *f, const global_options *global, const sim_workspace *w
         }
         fprintf(f, "\n");
     }
+    if(f != stdout) {
+        fclose(f);
+    } else {
+        fprintf(f, "\n\n");
+    }
+    return EXIT_SUCCESS;
 }
 
-void add_fit_params(global_options *global, simulation *sim, jibal_layer **layers, const size_t n_layers, fit_params *params) {
+void add_fit_params(global_options *global, simulation *sim, const sample_model *sm, fit_params *params) {
 #ifdef DEBUG
     fprintf(stderr, "fitvars = %s\n", global->fit_vars);
 #endif
@@ -455,24 +469,24 @@ void add_fit_params(global_options *global, simulation *sim, jibal_layer **layer
         }
         if(strncmp(token, "rough", 5) == 0 && strlen(token) > 5) {
             size_t i_layer = strtoul(token+5, NULL, 10);
-            if(i_layer >= 1 && i_layer <= n_layers) {
-                fit_params_add_parameter(params, &layers[i_layer-1]->roughness);
+            if(i_layer >= 1 && i_layer <= sm->n_ranges) {
+                fit_params_add_parameter(params, &sm->ranges[i_layer-1].rough.x);
             } else {
                 fprintf(stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
             }
         }
         if(strncmp(token, "thickness", 9) == 0 && strlen(token) > 9) {
             size_t i_layer = strtoul(token+9, NULL, 10);
-            if(i_layer >= 1 && i_layer <= n_layers) {
-                fit_params_add_parameter(params, &layers[i_layer-1]->thickness);
+            if(i_layer >= 1 && i_layer <= sm->n_ranges) {
+                fit_params_add_parameter(params, &sm->ranges[i_layer-1].x);
             } else {
                 fprintf(stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
             }
         }
         size_t i,j;
         if(sscanf(token, "conc%lu_%lu", &i, &j) == 2) {
-            if (i >= 1 && i <= n_layers && j >= 1  && j <= layers[i]->material->n_elements) {
-                fit_params_add_parameter(params, &layers[i-1]->material->concs[j-1]);
+            if (i >= 1 && i <= sm->n_ranges && j >= 1  && j <= sm->n_materials) {
+                fit_params_add_parameter(params, sample_model_conc_bin(sm, i-1, j-1));
             } else {
                 fprintf(stderr, "No element %lu in layer %lu\n", j, i);
             }

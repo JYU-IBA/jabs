@@ -41,7 +41,8 @@
 int main(int argc, char **argv) {
     global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = FALSE, .exp_filename = NULL,
             .bricks_filename = NULL, .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL,
-            .rbs = TRUE, .erd = TRUE, .detector_out_filename = NULL, .print_isotopes = FALSE, .sample_filename = NULL};
+            .rbs = TRUE, .erd = TRUE, .detector_out_filename = NULL, .print_isotopes = FALSE, .sample_filename = NULL,
+            .print_iters = FALSE};
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -53,7 +54,7 @@ int main(int argc, char **argv) {
     global.jibal = jibal;
     sim->beam_isotope = jibal_isotope_find(jibal->isotopes, NULL, 2, 4); /* Default: 4He */
     read_options(&global, sim, &argc, &argv);
-    if(argc < 2) {
+    if(!global.sample_filename && argc < 2) { /* No sample file given and not enough arguments left either. */
         usage();
         return EXIT_FAILURE;
     }
@@ -74,15 +75,6 @@ int main(int argc, char **argv) {
     }
 
     FILE *f;
-    if(global.out_filename) {
-        f = fopen(global.out_filename, "w");
-        if(!f) {
-            fprintf(stderr, "Can't open file \"%s\" for output.\n", global.out_filename);
-            return EXIT_FAILURE;
-        }
-    } else {
-        f = stdout;
-    }
     sample_model *sm;
     if(global.sample_filename) {
         sm = sample_model_from_file(jibal, global.sample_filename);
@@ -95,21 +87,16 @@ int main(int argc, char **argv) {
         sm = sample_model_split_elements(sm_raw);
         sample_model_free(sm_raw);
     }
-    if(!sm)
+    if(!sm) {
+        fprintf(stderr, "Could not build a sample model from input data.\n");
         return EXIT_FAILURE;
+    }
     sample_model_print(stderr, sm);
-    sample *sample2 = sample_from_sample_model(sm);
-
-
-    size_t n_layers = 0;
-    jibal_layer **layers = read_layers(jibal, argc, argv, &n_layers);
-    if(!layers)
-        return EXIT_FAILURE;
-    sample *sample = sample_from_layers(layers, n_layers);
-    if(!sample || sample->n_isotopes == 0)
-        return EXIT_FAILURE;
+    sample *sample = sample_from_sample_model(sm);
     sample_print(stderr, sample, global.print_isotopes);
-
+    if(sm->n_ranges == 0 || sm->n_materials == 0) {
+        fprintf(stderr, "Can not simulate nothing.\n");
+    }
     sim_calculate_geometry(sim);
     reaction *reactions = NULL;
     reactions = make_reactions(sample, sim, global.rbs, global.erd);
@@ -150,12 +137,12 @@ int main(int argc, char **argv) {
         fit_data.sim = sim;
         fit_data.exp = exp;
         fit_data.sample = NULL;
-        fit_data.layers = layers;
-        fit_data.n_layers = n_layers;
+        fit_data.sm = sm;
         fit_data.reactions = reactions;
         fit_data.ws = NULL;
         fit_data.fit_params = fit_params_new();
-        add_fit_params(&global, sim, layers, n_layers, fit_data.fit_params);
+        fit_data.print_iters = global.print_iters;
+        add_fit_params(&global, sim, sm, fit_data.fit_params);
         if(fit_data.fit_params->n == 0) {
             fprintf(stderr, "No parameters to fit!\n");
             return EXIT_FAILURE;
@@ -166,6 +153,9 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\nFinal composition:\n");
         sample_print(stderr, fit_data.sample, global.print_isotopes);
         sample_areal_densities_print(stderr, fit_data.sample, global.print_isotopes);
+        fprintf(stderr, "\nFinal sample model:\n");
+        sample_model_print(stderr, sm);
+
         ws = fit_data.ws;
         fprintf(stderr,"CPU time used for actual simulation: %.3lf s.\n", fit_data.cputime_actual);
         fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_data.cputime_actual/fit_stats.n_evals);
@@ -181,7 +171,7 @@ int main(int argc, char **argv) {
     if(exp) {
         set_spectrum_calibration(exp, &ws->sim.det); /* Update the experimental spectra to final calibration */
     }
-    print_spectra(f, &global, ws, exp);
+    print_spectra(global.out_filename, ws, exp);
 
     output_bricks(global.bricks_filename, ws);
 
@@ -193,6 +183,15 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Could not write detector to file \"%s\".\n", global.detector_out_filename);
         }
     }
+    if(global.sample_out_filename) {
+        FILE *f_sout;
+        if((f_sout = fopen(global.sample_out_filename, "w"))) {
+            sample_model_print(f_sout, sm);
+        } else {
+            fprintf(stderr, "Could not write sample to file \"%s\".\n", global.sample_out_filename);
+        }
+    }
+
     sim_workspace_free(ws);
     end = clock();
     double cputime_total =(((double) (end - start)) / CLOCKS_PER_SEC);
@@ -202,7 +201,7 @@ int main(int argc, char **argv) {
         fclose(f);
     }
     free(reactions);
-    layers_free(layers, n_layers);
+    sample_model_free(sm);
     sim_free(sim);
     sample_free(sample);
     jibal_free(jibal);

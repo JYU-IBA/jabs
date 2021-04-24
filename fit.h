@@ -39,8 +39,7 @@ struct fit_data {
     reaction *reactions;
     const jibal *jibal;
     sample *sample;
-    jibal_layer * const *layers;
-    size_t n_layers;
+    sample_model *sm;
     fit_params *fit_params;
     sim_workspace *ws; /* Handled by fitting function! */
     size_t low_ch;
@@ -48,6 +47,7 @@ struct fit_data {
     size_t n_iters_max;
     double cputime_actual; /* Statistics! */
     double dof;
+    int print_iters;
 };
 
 struct fit_stats {
