@@ -40,6 +40,7 @@ Several parameters can be set from the command line. See `jabs -h` and try somet
 $ ./jabs -E 2MeV --alpha=10deg --theta=170deg --out=spectrum.csv Au 500tfu SiO2 1000tfu Si 10000tfu
 ~~~~
 
+Detector and sample can be read from files. The file formats are simple and human readable. Please see [the example](example).
 
 ## Fitting
 

@@ -1,0 +1,6 @@
+slope = 1.72 keV
+offset = 25.0 keV
+resolution = 14 keV
+theta = 160 deg
+#the detector is in Cornell geometry. And this is a comment...
+phi = 90 deg

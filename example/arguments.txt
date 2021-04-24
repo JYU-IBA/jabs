@@ -1,0 +1,14 @@
+--energy=2.027MeV
+--alpha=0deg
+--theta=160deg
+--fluence=1.0e11
+--exp=experimental.dat
+--detector=detector.txt
+--detector_out=detector_fitted.txt
+--sample=sample.txt
+--sample_out=sample_fitted.txt
+--fit_low=100
+--fit_high=1200
+--fit_vars=calib,fluence,thickness1,thickness2,rough1
+--out=out.csv
+--fit
