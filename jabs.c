@@ -373,7 +373,7 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim, const sample *sampl
     return 0;
 }
 
-void print_spectra(FILE *f, const global_options *global, const sim_workspace *ws, const sample *sample, const gsl_histogram *exp) {
+void print_spectra(FILE *f, const global_options *global, const sim_workspace *ws, const gsl_histogram *exp) {
     char sep = ' ';
     if(global->out_filename) {
         size_t l = strlen(global->out_filename);
@@ -385,7 +385,7 @@ void print_spectra(FILE *f, const global_options *global, const sim_workspace *w
             }
             for(size_t j = 0; j < ws->n_reactions; j++) {
                 const reaction *r = ws->reactions[j].r;
-                fprintf(f, ",\"%s (%s)\"", sample->isotopes[r->i_isotope]->name, reaction_name(r));
+                fprintf(f, ",\"%s (%s)\"", r->isotope->name, reaction_name(r));
             }
             fprintf(f, "\n");
         }

@@ -26,7 +26,7 @@ void simulate(const ion *incident, double x_0, sim_workspace *ws, const sample *
 reaction make_reaction(const sample *sample, const simulation *sim, size_t i_isotope, reaction_type type);
 reaction *make_reactions(const sample *sample, const simulation *sim, int rbs, int erd);/* Note that sim->ion needs to be set and geometry has to be correct */
 int assign_stopping(jibal_gsto *gsto, const simulation *sim, const sample *sample, const reaction *reactions);
-void print_spectra(FILE *f, const global_options *global, const sim_workspace *ws, const sample *sample, const gsl_histogram *exp);
+void print_spectra(FILE *f, const global_options *global, const sim_workspace *ws, const gsl_histogram *exp);
 void add_fit_params(global_options *global, simulation *sim, jibal_layer **layers, size_t n_layers, fit_params *params);
 void output_bricks(const char *filename, const sim_workspace *ws);
 void no_ds(sim_workspace *ws, const sample *sample);

@@ -181,7 +181,7 @@ int main(int argc, char **argv) {
     if(exp) {
         set_spectrum_calibration(exp, &ws->sim.det); /* Update the experimental spectra to final calibration */
     }
-    print_spectra(f, &global, ws, sample, exp);
+    print_spectra(f, &global, ws, exp);
 
     output_bricks(global.bricks_filename, ws);
 
