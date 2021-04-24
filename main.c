@@ -33,7 +33,6 @@
 #include "options.h"
 #include "sample.h"
 #include "simulation.h"
-#include "layers.h"
 #include "spectrum.h"
 #include "fit.h"
 #include "jabs.h"
