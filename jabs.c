@@ -514,7 +514,7 @@ void no_ds(sim_workspace *ws, const sample *sample) {
     double p_sr = ws->sim.p_sr;
     size_t n_rl = 0; /* Number of rough layers */
     for(size_t i = 0; i < sample->n_ranges; i++) {
-        if(sample->ranges[i].rough.x > 0.0)
+        if(sample->ranges[i].rough.x > 0.1 * C_TFU) /* TODO: no arbitrary roughness cutoff */
             n_rl++;
     }
 #ifdef DEBUG
@@ -530,7 +530,7 @@ void no_ds(sim_workspace *ws, const sample *sample) {
     size_t j = 0;
     thick_prob_dist **tpd = malloc(sizeof(thick_prob_dist *) * n_rl);
     for(size_t i = 0; i < sample->n_ranges; i++) {
-        if(sample->ranges[i].rough.x > 0.0) {
+        if(sample->ranges[i].rough.x > 0.1 * C_TFU) { /* TODO: no arbitrary roughness cutoff */
             size_t n_step = ROUGHNESS_STEPS;
             tpd[j] = thickness_probability_table_gen(sample->ranges[i].x, sample->ranges[i].rough.x, n_step);
             index[j] = i;
@@ -543,7 +543,9 @@ void no_ds(sim_workspace *ws, const sample *sample) {
     }
     size_t iter_total = modulos[n_rl-1] * tpd[n_rl-1]->n;
     for(size_t i_iter = 0; i_iter < iter_total; i_iter++) {
-        //fprintf(stderr, "%zu", i_iter);
+#ifdef DEBUG
+        fprintf(stderr, "Gamma roughness step %zu/%zu\n", i_iter+1, iter_total);
+#endif
         double p = 1.0;
         for(size_t i_range = 0; i_range < sample->n_ranges; i_range++) { /* Reset ranges for every iter */
             sample_rough->ranges[i_range].x = sample->ranges[i_range].x;
@@ -555,10 +557,17 @@ void no_ds(sim_workspace *ws, const sample *sample) {
             size_t i_range = index[i];
             p *= tpd[i]->p[j].prob; /* Probability is multiplied by the "i"th roughness, element "j" */
             double x_diff = tpd[i]->p[j].x - sample->ranges[i_range].x; /* Amount to change thickness of this and and all subsequent layers */
-            //fprintf(stderr, "(%g, %.3lf%%) ", x_diff/C_TFU, tpd[i]->p[j].prob*100.0);
             for(; i_range < sample->n_ranges; i_range++) {
                 sample_rough->ranges[i_range].x += x_diff;
             }
+#ifdef DEBUG
+            fprintf(stderr, "Gamma roughness diff %g tfu (from %g tfu, index i_range=%zu), probability %.3lf%%)\n", x_diff/C_TFU, sample->ranges[i_range].x/C_TFU, i_range, tpd[i]->p[j].prob*100.0);
+            fprintf(stderr, "Gamma roughness, ranges");
+            for(i_range = 0; i_range < sample->n_ranges; i_range++) {
+                fprintf(stderr, ", %zu: %g tfu ", i_range, sample_rough->ranges[i_range].x/C_TFU);
+            }
+            fprintf(stderr, "\n");
+#endif
         }
         //fprintf(stderr, "\n");
         ws->sim.p_sr = p * p_sr;

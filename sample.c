@@ -121,8 +121,11 @@ int get_concs(const sample *s, const depth depth, double *out) {
     size_t i_range = depth.i;
     double x = depth.x;
     assert(i_range < s->n_ranges-1);
+#if 0
+    /* Due to floating point issues it is possible that depth.x is outside ranges[i] and ranges[i+1]. Note that depth.i should be respected even in this case. */
     assert(x >= s->ranges[i_range].x);
     assert(x <= s->ranges[i_range+1].x);
+#endif
     double *bins_low = &s->cbins[i_range * s->n_isotopes];
     double *bins_high = &s->cbins[(i_range+1) * s->n_isotopes];
     if(s->ranges[i_range].x == s->ranges[i_range+1].x) {
