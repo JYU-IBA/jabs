@@ -27,6 +27,7 @@ thick_prob_dist *thickness_probability_table_gen(double thickness, double sigma,
 
     
     double sum = 0.0;
+    double areal_sum = 0.0;
     for(i = 0; i < n; i++) {
         thick_prob *p = &tpd->p[i];
         double x_low = low + i*step;
@@ -35,13 +36,15 @@ thick_prob_dist *thickness_probability_table_gen(double thickness, double sigma,
         p->prob = thickness_gamma_pdf(x_high, thickness, sigma);
         p->prob -= thickness_gamma_pdf(x_low, thickness, sigma);
         sum += p->prob;
+        areal_sum += p->prob * p->x;
     }
+    double corr = thickness/areal_sum; /* Correction factor, since the used distribution is not perfect due to cutoffs. */
 #ifdef DEBUG
-    fprintf(stderr, "Gamma roughness, thickness low %g, high %g, step %g. Sum of probabilities before normalization %g.\n", low/C_TFU, high/C_TFU, step/C_TFU, sum);
+    fprintf(stderr, "Gamma roughness, thickness low %g, high %g, step %g. Sum of probabilities %g, areal density weighted with probability is %g tfu. Correction factor %g will be applied.\n", low/C_TFU, high/C_TFU, step/C_TFU, sum, areal_sum/C_TFU, corr);
 #endif
     for(i = 0; i < n; i++) {
         thick_prob *p = &tpd->p[i];
-        p->prob /= sum; /* Normalize */
+        p->prob *= corr;
     }
     return tpd;
 }
