@@ -13,12 +13,17 @@
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
     double em=E/incident->mass;
     double S1 = 0.0;
-    get_concs(sample, depth, ws->c);
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
-        if(ws->c[i_isotope] < ABUNDANCE_THRESHOLD)
+        double c;
+        if(sample->no_conc_gradients) {
+            c = *sample_conc_bin(sample, depth.i, i_isotope);
+        } else {
+            c = get_conc(sample, depth, i_isotope);
+        }
+        if(c < ABUNDANCE_THRESHOLD)
             continue;
         if (type == GSTO_STO_TOT) {
-            S1 += ws->c[i_isotope] * (
+            S1 += c * (
                     jibal_gsto_get_em(ws->gsto, GSTO_STO_ELE, incident->Z, sample->isotopes[i_isotope]->Z, em)
                     #ifdef NUCLEAR_STOPPING_FROM_JIBAL
                     +jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, sample->isotopes[i_isotope]->Z, sample->isotopes[i_isotope]->mass)
@@ -27,7 +32,7 @@ double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample,
                     #endif
                     );
         } else {
-            S1 += ws->c[i_isotope] * (
+            S1 += c * (
                     jibal_gsto_get_em(ws->gsto, type, incident->Z, sample->isotopes[i_isotope]->Z, em)
             );
         }

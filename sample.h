@@ -26,14 +26,6 @@ typedef struct sample_range {
     roughness rough;
 } sample_range;
 
-typedef struct sample {
-    size_t n_isotopes;
-    size_t n_ranges;
-    const jibal_isotope **isotopes; /* table, size is n_isotopes */
-    sample_range *ranges; /* size is n_ranges */
-    double *cbins; /* 2D-table: size is n_isotopes * n_ranges  */
-} sample;
-
 typedef struct depth {
     double x;
     size_t i; /* index in sample */
@@ -45,6 +37,15 @@ typedef enum sample_model_type {
     SAMPLE_MODEL_LAYERED = 2
 } sample_model_type;
 
+typedef struct sample {
+    int no_conc_gradients; /* TRUE (non zero) for samples based on layer models */
+    size_t n_isotopes;
+    size_t n_ranges;
+    const jibal_isotope **isotopes; /* table, size is n_isotopes */
+    sample_range *ranges; /* size is n_ranges */
+    double *cbins; /* 2D-table: size is n_isotopes * n_ranges  */
+} sample;
+
 typedef struct sample_model {
     sample_model_type type;
     size_t n_materials;
@@ -55,7 +56,6 @@ typedef struct sample_model {
 } sample_model;
 
 sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges);
-sample_model *sample_model_copy(const sample_model *sm);
 sample_model *sample_model_split_elements(const struct sample_model *sm);
 sample_model *sample_model_from_file(jibal *jibal, const char *filename);
 sample_model *sample_model_from_argv(jibal *jibal, int argc, char **argv);
@@ -70,13 +70,9 @@ depth depth_seek(const sample *sample, double x);
 inline double depth_diff(const depth a, const depth b) {
     return b.x - a.x;
 }
-depth depth_add(const sample *sample, depth in, double dx); /* Create a new depth by adding (or substracting, if negative) thickness to depth "in") */
 double get_conc(const sample *s, depth depth, size_t i_isotope);
-int get_concs(const sample *s, depth depth, double *out);
-size_t get_range_bin(const sample *s, double x, size_t *range_hint);
 
 sample *sample_alloc(size_t n_isotopes, size_t n_ranges);
-sample *sample_from_layers(jibal_layer * const *layers, size_t n_layers);
 sample *sample_copy(const sample *sample); /* Deep copy */
 void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes);
 void sample_print(FILE *f, const sample *sample, int print_isotopes); /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
