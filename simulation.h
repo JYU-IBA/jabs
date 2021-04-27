@@ -65,6 +65,7 @@ typedef struct {
     const jibal_config *jibal_config;
     int rk4;
     int nucl_stop_accurate;
+    int mean_conc_and_energy;
     gsto_stopping_type stopping_type;
     size_t n_channels; /* histogram */
     ion ion;

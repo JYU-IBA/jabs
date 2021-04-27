@@ -26,9 +26,11 @@ typedef enum {
 } reaction_type;
 
 typedef struct {
-    const jibal_isotope *isotope; /* target isotope */
-    int i_isotope; /* location of target isotope in concentration table */
+    const jibal_isotope *incident;
+    const jibal_isotope *target; /* target isotope */
+    size_t i_isotope; /* location of target isotope in concentration table */
     double K;
+
     /* TODO: cross section to use? */
     /* TODO: cross sections from files */
     reaction_type type;

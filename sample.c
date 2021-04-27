@@ -522,14 +522,14 @@ void sample_free(sample *sample) {
     free(sample);
 }
 
-double sample_isotope_max_depth(const sample *sample, int i_isotope) {
-    int i;
-    for(i = sample->n_ranges - 1; i >= 0; i--) {
+double sample_isotope_max_depth(const sample *sample, size_t i_isotope) {
+    for(size_t i = sample->n_ranges; i--;) {
         double *c = sample_conc_bin(sample, i, i_isotope);
-        if(*c > 0.0) /* TODO: other cutoff? */
-            break;
+        if(*c > ABUNDANCE_THRESHOLD) {
+            return sample->ranges[i].x;
+        }
     }
-    return sample->ranges[i].x;
+    return 0.0;
 }
 
 void sample_sort_isotopes(sample *sample) {

@@ -77,7 +77,7 @@ sample *sample_copy(const sample *sample); /* Deep copy */
 void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes);
 void sample_print(FILE *f, const sample *sample, int print_isotopes); /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
 void sample_free(sample *sample);
-double sample_isotope_max_depth(const sample *sample, int i_isotope);
+double sample_isotope_max_depth(const sample *sample, size_t i_isotope);
 inline double *sample_model_conc_bin(const sample_model *sm, size_t i_range, size_t i_material) {
     return sm->cbins + i_range * sm->n_materials + i_material;
 }

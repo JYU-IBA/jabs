@@ -122,6 +122,28 @@ depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, depth de
     return fulldepth; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
+double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const ion *incident, const reaction *r, double theta, double E_front, double E_back, const depth *d_before, const depth *d_after) {
+    double sigma;
+   // if(ws->mean_conc_and_energy) {
+        const depth d_halfdepth = {.x = (d_before->x + d_after->x)/2.0, .i = d_after->i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
+        double c = get_conc(sample, d_halfdepth, r->i_isotope);
+        if(c < ABUNDANCE_THRESHOLD)
+            return 0.0;
+        const double E_mean = (E_front + E_back) / 2.0;
+    //}
+    switch (r->type) {
+        case REACTION_RBS:
+            sigma = jibal_cross_section_rbs(incident->isotope, r->target, theta, E_mean, ws->jibal_config->cs_rbs);
+            break;
+        case REACTION_ERD:
+            sigma = jibal_cross_section_erd(incident->isotope, r->target, theta, E_mean, ws->jibal_config->cs_erd);
+            break;
+        default:
+            sigma = 0.0;
+    }
+    return sigma*c;
+}
+
 void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample system at depth x_0 */
     assert(sample->n_ranges);
     double thickness = sample->ranges[sample->n_ranges-1].x;
@@ -150,6 +172,9 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         b->E_0 = ion1.E;
         if(r->r->K < K_min)
             K_min = r->r->K;
+#ifdef DEBUG
+        fprintf(stderr, "Simulation reaction %zu: %s. Max depth %g tfu.\n", i, r->r->target->name, r->max_depth / C_TFU);
+#endif
     }
     assert(K_min > 0.0);
     i_depth=1;
@@ -168,6 +193,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         }
 
         double E_front = ion1.E;
+        double S_front = ion1.S;
         depth d_after = stop_step(ws, &ion1, sample, d_before, ws->sim.stop_step_incident == 0.0?sqrt(ws->sim.det.resolution+K_min*(ion1.S)):ws->sim.stop_step_incident);
 #ifdef DEBUG
         fprintf(stderr, "After:  %g tfu in range %zu\n", d_after.x/C_TFU, d_after.i);
@@ -176,15 +202,13 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             fprintf(stderr, "Error: no progress was made (E = %g keV, depth = %g tfu), check stopping.\n", ion1.E/C_KEV, d_before.x/C_TFU);
             break;
         }
-        const depth d_halfdepth = {.x = (d_before.x + d_after.x)/2.0, .i = d_after.i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         /* DEPTH BIN [x, x+h) */
         double E_back = ion1.E;
+        double S_back = ion1.S;
 #ifdef DEBUG_VERBOSE
         double E_diff = E_front-E_back;
         fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3lf keV to  %8.3lf keV (diff %6.4lf keV)\n", x/C_TFU, (x+h)/C_TFU, E_front/C_KEV, ws->ion.E/C_KEV, E_diff/C_KEV);
 #endif
-        double S_back = ion1.S;
-        double E_mean = (E_front + E_back) / 2.0;
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
                         E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ion1.S) / C_KEV);
@@ -207,7 +231,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             if (d_before.x >= r->max_depth) {
 #ifdef DEBUG
                 fprintf(stderr, "Reaction %lu with %s stops, because maximum depth is reached at x = %.3lf tfu.\n",
-                        i, r->r->isotope->name, d_before.x / C_TFU); /* TODO: give reactions a name */
+                        i, r->r->target->name, d_before.x / C_TFU); /* TODO: give reactions a name */
 #endif
                 b->Q = -1.0;
                 r->stop = 1;
@@ -216,7 +240,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             depth d = d_after;
             depth d_exit;
 #ifdef DEBUG
-            fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->isotope->name);
+            fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
 #endif
             while(1) {
 #ifdef DEBUG
@@ -227,7 +251,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
 #ifdef DEBUG
                     fprintf(stderr,
                             "  Reaction %lu with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
-                            i, r->r->isotope->name, d_after.x / C_TFU);
+                            i, r->r->target->name, d_after.x / C_TFU);
 #endif
                     break;
                 }
@@ -237,44 +261,29 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                 }
                 d = d_exit;
             }
-            double c = get_conc(sample, d_halfdepth, r->r->i_isotope); /* TODO: concentration at half depth (x+step/2.0) is actually exact for linearly varying concentration profiles. State this clearly somewhere. */
-            if(d_halfdepth.i == sample->n_ranges-2) {
-                c *= ws->sim.channeling;
-            }
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
-            if (c > ABUNDANCE_THRESHOLD && r->p.E > ws->sim.emin) {/* TODO: concentration cutoff? TODO: it->E should be updated when we start calculating it again?*/
-                double sigma;
-                switch (r->r->type) {
-                    case REACTION_RBS:
-                        sigma = jibal_cross_section_rbs(ion1.isotope, r->r->isotope, scatter_theta, E_mean, ws->jibal_config->cs_rbs);
-                        break;
-                    case REACTION_ERD:
-                        sigma = jibal_cross_section_erd(ion1.isotope, r->r->isotope, scatter_theta, E_mean, ws->jibal_config->cs_erd);
-                        break;
-                    default:
-                        sigma = 0.0;
-                }
-                double Q = c * fabs(incident->inverse_cosine_theta) * sigma * depth_diff(d_before, d_after); /* TODO: worst possible approximation... */ /* Note that ion is not the same as incident anymore. Incident has the original angles. */
+            if (r->p.E > ws->sim.emin) {
+                double sigma_conc = cross_section_concentration_product(ws, sample, &ion1, r->r, scatter_theta, E_front,
+                                                                        E_back, &d_before, &d_after); /* Product of concentration and sigma */
+                if(sigma_conc > 0.0) {
+                    if(d_after.i == sample->n_ranges - 2) {
+                        sigma_conc *= ws->sim.channeling;
+                    }
+                    b->Q = fabs(incident->inverse_cosine_theta) * sigma_conc * depth_diff(d_before, d_after); /* Note that ion is not the same as incident anymore. Incident has the original angles. */
 #ifdef DEBUG
-                fprintf(stderr, "    %s: type=%i, E_mean = %.3lf, E_after = %.3lf, E_out = %.3lf (sigma = %g mb/sr, Q = %g (c = %.4lf%%, thickness = %.4lf tfu)\n",
-                                 r->r->isotope->name, r->r->type, E_mean/C_KEV, (ion1.E * r->r->K)/C_KEV, r->p.E/C_KEV, sigma/C_MB_SR, Q, c*100.0, depth_diff(d_before, d_after)/C_TFU);
+                    fprintf(stderr, "    %s: type=%i, E_front = %.3lf, E_after = %.3lf, E_out = %.3lf (sigma*conc = %g mb/sr, Q = %g (thickness = %.4lf tfu)\n",
+                                 r->r->target->name, r->r->type, E_front/C_KEV, (ion1.E * r->r->K)/C_KEV, r->p.E/C_KEV, sigma_conc/C_MB_SR, b->Q, depth_diff(d_before, d_after)/C_TFU);
 #endif
-                assert(sigma > 0.0);
-                assert(r->p.S > 0.0);
-                assert(Q < 1.0e7 || Q > 0.0);
-                assert(i_depth < r->n_bricks);
-                b->Q = Q;
-            } else {
-                if (r->p.E < ws->sim.emin) {
-                    r->stop = 1;
-                    r->bricks[i_depth].Q = -1.0;
-#ifdef DEBUG
-                    fprintf(stderr, "This was last depth for this reaction (and it didn't count anymore)\n");
-#endif
-                } else {
+                 } else {
                     b->Q = 0.0;
                 }
+            } else {
+                r->stop = 1;
+                r->bricks[i_depth].Q = -1.0;
+#ifdef DEBUG
+                fprintf(stderr, "This was last depth for this reaction (and it didn't count anymore)\n");
+#endif
             }
         }
         d_before = d_after;
@@ -300,28 +309,29 @@ reaction make_reaction(const sample *sample, const simulation *sim, const size_t
 #endif
     reaction r;
     r.type = type;
-    r.isotope = sample->isotopes[i_isotope];
+    r.incident = sim->beam_isotope;
+    r.target = sample->isotopes[i_isotope];
     r.i_isotope = i_isotope;
-    if(!r.isotope) {
+    if(!r.target) {
         r.type = REACTION_NONE;
         return r;
     }
     r.i_isotope = i_isotope;
     if(type == REACTION_RBS) {
-        double theta_max=asin(r.isotope->mass/sim->beam_isotope->mass);
-        if(sim->beam_isotope->mass >= r.isotope->mass && sim->theta > theta_max) {
-            fprintf(stderr, "RBS with %s is not possible (theta max %g deg, sim theta %g deg)\n", r.isotope->name, theta_max/C_DEG, sim->theta/C_DEG);
+        double theta_max=asin(r.target->mass/r.incident->mass);
+        if(r.incident->mass >= r.target->mass && sim->theta > theta_max) {
+            fprintf(stderr, "RBS with %s is not possible (theta max %g deg, sim theta %g deg)\n", r.target->name, theta_max/C_DEG, sim->theta/C_DEG);
             r.type = REACTION_NONE;
             return r;
         }
-        r.K = jibal_kin_rbs(sim->beam_isotope->mass, r.isotope->mass, sim->theta, '+');
+        r.K = jibal_kin_rbs(r.incident->mass, r.target->mass, sim->theta, '+');
     } else if (type == REACTION_ERD) {
         if(sim->theta > C_PI/2.0) {
-            fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)", r.isotope->name, sim->theta);
+            fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)", r.target->name, sim->theta);
             r.type = REACTION_NONE;
             return r;
         }
-        r.K = jibal_kin_erd(sim->beam_isotope->mass, r.isotope->mass, sim->theta);
+        r.K = jibal_kin_erd(r.incident->mass, r.target->mass, sim->theta);
     } else {
         r.type = REACTION_NONE;
         return r;
@@ -368,7 +378,7 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim, const sample *sampl
         }
         for(const reaction *r = reactions; r->type != REACTION_NONE; r++) {
             if(r->type == REACTION_ERD) {
-                if (!jibal_gsto_auto_assign(gsto, r->isotope->Z, Z2)) {
+                if (!jibal_gsto_auto_assign(gsto, r->target->Z, Z2)) {
                     fprintf(stderr, "Can not assign stopping.\n");
                     return 1;
                 }
@@ -396,7 +406,7 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
             }
             for(size_t j = 0; j < ws->n_reactions; j++) {
                 const reaction *r = ws->reactions[j].r;
-                fprintf(f, ",\"%s (%s)\"", r->isotope->name, reaction_name(r));
+                fprintf(f, ",\"%s (%s)\"", r->target->name, reaction_name(r));
             }
             fprintf(f, "\n");
         }
@@ -513,7 +523,7 @@ void output_bricks(const char *filename, const sim_workspace *ws) {
         return;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const sim_reaction *r = &ws->reactions[i];
-        fprintf(f, "#%s %s\n", reaction_name(r->r), r->r->isotope->name);
+        fprintf(f, "#%s %s\n", reaction_name(r->r), r->r->target->name);
         for(size_t j = 0; j < r->n_bricks; j++) {
             brick *b = &r->bricks[j];
             if(b->Q < 0.0)
@@ -551,7 +561,7 @@ void no_ds(sim_workspace *ws, const sample *sample) {
     for(size_t i = 0; i < sample->n_ranges; i++) {
         if(sample->ranges[i].rough.model != ROUGHNESS_NONE) {
 #ifdef DEBUG
-            fprintf(stderr, "Range %zu is rough, model %i, amount %g tfu, n = %zu spectra\n", i, sample->ranges[i].rough.model, sample->ranges[i].rough.x/C_TFU, sample->ranges->rough.n);
+            fprintf(stderr, "Range %zu is rough, model %i, amount %g tfu, n = %zu spectra\n", i, sample->ranges[i].rough.model, sample->ranges[i].rough.x/C_TFU, sample->ranges[i].rough.n);
 #endif
             assert(sample->ranges[i].rough.n > 0);
             tpd[j] = thickness_probability_table_gen(sample->ranges[i].x, sample->ranges[i].rough.x, sample->ranges[i].rough.n);

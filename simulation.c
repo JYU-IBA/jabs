@@ -114,9 +114,11 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
     if (sim->fast) {
         ws->rk4 = 0;
         ws->nucl_stop_accurate = 0;
+        ws->mean_conc_and_energy = 1;
     } else {
         ws->rk4 = 1;
         ws->nucl_stop_accurate = 1;
+        ws->mean_conc_and_energy = 0;
     }
     sim_workspace_recalculate_n_channels(ws, sim);
 
