@@ -129,7 +129,8 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
         if(c < ABUNDANCE_THRESHOLD)
             return 0.0;
         const double E_mean = (E_front + E_back) / 2.0;
-        double sigma = sim_reaction_cross_section_rbs(sim_r, E_mean);
+        assert(sim_r->cross_section);
+        double sigma = sim_r->cross_section(sim_r, E_mean);
         return sigma*c;
     } else {
 
@@ -147,6 +148,14 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     rotate(ws->sim.det.theta, ws->sim.det.phi, ws->sim.sample_theta, ws->sim.sample_phi, &theta, &phi); /* Detector in sample coordinate system */
     rotate(ws->sim.det.theta, ws->sim.det.phi, ion1.theta, ion1.phi, &scatter_theta, &scatter_phi); /* Detector in ion system */
     rotate(scatter_theta, scatter_phi, -ws->sim.sample_theta, -ws->sim.sample_phi, &scatter_theta, &scatter_phi); /* Counter sample rotation. Detector in lab (usually). If ion was somehow "deflected" then this is the real scattering angle. Compare to sim->theta.  */
+#ifdef DEBUG
+    fprintf(stderr, "Simulate from depth %g tfu, sim_theta = %g deg, theta = %g deg. %zu reactions.\n", x_0/C_TFU, ws->sim.theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
+    fprintf(stderr, "Incident lab angles %g deg and %g deg\n", incident->theta/C_DEG, incident->phi/C_DEG);
+    fprintf(stderr, "Sample lab angles %g deg and %g deg, detector lab angles %g deg and %g deg\n", ws->sim.sample_theta/C_DEG, ws->sim.sample_phi/C_DEG, ws->sim.det.theta/C_DEG, ws->sim.det.phi/C_DEG);
+    fprintf(stderr, "Reaction angles (in sample) %g deg and %g deg\n", theta/C_DEG, phi/C_DEG);
+    fprintf(stderr, "Final lab scattering angles %g deg and %g deg\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
+#endif
+    assert(fabs(ws->sim.theta - scatter_theta) < 0.01*C_DEG); /* TODO: with DS this might is wrong */
     double K_min = 1.0;
     depth d_before = depth_seek(sample, x_0);
     for(size_t i = 0; i < ws->n_reactions; i++) {
@@ -317,7 +326,7 @@ reaction *make_reactions(const sample *sample, const simulation *sim, jibal_cros
         for (size_t i = 0; i < sample->n_isotopes; i++) {
             *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_RBS, cs_rbs, sim->theta);
             if (r->type == REACTION_NONE) {
-                fprintf(stderr, "Failed to make an RBS reaction %lu (with %s)\n", i, sample->isotopes[i]->name);
+                fprintf(stderr, "Failed to make an RBS reaction with isotope %zu (%s)\n", i, sample->isotopes[i]->name);
             } else {
                 r++;
             }
@@ -327,7 +336,7 @@ reaction *make_reactions(const sample *sample, const simulation *sim, jibal_cros
         for (size_t i = 0; i < sample->n_isotopes; i++) {
             *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_ERD, cs_erd, sim->theta);
             if (r->type == REACTION_NONE) {
-                fprintf(stderr, "Failed to make an ERD reaction %lu (with %s)\n", i, sample->isotopes[i]->name);
+                fprintf(stderr, "Failed to make an ERD reaction with isotope %zu (%s)\n", i, sample->isotopes[i]->name);
             } else {
                 r++;
             }
@@ -518,6 +527,8 @@ void no_ds(sim_workspace *ws, const sample *sample) {
     fprintf(stderr, "%zu rough layers\n", n_rl);
 #endif
     if(!n_rl) {
+        ion_set_angle(&ws->ion, 0.0, 0.0);
+        ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
         simulate(&ws->ion, 0.0, ws, sample);
         return;
     }

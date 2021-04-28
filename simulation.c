@@ -249,6 +249,9 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *r) {
         default:
             return;
     }
+#ifdef DEBUG
+    fprintf(stderr, "Reaction recalculated, theta = %g deg, K = %g\n", r->theta/C_DEG, r->K);
+#endif
 }
 
 double sim_reaction_cross_section_rbs(const sim_reaction *sim_r, double E) {
