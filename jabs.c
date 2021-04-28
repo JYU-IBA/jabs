@@ -122,26 +122,19 @@ depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, depth de
     return fulldepth; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
-double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, size_t i_isotope, const ion *incident, const reaction *r, double theta, double E_front, double E_back, const depth *d_before, const depth *d_after) {
-    double sigma;
-   // if(ws->mean_conc_and_energy) {
+double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, size_t i_isotope, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after) {
+   if(ws->mean_conc_and_energy) {
         const depth d_halfdepth = {.x = (d_before->x + d_after->x)/2.0, .i = d_after->i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         double c = get_conc(sample, d_halfdepth, i_isotope);
         if(c < ABUNDANCE_THRESHOLD)
             return 0.0;
         const double E_mean = (E_front + E_back) / 2.0;
-    //}
-    switch (r->type) {
-        case REACTION_RBS:
-            sigma = jibal_cross_section_rbs(incident->isotope, r->target, theta, E_mean, ws->jibal_config->cs_rbs);
-            break;
-        case REACTION_ERD:
-            sigma = jibal_cross_section_erd(incident->isotope, r->target, theta, E_mean, ws->jibal_config->cs_erd);
-            break;
-        default:
-            sigma = 0.0;
-    }
-    return sigma*c;
+        double sigma = sim_reaction_cross_section_rbs(sim_r, E_mean);
+        return sigma*c;
+    } else {
+
+   }
+    return 0.0;
 }
 
 void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample system at depth x_0 */
@@ -158,18 +151,20 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     depth d_before = depth_seek(sample, x_0);
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
+        r->theta = scatter_theta;
+        sim_reaction_recalculate_internal_variables(r);
         ion *p = &r->p;
-        p->E = ion1.E * r->r->K;
+        p->E = ion1.E * r->K;
         p->S = 0.0;
         r->max_depth = sample_isotope_max_depth(sample, r->i_isotope);
         ion_set_angle(p, theta, phi); /* Reaction products travel towards the detector (in the sample system), calculated above */
         brick *b = &r->bricks[0];
-        b->E = ion1.E * r->r->K;
+        b->E = ion1.E * r->K;
         b->S = 0.0;
         b->d = d_before;
         b->E_0 = ion1.E;
-        if(r->r->K < K_min)
-            K_min = r->r->K;
+        if(r->K < K_min)
+            K_min = r->K;
         if(r->i_isotope >= sample->n_isotopes) { /* No target isotope for reaction. */
             r->stop = TRUE;
             b->Q = -1.0;
@@ -228,8 +223,8 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                 continue;
             }
             brick *b = &r->bricks[i_depth];
-            r->p.E = ion1.E * r->r->K;
-            r->p.S = ion1.S * r->r->K;
+            r->p.E = ion1.E * r->K;
+            r->p.S = ion1.S * r->K;
             b->d = d_after;
             b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
             assert(r->p.E > 0.0);
@@ -269,8 +264,8 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
             if (r->p.E > ws->sim.emin) {
-                double sigma_conc = cross_section_concentration_product(ws, sample, r->i_isotope, &ion1, r->r, scatter_theta, E_front,
-                                                                        E_back, &d_before, &d_after); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
+                double sigma_conc = cross_section_concentration_product(ws, sample, r->i_isotope, r, E_front, E_back,
+                                                                        &d_before, &d_after); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
                 if(sigma_conc > 0.0) {
                     if(d_after.i == sample->n_ranges - 2) {
                         sigma_conc *= ws->sim.channeling;
@@ -278,7 +273,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                     b->Q = fabs(incident->inverse_cosine_theta) * sigma_conc * d_diff; /* Note that ion is not the same as incident anymore. Incident has the original angles. */
 #ifdef DEBUG
                     fprintf(stderr, "    %s: type=%i, E_front = %.3lf, E_after = %.3lf, E_out = %.3lf (sigma*conc = %g mb/sr, Q = %g (thickness = %.4lf tfu)\n",
-                                 r->r->target->name, r->r->type, E_front/C_KEV, (ion1.E * r->r->K)/C_KEV, r->p.E/C_KEV, sigma_conc/C_MB_SR, b->Q, d_diff/C_TFU);
+                                 r->r->target->name, r->r->type, E_front/C_KEV, (ion1.E * r->K)/C_KEV, r->p.E/C_KEV, sigma_conc/C_MB_SR, b->Q, d_diff/C_TFU);
 #endif
                  } else {
                     b->Q = 0.0;
@@ -308,15 +303,19 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     convolute_bricks(ws);
 }
 
-reaction *make_reactions(const sample *sample, const simulation *sim, int rbs, int erd) { /* Note that sim->ion needs to be set! */
-    if(sim->theta > C_PI/2.0)
-        erd = 0; /* Default when ERD is not possible :) */
+reaction *make_reactions(const sample *sample, const simulation *sim, jibal_cross_section_type cs_rbs, jibal_cross_section_type cs_erd) { /* Note that sim->ion needs to be set! */
+    int rbs = (cs_rbs != JIBAL_CS_NONE);
+    int erd = (cs_erd != JIBAL_CS_NONE);
+    if(sim->theta > C_PI/2.0) {
+        erd = FALSE;
+        cs_erd = JIBAL_CS_NONE; /* Default when ERD is not possible :) */
+    }
     size_t n_reactions = (sample->n_isotopes*rbs + sample->n_isotopes*erd + 1); /* TODO: we can predict this more accurately */
     reaction *reactions = malloc(n_reactions*sizeof(reaction));
     reaction *r = reactions;
     if(rbs) {
         for (size_t i = 0; i < sample->n_isotopes; i++) {
-            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_RBS, sim->theta);
+            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_RBS, cs_rbs, sim->theta);
             if (r->type == REACTION_NONE) {
                 fprintf(stderr, "Failed to make an RBS reaction %lu (with %s)\n", i, sample->isotopes[i]->name);
             } else {
@@ -326,7 +325,7 @@ reaction *make_reactions(const sample *sample, const simulation *sim, int rbs, i
     }
     if(erd) {
         for (size_t i = 0; i < sample->n_isotopes; i++) {
-            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_ERD, sim->theta);
+            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_ERD, cs_erd, sim->theta);
             if (r->type == REACTION_NONE) {
                 fprintf(stderr, "Failed to make an ERD reaction %lu (with %s)\n", i, sample->isotopes[i]->name);
             } else {

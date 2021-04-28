@@ -45,7 +45,7 @@ typedef struct {
     double channeling; /* a very ad-hoc channeling yield correction */
 } simulation;
 
-typedef struct {
+typedef struct sim_reaction {
     const reaction *r;
     ion p; /* Reaction product */
     gsl_histogram *histo;
@@ -54,6 +54,9 @@ typedef struct {
     int stop;
     double max_depth;
     size_t i_isotope; /* Number of isotope (r->target) in sample->isotopes */
+    double theta;
+    double K;
+    double (*cross_section)(const struct sim_reaction *, double);
 } sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
 
 
@@ -85,4 +88,8 @@ void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);
 void simulation_print(FILE *f, const simulation *sim);
 void convolute_bricks(sim_workspace *ws);
+void sim_reaction_recalculate_internal_variables(sim_reaction *r);
+double sim_reaction_cross_section_rbs(const sim_reaction *r, double E);
+double sim_reaction_cross_section_erd(const sim_reaction *r, double E);
+double sim_reaction_cross_section_none(const sim_reaction *r, double E);
 #endif // JABS_SIMULATION_H

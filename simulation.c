@@ -112,13 +112,13 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
 
     ws->stopping_type = GSTO_STO_TOT;
     if (sim->fast) {
-        ws->rk4 = 0;
-        ws->nucl_stop_accurate = 0;
-        ws->mean_conc_and_energy = 1;
+        ws->rk4 = FALSE;
+        ws->nucl_stop_accurate = FALSE;
+        ws->mean_conc_and_energy = TRUE;
     } else {
-        ws->rk4 = 1;
-        ws->nucl_stop_accurate = 1;
-        ws->mean_conc_and_energy = 0;
+        ws->rk4 = TRUE;
+        ws->nucl_stop_accurate = TRUE;
+        ws->mean_conc_and_energy = TRUE; /* TODO: should be FALSE when it is implemented */
     }
     sim_workspace_recalculate_n_channels(ws, sim);
 
@@ -163,10 +163,13 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
             ion_set_isotope(p, ws->ion.isotope);
             p->nucl_stop_isotopes = ws->ion.nucl_stop_isotopes;
             p->nucl_stop = ws->ion.nucl_stop; /* Shallow copy! Shared. */
-        }
-        if(r->r->type == REACTION_ERD) {
+            r->cross_section = sim_reaction_cross_section_rbs;
+        } else if(r->r->type == REACTION_ERD) {
             ion_set_isotope(p, r->r->target);
             ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes); /* This allocates memory */
+            r->cross_section = sim_reaction_cross_section_erd;
+        } else { /* TODO: implement other than the Rutherford RBS / ERD reactions too */
+            r->cross_section = sim_reaction_cross_section_none;
         }
     }
     ws->c = calloc(sample->n_isotopes, sizeof(double));
@@ -231,4 +234,56 @@ void convolute_bricks(sim_workspace *ws) {
 #endif
         brick_int2(r->histo, r->bricks, r->n_bricks, ws->sim.det.resolution, ws->sim.p_sr);
     }
+}
+
+void sim_reaction_recalculate_internal_variables(sim_reaction *r) {
+    switch(r->r->type) {
+        case REACTION_NONE:
+            r->K = 0.0;
+            return;
+        case REACTION_RBS:
+            r->K = jibal_kin_rbs(r->r->incident->mass, r->r->target->mass, r->theta, '+');
+            break;
+        case REACTION_ERD:
+            r->K = jibal_kin_erd(r->r->incident->mass, r->r->target->mass, r->theta);
+        default:
+            return;
+    }
+}
+
+double sim_reaction_cross_section_rbs(const sim_reaction *sim_r, double E) {
+#ifdef CROSS_SECTIONS_FROM_JIBAL
+    return jibal_cross_section_rbs(sim_r->r->incident, sim_r->r->target, sim_r->theta, E, sim_r->r->cs);
+#else
+    const reaction *r = sim_r->r;
+    double E_cm_ratio = r->target->mass / (r->incident->mass + r->target->mass);
+    double mass_ratio = r->incident->mass / r->target->mass;
+
+
+    double E_cm = E_cm_ratio * E;
+    double theta_cm = sim_r->theta + asin(mass_ratio * sin(sim_r->theta));;
+    double sigma_cm = pow2((r->incident->Z * C_E * r->target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) * pow2(1.0 / (4.0 * E_cm)) *
+                      pow4(1.0 / sin(theta_cm / 2.0));
+    double sigma_r = (sigma_cm * pow2(sin(theta_cm))) / (pow2(sin(sim_r->theta)) * cos(theta_cm - sim_r->theta));
+    double r_VE, F;
+    switch(r->cs) {
+        case JIBAL_CS_RUTHERFORD:
+            return sigma_r;
+        case JIBAL_CS_ANDERSEN:
+            r_VE = 48.73 * C_EV * r->incident->Z * r->target->Z * sqrt(pow(r->incident->Z, 2.0 / 3.0) + pow(r->target->Z, 2.0 / 3.0)) / E_cm;
+            F = pow2(1 + 0.5 * r_VE) / pow2(1 + r_VE + pow2(0.5 * r_VE / (sin(theta_cm / 2.0))));
+            return F * sigma_r;
+        default:
+            return sigma_r;
+    }
+#endif
+}
+
+double sim_reaction_cross_section_erd(const sim_reaction *sim_r, double E) {
+    return jibal_cross_section_erd(sim_r->r->incident, sim_r->r->target, sim_r->theta, E, sim_r->r->cs);
+    /* TODO: implement optimized version here */
+}
+
+double sim_reaction_cross_section_none(const sim_reaction *r, double E) {
+    return 0.0;
 }

@@ -35,11 +35,6 @@ extern inline double depth_diff(depth a, depth b);
 extern inline double *sample_conc_bin(const sample *s, size_t i_range, size_t i_isotope);
 extern inline double *sample_model_conc_bin(const sample_model *sm, size_t i_range, size_t i_material);
 
-extern inline int depth_is_almost_inside(double x, double low, double high) { /* Almost is good enough for us! */
-    static const double abs_tol = DEPTH_TOLERANCE; /* we consider x to be in range [low, high] with this tolerance */
-    return (x >= low-abs_tol && x <= high+abs_tol);
-}
-
 double get_conc(const sample *s, const depth depth, size_t i_isotope) {
     assert(i_isotope < s->n_isotopes);
     size_t i_range = depth.i;

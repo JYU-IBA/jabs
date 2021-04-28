@@ -97,7 +97,9 @@ int main(int argc, char **argv) {
     }
     sim_calculate_geometry(sim);
     reaction *reactions = NULL;
-    reactions = make_reactions(sample, sim, global.rbs, global.erd);
+    fprintf(stderr, "Default RBS cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_rbs));
+    fprintf(stderr, "Default ERD cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_erd));
+    reactions = make_reactions(sample, sim, global.rbs?jibal->config->cs_rbs:JIBAL_CS_NONE, global.erd?jibal->config->cs_erd:JIBAL_CS_NONE);
 
     fprintf(stderr, "\n");
     reactions_print(stderr, reactions);
@@ -112,9 +114,6 @@ int main(int argc, char **argv) {
     jibal_gsto_print_assignments(jibal->gsto);
     jibal_gsto_print_files(jibal->gsto, 1);
     jibal_gsto_load_all(jibal->gsto);
-
-
-    fprintf(stderr, "Default RBS cross section model used: %s\n", jibal_cs_rbs_name(jibal->config));
     simulation_print(stderr, sim);
     fprintf(stderr, "\nSTARTING SIMULATION... NOW! Hold your breath!\n");
     fflush(stderr);
