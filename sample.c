@@ -422,10 +422,16 @@ sample_model *sample_model_from_argv(jibal *jibal, int argc, char **argv) {
                 return NULL;
         }
         if(sm->n_ranges && strcmp(argv[0], "rough") == 0) {
-            sm->ranges[sm->n_ranges - 1].rough.x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]);
+            sample_range *range = &sm->ranges[sm->n_ranges - 1];
+            range->rough.x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]);
+            range->rough.model = ROUGHNESS_GAMMA;
         } else {
             sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, argv[0]);
-            sm->ranges[sm->n_ranges].x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]);
+            sample_range *range = &sm->ranges[sm->n_ranges];
+            range->x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]);
+            range->rough.x = 0.0;
+            range->rough.model = ROUGHNESS_NONE;
+            range->rough.n = 0;
             sm->n_ranges++;
             sm->n_materials++;
         }

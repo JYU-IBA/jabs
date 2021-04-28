@@ -520,7 +520,7 @@ void no_ds(sim_workspace *ws, const sample *sample) {
     double p_sr = ws->sim.p_sr;
     size_t n_rl = 0; /* Number of rough layers */
     for(size_t i = 0; i < sample->n_ranges; i++) {
-        if(sample->ranges[i].rough.model != ROUGHNESS_NONE)
+        if(sample->ranges[i].rough.model == ROUGHNESS_GAMMA)
             n_rl++;
     }
 #ifdef DEBUG
@@ -538,11 +538,11 @@ void no_ds(sim_workspace *ws, const sample *sample) {
     size_t j = 0;
     thick_prob_dist **tpd = malloc(sizeof(thick_prob_dist *) * n_rl);
     for(size_t i = 0; i < sample->n_ranges; i++) {
-        if(sample->ranges[i].rough.model != ROUGHNESS_NONE) {
+        if(sample->ranges[i].rough.model == ROUGHNESS_GAMMA) {
 #ifdef DEBUG
-            fprintf(stderr, "Range %zu is rough, model %i, amount %g tfu, n = %zu spectra\n", i, sample->ranges[i].rough.model, sample->ranges[i].rough.x/C_TFU, sample->ranges[i].rough.n);
+            fprintf(stderr, "Range %zu is rough (gamma), amount %g tfu, n = %zu spectra\n", i, sample->ranges[i].rough.x/C_TFU, sample->ranges[i].rough.n);
 #endif
-            assert(sample->ranges[i].rough.n > 0);
+            assert(sample->ranges[i].rough.n > 0 && sample->ranges[i].rough.n < 1000);
             tpd[j] = thickness_probability_table_gen(sample->ranges[i].x, sample->ranges[i].rough.x, sample->ranges[i].rough.n);
             index[j] = i;
             if(j)
