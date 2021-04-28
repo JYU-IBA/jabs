@@ -169,7 +169,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
             ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes); /* This allocates memory */
             r->cross_section = sim_reaction_cross_section_erd;
         } else { /* TODO: implement other than the Rutherford RBS / ERD reactions too */
-            r->cross_section = sim_reaction_cross_section_none;
+            r->cross_section = NULL;
         }
     }
     ws->c = calloc(sample->n_isotopes, sizeof(double));
@@ -237,20 +237,33 @@ void convolute_bricks(sim_workspace *ws) {
 }
 
 void sim_reaction_recalculate_internal_variables(sim_reaction *r) {
+    const jibal_isotope *incident = r->r->incident;
+    const jibal_isotope *target = r->r->target;
+    r->E_cm_ratio = target->mass / (incident->mass + target->mass);
+    r->mass_ratio = incident->mass / target->mass;
     switch(r->r->type) {
         case REACTION_NONE:
+            r->theta_cm = 0.0;
             r->K = 0.0;
             return;
         case REACTION_RBS:
             r->K = jibal_kin_rbs(r->r->incident->mass, r->r->target->mass, r->theta, '+');
+            r->theta_cm = r->theta + asin(r->mass_ratio * sin(r->theta));
+            r->sigma_to_lab_factor = (pow2(sin(r->theta_cm))) / (pow2(sin(r->theta)) * cos(r->theta_cm - r->theta));
+            r->cs_constant = r->sigma_to_lab_factor * pow2((incident->Z * C_E * target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) * pow4(1.0 / sin(r->theta_cm / 2.0));
             break;
         case REACTION_ERD:
             r->K = jibal_kin_erd(r->r->incident->mass, r->r->target->mass, r->theta);
+            r->theta_cm = C_PI - 2.0 * r->theta;
+            r->cs_constant = pow2(incident->Z*C_E*target->Z*C_E/(8*C_PI*C_EPSILON0)) * pow2(1.0 + incident->mass/target->mass) * pow(cos(r->theta), -3.0);
+            break;
         default:
             return;
     }
+
+    r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0));
 #ifdef DEBUG
-    fprintf(stderr, "Reaction recalculated, theta = %g deg, K = %g\n", r->theta/C_DEG, r->K);
+    fprintf(stderr, "Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g\n", r->theta/C_DEG, r->theta_cm/C_DEG, r->K);
 #endif
 }
 
@@ -259,34 +272,39 @@ double sim_reaction_cross_section_rbs(const sim_reaction *sim_r, double E) {
     return jibal_cross_section_rbs(sim_r->r->incident, sim_r->r->target, sim_r->theta, E, sim_r->r->cs);
 #else
     const reaction *r = sim_r->r;
-    double E_cm_ratio = r->target->mass / (r->incident->mass + r->target->mass);
-    double mass_ratio = r->incident->mass / r->target->mass;
-
-
-    double E_cm = E_cm_ratio * E;
-    double theta_cm = sim_r->theta + asin(mass_ratio * sin(sim_r->theta));;
-    double sigma_cm = pow2((r->incident->Z * C_E * r->target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) * pow2(1.0 / (4.0 * E_cm)) *
-                      pow4(1.0 / sin(theta_cm / 2.0));
-    double sigma_r = (sigma_cm * pow2(sin(theta_cm))) / (pow2(sin(sim_r->theta)) * cos(theta_cm - sim_r->theta));
+    const double E_cm = sim_r->E_cm_ratio * E;
+    const double sigma_r = sim_r->cs_constant * pow2(1.0 / (4.0 * E_cm));
     double r_VE, F;
     switch(r->cs) {
         case JIBAL_CS_RUTHERFORD:
             return sigma_r;
         case JIBAL_CS_ANDERSEN:
-            r_VE = 48.73 * C_EV * r->incident->Z * r->target->Z * sqrt(pow(r->incident->Z, 2.0 / 3.0) + pow(r->target->Z, 2.0 / 3.0)) / E_cm;
-            F = pow2(1 + 0.5 * r_VE) / pow2(1 + r_VE + pow2(0.5 * r_VE / (sin(theta_cm / 2.0))));
+            r_VE = sim_r->r_VE_factor / E_cm;
+            F = pow2(1 + 0.5 * r_VE) / pow2(1 + r_VE + pow2(0.5 * r_VE / (sin(sim_r->theta_cm / 2.0))));
             return F * sigma_r;
         default:
-            return sigma_r;
+            return 0.0;
     }
 #endif
 }
 
 double sim_reaction_cross_section_erd(const sim_reaction *sim_r, double E) {
+#ifdef CROSS_SECTIONS_FROM_JIBAL
     return jibal_cross_section_erd(sim_r->r->incident, sim_r->r->target, sim_r->theta, E, sim_r->r->cs);
-    /* TODO: implement optimized version here */
-}
-
-double sim_reaction_cross_section_none(const sim_reaction *r, double E) {
-    return 0.0;
+#else
+    const reaction *r = sim_r->r;
+    const double E_cm = sim_r->E_cm_ratio * E;
+    double sigma_r = sim_r->cs_constant / pow2(E) ;
+    double r_VE, F;
+    switch(r->cs) {
+        case JIBAL_CS_RUTHERFORD:
+            return sigma_r;
+        case JIBAL_CS_ANDERSEN:
+            r_VE = sim_r->r_VE_factor / E_cm;
+            F = pow2(1 + 0.5 * r_VE) / pow2(1 + r_VE + pow2(0.5 * r_VE / (sin(sim_r->theta_cm / 2.0))));
+            return F * sigma_r;
+        default:
+            return 0.0;
+    }
+#endif
 }

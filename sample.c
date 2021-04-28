@@ -203,6 +203,10 @@ sample *sample_from_sample_model(const sample_model *sm) {
 
     for(size_t i_range = 0; i_range < s->n_ranges; i_range++) { /* Set defaults for roughness */
         sample_range *r = &s->ranges[i_range];
+        if(r->rough.x < 0.01 * C_TFU) {
+            r->rough.model = ROUGHNESS_NONE;
+            r->rough.x = 0.0;
+        }
         if(r->rough.model == ROUGHNESS_GAMMA && r->rough.n == 0) { /* Zero is not valid number, but it means "auto" */
             /* TODO: implement variable number of spectra based on absolute and relative roughness. */
             r->rough.n = GAMMA_ROUGHNESS_STEPS;

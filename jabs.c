@@ -182,7 +182,8 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             b->Q = 0.0;
         }
 #ifdef DEBUG
-        fprintf(stderr, "Simulation reaction %zu: %s. Max depth %g tfu. i_isotope=%zu, stop = %i.\n", i, r->r->target->name, r->max_depth / C_TFU, r->i_isotope, r->stop);
+        fprintf(stderr, "Simulation reaction %zu: %s. Max depth %g tfu. i_isotope=%zu, stop = %i. Cross section at %g keV is %g mb/sr \n",
+                i, r->r->target->name, r->max_depth / C_TFU, r->i_isotope, r->stop, ion1.E/C_KEV, r->cross_section(r, ion1.E)/C_MB_SR);
 #endif
     }
     assert(K_min > 0.0);

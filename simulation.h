@@ -57,6 +57,12 @@ typedef struct sim_reaction {
     double theta;
     double K;
     double (*cross_section)(const struct sim_reaction *, double);
+    double theta_cm;
+    double mass_ratio; /* m1/m2, these are variables to speed up cross section calculation */
+    double E_cm_ratio;  /* m1/(m1+m2) */
+    double cs_constant; /* Rutherford cross section term for RBS (non-energy dependent) */
+    double sigma_to_lab_factor; /* Factor to convert cross section to lab */
+    double r_VE_factor; /* Andersen correction factor r_VE = this / E_cm */
 } sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
 
 
