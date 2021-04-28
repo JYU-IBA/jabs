@@ -133,6 +133,15 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
         ion *p = &r->p;
         ion_reset(p);
         r->max_depth = 0.0;
+        r->i_isotope = sample->n_isotopes; /* Intentionally not valid */
+        for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
+            if(sample->isotopes[i_isotope] == r->r->target) {
+#ifdef DEBUG
+                fprintf(stderr, "Reaction %zu target isotope %s is isotope number %zu in sample.\n", i_reaction, r->r->target->name, i_isotope);
+#endif
+                r->i_isotope = i_isotope;
+            }
+        }
         if(sim->depthsteps_max) {
             r->n_bricks = sim->depthsteps_max;
         } else {
@@ -156,7 +165,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
             p->nucl_stop = ws->ion.nucl_stop; /* Shallow copy! Shared. */
         }
         if(r->r->type == REACTION_ERD) {
-            ion_set_isotope(p, sample->isotopes[r->r->i_isotope]);
+            ion_set_isotope(p, r->r->target);
             ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes); /* This allocates memory */
         }
     }

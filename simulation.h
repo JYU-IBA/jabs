@@ -53,6 +53,7 @@ typedef struct {
     size_t n_bricks;
     int stop;
     double max_depth;
+    size_t i_isotope; /* Number of isotope (r->target) in sample->isotopes */
 } sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
 
 

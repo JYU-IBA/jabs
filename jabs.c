@@ -62,14 +62,14 @@ double next_crossing(const ion *incident, const sample  *sample, depth *depth) {
 depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, depth depth, double step) {
     double k1, k2, k3, k4, stop, dE, E;
     double h_max_perp = next_crossing(incident, sample, &depth);
-#ifdef DEBUG
+#ifdef DEBUG_STOP_STEP
     fprintf(stderr, "stop_step depth %g tfu (i=%zu) distance to next crossing %g tfu.\n", depth.x/C_TFU, depth.i, h_max_perp/C_TFU);
 #endif
     /* k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
     E = incident->E;
     k1 = stop_sample(ws, incident, sample, ws->stopping_type, depth, E);
     if(k1 < 0.001*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
-#ifdef DEBUG
+#ifdef DEBUG_STOP_STEP
         fprintf(stderr, "stop_step returns no progress, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)\n", k1/C_EV_TFU, depth.x/C_TFU, E/C_KEV);
 #endif
         return depth;
@@ -100,7 +100,7 @@ depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, depth de
 #if 0
     fprintf(stderr, "%s stop = %.3lf eV/tfu ( x = %.3lf, h = %.3lf, h_max = %.3lf), E = %.3lf keV, h = %6.3lf  dE = %.5lf keV\n", incident->isotope->name, stop/C_EV_TFU, x/C_TFU, h/C_TFU, h_max/C_TFU, E/C_KEV, h/C_TFU, dE/C_KEV);
 #endif
-#ifdef DEBUG
+#ifdef DEBUG_STOP_STEP
     if(fabs(stop) < 0.1*C_EV_TFU) {
         fprintf(stderr, "Not good!\n");
         return depth;
@@ -122,11 +122,11 @@ depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, depth de
     return fulldepth; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
-double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const ion *incident, const reaction *r, double theta, double E_front, double E_back, const depth *d_before, const depth *d_after) {
+double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, size_t i_isotope, const ion *incident, const reaction *r, double theta, double E_front, double E_back, const depth *d_before, const depth *d_after) {
     double sigma;
    // if(ws->mean_conc_and_energy) {
         const depth d_halfdepth = {.x = (d_before->x + d_after->x)/2.0, .i = d_after->i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
-        double c = get_conc(sample, d_halfdepth, r->i_isotope);
+        double c = get_conc(sample, d_halfdepth, i_isotope);
         if(c < ABUNDANCE_THRESHOLD)
             return 0.0;
         const double E_mean = (E_front + E_back) / 2.0;
@@ -161,19 +161,24 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         ion *p = &r->p;
         p->E = ion1.E * r->r->K;
         p->S = 0.0;
-        r->max_depth = sample_isotope_max_depth(sample, r->r->i_isotope);
+        r->max_depth = sample_isotope_max_depth(sample, r->i_isotope);
         ion_set_angle(p, theta, phi); /* Reaction products travel towards the detector (in the sample system), calculated above */
-        r->stop = 0;
         brick *b = &r->bricks[0];
         b->E = ion1.E * r->r->K;
         b->S = 0.0;
         b->d = d_before;
-        b->Q = 0.0;
         b->E_0 = ion1.E;
         if(r->r->K < K_min)
             K_min = r->r->K;
+        if(r->i_isotope >= sample->n_isotopes) { /* No target isotope for reaction. */
+            r->stop = TRUE;
+            b->Q = -1.0;
+        } else {
+            r->stop = FALSE;
+            b->Q = 0.0;
+        }
 #ifdef DEBUG
-        fprintf(stderr, "Simulation reaction %zu: %s. Max depth %g tfu.\n", i, r->r->target->name, r->max_depth / C_TFU);
+        fprintf(stderr, "Simulation reaction %zu: %s. Max depth %g tfu. i_isotope=%zu, stop = %i.\n", i, r->r->target->name, r->max_depth / C_TFU, r->i_isotope, r->stop);
 #endif
     }
     assert(K_min > 0.0);
@@ -191,20 +196,20 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
 #endif
             break;
         }
-
-        double E_front = ion1.E;
-        double S_front = ion1.S;
+        const double E_front = ion1.E;
+        const double S_front = ion1.S;
         depth d_after = stop_step(ws, &ion1, sample, d_before, ws->sim.stop_step_incident == 0.0?sqrt(ws->sim.det.resolution+K_min*(ion1.S)):ws->sim.stop_step_incident);
 #ifdef DEBUG
         fprintf(stderr, "After:  %g tfu in range %zu\n", d_after.x/C_TFU, d_after.i);
 #endif
-        if(d_after.x == d_before.x) {
+        const double d_diff = depth_diff(d_before, d_after);
+        if(d_diff < 0.001*C_TFU) {
             fprintf(stderr, "Error: no progress was made (E = %g keV, depth = %g tfu), check stopping.\n", ion1.E/C_KEV, d_before.x/C_TFU);
             break;
         }
         /* DEPTH BIN [x, x+h) */
-        double E_back = ion1.E;
-        double S_back = ion1.S;
+        const double E_back = ion1.E;
+        const double S_back = ion1.S;
 #ifdef DEBUG_VERBOSE
         double E_diff = E_front-E_back;
         fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3lf keV to  %8.3lf keV (diff %6.4lf keV)\n", x/C_TFU, (x+h)/C_TFU, E_front/C_KEV, ws->ion.E/C_KEV, E_diff/C_KEV);
@@ -219,7 +224,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                 continue;
             if (i_depth >= r->n_bricks) {
                 fprintf(stderr, "Too many bricks. Data partial.\n");
-                r->stop = 1;
+                r->stop = TRUE;
                 continue;
             }
             brick *b = &r->bricks[i_depth];
@@ -234,21 +239,21 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
                         i, r->r->target->name, d_before.x / C_TFU); /* TODO: give reactions a name */
 #endif
                 b->Q = -1.0;
-                r->stop = 1;
+                r->stop = TRUE;
                 continue;
             }
             depth d = d_after;
             depth d_exit;
-#ifdef DEBUG
+#ifdef DEBUG_REACTION
             fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
 #endif
             while(1) {
-#ifdef DEBUG
+#ifdef DEBUG_REACTION
                 fprintf(stderr, "  Exiting... depth = %g tfu (i = %zu)\n", d.x, d.i);
 #endif
                 d_exit = stop_step(ws, &r->p, sample, d, ws->sim.stop_step_exiting == 0.0?r->p.E*0.1+sqrt(r->p.S):ws->sim.stop_step_exiting); /* TODO: 10% of energy plus straggling is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
                 if(r->p.E < ws->sim.emin) {
-#ifdef DEBUG
+#ifdef DEBUG_REACTION
                     fprintf(stderr,
                             "  Reaction %lu with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
                             i, r->r->target->name, d_after.x / C_TFU);
@@ -264,22 +269,22 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
             if (r->p.E > ws->sim.emin) {
-                double sigma_conc = cross_section_concentration_product(ws, sample, &ion1, r->r, scatter_theta, E_front,
-                                                                        E_back, &d_before, &d_after); /* Product of concentration and sigma */
+                double sigma_conc = cross_section_concentration_product(ws, sample, r->i_isotope, &ion1, r->r, scatter_theta, E_front,
+                                                                        E_back, &d_before, &d_after); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
                 if(sigma_conc > 0.0) {
                     if(d_after.i == sample->n_ranges - 2) {
                         sigma_conc *= ws->sim.channeling;
                     }
-                    b->Q = fabs(incident->inverse_cosine_theta) * sigma_conc * depth_diff(d_before, d_after); /* Note that ion is not the same as incident anymore. Incident has the original angles. */
+                    b->Q = fabs(incident->inverse_cosine_theta) * sigma_conc * d_diff; /* Note that ion is not the same as incident anymore. Incident has the original angles. */
 #ifdef DEBUG
                     fprintf(stderr, "    %s: type=%i, E_front = %.3lf, E_after = %.3lf, E_out = %.3lf (sigma*conc = %g mb/sr, Q = %g (thickness = %.4lf tfu)\n",
-                                 r->r->target->name, r->r->type, E_front/C_KEV, (ion1.E * r->r->K)/C_KEV, r->p.E/C_KEV, sigma_conc/C_MB_SR, b->Q, depth_diff(d_before, d_after)/C_TFU);
+                                 r->r->target->name, r->r->type, E_front/C_KEV, (ion1.E * r->r->K)/C_KEV, r->p.E/C_KEV, sigma_conc/C_MB_SR, b->Q, d_diff/C_TFU);
 #endif
                  } else {
                     b->Q = 0.0;
                 }
             } else {
-                r->stop = 1;
+                r->stop = TRUE;
                 r->bricks[i_depth].Q = -1.0;
 #ifdef DEBUG
                 fprintf(stderr, "This was last depth for this reaction (and it didn't count anymore)\n");
@@ -303,42 +308,6 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     convolute_bricks(ws);
 }
 
-reaction make_reaction(const sample *sample, const simulation *sim, const size_t i_isotope, reaction_type type) {
-#ifdef DEBUG
-    fprintf(stderr, "Attempting to make reaction with sample isotope %lu (%s)\n", i_isotope, sample->isotopes[i_isotope]->name);
-#endif
-    reaction r;
-    r.type = type;
-    r.incident = sim->beam_isotope;
-    r.target = sample->isotopes[i_isotope];
-    r.i_isotope = i_isotope;
-    if(!r.target) {
-        r.type = REACTION_NONE;
-        return r;
-    }
-    r.i_isotope = i_isotope;
-    if(type == REACTION_RBS) {
-        double theta_max=asin(r.target->mass/r.incident->mass);
-        if(r.incident->mass >= r.target->mass && sim->theta > theta_max) {
-            fprintf(stderr, "RBS with %s is not possible (theta max %g deg, sim theta %g deg)\n", r.target->name, theta_max/C_DEG, sim->theta/C_DEG);
-            r.type = REACTION_NONE;
-            return r;
-        }
-        r.K = jibal_kin_rbs(r.incident->mass, r.target->mass, sim->theta, '+');
-    } else if (type == REACTION_ERD) {
-        if(sim->theta > C_PI/2.0) {
-            fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)", r.target->name, sim->theta);
-            r.type = REACTION_NONE;
-            return r;
-        }
-        r.K = jibal_kin_erd(r.incident->mass, r.target->mass, sim->theta);
-    } else {
-        r.type = REACTION_NONE;
-        return r;
-    }
-    return r;
-}
-
 reaction *make_reactions(const sample *sample, const simulation *sim, int rbs, int erd) { /* Note that sim->ion needs to be set! */
     if(sim->theta > C_PI/2.0)
         erd = 0; /* Default when ERD is not possible :) */
@@ -347,7 +316,7 @@ reaction *make_reactions(const sample *sample, const simulation *sim, int rbs, i
     reaction *r = reactions;
     if(rbs) {
         for (size_t i = 0; i < sample->n_isotopes; i++) {
-            *r = make_reaction(sample, sim, i, REACTION_RBS);
+            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_RBS, sim->theta);
             if (r->type == REACTION_NONE) {
                 fprintf(stderr, "Failed to make an RBS reaction %lu (with %s)\n", i, sample->isotopes[i]->name);
             } else {
@@ -357,7 +326,7 @@ reaction *make_reactions(const sample *sample, const simulation *sim, int rbs, i
     }
     if(erd) {
         for (size_t i = 0; i < sample->n_isotopes; i++) {
-            *r = make_reaction(sample, sim, i, REACTION_ERD);
+            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_ERD, sim->theta);
             if (r->type == REACTION_NONE) {
                 fprintf(stderr, "Failed to make an ERD reaction %lu (with %s)\n", i, sample->isotopes[i]->name);
             } else {
