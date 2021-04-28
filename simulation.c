@@ -261,11 +261,18 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *r) {
             return;
     }
 
-    r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0));
+    r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0)); /* Factors for Andersen correction */
+    r->r_VE_factor2 = pow2(0.5 / sin(r->theta_cm / 2.0));
 #ifdef DEBUG
     fprintf(stderr, "Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g\n", r->theta/C_DEG, r->theta_cm/C_DEG, r->K);
 #endif
 }
+
+double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm) {
+    const double r_VE = sim_r->r_VE_factor / E_cm;
+    return pow2(1 + 0.5 * r_VE) / pow2(1 + r_VE + sim_r->r_VE_factor2 * pow2(r_VE));
+}
+
 
 double sim_reaction_cross_section_rbs(const sim_reaction *sim_r, double E) {
 #ifdef CROSS_SECTIONS_FROM_JIBAL
@@ -274,14 +281,11 @@ double sim_reaction_cross_section_rbs(const sim_reaction *sim_r, double E) {
     const reaction *r = sim_r->r;
     const double E_cm = sim_r->E_cm_ratio * E;
     const double sigma_r = sim_r->cs_constant * pow2(1.0 / (4.0 * E_cm));
-    double r_VE, F;
     switch(r->cs) {
         case JIBAL_CS_RUTHERFORD:
             return sigma_r;
         case JIBAL_CS_ANDERSEN:
-            r_VE = sim_r->r_VE_factor / E_cm;
-            F = pow2(1 + 0.5 * r_VE) / pow2(1 + r_VE + pow2(0.5 * r_VE / (sin(sim_r->theta_cm / 2.0))));
-            return F * sigma_r;
+            return sigma_r * sim_reaction_andersen(sim_r, E_cm);
         default:
             return 0.0;
     }
@@ -295,14 +299,11 @@ double sim_reaction_cross_section_erd(const sim_reaction *sim_r, double E) {
     const reaction *r = sim_r->r;
     const double E_cm = sim_r->E_cm_ratio * E;
     double sigma_r = sim_r->cs_constant / pow2(E) ;
-    double r_VE, F;
     switch(r->cs) {
         case JIBAL_CS_RUTHERFORD:
             return sigma_r;
         case JIBAL_CS_ANDERSEN:
-            r_VE = sim_r->r_VE_factor / E_cm;
-            F = pow2(1 + 0.5 * r_VE) / pow2(1 + r_VE + pow2(0.5 * r_VE / (sin(sim_r->theta_cm / 2.0))));
-            return F * sigma_r;
+            return sigma_r * sim_reaction_andersen(sim_r, E_cm);
         default:
             return 0.0;
     }

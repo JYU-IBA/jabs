@@ -63,6 +63,7 @@ typedef struct sim_reaction {
     double cs_constant; /* Rutherford cross section term for RBS (non-energy dependent) */
     double sigma_to_lab_factor; /* Factor to convert cross section to lab */
     double r_VE_factor; /* Andersen correction factor r_VE = this / E_cm */
+    double r_VE_factor2;
 } sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
 
 
@@ -98,4 +99,5 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *r);
 double sim_reaction_cross_section_rbs(const sim_reaction *r, double E);
 double sim_reaction_cross_section_erd(const sim_reaction *r, double E);
 double sim_reaction_cross_section_none(const sim_reaction *r, double E);
+double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);
 #endif // JABS_SIMULATION_H
