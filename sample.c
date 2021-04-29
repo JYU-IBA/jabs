@@ -155,8 +155,10 @@ sample *sample_from_sample_model(const sample_model *sm) {
     sample_model *sm_copy = NULL;
     if(sm->type == SAMPLE_MODEL_LAYERED) {
         sm_copy = sample_model_to_point_by_point(sm);
-        if(!sm_copy)
+        if(!sm_copy) {
+            free(s);
             return NULL;
+        }
         sm = sm_copy;
         s->no_conc_gradients = TRUE;
     } else {
@@ -385,6 +387,7 @@ sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
             r->rough.x = 0.0;
         }
     }
+    free(line);
     return sm;
 }
 
