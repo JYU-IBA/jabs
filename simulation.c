@@ -211,6 +211,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
 void simulation_print(FILE *f, const simulation *sim) {
     fprintf(f, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass/C_U);
     fprintf(f, "E = %.3lf keV\n", sim->beam_E/C_KEV);
+    fprintf(f, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
     fprintf(f, "alpha = %.3lf deg\n", sim->alpha/C_DEG);
     fprintf(f, "beta = %.3lf deg\n", sim->beta/C_DEG);
     fprintf(f, "theta = %.3lf deg\n", sim->theta/C_DEG);

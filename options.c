@@ -40,6 +40,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"out",           required_argument, NULL, 'o'},
             {"ion",           required_argument, NULL, 'I'},
             {"energy",        required_argument, NULL, 'E'},
+            {"broad",         required_argument, NULL, 'B'},
             {"alpha",         required_argument, NULL, 'a'},
             {"theta",         required_argument, NULL, 't'},
             {"phi",           required_argument, NULL, 'p'},
@@ -76,6 +77,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Output to file instead of standard output. For CSV use .csv suffix.",
             "Incident ion (without charge state), e.g. 4He",
             "Incident beam energy. Please give units as well, e.g. 2MeV or \"2 MeV\" or 2000keV",
+            "Incident beam broadening (FWHM)",
             "Incident angle (from sample normal).",
             "Detector or scattering angle (from beam).",
             "Detector azimuthal angle (0 deg or 180 deg = IBM, +/-90 deg or 270 deg = Cornell).",
@@ -107,7 +109,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:prob:I:R:S:s:fe:Fd:D:c:C:", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:prob:I:R:S:s:fe:Fd:D:B:c:C:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -221,6 +223,9 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 break;
             case 'E':
                 sim->beam_E = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                break;
+            case 'B':
+                sim->beam_E_broad = pow2(jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg)/C_FWHM);
                 break;
             case 'I':
                 sim->beam_isotope = jibal_isotope_find(global->jibal->isotopes, optarg, 0, 0);
