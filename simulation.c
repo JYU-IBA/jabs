@@ -130,6 +130,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
     for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
         sim_reaction *r = &ws->reactions[i_reaction];
         r->r = &reactions[i_reaction];
+        assert(r->r->product);
         ion *p = &r->p;
         ion_reset(p);
         r->max_depth = 0.0;
@@ -159,16 +160,18 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
         set_spectrum_calibration(r->histo, &ws->sim.det);
         gsl_histogram_reset(r->histo);
         r->bricks = calloc(r->n_bricks, sizeof(brick));
+        ion_set_isotope(p, r->r->product);
         if(r->r->type == REACTION_RBS) {
-            ion_set_isotope(p, ws->ion.isotope);
+            assert(p->isotope == ws->ion.isotope);
             p->nucl_stop_isotopes = ws->ion.nucl_stop_isotopes;
             p->nucl_stop = ws->ion.nucl_stop; /* Shallow copy! Shared. */
             r->cross_section = sim_reaction_cross_section_rutherford;
         } else if(r->r->type == REACTION_ERD) {
-            ion_set_isotope(p, r->r->target);
             ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes); /* This allocates memory */
             r->cross_section = sim_reaction_cross_section_rutherford;
         } else { /* TODO: implement other than the Rutherford RBS / ERD reactions too */
+            p->nucl_stop = NULL;
+            p->nucl_stop_isotopes = 0;
             r->cross_section = NULL;
         }
     }

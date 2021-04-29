@@ -52,7 +52,7 @@ size_t reaction_count(const reaction *reactions) {
 
 
 
-reaction reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta) {
+reaction reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta, int force) {
     reaction r;
     r.type = type;
     r.cs = cs;
@@ -60,9 +60,14 @@ reaction reaction_make(const jibal_isotope *incident, const jibal_isotope *targe
     r.target = target;
     if(!r.target) {
         r.type = REACTION_NONE;
+        r.product = NULL;
         return r;
     }
     if(type == REACTION_RBS) {
+        r.product = incident;
+        if(force) {
+            return r;
+        }
         double theta_max=asin(r.target->mass/r.incident->mass);
         if(r.incident->mass >= r.target->mass && theta > theta_max) {
             fprintf(stderr, "RBS with %s is not possible (theta max %g deg, sim theta %g deg)\n", r.target->name, theta_max/C_DEG, theta/C_DEG);
@@ -70,6 +75,10 @@ reaction reaction_make(const jibal_isotope *incident, const jibal_isotope *targe
             return r;
         }
     } else if (type == REACTION_ERD) {
+        r.product = target;
+        if(force) {
+            return r;
+        }
         if(theta > C_PI/2.0) {
             fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)", r.target->name, theta);
             r.type = REACTION_NONE;

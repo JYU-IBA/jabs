@@ -173,15 +173,14 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         b->S = 0.0;
         b->d = d_before;
         b->E_0 = ion1.E;
+        b->Q = 0.0;
         if(r->K < K_min)
             K_min = r->K;
         if(r->i_isotope >= sample->n_isotopes) { /* No target isotope for reaction. */
             r->stop = TRUE;
         }
         if(r->stop) {
-            b->Q = -1.0;
-        } else {
-            b->Q = 0.0;
+            r->bricks[1].Q = -1.0;
         }
 #ifdef DEBUG
         fprintf(stderr, "Simulation reaction %zu: %s %s. Max depth %g tfu. i_isotope=%zu, stop = %i. Cross section at %g keV is %g mb/sr \n",
@@ -326,7 +325,7 @@ reaction *make_reactions(const sample *sample, const simulation *sim, jibal_cros
     reaction *r = reactions;
     if(rbs) {
         for (size_t i = 0; i < sample->n_isotopes; i++) {
-            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_RBS, cs_rbs, sim->theta);
+            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_RBS, cs_rbs, sim->theta, FALSE);
             if (r->type == REACTION_NONE) {
                 fprintf(stderr, "Failed to make an RBS reaction with isotope %zu (%s)\n", i, sample->isotopes[i]->name);
             } else {
@@ -336,7 +335,7 @@ reaction *make_reactions(const sample *sample, const simulation *sim, jibal_cros
     }
     if(erd) {
         for (size_t i = 0; i < sample->n_isotopes; i++) {
-            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_ERD, cs_erd, sim->theta);
+            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_ERD, cs_erd, sim->theta, FALSE);
             if (r->type == REACTION_NONE) {
                 fprintf(stderr, "Failed to make an ERD reaction with isotope %zu (%s)\n", i, sample->isotopes[i]->name);
             } else {

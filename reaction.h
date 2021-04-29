@@ -30,15 +30,18 @@ typedef enum {
 
 typedef struct reaction {
     reaction_type type;
+    /* Reactions are like this: target(incident,product)product_nucleus */
     const jibal_isotope *incident;
-    const jibal_isotope *target; /* target isotope */
-    jibal_cross_section_type cs;
+    const jibal_isotope *target;
+    const jibal_isotope *product;
+    const jibal_isotope *product_nucleus; /* Not used */
+    jibal_cross_section_type cs; /* Cross section model to use (e.g. screening corrections) */
     char *filename; /* for REACTION_FILE */
 } reaction;
 
 
 void reactions_print(FILE *f, const reaction *reactions);
-reaction reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta); /* theta is used to check sanity of RBS and ERD reactions */
+reaction reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta, int force); /* theta is used to check sanity of RBS and ERD reactions */
 const char *reaction_name(const reaction *r);
 size_t reaction_count(const reaction *reactions);
 #endif //JABS_REACTION_H
