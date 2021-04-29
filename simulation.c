@@ -247,11 +247,27 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *r) {
             r->K = 0.0;
             return;
         case REACTION_RBS:
+            if(incident->mass >= target->mass && r->theta > asin(target->mass/incident->mass)) {
+                r->K = 0.0;
+                r->cs_constant = 0.0;
+                r->stop = TRUE;
+                return;
+            }
             r->K = jibal_kin_rbs(r->r->incident->mass, r->r->target->mass, r->theta, '+');
             r->theta_cm = r->theta + asin(r->mass_ratio * sin(r->theta));
             r->cs_constant = (pow2(sin(r->theta_cm))) / (pow2(sin(r->theta)) * cos(r->theta_cm - r->theta)) * pow2((incident->Z * C_E * target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) * pow4(1.0 / sin(r->theta_cm / 2.0)) * (1.0/16.0);
             break;
         case REACTION_ERD:
+            if(r->theta > C_PI/2.0) {
+#ifdef DEBUG
+                fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)", target->name, r->theta);
+#endif
+                r->K = 0.0;
+                r->cs_constant = 0.0;
+                r->theta_cm = 0.0;
+                r->stop = TRUE;
+                return;
+            }
             r->K = jibal_kin_erd(r->r->incident->mass, r->r->target->mass, r->theta);
             r->theta_cm = C_PI - 2.0 * r->theta;
             r->cs_constant = pow2(incident->Z*C_E*target->Z*C_E/(8*C_PI*C_EPSILON0)) * pow2(1.0 + incident->mass/target->mass) * pow(cos(r->theta), -3.0) * pow2(r->E_cm_ratio);

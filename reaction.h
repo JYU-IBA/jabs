@@ -24,7 +24,8 @@ typedef enum {
     REACTION_NONE = 0,
     REACTION_RBS = 1,
     REACTION_ERD = 2,
-    REACTION_ARB = 3 /* TODO: types of reactions */
+    REACTION_FILE = 3,
+    REACTION_ARB = 4 /* TODO: types of reactions */
 } reaction_type;
 
 typedef struct reaction {
@@ -32,12 +33,12 @@ typedef struct reaction {
     const jibal_isotope *incident;
     const jibal_isotope *target; /* target isotope */
     jibal_cross_section_type cs;
-    /* TODO: cross sections from files */
+    char *filename; /* for REACTION_FILE */
 } reaction;
 
 
 void reactions_print(FILE *f, const reaction *reactions);
-reaction reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta);
+reaction reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta); /* theta is used to check sanity of RBS and ERD reactions */
 const char *reaction_name(const reaction *r);
 size_t reaction_count(const reaction *reactions);
 #endif //JABS_REACTION_H

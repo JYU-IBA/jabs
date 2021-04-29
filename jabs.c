@@ -160,6 +160,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     depth d_before = depth_seek(sample, x_0);
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
+        r->stop = FALSE;
         r->theta = scatter_theta;
         sim_reaction_recalculate_internal_variables(r);
         ion *p = &r->p;
@@ -176,9 +177,10 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             K_min = r->K;
         if(r->i_isotope >= sample->n_isotopes) { /* No target isotope for reaction. */
             r->stop = TRUE;
+        }
+        if(r->stop) {
             b->Q = -1.0;
         } else {
-            r->stop = FALSE;
             b->Q = 0.0;
         }
 #ifdef DEBUG
@@ -318,7 +320,6 @@ reaction *make_reactions(const sample *sample, const simulation *sim, jibal_cros
     int erd = (cs_erd != JIBAL_CS_NONE);
     if(sim->theta > C_PI/2.0) {
         erd = FALSE;
-        cs_erd = JIBAL_CS_NONE; /* Default when ERD is not possible :) */
     }
     size_t n_reactions = (sample->n_isotopes*rbs + sample->n_isotopes*erd + 1); /* TODO: we can predict this more accurately */
     reaction *reactions = malloc(n_reactions*sizeof(reaction));
