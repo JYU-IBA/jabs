@@ -199,7 +199,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "...finished!\n\n");
     fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
     for(reaction **r = reactions; *r != NULL; r++) {
-        free(*r);
+        reaction_free(*r);
     }
     free(reactions);
     sample_model_free(sm);

@@ -51,4 +51,5 @@ void reactions_print(FILE *f, reaction * const *reactions);
 reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta, int force); /* theta is used to check sanity of RBS and ERD reactions */
 const char *reaction_name(const reaction *r);
 size_t reaction_count(reaction * const *reactions);
+void reaction_free(reaction *r);
 #endif //JABS_REACTION_H

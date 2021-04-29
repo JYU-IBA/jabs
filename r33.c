@@ -16,29 +16,135 @@
 #include <string.h>
 #include "r33.h"
 
-r33_file *r33_alloc() {
+typedef enum {
+    R33_PARSE_STATE_INIT = 0,
+    R33_PARSE_STATE_COMMENT = 1,
+    R33_PARSE_STATE_HEADERS = 2,
+    R33_PARSE_STATE_DATA = 3,
+    R33_PARSE_STATE_END = 4
+} r33_parser_state;
+
+r33_file *r33_file_alloc() {
     r33_file *rfile = malloc(sizeof(r33_file));
     memset(rfile, 0, sizeof(r33_file));
     return rfile;
 }
 
-r33_file *r33_read(const char *filename) {
+void r33_file_free(r33_file *rfile) {
+    free(rfile->filename);
+    free(rfile->comment);
+    free(rfile->source);
+    free(rfile->name);
+    for(size_t i = 0; i < R33_N_ADDRESS_FIELDS; i++) {
+        free(rfile->address[i]);
+    }
+    free(rfile->reaction);
+    free(rfile->composition);
+    free(rfile->data);
+    free(rfile);
+}
+
+int r33_file_data_realloc(r33_file *rfile, size_t n) {
+    if(n == 0) {
+        n = R33_INITIAL_ALLOC;
+    }
+    if(n < rfile->n_data) {
+        fprintf(stderr, "Warning, possible data loss in R33 file.\n");
+        rfile->n_data = n;
+    }
+    rfile->data = realloc(rfile->data, sizeof(r33_data) * n);
+    if(!rfile->data)
+        return -1;
+    rfile->n_data_alloc = n;
+    return 0;
+}
+
+
+r33_file *r33_file_read(const char *filename) {
     FILE *f = fopen(filename, "r");
-    if(!f)
+    if(!f) {
+        fprintf(stderr, "Could open file \"%s\".", filename);
         return NULL;
-    r33_file *rfile = r33_alloc();
+    }
+    r33_file *rfile = r33_file_alloc();
     char *line = NULL;
     size_t line_size = 0;
     size_t lineno = 0;
-    while(getline(&line, &line_size, f) > 0) {
+    r33_parser_state state = R33_PARSE_STATE_INIT;
+    int valid = TRUE; /* Unless proven otherwise. */
+    while(getline(&line, &line_size, f) > 0 && valid) {
         lineno++;
-        line[strcspn(line, "\r\n")] = 0; /* Strips all kinds of newlines! */
-        char *line_split = line;
-#if 0
-        while((col = strsep(&line_split, " ,;:")) != NULL) {
-
+        line[strcspn(line, "\r\n")] = 0; /* Strips all kinds of newlines! R33 requires CR LF sequences, but we happily accept just LF. */
+        if(state == R33_PARSE_STATE_INIT || state == R33_PARSE_STATE_HEADERS) {
+            char *line_split = line;
+            strsep(&line_split, ":");
+            if(line_split == NULL) {
+                fprintf(stderr, "Line %zu is not valid. Stopping.\n", lineno);
+                valid = FALSE;
+                break;
+            }
+            if(line_split[0] == ' ') {
+                line_split++; /* Skip space. This parser doesn't care if there is no space! */
+            }
+            r33_header_type type = r33_header_type_find(line);
+            if(type != R33_HEADER_NONE) {
+                fprintf(stderr, "Line %zu: header type %i (%s)\n", lineno, type, r33_header_string(type));
+            }
+            if(state == R33_PARSE_STATE_INIT) {
+                if(type == R33_HEADER_COMMENT) {
+                    r33_string_append(&rfile->comment, line_split);
+                    state = R33_PARSE_STATE_COMMENT;
+                    continue;
+                } else {
+                    fprintf(stderr, "Expected comment field, got something else instead.\n");
+                    valid = FALSE;
+                    break;
+                }
+            }
+            /* This point is reached only when state is R33_PARSE_STATE_HEADERS */
+            if(type == R33_HEADER_DATA) {
+                state = R33_PARSE_STATE_DATA;
+                continue;
+            }
+            if(type >= R33_HEADER_ADDRESS1 && type <= R33_HEADER_ADDRESS9) {
+                r33_string_append(&rfile->address[type-R33_HEADER_ADDRESS1], line_split);
+            }
+        } else if(state == R33_PARSE_STATE_COMMENT) {
+            if(strlen(line) == 0) {
+                state = R33_PARSE_STATE_HEADERS;
+                continue;
+            }
+            r33_string_append(&rfile->comment, line);
+        } else if (state == R33_PARSE_STATE_DATA) {
+            if(strncmp(line, "End", 3) == 0) { /* "EndData:" or "Enddata" or "eNdDAta", we take the hint... */
+                state = R33_PARSE_STATE_END;
+                continue;
+            }
+            if(rfile->n_data == rfile->n_data_alloc) { /* Full, allocate more memory */
+                if(r33_file_data_realloc(rfile, rfile->n_data * 2)) {
+                    valid = FALSE;
+                    fprintf(stderr, "Issues with R33 file reallocation.\n");
+                }
+            }
+            if(r33_values_read(line, rfile->data[rfile->n_data], R33_N_DATA_COLUMNS) != R33_N_DATA_COLUMNS) {
+                fprintf(stderr, "Not enough data on line %zu.\n", lineno);
+                valid = FALSE;
+                break;
+            }
+            rfile->n_data++;
+        } else if (state == R33_PARSE_STATE_END) {
+            fprintf(stderr, "End reached, %zu lines read.\n", lineno);
+            break;
+        } else {
+            fprintf(stderr, "R33 parser state machine broken.\n");
+            break;
         }
-#endif
+    }
+    /* TODO: check that all required headers are given */
+    /* TODO: check that no conflicts exist (mutually exclusive or contradictory), handle some conflicts gracefully */
+    if(!valid) {
+        r33_file_free(rfile);
+        return NULL;
     }
     return rfile;
 }
@@ -55,6 +161,55 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     } else {
         r->filename = NULL;
     }
-    /* TODO: actual data */
+    /* TODO: copy and convert data (check units etc) */
     return r;
-};
+}
+
+const char *r33_header_string(r33_header_type type) {
+    for(const r33_header *h = r33_headers; h->type != 0; h++) {
+        if(type == h->type) {
+            return h->s;
+        }
+    }
+    return NULL;
+}
+
+r33_header_type r33_header_type_find(const char *s) {
+    if(!s)
+        return R33_HEADER_NONE;
+    for(const r33_header *h = r33_headers; h->s != 0; h++) {
+        if(strcmp(s, h->s) == 0) {
+            return h->type;
+        }
+    }
+    return R33_HEADER_NONE;
+}
+
+void r33_string_append(char **dest, const char *src) {
+    if(!*dest) {
+        *dest = strdup(src);
+        return;
+    }
+    size_t len = strlen(*dest) + 1 + strlen(src) + 1;
+    *dest = realloc(*dest, sizeof(char)*len+1);
+    strcat(*dest, "\n");
+    strcat(*dest, src);
+}
+
+size_t r33_values_read(const char *str, double *dest, size_t n) {
+    char *str_orig = strdup(str);
+    char *split = strdup(str);
+    char *col;
+    size_t i = 0;
+    while((col = strsep(&split, " ,;:")) != NULL) {
+        if(*col == '\0') {/* Multiple separators are treated as one */
+            continue;
+        }
+        if(i==n)
+            break;
+        dest[i] = strtod(split, NULL);
+        i++;
+    }
+    free(str_orig);
+    return i;
+}

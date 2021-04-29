@@ -97,3 +97,7 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     }
     return r;
 }
+
+void reaction_free(reaction *r) {
+    free(r->cs_table);
+}
