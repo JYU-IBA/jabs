@@ -87,9 +87,6 @@ r33_file *r33_file_read(const char *filename) {
                 line_split++; /* Skip space. This parser doesn't care if there is no space! */
             }
             r33_header_type type = r33_header_type_find(line);
-            if(type != R33_HEADER_NONE) {
-                fprintf(stderr, "Line %zu: header type %i (%s)\n", lineno, type, r33_header_string(type));
-            }
             if(state == R33_PARSE_STATE_INIT) {
                 if(type == R33_HEADER_COMMENT) {
                     r33_string_append(&rfile->comment, line_split);
@@ -102,13 +99,44 @@ r33_file *r33_file_read(const char *filename) {
                 }
             }
             /* This point is reached only when state is R33_PARSE_STATE_HEADERS */
+            if(type == R33_HEADER_NONE) {
+                fprintf(stderr, "Line %zu: unhandled header type \"%s\"\n", lineno, line);
+                continue;
+            }
+            if(type == R33_HEADER_VERSION) {
+                char *s = r33_string_upper(line_split);
+                if(strcmp(line_split, "R33A") == 0) {
+                    rfile->version = R33_VERSION_R33a;
+                } else if(strcmp(line_split, "R33") == 0) {
+                    rfile->version = R33_VERSION_R33;
+                } else {
+                    fprintf(stderr, "\"%s\" is not a valid or supported R33 file version. I'll assume you meant \"R33\".\n", line_split);
+                    rfile->version = R33_VERSION_R33; /* Grudgingly */
+                }
+                free(s);
+                continue;
+            }
+            if(type == R33_HEADER_SOURCE) {
+                r33_string_overwrite(&rfile->source, line_split);
+                continue;
+            }
+            if(type == R33_HEADER_NAME) {
+                r33_string_overwrite(&rfile->name, line_split);
+                continue;
+            }
+            if(type == R33_HEADER_REACTION) {
+                r33_string_overwrite(&rfile->reaction, line_split);
+                continue;
+            }
             if(type == R33_HEADER_DATA) {
                 state = R33_PARSE_STATE_DATA;
                 continue;
             }
             if(type >= R33_HEADER_ADDRESS1 && type <= R33_HEADER_ADDRESS9) {
-                r33_string_append(&rfile->address[type-R33_HEADER_ADDRESS1], line_split);
+                r33_string_overwrite(&rfile->address[type-R33_HEADER_ADDRESS1], line_split);
+                continue;
             }
+            fprintf(stderr, "Line %zu: unhandled valid header type %i (%s)\n", lineno, type, r33_header_string(type));
         } else if(state == R33_PARSE_STATE_COMMENT) {
             if(strlen(line) == 0) {
                 state = R33_PARSE_STATE_HEADERS;
@@ -133,14 +161,14 @@ r33_file *r33_file_read(const char *filename) {
             }
             rfile->n_data++;
         } else if (state == R33_PARSE_STATE_END) {
-            fprintf(stderr, "End reached, %zu lines read.\n", lineno);
+            fprintf(stderr, "End reached, %zu lines read.\n", lineno); /* This will NOT be printed out if data ends with Enddata */
             break;
         } else {
             fprintf(stderr, "R33 parser state machine broken.\n");
             break;
         }
     }
-    /* TODO: check that all required headers are given */
+    /* TODO: check that all required headers are given.. or don't, because they probably aren't. This is not a validator. */
     /* TODO: check that no conflicts exist (mutually exclusive or contradictory), handle some conflicts gracefully */
     if(!valid) {
         r33_file_free(rfile);
@@ -186,6 +214,8 @@ r33_header_type r33_header_type_find(const char *s) {
 }
 
 void r33_string_append(char **dest, const char *src) {
+    if(!src || src[0] == '\0') /* Appending NULL or null-terminated string is NOP */
+        return;
     if(!*dest) {
         *dest = strdup(src);
         return;
@@ -194,6 +224,16 @@ void r33_string_append(char **dest, const char *src) {
     *dest = realloc(*dest, sizeof(char)*len+1);
     strcat(*dest, "\n");
     strcat(*dest, src);
+}
+
+void r33_string_overwrite(char **dest, const char *src) {
+    if(!src || src[0] == '\0')
+        return;
+    if(*dest) {
+        free(*dest);
+    }
+    *dest = strdup(src);
+    return;
 }
 
 size_t r33_values_read(const char *str, double *dest, size_t n) {
@@ -212,4 +252,14 @@ size_t r33_values_read(const char *str, double *dest, size_t n) {
     }
     free(str_orig);
     return i;
+}
+
+char *r33_string_upper(const char *str) {
+    char *s_orig = strdup(str);
+    for(char *s = s_orig; *(s) != '\0'; s++) {
+        if(*s >= 'a' && *s < 'z') {
+            *s += 'A' - 'a';
+        }
+    }
+    return s_orig;
 }

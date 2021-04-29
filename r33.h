@@ -153,5 +153,7 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
 const char *r33_header_string(r33_header_type type);
 r33_header_type r33_header_type_find(const char *s);
 void r33_string_append(char **dest, const char *src);
+void r33_string_overwrite(char **dest, const char *src);
 size_t r33_values_read(const char *str, double *dest, size_t n);
+char *r33_string_upper(const char *str);
 #endif // JABS_R33_H
