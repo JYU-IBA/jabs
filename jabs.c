@@ -314,19 +314,19 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     convolute_bricks(ws);
 }
 
-reaction *make_reactions(const sample *sample, const simulation *sim, jibal_cross_section_type cs_rbs, jibal_cross_section_type cs_erd) { /* Note that sim->ion needs to be set! */
+reaction **make_reactions(const sample *sample, const simulation *sim, jibal_cross_section_type cs_rbs, jibal_cross_section_type cs_erd) { /* Note that sim->ion needs to be set! */
     int rbs = (cs_rbs != JIBAL_CS_NONE);
     int erd = (cs_erd != JIBAL_CS_NONE);
     if(sim->theta > C_PI/2.0) {
         erd = FALSE;
     }
     size_t n_reactions = (sample->n_isotopes*rbs + sample->n_isotopes*erd + 1); /* TODO: we can predict this more accurately */
-    reaction *reactions = malloc(n_reactions*sizeof(reaction));
-    reaction *r = reactions;
+    reaction **reactions = malloc(n_reactions*sizeof(reaction *));
+    reaction **r = reactions;
     if(rbs) {
         for (size_t i = 0; i < sample->n_isotopes; i++) {
-            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_RBS, cs_rbs, sim->theta, FALSE);
-            if (r->type == REACTION_NONE) {
+            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_RBS, cs_rbs, sim->theta, TRUE);
+            if (!(*r)) {
                 fprintf(stderr, "Failed to make an RBS reaction with isotope %zu (%s)\n", i, sample->isotopes[i]->name);
             } else {
                 r++;
@@ -335,28 +335,28 @@ reaction *make_reactions(const sample *sample, const simulation *sim, jibal_cros
     }
     if(erd) {
         for (size_t i = 0; i < sample->n_isotopes; i++) {
-            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_ERD, cs_erd, sim->theta, FALSE);
-            if (r->type == REACTION_NONE) {
+            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_ERD, cs_erd, sim->theta, TRUE);
+            if (!(*r)) {
                 fprintf(stderr, "Failed to make an ERD reaction with isotope %zu (%s)\n", i, sample->isotopes[i]->name);
             } else {
                 r++;
             }
         };
     }
-    r->type = REACTION_NONE; /* Last reaction is a dummy one */
+    *r = NULL; /* Last reaction is a dummy one */
     return reactions;
 }
 
-int assign_stopping(jibal_gsto *gsto, const simulation *sim, const sample *sample, const reaction *reactions) {
+int assign_stopping(jibal_gsto *gsto, const simulation *sim, const sample *sample, reaction * const *reactions) {
     for(size_t i = 0; i < sample->n_isotopes; i++) {
         int Z2 = sample->isotopes[i]->Z;
         if (!jibal_gsto_auto_assign(gsto, sim->beam_isotope->Z, Z2)) { /* This should handle RBS */
             fprintf(stderr, "Can not assign stopping.\n");
             return 1;
         }
-        for(const reaction *r = reactions; r->type != REACTION_NONE; r++) {
-            if(r->type == REACTION_ERD) {
-                if (!jibal_gsto_auto_assign(gsto, r->target->Z, Z2)) {
+        for(reaction * const *r = reactions; *r != NULL; r++) {
+            if((*r)->type == REACTION_ERD) {
+                if (!jibal_gsto_auto_assign(gsto, (*r)->target->Z, Z2)) {
                     fprintf(stderr, "Can not assign stopping.\n");
                     return 1;
                 }

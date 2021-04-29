@@ -88,7 +88,7 @@ void sim_workspace_reset(sim_workspace *ws, const simulation *sim) {
 }
 #endif
 
-sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactions, const sample *sample, const jibal *jibal) {
+sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *reactions, const sample *sample, const jibal *jibal) {
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->sim = *sim;
     ws->n_reactions = reaction_count(reactions);
@@ -129,7 +129,8 @@ sim_workspace *sim_workspace_init(const simulation *sim, const reaction *reactio
     ws->reactions = calloc(ws->n_reactions, sizeof (sim_reaction));
     for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
         sim_reaction *r = &ws->reactions[i_reaction];
-        r->r = &reactions[i_reaction];
+        r->r = reactions[i_reaction];
+        assert(r->r);
         assert(r->r->product);
         ion *p = &r->p;
         ion_reset(p);

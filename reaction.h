@@ -28,6 +28,11 @@ typedef enum {
     REACTION_ARB = 4 /* TODO: types of reactions */
 } reaction_type;
 
+struct reaction_point {
+    double E;
+    double sigma;
+};
+
 typedef struct reaction {
     reaction_type type;
     /* Reactions are like this: target(incident,product)product_nucleus */
@@ -37,11 +42,13 @@ typedef struct reaction {
     const jibal_isotope *product_nucleus; /* Not used */
     jibal_cross_section_type cs; /* Cross section model to use (e.g. screening corrections) */
     char *filename; /* for REACTION_FILE */
+    struct reaction_point *cs_table; /* for REACTION_FILE */
+    size_t n_cs_table;
 } reaction;
 
 
-void reactions_print(FILE *f, const reaction *reactions);
-reaction reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta, int force); /* theta is used to check sanity of RBS and ERD reactions */
+void reactions_print(FILE *f, reaction * const *reactions);
+reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta, int force); /* theta is used to check sanity of RBS and ERD reactions */
 const char *reaction_name(const reaction *r);
-size_t reaction_count(const reaction *reactions);
+size_t reaction_count(reaction * const *reactions);
 #endif //JABS_REACTION_H

@@ -96,16 +96,20 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Can not simulate nothing.\n");
     }
     sim_calculate_geometry(sim);
-    reaction *reactions = NULL;
+    reaction **reactions = NULL;
     fprintf(stderr, "Default RBS cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_rbs));
     fprintf(stderr, "Default ERD cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_erd));
     reactions = make_reactions(sample, sim, global.rbs?jibal->config->cs_rbs:JIBAL_CS_NONE, global.erd?jibal->config->cs_erd:JIBAL_CS_NONE);
 
     fprintf(stderr, "\n");
     reactions_print(stderr, reactions);
-    if(reactions[0].type == REACTION_NONE) {
+    if(reactions[0] == NULL ) {
         fprintf(stderr, "No reactions, nothing to do.\n");
         return EXIT_FAILURE;
+    } else {
+        if(global.verbose) {
+            fprintf(stderr, "%zu reactions.\n", reaction_count(reactions));
+        }
     }
 
     if(assign_stopping(jibal->gsto, sim, sample, reactions)) {
@@ -194,6 +198,9 @@ int main(int argc, char **argv) {
     double cputime_total =(((double) (end - start)) / CLOCKS_PER_SEC);
     fprintf(stderr, "...finished!\n\n");
     fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
+    for(reaction **r = reactions; *r != NULL; r++) {
+        free(*r);
+    }
     free(reactions);
     sample_model_free(sm);
     sim_free(sim);

@@ -36,7 +36,7 @@ typedef struct fit_params {
 struct fit_data {
     gsl_histogram *exp; /* experimental data to be fitted */
     const simulation *sim;
-    reaction *reactions;
+    reaction * const *reactions;
     const jibal *jibal;
     sample *sample;
     sample_model *sm;

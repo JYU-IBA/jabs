@@ -16,10 +16,12 @@
 #include "reaction.h"
 
 
-void reactions_print(FILE *f, const reaction *reactions) {
+void reactions_print(FILE *f, reaction * const *reactions) {
     int i = 1;
-    for (const reaction *r = reactions; r->type != REACTION_NONE; r++) {
-        fprintf(f, "Reaction %3i: %s with %5s.\n", i++, reaction_name(r), r->target->name);
+    if(!reactions)
+        return;
+    for (reaction * const *r = reactions; *r != NULL; r++) {
+        fprintf(f, "Reaction %3i: %s with %5s (reaction product %s).\n", i++, reaction_name(*r), (*r)->target->name, (*r)->product->name);
     }
 }
 
@@ -33,6 +35,8 @@ const char *reaction_name(const reaction *r) {
             return "RBS";
         case REACTION_ERD:
             return "ERD";
+        case REACTION_FILE:
+            return "FILE";
         case REACTION_ARB:
             return "ARB";
         default:
@@ -40,11 +44,11 @@ const char *reaction_name(const reaction *r) {
     }
 }
 
-size_t reaction_count(const reaction *reactions) {
+size_t reaction_count(reaction * const *reactions) {
     size_t n=0;
     if(!reactions)
         return 0;
-    for (const reaction *r = reactions; r->type != REACTION_NONE; r++) {
+    for (reaction * const *r = reactions; *r != NULL; r++) {
         n++;
     }
     return n;
@@ -52,41 +56,44 @@ size_t reaction_count(const reaction *reactions) {
 
 
 
-reaction reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta, int force) {
-    reaction r;
-    r.type = type;
-    r.cs = cs;
-    r.incident = incident;
-    r.target = target;
-    if(!r.target) {
-        r.type = REACTION_NONE;
-        r.product = NULL;
-        return r;
+reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta, int force) {
+    if(!target || !incident) {
+        return NULL;
     }
-    if(type == REACTION_RBS) {
-        r.product = incident;
-        if(force) {
-            return r;
+    if(!force) {
+        if(type == REACTION_RBS) {
+            double theta_max = asin(target->mass / incident->mass);
+            if(incident->mass >= target->mass && theta > theta_max) {
+                fprintf(stderr, "RBS with %s is not possible (theta max %g deg, sim theta %g deg)\n", target->name,
+                        theta_max / C_DEG, theta / C_DEG);
+                return NULL;
+            }
+        } else if(type == REACTION_ERD) {
+            if(theta > C_PI / 2.0) {
+                fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)", target->name, theta);
+                return NULL;
+            }
         }
-        double theta_max=asin(r.target->mass/r.incident->mass);
-        if(r.incident->mass >= r.target->mass && theta > theta_max) {
-            fprintf(stderr, "RBS with %s is not possible (theta max %g deg, sim theta %g deg)\n", r.target->name, theta_max/C_DEG, theta/C_DEG);
-            r.type = REACTION_NONE;
-            return r;
-        }
-    } else if (type == REACTION_ERD) {
-        r.product = target;
-        if(force) {
-            return r;
-        }
-        if(theta > C_PI/2.0) {
-            fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)", r.target->name, theta);
-            r.type = REACTION_NONE;
-            return r;
-        }
-    } else {
-        r.type = REACTION_NONE;
-        return r;
+    }
+    reaction *r = malloc(sizeof(reaction));
+    r->type = type;
+    r->cs = cs;
+    r->incident = incident;
+    r->target = target;
+    r->filename = NULL;
+    r->cs_table = NULL;
+    r->n_cs_table = 0;
+    switch(type) {
+        case REACTION_ERD:
+            r->product = target;
+            break;
+        case REACTION_RBS:
+            r->product = incident;
+            break;
+        default:
+            fprintf(stderr, "Warning, reaction product is null.\n");
+            r->product = NULL;
+            break;
     }
     return r;
 }
