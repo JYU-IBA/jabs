@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <jibal_cross_section.h>
 #include "r33.h"
 
 typedef enum {
@@ -299,18 +300,44 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
         fprintf(stderr, "This program does not currently support \"Composition\" in R33 files.\n");
         return NULL;
     }
+
+
     reaction *r = malloc(sizeof(reaction));
     r->cs = JIBAL_CS_NONE;
+#ifdef R33_IGNORE_REACTION_STRING
     r->incident = nuclei[0];
     r->target = nuclei[1];
+#else
+    r->incident = nuclei[1];
+    r->target = nuclei[0];
+#endif
     r->product = nuclei[2];
     r->product_nucleus = nuclei[3];
+    if(rfile->unit == R33_UNIT_RR && r->incident != r->product) {
+        fprintf(stderr, "R33 file is in units of ratio to Rutherford, but reaction product (%s) is not the same as target (%s). I don't know what to do.\n", r->product->name, r->target->name);
+        return NULL;
+    }
+    r->theta = rfile->theta * C_DEG;
+    r->Q = rfile->Qvalues[0]; /* TODO: other values? */
     if(rfile->filename) {
         r->filename = strdup(rfile->filename);
     } else {
         r->filename = NULL;
     }
     /* TODO: copy and convert data (check units etc) */
+    r->n_cs_table = rfile->n_data;
+    r->cs_table = malloc(sizeof(struct reaction_point) * r->n_cs_table);
+    for(size_t i = 0; i < rfile->n_data; i++) {
+        struct reaction_point *rp = &r->cs_table[i];
+        rp->E = rfile->data[i][0] * rfile->enfactors[0] * C_KEV; /* TODO: other factors? */
+        if(rfile->unit == R33_UNIT_RR) {
+            rp->sigma = rfile->data[i][2] * rfile->sigfactors[0] * jibal_cross_section_rbs(r->incident, r->target, r->theta, rp->E, JIBAL_CS_RUTHERFORD);
+        } else if (rfile->unit == R33_UNIT_MB){
+            rp->sigma = rfile->data[i][2] * rfile->sigfactors[0] * C_MB_SR;
+        } else {
+            rp->sigma = 0.0;
+        }
+    }
     return r;
 }
 
@@ -404,6 +431,12 @@ void r33_parse_reaction_string(r33_file *rfile) {
     for(size_t i = 0; i < R33_N_NUCLEI; i++) {
         rfile->reaction_nuclei[i] = strdup(p_str[i]);
     }
+    s = rfile->reaction_nuclei[2]; /* This guy can have postfixes. Let's clean it up. */
+    while(*s >= '0' && *s < '9') /* Wind over possible A e.g. "28Si" -> "Si" */
+        s++;
+    while((*s >= 'a' && *s < 'z') || (*s >= 'A' && *s < 'Z')) /* And letters, like "p" or "Si" */
+        s++;
+    *s = '\0'; /* What remains after this is not our concern. The original reaction string is still stored in rfile->reaction */
     free(p_str[0]);
 }
 int r33_double_to_int(double d) {

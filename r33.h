@@ -23,6 +23,7 @@
 #define R33_N_DATA_COLUMNS 4
 #define R33_N_ADDRESS_FIELDS 9 /* Note that if this is ever changed, changes are required elsewhere too. */
 #define R33_N_QVALUES 5 /* Up to 5 Q-values are allowed */
+#define R33_NUCLEUS_INCIDENT
 #define R33_N_NUCLEI 4 /* Four nuclei are involved in a reaction. No exceptions! */
 #define R33_N_SIGFACTORS 2
 #define R33_N_ENFACTORS 3
