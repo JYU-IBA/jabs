@@ -55,10 +55,11 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Single parameter ad-hoc substrate channeling correction
  - Faster (less accurate) mode
  - User defined "molecules" i.e. elements with fixed concentration ratios (e.g. you can fit C in SiO2 without changing Si/O ratio)
+ - Arbitrary cross sections (R33 files). Support is very preliminary and results are not to be trusted!
+
 ### Not (yet) implemented, but planned
  - Multiple scattering (plural and small angle)
  - Kinematic (geometric) broadening
- - Arbitrary cross sections (R33 files)
  - Weighting of cross-sections by straggling and accurate handling of sharp peaks in cross sections (resonances)
  - Simulation of pile-up and dead time
  - Stopping corrections supplied by user (Bragg correction etc)
