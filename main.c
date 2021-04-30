@@ -38,10 +38,7 @@
 #include "jabs.h"
 
 int main(int argc, char **argv) {
-    global_options global = {.jibal = NULL, .out_filename = NULL, .verbose = FALSE, .exp_filename = NULL,
-            .bricks_filename = NULL, .fit = 0, .fit_low = 0, .fit_high = 0, .fit_vars = NULL,
-            .rbs = TRUE, .erd = TRUE, .detector_out_filename = NULL, .print_isotopes = FALSE, .sample_filename = NULL,
-            .print_iters = FALSE};
+    global_options *global = global_options_alloc();
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -50,10 +47,10 @@ int main(int argc, char **argv) {
                 jibal_error_string(jibal->error));
         return 1;
     }
-    global.jibal = jibal;
+    global->jibal = jibal;
     sim->beam_isotope = jibal_isotope_find(jibal->isotopes, NULL, 2, 4); /* Default: 4He */
-    read_options(&global, sim, &argc, &argv);
-    if(!global.sample_filename && argc < 2) { /* No sample file given and not enough arguments left either. */
+    read_options(global, sim, &argc, &argv);
+    if(!global->sample_filename && argc < 2) { /* No sample file given and not enough arguments left either. */
         usage();
         return EXIT_FAILURE;
     }
@@ -65,17 +62,17 @@ int main(int argc, char **argv) {
     sim_sanity_check(sim);
 
     gsl_histogram *exp = NULL;
-    if(global.exp_filename) {
-        exp = read_experimental_spectrum(global.exp_filename, &sim->det);
+    if(global->exp_filename) {
+        exp = read_experimental_spectrum(global->exp_filename, &sim->det);
         if(!exp) {
-            fprintf(stderr, "Error! Can not open file \"%s\".\n", global.exp_filename);
+            fprintf(stderr, "Error! Can not open file \"%s\".\n", global->exp_filename);
             return EXIT_FAILURE;
         }
     }
 
     sample_model *sm;
-    if(global.sample_filename) {
-        sm = sample_model_from_file(jibal, global.sample_filename);
+    if(global->sample_filename) {
+        sm = sample_model_from_file(jibal, global->sample_filename);
     } else {
         sample_model *sm_raw  = sample_model_from_argv(jibal, argc, argv);
 #ifdef DEBUG
@@ -89,34 +86,47 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Could not build a sample model from input data.\n");
         return EXIT_FAILURE;
     }
-    sample_model_print(stderr, sm);
     sample *sample = sample_from_sample_model(sm);
-    sample_print(stderr, sample, global.print_isotopes);
+    if(global->verbose) {
+        sample_model_print(stderr, sm);
+        fprintf(stderr, "\nSimplified sample model for simulation:\n");
+        sample_print(stderr, sample, global->print_isotopes);
+    }
     if(sm->n_ranges == 0 || sm->n_materials == 0) {
         fprintf(stderr, "Can not simulate nothing.\n");
     }
     sim_calculate_geometry(sim);
     reaction **reactions = NULL;
-    fprintf(stderr, "Default RBS cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_rbs));
-    fprintf(stderr, "Default ERD cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_erd));
-    reactions = make_reactions(sample, sim, global.rbs?jibal->config->cs_rbs:JIBAL_CS_NONE, global.erd?jibal->config->cs_erd:JIBAL_CS_NONE);
+    if(global->verbose) {
+        fprintf(stderr, "Default RBS cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_rbs));
+        fprintf(stderr, "Default ERD cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_erd));
+        fprintf(stderr, "\n");
+    }
+    reactions = make_reactions(sample, sim, global->rbs?jibal->config->cs_rbs:JIBAL_CS_NONE, global->erd?jibal->config->cs_erd:JIBAL_CS_NONE);
+    if(global->reaction_filenames) {
+        if(process_reaction_files(jibal->isotopes, reactions, global->reaction_filenames, global->n_reaction_filenames)) {
+            fprintf(stderr, "Could not process all reaction files. Aborting.\n");
+            return EXIT_FAILURE;
+        }
+    }
 
-    fprintf(stderr, "\n");
-    reactions_print(stderr, reactions);
-    if(reactions[0] == NULL ) {
+    if(!reactions || reactions[0] == NULL ) {
         fprintf(stderr, "No reactions, nothing to do.\n");
         return EXIT_FAILURE;
     } else {
-        if(global.verbose) {
+        if(global->verbose) {
             fprintf(stderr, "%zu reactions.\n", reaction_count(reactions));
+            reactions_print(stderr, reactions);
         }
     }
 
     if(assign_stopping(jibal->gsto, sim, sample, reactions)) {
         return EXIT_FAILURE;
     }
-    jibal_gsto_print_assignments(jibal->gsto);
-    jibal_gsto_print_files(jibal->gsto, 1);
+    if(global->verbose) {
+        jibal_gsto_print_assignments(jibal->gsto);
+        jibal_gsto_print_files(jibal->gsto, 1);
+    }
     jibal_gsto_load_all(jibal->gsto);
     simulation_print(stderr, sim);
     fprintf(stderr, "\nSTARTING SIMULATION... NOW! Hold your breath!\n");
@@ -124,13 +134,13 @@ int main(int argc, char **argv) {
     start = clock();
     sim_workspace *ws = NULL;
     struct fit_stats fit_stats;
-    if(global.fit) {
+    if(global->fit) {
         struct fit_data fit_data;
         fit_data.n_iters_max = 150;
-        fit_data.low_ch = global.fit_low;
+        fit_data.low_ch = global->fit_low;
         if(fit_data.low_ch <= 0)
             fit_data.low_ch = (int)(exp->n*0.1);
-        fit_data.high_ch = global.fit_high;
+        fit_data.high_ch = global->fit_high;
         if(fit_data.high_ch <= 0)
             fit_data.high_ch = exp->n - 1;
         fprintf(stderr, "Fit range [%lu, %lu]\n", fit_data.low_ch, fit_data.high_ch);
@@ -142,8 +152,8 @@ int main(int argc, char **argv) {
         fit_data.reactions = reactions;
         fit_data.ws = NULL;
         fit_data.fit_params = fit_params_new();
-        fit_data.print_iters = global.print_iters;
-        add_fit_params(&global, sim, sm, fit_data.fit_params);
+        fit_data.print_iters = global->print_iters;
+        add_fit_params(global, sim, sm, fit_data.fit_params);
         if(fit_data.fit_params->n == 0) {
             fprintf(stderr, "No parameters to fit!\n");
             return EXIT_FAILURE;
@@ -152,8 +162,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\nFinal parameters:\n");
         simulation_print(stderr, sim);
         fprintf(stderr, "\nFinal composition:\n");
-        sample_print(stderr, fit_data.sample, global.print_isotopes);
-        sample_areal_densities_print(stderr, fit_data.sample, global.print_isotopes);
+        sample_print(stderr, fit_data.sample, global->print_isotopes);
+        sample_areal_densities_print(stderr, fit_data.sample, global->print_isotopes);
         fprintf(stderr, "\nFinal sample model:\n");
         sample_model_print(stderr, sm);
 
@@ -172,24 +182,24 @@ int main(int argc, char **argv) {
     if(exp) {
         set_spectrum_calibration(exp, &ws->sim.det); /* Update the experimental spectra to final calibration */
     }
-    print_spectra(global.out_filename, ws, exp);
+    print_spectra(global->out_filename, ws, exp);
 
-    output_bricks(global.bricks_filename, ws);
+    output_bricks(global->bricks_filename, ws);
 
-    if(global.detector_out_filename) {
+    if(global->detector_out_filename) {
         FILE *f_det;
-        if((f_det = fopen(global.detector_out_filename, "w"))) {
+        if((f_det = fopen(global->detector_out_filename, "w"))) {
             detector_print(f_det, &ws->sim.det);
         } else {
-            fprintf(stderr, "Could not write detector to file \"%s\".\n", global.detector_out_filename);
+            fprintf(stderr, "Could not write detector to file \"%s\".\n", global->detector_out_filename);
         }
     }
-    if(global.sample_out_filename) {
+    if(global->sample_out_filename) {
         FILE *f_sout;
-        if((f_sout = fopen(global.sample_out_filename, "w"))) {
+        if((f_sout = fopen(global->sample_out_filename, "w"))) {
             sample_model_print(f_sout, sm);
         } else {
-            fprintf(stderr, "Could not write sample to file \"%s\".\n", global.sample_out_filename);
+            fprintf(stderr, "Could not write sample to file \"%s\".\n", global->sample_out_filename);
         }
     }
 
@@ -207,5 +217,6 @@ int main(int argc, char **argv) {
     sample_free(sample);
     jibal_free(jibal);
     free(exp);
+    global_options_free(global);
     return EXIT_SUCCESS;
 }

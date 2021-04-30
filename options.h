@@ -33,11 +33,16 @@ typedef struct {
     char *detector_out_filename;
     char *sample_filename;
     char *sample_out_filename;
+    char **reaction_filenames;
+    size_t n_reaction_filenames;
 } global_options;
+
 
 #include "simulation.h"
 
 void read_options(global_options *global, simulation *sim, int *argc, char ***argv);
+global_options *global_options_alloc();
+void global_options_free(global_options *global);
 const char *jabs_version();
 void usage();
 

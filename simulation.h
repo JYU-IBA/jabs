@@ -94,8 +94,9 @@ void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);
 void simulation_print(FILE *f, const simulation *sim);
 void convolute_bricks(sim_workspace *ws);
-void sim_reaction_recalculate_internal_variables(sim_reaction *r);
-double sim_reaction_cross_section_rutherford(const sim_reaction *r, double E);
-double sim_reaction_cross_section_none(const sim_reaction *r, double E);
+void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r);
+double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);
+double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E);
+double sim_reaction_cross_section_none(const sim_reaction *_simr, double E);
 double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);
 #endif // JABS_SIMULATION_H

@@ -170,7 +170,10 @@ sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *react
         } else if(r->r->type == REACTION_ERD) {
             ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes); /* This allocates memory */
             r->cross_section = sim_reaction_cross_section_rutherford;
-        } else { /* TODO: implement other than the Rutherford RBS / ERD reactions too */
+        } else if(r->r->type == REACTION_FILE) {
+            ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes); /* This allocates memory. We could share (like with RBS) in some cases, but that's not necessarily convenient. */
+            r->cross_section = sim_reaction_cross_section_tabulated;
+        } else {
             p->nucl_stop = NULL;
             p->nucl_stop_isotopes = 0;
             r->cross_section = NULL;
@@ -241,50 +244,49 @@ void convolute_bricks(sim_workspace *ws) {
     }
 }
 
-void sim_reaction_recalculate_internal_variables(sim_reaction *r) {
-    const jibal_isotope *incident = r->r->incident;
-    const jibal_isotope *target = r->r->target;
-    r->E_cm_ratio = target->mass / (incident->mass + target->mass);
-    r->mass_ratio = incident->mass / target->mass;
-    switch(r->r->type) {
-        case REACTION_NONE:
-            r->theta_cm = 0.0;
-            r->K = 0.0;
+void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) { /* Calculate variables for Rutherford (and Andersen) cross sections. This is done for all reactions. */
+    const jibal_isotope *incident = sim_r->r->incident;
+    const jibal_isotope *target = sim_r->r->target;
+    const jibal_isotope *product = sim_r->r->product;
+    sim_r->E_cm_ratio = target->mass / (incident->mass + target->mass);
+    sim_r->mass_ratio = incident->mass / target->mass;
+    if(product == incident) { /* RBS */
+        if(incident->mass >= target->mass && sim_r->theta > asin(target->mass / incident->mass)) {
+            sim_r->K = 0.0;
+            sim_r->cs_constant = 0.0;
+            sim_r->stop = TRUE;
             return;
-        case REACTION_RBS:
-            if(incident->mass >= target->mass && r->theta > asin(target->mass/incident->mass)) {
-                r->K = 0.0;
-                r->cs_constant = 0.0;
-                r->stop = TRUE;
-                return;
-            }
-            r->K = jibal_kin_rbs(r->r->incident->mass, r->r->target->mass, r->theta, '+');
-            r->theta_cm = r->theta + asin(r->mass_ratio * sin(r->theta));
-            r->cs_constant = (pow2(sin(r->theta_cm))) / (pow2(sin(r->theta)) * cos(r->theta_cm - r->theta)) * pow2((incident->Z * C_E * target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) * pow4(1.0 / sin(r->theta_cm / 2.0)) * (1.0/16.0);
-            break;
-        case REACTION_ERD:
-            if(r->theta > C_PI/2.0) {
+        }
+        sim_r->K = jibal_kin_rbs(sim_r->r->incident->mass, sim_r->r->target->mass, sim_r->theta, '+');
+        sim_r->theta_cm = sim_r->theta + asin(sim_r->mass_ratio * sin(sim_r->theta));
+        sim_r->cs_constant = (pow2(sin(sim_r->theta_cm))) / (pow2(sin(sim_r->theta)) * cos(sim_r->theta_cm - sim_r->theta)) *
+                             pow2((incident->Z * C_E * target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) *
+                             pow4(1.0 / sin(sim_r->theta_cm / 2.0)) * (1.0 / 16.0);
+    } else if(product == target) { /* ERD */
+        if(sim_r->theta > C_PI/2.0) {
 #ifdef DEBUG
-                fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)", target->name, r->theta);
+            fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)", target->name, sim_r->theta);
 #endif
-                r->K = 0.0;
-                r->cs_constant = 0.0;
-                r->theta_cm = 0.0;
-                r->stop = TRUE;
-                return;
-            }
-            r->K = jibal_kin_erd(r->r->incident->mass, r->r->target->mass, r->theta);
-            r->theta_cm = C_PI - 2.0 * r->theta;
-            r->cs_constant = pow2(incident->Z*C_E*target->Z*C_E/(8*C_PI*C_EPSILON0)) * pow2(1.0 + incident->mass/target->mass) * pow(cos(r->theta), -3.0) * pow2(r->E_cm_ratio);
-            break;
-        default:
+            sim_r->K = 0.0;
+            sim_r->cs_constant = 0.0;
+            sim_r->theta_cm = 0.0;
+            sim_r->stop = TRUE;
             return;
+        }
+        sim_r->K = jibal_kin_erd(sim_r->r->incident->mass, sim_r->r->target->mass, sim_r->theta);
+        sim_r->theta_cm = C_PI - 2.0 * sim_r->theta;
+        sim_r->cs_constant = pow2(incident->Z * C_E * target->Z * C_E / (8 * C_PI * C_EPSILON0)) * pow2(1.0 + incident->mass / target->mass) * pow(cos(sim_r->theta), -3.0) * pow2(sim_r->E_cm_ratio);
+    } else {
+        sim_r->K = 0.0;
+        sim_r->cs_constant = 0.0;
+        sim_r->theta_cm = 0.0;
+        sim_r->stop = TRUE;
     }
 
-    r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0)); /* Factors for Andersen correction */
-    r->r_VE_factor2 = pow2(0.5 / sin(r->theta_cm / 2.0));
+    sim_r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0)); /* Factors for Andersen correction */
+    sim_r->r_VE_factor2 = pow2(0.5 / sin(sim_r->theta_cm / 2.0));
 #ifdef DEBUG
-    fprintf(stderr, "Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g\n", r->theta/C_DEG, r->theta_cm/C_DEG, r->K);
+    fprintf(stderr, "Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g\n", sim_r->theta/C_DEG, sim_r->theta_cm/C_DEG, sim_r->K);
 #endif
 }
 
@@ -309,4 +311,24 @@ double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E
             return 0.0;
     }
 #endif
+}
+
+double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E) {
+    size_t lo, mi, hi;
+    const reaction *r = sim_r->r;
+    const struct reaction_point *t = r->cs_table;
+    hi = r->n_cs_table - 1;
+    lo = 0;
+    if(E < t[lo].E || E > t[hi].E) {
+        return sim_reaction_cross_section_rutherford(sim_r, E); /* Fall back quietly to analytical formulae outside tabulated values */
+    }
+    while (hi - lo > 1) {
+        mi = (hi + lo) / 2;
+        if (E >= t[mi].E) {
+            lo = mi;
+        } else {
+            hi = mi;
+        }
+    }
+    return t[lo].sigma+((t[lo+1].sigma-t[lo].sigma)/(t[lo+1].E-t[lo].E))*(E-t[lo].E);
 }

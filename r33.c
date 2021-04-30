@@ -168,7 +168,7 @@ int r33_parse_header_content(r33_file *rfile, r33_header_type type, const char *
 r33_file *r33_file_read(const char *filename) {
     FILE *f = fopen(filename, "r");
     if(!f) {
-        fprintf(stderr, "Could open file \"%s\".", filename);
+        fprintf(stderr, "Could not open file \"%s\".\n", filename);
         return NULL;
     }
     r33_file *rfile = r33_file_alloc();
@@ -192,6 +192,9 @@ r33_file *r33_file_read(const char *filename) {
                 line_split++; /* Skip space. This parser doesn't care if there is no space! */
             }
             r33_header_type type = r33_header_type_find(line);
+            if(r33_parse_header_content(rfile, type, line_split)) { /* Headers that don't cause state changes are parsed here */
+                fprintf(stderr, "Line %zu: header type %i (%s)\n", lineno, type, r33_header_string(type));
+            }
             if(state == R33_PARSE_STATE_INIT) {
                 if(type == R33_HEADER_COMMENT) {
                     r33_string_append(&rfile->comment, line_split);
@@ -266,6 +269,16 @@ r33_file *r33_file_read(const char *filename) {
         }
     }
     /* TODO: check that all required headers are given.. or don't, because they probably aren't. This is not a validator. */
+    if(state != R33_PARSE_STATE_END) {
+        fprintf(stderr, "Reading file \"%s\" was not completed successfully.\n", filename);
+        if(state == R33_PARSE_STATE_COMMENT) {
+            fprintf(stderr, "The comment in R33 file must be terminated with an empty line. Otherwise the entire file is a comment.\n");
+        }
+    }
+    if(!rfile->reaction) {
+        fprintf(stderr, "No reaction given in R33 file.\n");
+        valid = FALSE;
+    }
     if(rfile->unit == R33_UNIT_TOT && rfile->distribution == R33_DIST_ANGLE) {
         fprintf(stderr, "R33 file is not valid, since unit is 'tot', but distribution is angle.\n");
         valid = FALSE;
@@ -276,6 +289,7 @@ r33_file *r33_file_read(const char *filename) {
         r33_file_free(rfile);
         return NULL;
     }
+    fclose(f);
     return rfile;
 }
 
@@ -304,6 +318,7 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
 
     reaction *r = malloc(sizeof(reaction));
     r->cs = JIBAL_CS_NONE;
+    r->type = REACTION_FILE;
 #ifdef R33_IGNORE_REACTION_STRING
     r->incident = nuclei[0];
     r->target = nuclei[1];
@@ -437,6 +452,7 @@ void r33_parse_reaction_string(r33_file *rfile) {
     while((*s >= 'a' && *s < 'z') || (*s >= 'A' && *s < 'Z')) /* And letters, like "p" or "Si" */
         s++;
     *s = '\0'; /* What remains after this is not our concern. The original reaction string is still stored in rfile->reaction */
+    fprintf(stderr, "Special snowflake is %s\n", rfile->reaction_nuclei[2]);
     free(p_str[0]);
 }
 int r33_double_to_int(double d) {

@@ -45,6 +45,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"theta",         required_argument, NULL, 't'},
             {"phi",           required_argument, NULL, 'p'},
             {"fluence",       required_argument, NULL, '3'},
+            {"reaction",      required_argument, NULL, 'r'},
             {"resolution",    required_argument, NULL, 'R'},
             {"step_incident", required_argument, NULL, 2  },
             {"step_exiting",  required_argument, NULL, 1  },
@@ -82,6 +83,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Detector or scattering angle (from beam).",
             "Detector azimuthal angle (0 deg or 180 deg = IBM, +/-90 deg or 270 deg = Cornell).",
             "Fluence (or actually particles * sr).",
+            "Reaction file to load (in R33 format).",
             "Resolution of detector (FHWM of Gaussian)",
             "Incident ion step size. Zero is automatic.",
             "Exiting particle step size.",
@@ -109,7 +111,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:prob:I:R:S:s:fe:Fd:D:B:c:C:", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:prob:I:r:R:S:s:fe:Fd:D:B:c:C:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -151,10 +153,10 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 global->fit_high = atoi(optarg);
                 break;
             case '6':
-                global->fit_vars = optarg;
+                global->fit_vars = strdup(optarg);
                 break;
             case '7':
-                global->bricks_filename = optarg;
+                global->bricks_filename = strdup(optarg);
                 break;
             case '8':
                 sim->depthsteps_max = atoi(optarg);
@@ -172,10 +174,10 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 sim->stop_step_incident = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 's':
-                global->sample_filename = optarg;
+                global->sample_filename = strdup(optarg);
                 break;
             case 'S':
-                global->sample_out_filename = optarg;
+                global->sample_out_filename = strdup(optarg);
                 break;
             case 'a':
                 sim->sample_theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
@@ -216,10 +218,10 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                     global->verbose++;
                 break;
             case 'o':
-                global->out_filename = optarg;
+                global->out_filename = strdup(optarg);
                 break;
             case 'e':
-                global->exp_filename = optarg;
+                global->exp_filename = strdup(optarg);
                 break;
             case 'E':
                 sim->beam_E = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
@@ -234,6 +236,11 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                     exit(EXIT_FAILURE);
                 }
                 break;
+            case 'r':
+                global->n_reaction_filenames++;
+                global->reaction_filenames=realloc(global->reaction_filenames, global->n_reaction_filenames*sizeof(char *));
+                global->reaction_filenames[global->n_reaction_filenames-1] = strdup(optarg);
+                break;
             case 'R':
                 sim->det.resolution = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg)/C_FWHM;
                 sim->det.resolution *= sim->det.resolution; /* square */
@@ -242,7 +249,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 sim->det = detector_from_file(global->jibal->units, optarg);
                 break;
             case 'D':
-                global->detector_out_filename = optarg;
+                global->detector_out_filename = strdup(optarg);
                 break;
             default:
                 usage();
@@ -252,4 +259,28 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
     }
     *argc -= optind;
     *argv += optind;
+}
+
+global_options *global_options_alloc() {
+    global_options *global = malloc(sizeof(global_options));
+    memset(global, 0, sizeof(global_options));
+    global->rbs = TRUE;
+    global->erd = TRUE;
+    return global;
+}
+
+void global_options_free(global_options *global) {
+    free(global->out_filename);
+    free(global->exp_filename);
+    free(global->bricks_filename);
+    free(global->fit_vars);
+    free(global->detector_out_filename);
+    free(global->sample_filename);
+    free(global->sample_out_filename);
+    if(global->reaction_filenames) {
+        for(size_t i = 0; i < global->n_reaction_filenames; i++) {
+            free(global->reaction_filenames[i]);
+        }
+    }
+    free(global->reaction_filenames);
 }
