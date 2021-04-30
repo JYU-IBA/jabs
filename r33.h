@@ -25,6 +25,7 @@
 #define R33_N_QVALUES 5 /* Up to 5 Q-values are allowed */
 #define R33_N_NUCLEI 4 /* Four nuclei are involved in a reaction. No exceptions! */
 #define R33_N_SIGFACTORS 2
+#define R33_N_ENFACTORS 3
 #define R33_UNKNOWN "Unknown"
 
 typedef enum {
@@ -73,14 +74,14 @@ typedef enum {
 } r33_optional;
 
 typedef enum {
-    R33_UNIT_MB = 0,
-    R33_UNIT_RR = 1,
-    R33_UNIT_TOT = 2
+    R33_UNIT_MB = 0, /* mb/sr */
+    R33_UNIT_RR = 1, /* ratio to Rutherford */
+    R33_UNIT_TOT = 2 /* mb */
 } r33_unit;
 
 typedef enum {
     R33_DIST_ENERGY = 0,
-    R33_UNIT_ANGLE = 1
+    R33_DIST_ANGLE = 1
 } r33_distribution;
 
 typedef struct {
@@ -130,24 +131,29 @@ typedef struct r33_file {
     char *source;
     char *name;
     char *address[R33_N_ADDRESS_FIELDS];
-    int serial;
-    char *reaction; /* Reaction string, will not be parsed, but it is read */
+    long int serial;
+    char *reaction;
+    char *reaction_nuclei[R33_N_NUCLEI];
     double masses[R33_N_NUCLEI]; /* Reaction masses m2(m1,m3)m4 */
-    int zeds[R33_N_NUCLEI]; /* Same order as masses. */
+    double zeds[R33_N_NUCLEI]; /* Same order as masses. Stored as doubles so we don't have to write extra code. Storing (small-ish) ints as doubles works well enough :) */
     char *composition;
     double Qvalues[R33_N_QVALUES];
     r33_distribution distribution;
     double theta;
     double energy;
     double sigfactors[R33_N_SIGFACTORS];
+    r33_unit unit;
+    double enfactors[R33_N_ENFACTORS];
     r33_data *data;
     size_t n_data;
     size_t n_data_alloc;
+    long int nvalues;
 } r33_file;
 
 r33_file *r33_file_alloc();
 void r33_file_free(r33_file *rfile);
 int r33_file_data_realloc(r33_file *rfile, size_t n);
+int r33_parse_header_content(r33_file *rfile, r33_header_type type, const char *line_split); /* Internal */
 r33_file *r33_file_read(const char *filename);
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile);
 const char *r33_header_string(r33_header_type type);
@@ -156,4 +162,6 @@ void r33_string_append(char **dest, const char *src);
 void r33_string_overwrite(char **dest, const char *src);
 size_t r33_values_read(const char *str, double *dest, size_t n);
 char *r33_string_upper(const char *str);
+void r33_parse_reaction_string(r33_file *rfile);
+int r33_double_to_int(double d);
 #endif // JABS_R33_H
