@@ -155,7 +155,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *react
             r->n_bricks = sim->depthsteps_max;
         } else {
             if(sim->stop_step_incident == 0.0) { /* Automatic incident step size */
-                r->n_bricks = (int) ceil(sim->beam_E / sqrt(sim->det.resolution) + sample->n_ranges); /* This is conservative */
+                r->n_bricks = (int) ceil(sim->beam_E / (STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(sim->det.resolution)) + sample->n_ranges); /* This is conservative */
             } else {
                 r->n_bricks = (int) ceil(sim->beam_E / sim->stop_step_incident + sample->n_ranges); /* This is conservative */
             }

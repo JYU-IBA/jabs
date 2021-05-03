@@ -14,6 +14,8 @@
 #define STOP_STEP_INCIDENT (0.0*C_KEV) /* Zero is automatic */
 #define STOP_STEP_EXITING (0.0*C_KEV) /* Zero is automatic */
 
+#define STOP_STEP_AUTO_FUDGE_FACTOR (0.7) /* TODO: make this runtime configurable */
+
 /* Other constants */
 #define DEPTH_TOLERANCE (1.0e-6 * C_TFU)
 #define GAMMA_ROUGHNESS_STEPS 21

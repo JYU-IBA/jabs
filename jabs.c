@@ -140,7 +140,7 @@ double cross_section_straggling(const sim_reaction *sim_r, int n_steps, double E
     for(int i = 0; i < n_steps; i++) {
         double x = w*(i-half_n);
         double E_stragg = E + x * std_dev;
-        double prob = normal_pdf(x, 0.0, 1.0)*w;
+        double prob = normal_pdf(x, 0.0, 1.0)*w; /* TODO: if this is always a normal distribution and n_steps doesn't change, this function call could be replaced by a lookup table */
         prob_sum += prob;
         cs_sum += prob * sim_r->cross_section(sim_r, E_stragg);
     }
@@ -258,7 +258,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         }
         const double E_front = ion1.E;
         const double S_front = ion1.S;
-        depth d_after = stop_step(ws, &ion1, sample, d_before, ws->sim.stop_step_incident == 0.0?sqrt(ws->sim.det.resolution+K_min*(ion1.S)):ws->sim.stop_step_incident);
+        depth d_after = stop_step(ws, &ion1, sample, d_before, ws->sim.stop_step_incident == 0.0?STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(ws->sim.det.resolution+K_min*(ion1.S)):ws->sim.stop_step_incident);
 #ifdef DEBUG
         fprintf(stderr, "After:  %g tfu in range %zu\n", d_after.x/C_TFU, d_after.i);
 #endif

@@ -192,9 +192,7 @@ r33_file *r33_file_read(const char *filename) {
                 line_split++; /* Skip space. This parser doesn't care if there is no space! */
             }
             r33_header_type type = r33_header_type_find(line);
-            if(r33_parse_header_content(rfile, type, line_split)) { /* Headers that don't cause state changes are parsed here */
-                fprintf(stderr, "Line %zu: header type %i (%s)\n", lineno, type, r33_header_string(type));
-            }
+
             if(state == R33_PARSE_STATE_INIT) {
                 if(type == R33_HEADER_COMMENT) {
                     r33_string_append(&rfile->comment, line_split);
