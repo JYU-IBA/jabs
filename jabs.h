@@ -33,5 +33,5 @@ void add_fit_params(global_options *global, simulation *sim, const sample_model 
 void output_bricks(const char *filename, const sim_workspace *ws);
 void no_ds(sim_workspace *ws, const sample *sample);
 void ds(sim_workspace *ws, const sample *sample); /* TODO: the DS routine is more pseudocode at this stage... */
-double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, size_t i_isotope, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after);
+double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, size_t i_isotope, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back);
 #endif // JABS_JABS_H

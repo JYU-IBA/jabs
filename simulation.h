@@ -43,6 +43,8 @@ typedef struct {
     int ds_steps_polar;
     int n_ds;
     double channeling; /* a very ad-hoc channeling yield correction */
+    int cs_n_steps; /* Number of steps to take, when calculating cross section * concentration product */
+    int cs_stragg_half_n;
 } simulation;
 
 typedef struct sim_reaction {
@@ -81,6 +83,8 @@ typedef struct {
     ion ion;
     sim_reaction *reactions;
     const jibal_isotope *isotopes;
+    double cs_frac; /* Fractional step size 1.0/(sim.cs_n_steps+1) */
+    int cs_n_stragg_steps;
 } sim_workspace;
 
 

@@ -40,6 +40,8 @@ simulation *sim_init() {
     sim->ds_steps_azi = 12;
     sim->n_ds = sim->ds_steps_polar * sim->ds_steps_azi;
     sim->channeling = 1.0;
+    sim->cs_n_steps = CS_CONC_STEPS;
+    sim->cs_stragg_half_n = CS_STRAGG_HALF_N;
     return sim;
 }
 
@@ -118,8 +120,13 @@ sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *react
     } else {
         ws->rk4 = TRUE;
         ws->nucl_stop_accurate = TRUE;
-        ws->mean_conc_and_energy = TRUE; /* TODO: should be FALSE when it is implemented */
+        ws->mean_conc_and_energy = FALSE;
     }
+    ws->cs_frac = 1.0/(1.0*(ws->sim.cs_n_steps+1));
+    assert(sim->cs_stragg_half_n >= 0);
+    ws->cs_n_stragg_steps = sim->cs_stragg_half_n * 2 + 1;
+
+
     sim_workspace_recalculate_n_channels(ws, sim);
 
     if(ws->n_channels == 0) {

@@ -17,4 +17,6 @@
 /* Other constants */
 #define DEPTH_TOLERANCE (1.0e-6 * C_TFU)
 #define GAMMA_ROUGHNESS_STEPS 21
+#define CS_CONC_STEPS 3 /* Minimum 1, odd numbers preferred */
+#define CS_STRAGG_HALF_N 5 /* Cross section weighting by straggling, number of steps is this times 2 + 1. Set to zero to disable (aka 1 step). */
 #endif // JABS_DEFAULTS_H

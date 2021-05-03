@@ -122,8 +122,40 @@ depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, depth de
     return fulldepth; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
-double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, size_t i_isotope, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after) {
-   if(ws->mean_conc_and_energy) {
+
+double normal_pdf(double x, double mean, double sigma) {
+    static const double inv_sqrt_2pi = 0.398942280401432703;
+    double a = (x - mean) / sigma;
+    return (inv_sqrt_2pi / sigma) * exp(-0.5 * a * a);
+}
+
+double cross_section_straggling(const sim_reaction *sim_r, int n_steps, double E, double S) {
+    const double sigmas = 4.0;
+    const double std_dev = sqrt(S);
+    const int half_n = n_steps/2;
+    const double w = sigmas/(half_n);
+    double cs_sum = 0.0;
+    double prob_sum = 0.0;
+    //static const double inv_sqrt_2pi = 0.398942280401432703;
+    for(int i = 0; i < n_steps; i++) {
+        double x = w*(i-half_n);
+        double E_stragg = E + x * std_dev;
+        double prob = normal_pdf(x, 0.0, 1.0)*w;
+        prob_sum += prob;
+        cs_sum += prob * sim_r->cross_section(sim_r, E_stragg);
+    }
+    cs_sum /= prob_sum;
+#ifdef DEBUG
+    double unweighted = sim_r->cross_section(sim_r, E);
+    double diff = (cs_sum-unweighted)/unweighted;
+    fprintf(stderr, "Got cs %.7lf mb/sr (unweighted by straggling %.7lf mb/sr) diff %.5lf%%. Sum of probs %lf%% (compensated for).\n", cs_sum/C_MB_SR, unweighted/C_MB_SR, 100.0*diff, prob_sum*100.0);
+#endif
+    return cs_sum;
+}
+
+
+double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, size_t i_isotope, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
+   if(ws->mean_conc_and_energy) { /* This if-branch is slightly faster (maybe) and also serves as a testing branch, since it is a lot easier to understand... */
         const depth d_halfdepth = {.x = (d_before->x + d_after->x)/2.0, .i = d_after->i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         double c = get_conc(sample, d_halfdepth, i_isotope);
         if(c < ABUNDANCE_THRESHOLD)
@@ -133,7 +165,29 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
         double sigma = sim_r->cross_section(sim_r, E_mean);
         return sigma*c;
     } else {
-
+        depth d;
+        d.i = d_after->i;
+        const double x_step = (d_after->x - d_before->x) * ws->cs_frac;
+        const double E_step = (E_back - E_front) * ws->cs_frac;
+        const double S_step = (S_back - S_front) * ws->cs_frac;
+        double sum = 0.0;
+        for(int i = 1; i <= ws->sim.cs_n_steps; i++) { /* Compute cross section and concentration product in several "sub-steps" */
+            d.x = d_before->x + x_step * i;
+            double E = E_front + E_step * i;
+#ifdef DEBUG
+            fprintf(stderr, "i=%i, E = %g keV, (E_front = %g keV, E_back = %g keV)\n", i, E/C_KEV, E_front/C_KEV, E_back/C_KEV);
+#endif
+            double c = get_conc(sample, d, i_isotope);
+            double sigma;
+            if(ws->cs_n_stragg_steps > 1) { /* Further weighted with straggling */
+                double S = S_front + S_step * i;
+                sigma = cross_section_straggling(sim_r, ws->cs_n_stragg_steps, E, S);
+            } else {
+                sigma = sim_r->cross_section(sim_r, E);
+            }
+            sum += sigma * c;
+        }
+       return sum/(ws->sim.cs_n_steps*1.0);
    }
     return 0.0;
 }
@@ -165,12 +219,12 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
         sim_reaction_recalculate_internal_variables(r);
         ion *p = &r->p;
         p->E = ion1.E * r->K;
-        p->S = 0.0;
+        p->S = ion1.S * r->K;
         r->max_depth = sample_isotope_max_depth(sample, r->i_isotope);
         ion_set_angle(p, theta, phi); /* Reaction products travel towards the detector (in the sample system), calculated above */
         brick *b = &r->bricks[0];
-        b->E = ion1.E * r->K;
-        b->S = 0.0;
+        b->E = p->E;
+        b->S = p->S;
         b->d = d_before;
         b->E_0 = ion1.E;
         b->Q = 0.0;
@@ -276,7 +330,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
             b->S = r->p.S;
             if (r->p.E > ws->sim.emin) {
                 double sigma_conc = cross_section_concentration_product(ws, sample, r->i_isotope, r, E_front, E_back,
-                                                                        &d_before, &d_after); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
+                                                                        &d_before, &d_after, S_front, S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
                 if(sigma_conc > 0.0) {
                     if(d_after.i == sample->n_ranges - 2) {
                         sigma_conc *= ws->sim.channeling;
@@ -314,7 +368,7 @@ void simulate(const ion *incident, const double x_0, sim_workspace *ws, const sa
     convolute_bricks(ws);
 }
 
-reaction **make_reactions(const sample *sample, const simulation *sim, jibal_cross_section_type cs_rbs, jibal_cross_section_type cs_erd) { /* Note that sim->ion needs to be set! */
+reaction **make_reactions(const struct sample *sample, const simulation *sim, jibal_cross_section_type cs_rbs, jibal_cross_section_type cs_erd) { /* Note that sim->ion needs to be set! */
     int rbs = (cs_rbs != JIBAL_CS_NONE);
     int erd = (cs_erd != JIBAL_CS_NONE);
     if(sim->theta > C_PI/2.0) {
