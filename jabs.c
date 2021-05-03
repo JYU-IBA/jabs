@@ -130,7 +130,7 @@ double normal_pdf(double x, double mean, double sigma) {
 }
 
 double cross_section_straggling(const sim_reaction *sim_r, int n_steps, double E, double S) {
-    const double sigmas = 4.0;
+    const double sigmas = 2.0; /* TODO: what is enough or too much? */
     const double std_dev = sqrt(S);
     const int half_n = n_steps/2;
     const double w = sigmas/(half_n);

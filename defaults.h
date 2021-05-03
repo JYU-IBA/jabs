@@ -14,11 +14,11 @@
 #define STOP_STEP_INCIDENT (0.0*C_KEV) /* Zero is automatic */
 #define STOP_STEP_EXITING (0.0*C_KEV) /* Zero is automatic */
 
-#define STOP_STEP_AUTO_FUDGE_FACTOR (0.7) /* TODO: make this runtime configurable */
+#define STOP_STEP_AUTO_FUDGE_FACTOR (0.75) /* TODO: make this runtime configurable */
 
 /* Other constants */
 #define DEPTH_TOLERANCE (1.0e-6 * C_TFU)
 #define GAMMA_ROUGHNESS_STEPS 21
 #define CS_CONC_STEPS 3 /* Minimum 1, odd numbers preferred */
-#define CS_STRAGG_HALF_N 5 /* Cross section weighting by straggling, number of steps is this times 2 + 1. Set to zero to disable (aka 1 step). */
+#define CS_STRAGG_HALF_N 3 /* Cross section weighting by straggling, number of steps is this times 2 + 1. Set to zero to disable (aka 1 step). */
 #endif // JABS_DEFAULTS_H
