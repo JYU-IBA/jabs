@@ -57,6 +57,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"offset",        required_argument, NULL, '2'},
             {"compress",      required_argument, NULL, 'c'},
             {"fast",          optional_argument, NULL, 'f'},
+            {"ds",            no_argument,       NULL,  0},
             {"exp",           required_argument, NULL, 'e'},
             {"fit",           no_argument,       NULL, 'F'},
             {"fit_low",       required_argument, NULL, '4'},
@@ -95,6 +96,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Offset of energy calibration.",
             "Compress channels in spectra by an integer factor.",
             "Make things faster, but worse.",
+            "Dual scattering (broken!)",
             "Load experimental spectrum from file.",
             "Fit",
             "Fit range, low",
@@ -120,6 +122,9 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                     global->print_isotopes = TRUE;
                 } else if(strcmp(long_options[option_index].name, "print_iters") == 0) {
                     global->print_iters = TRUE;
+                }
+                else if(strcmp(long_options[option_index].name, "ds") == 0) {
+                    sim->ds = TRUE;
                 }
                 break;
             case 'f':

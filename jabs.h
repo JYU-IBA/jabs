@@ -23,7 +23,7 @@
 
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, struct depth depth, double E);
 depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, struct depth depth, double step);
-void simulate(const ion *incident, double x_0, sim_workspace *ws, const sample *sample);
+void simulate(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample);
 reaction **make_reactions(const sample *sample, const simulation *sim, jibal_cross_section_type cs_rbs, jibal_cross_section_type cs_erd);/* Note that sim->ion needs to be set and geometry has to be correct */
 int process_reaction_files(const jibal_isotope *jibal_isotopes, reaction **reactions, char * const *reaction_filenames, size_t n_reaction_filenames);
 int assign_stopping(jibal_gsto *gsto, const simulation *sim, const sample *sample, reaction * const *reactions);
