@@ -75,6 +75,10 @@ int main(int argc, char **argv) {
         sm = sample_model_from_file(jibal, global->sample_filename);
     } else {
         sample_model *sm_raw  = sample_model_from_argv(jibal, argc, argv);
+        if(!sm_raw) {
+            fprintf(stderr, "Error in reading sample model from command line.\n");
+            return EXIT_FAILURE;
+        }
 #ifdef DEBUG
         fprintf(stderr, "Sample model, as read from command line.\n");
         sample_model_print(stderr, sm_raw);
@@ -174,6 +178,7 @@ int main(int argc, char **argv) {
     } else {
         ws = sim_workspace_init(sim, reactions, sample, jibal);
         no_ds(ws, sample);
+        //ds(ws, sample);
     }
     if(!ws) {
         fprintf(stderr, "ERROR! Simulation workspace does not exist after the simulation. This implies something failed spectacularly.\nNo output generated.\n");

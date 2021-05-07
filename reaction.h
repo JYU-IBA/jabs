@@ -18,6 +18,7 @@
 #include <gsl/gsl_histogram.h>
 #include <jibal_cross_section.h>
 #include <jibal_kin.h>
+#include <jibal_r33.h>
 #include "ion.h"
 
 typedef enum {
@@ -54,4 +55,5 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
 const char *reaction_name(const reaction *r);
 size_t reaction_count(reaction * const *reactions);
 void reaction_free(reaction *r);
+reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile);
 #endif //JABS_REACTION_H

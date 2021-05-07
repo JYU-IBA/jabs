@@ -13,6 +13,7 @@
  */
 
 #include <assert.h>
+#include <string.h>
 #include "reaction.h"
 
 
@@ -100,4 +101,67 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
 
 void reaction_free(reaction *r) {
     free(r->cs_table);
+}
+
+reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile) {
+    const jibal_isotope *nuclei[R33_N_NUCLEI];
+    for(size_t i = 0; i < R33_N_NUCLEI; i++) {
+#ifdef R33_IGNORE_REACTION_STRING
+        nuclei[i] = jibal_isotope_find(isotopes, NULL, r33_double_to_int(rfile->zeds[i]), r33_double_to_int(rfile->masses[i]));
+#else
+        nuclei[i] = jibal_isotope_find(isotopes, rfile->reaction_nuclei[i], 0, 0);
+#endif
+        if(!nuclei[i]) {
+#ifdef R33_IGNORE_REACTION_STRING
+            fprintf(stderr, "Could not parse an isotope from Z=%g, mass=%g.", rfile->zeds[i], rfile->masses[i]);
+#else
+            fprintf(stderr, "Could not parse an isotope from \"%s\".\n", rfile->reaction_nuclei[i]);
+#endif
+            return NULL;
+        }
+    }
+    if(rfile->composition) {
+        fprintf(stderr, "This program does not currently support \"Composition\" in R33 files.\n");
+        return NULL;
+    }
+
+
+    reaction *r = malloc(sizeof(reaction));
+    r->cs = JIBAL_CS_NONE;
+    r->type = REACTION_FILE;
+#ifdef R33_IGNORE_REACTION_STRING
+    r->incident = nuclei[0];
+    r->target = nuclei[1];
+#else
+    r->incident = nuclei[1];
+    r->target = nuclei[0];
+#endif
+    r->product = nuclei[2];
+    r->product_nucleus = nuclei[3];
+    if(rfile->unit == R33_UNIT_RR && r->incident != r->product) {
+        fprintf(stderr, "R33 file is in units of ratio to Rutherford, but reaction product (%s) is not the same as target (%s). I don't know what to do.\n", r->product->name, r->target->name);
+        return NULL;
+    }
+    r->theta = rfile->theta * C_DEG;
+    r->Q = rfile->Qvalues[0]; /* TODO: other values? */
+    if(rfile->filename) {
+        r->filename = strdup(rfile->filename);
+    } else {
+        r->filename = NULL;
+    }
+    /* TODO: copy and convert data (check units etc) */
+    r->n_cs_table = rfile->n_data;
+    r->cs_table = malloc(sizeof(struct reaction_point) * r->n_cs_table);
+    for(size_t i = 0; i < rfile->n_data; i++) {
+        struct reaction_point *rp = &r->cs_table[i];
+        rp->E = rfile->data[i][0] * rfile->enfactors[0] * C_KEV; /* TODO: other factors? */
+        if(rfile->unit == R33_UNIT_RR) {
+            rp->sigma = rfile->data[i][2] * rfile->sigfactors[0] * jibal_cross_section_rbs(r->incident, r->target, r->theta, rp->E, JIBAL_CS_RUTHERFORD);
+        } else if (rfile->unit == R33_UNIT_MB){
+            rp->sigma = rfile->data[i][2] * rfile->sigfactors[0] * C_MB_SR;
+        } else {
+            rp->sigma = 0.0;
+        }
+    }
+    return r;
 }
