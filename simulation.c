@@ -12,6 +12,7 @@
 
  */
 #include <assert.h>
+#include <string.h>
 #include "simulation.h"
 #include "defaults.h"
 #include "rotate.h"
@@ -36,7 +37,7 @@ simulation *sim_init() {
     sim->emin = E_MIN;
     sim->depthsteps_max = 0; /* Zero: automatic */
     sim->ds = 1;
-    sim->ds_steps_polar = 10;
+    sim->ds_steps_polar = 13;
     sim->ds_steps_azi = 12;
     sim->n_ds = sim->ds_steps_polar * sim->ds_steps_azi;
     sim->channeling = 1.0;
@@ -295,6 +296,10 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) { /* Calcu
 #ifdef DEBUG
     fprintf(stderr, "Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g\n", sim_r->theta/C_DEG, sim_r->theta_cm/C_DEG, sim_r->K);
 #endif
+}
+
+void sim_reaction_reset_bricks(sim_reaction *sim_r) {
+    memset(sim_r->bricks, 0, sizeof(brick) * sim_r->n_bricks);
 }
 
 double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm) {

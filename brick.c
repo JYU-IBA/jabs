@@ -57,11 +57,8 @@ void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const do
     for(size_t i = 1; i < n_bricks; i++) {
         const brick *b_high = &bricks[i-1];
         const brick *b_low = &bricks[i];
-        if(b_low->Q < 0.0) {
-#ifdef DEBUG_VERBOSE
-            fprintf(stderr, "Reaction had %i bricks.\n", i);
-#endif
-            break;
+        if(b_low->Q <= 0.0) {
+            continue;
         }
         double sigma_low = sqrt(b_low->S + S);
         double sigma_high = sqrt(b_high->S + S);
@@ -73,7 +70,6 @@ void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const do
             h->bin[j] += scale * y * w * b_low->Q;
             //fprintf(stderr, "i=%i, j=%i, w = %.5lf keV, E = %.3lf keV, y=%g\n", i, j, w/C_KEV, E/C_KEV, y);
             assert(!isnan(y));
-
         }
     }
 }

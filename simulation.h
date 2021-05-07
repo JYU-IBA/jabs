@@ -99,6 +99,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
 void simulation_print(FILE *f, const simulation *sim);
 void convolute_bricks(sim_workspace *ws);
 void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r);
+void sim_reaction_reset_bricks(sim_reaction *sim_r);
 double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);
 double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E);
 double sim_reaction_cross_section_none(const sim_reaction *_simr, double E);
