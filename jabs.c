@@ -145,7 +145,7 @@ double cross_section_straggling(const sim_reaction *sim_r, int n_steps, double E
         cs_sum += prob * sim_r->cross_section(sim_r, E_stragg);
     }
     cs_sum /= prob_sum;
-#ifdef DEBUG
+#ifdef DEBUG_CS_WEIGHT
     double unweighted = sim_r->cross_section(sim_r, E);
     double diff = (cs_sum-unweighted)/unweighted;
     fprintf(stderr, "Got cs %.7lf mb/sr (unweighted by straggling %.7lf mb/sr) diff %.5lf%%. Sum of probs %lf%% (compensated for).\n", cs_sum/C_MB_SR, unweighted/C_MB_SR, 100.0*diff, prob_sum*100.0);
@@ -215,29 +215,39 @@ void post_scatter_exit(ion *p, const depth depth_start, sim_workspace *ws, const
     }
 }
 
-void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample system at depth x_0 */
-    assert(sample->n_ranges);
-    double thickness = sample->ranges[sample->n_ranges-1].x;
-    size_t i_depth;
-    ion ion1 = *incident; /* Shallow copy of the incident ion */
-    double theta, phi; /* Generic polar and azimuth angles */
+double scattering_angle(const ion *incident, sim_workspace *ws) { /* Calculate scattering angle necessary for ion (in sample coordinate system) to hit detector */
+
     double scatter_theta, scatter_phi;
-    rotate(ws->sim.det.theta, ws->sim.det.phi, ws->sim.sample_theta, ws->sim.sample_phi, &theta, &phi); /* Detector in sample coordinate system */
-    rotate(ws->sim.det.theta, ws->sim.det.phi, ion1.theta, ion1.phi, &scatter_theta, &scatter_phi);/* Detector in ion system */
+
+    rotate(ws->sim.det.theta, ws->sim.det.phi, incident->theta, incident->phi, &scatter_theta, &scatter_phi);/* Detector in ion system */
 #ifdef DEBUG
     fprintf(stderr, "Detector in ion system angles %g deg and %g deg.\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
 #endif
     rotate(scatter_theta, scatter_phi, -1.0*ws->sim.sample_theta, ws->sim.sample_phi, &scatter_theta, &scatter_phi); /* Counter sample rotation. Detector in lab (usually). If ion was somehow "deflected" then this is the real scattering angle. Compare to sim->theta.  */
 #ifdef DEBUG
-    fprintf(stderr, "Simulate from depth %g tfu (index %zu), sim_theta = %g deg, theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->sim.theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
-    fprintf(stderr, "Incident lab angles %g deg and %g deg\n", incident->theta/C_DEG, incident->phi/C_DEG);
+    fprintf(stderr, "Incident angles %g deg and %g deg (in sample)\n", incident->theta/C_DEG, incident->phi/C_DEG);
     fprintf(stderr, "Sample lab angles %g deg and %g deg, detector lab angles %g deg and %g deg\n", ws->sim.sample_theta/C_DEG, ws->sim.sample_phi/C_DEG, ws->sim.det.theta/C_DEG, ws->sim.det.phi/C_DEG);
-    fprintf(stderr, "Reaction angles (in sample) %g deg and %g deg\n", theta/C_DEG, phi/C_DEG);
     fprintf(stderr, "Final lab scattering angles %g deg and %g deg\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
+    if(!ws->sim.ds) {
+        assert(fabs(ws->sim.theta - scatter_theta) < 0.01 * C_DEG); /* with DS this assert will fail */
+    }
 #endif
-    //assert(fabs(ws->sim.theta - scatter_theta) < 0.01*C_DEG); /* TODO: with DS this might is wrong */
-    if(ws->sim.ds && scatter_theta < 20.0*C_DEG)
-        return;
+    return scatter_theta;
+}
+
+void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth */
+    assert(sample->n_ranges);
+    double thickness = sample->ranges[sample->n_ranges-1].x;
+    size_t i_depth;
+    ion ion1 = *incident; /* Shallow copy of the incident ion */
+    double theta, phi; /* Generic polar and azimuth angles */
+    rotate(ws->sim.det.theta, ws->sim.det.phi, ws->sim.sample_theta, ws->sim.sample_phi, &theta, &phi); /* Detector in sample coordinate system */
+    double scatter_theta = scattering_angle(incident, ws);
+#ifdef DEBUG
+    ion_print(stderr, incident);
+    fprintf(stderr, "Reaction angles (in sample) %g deg and %g deg\n", theta/C_DEG, phi/C_DEG);
+    fprintf(stderr, "Simulate from depth %g tfu (index %zu), sim_theta = %g deg, theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->sim.theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
+#endif
     double K_min = 1.0;
     depth d_before = depth_start;
     for(size_t i = 0; i < ws->n_reactions; i++) {
@@ -264,18 +274,12 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         b->E = p->E;
         b->S = p->S;
 #ifdef DEBUG
-        fprintf(stderr, "Simulation reaction %zu: %s %s. Max depth %g tfu. i_isotope=%zu, stop = %i. Cross section at %g keV is %g mb/sr \n",
-                i, reaction_name(r->r), r->r->target->name, r->max_depth / C_TFU, r->i_isotope, r->stop, ion1.E/C_KEV, r->cross_section(r, ion1.E)/C_MB_SR);
+        fprintf(stderr, "Simulation reaction %zu: %s %s. Max depth %g tfu. i_isotope=%zu, stop = %i.\nCross section at %g keV is %g mb/sr, exit %g keV\n",
+                i, reaction_name(r->r), r->r->target->name, r->max_depth / C_TFU, r->i_isotope, r->stop, ion1.E/C_KEV, r->cross_section(r, ion1.E)/C_MB_SR, p->E/C_KEV);
 #endif
     }
     assert(K_min > 0.0);
     i_depth=1;
-
-#ifdef DEBUG
-    ion_print(stderr, incident);
-    fprintf(stderr, "Reaction product angles in sample system: (%g deg, %g deg)\n", theta/C_DEG, phi/C_DEG);
-    fprintf(stderr, "Detector angles in ion system: (%g deg, %g deg). Sim theta is %g deg\n", scatter_theta/C_DEG, scatter_phi/C_DEG, ws->sim.theta/C_DEG);
-#endif
     if(fabs(ion1.cosine_theta) < 1e-6) {
 #ifdef DEBUG
         fprintf(stderr, "Ion was going sideways in the sample, we nudged it a little.\n");
@@ -619,7 +623,7 @@ void no_ds(sim_workspace *ws, const sample *sample) {
     fprintf(stderr, "%zu rough layers\n", n_rl);
 #endif
     if(!n_rl) {
-        ion_set_angle(&ws->ion, 0.0, 0.0);
+        ion_set_angle(&ws->ion, 0.0*C_DEG, 0.0);
         ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
         simulate(&ws->ion, depth_seek(sample, 0.0*C_TFU), ws, sample);
         return;
@@ -687,7 +691,7 @@ void no_ds(sim_workspace *ws, const sample *sample) {
 }
 
 void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is more pseudocode at this stage... */
-    const double p_sr = ws->sim.p_sr;
+    double p_sr = ws->sim.p_sr;
     ion_set_angle(&ws->ion, 0.0, 0.0);
     ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
     ion ion1 = ws->ion;
@@ -701,21 +705,24 @@ void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is mo
         double E_front = ion1.E;
         if(E_front < ws->sim.emin)
             break;
-        depth d_after = stop_step(ws, &ion1, sample, d_before, 10.0*C_KEV); /* TODO: step? */
-        double thick_step = depth_diff(d_before,d_after);
+        depth d_after = stop_step(ws, &ion1, sample, d_before, 8.0*C_KEV); /* TODO: step? */
+        double thick_step = depth_diff(d_before, d_after);
         const depth d_halfdepth = {.x = (d_before.x + d_after.x)/2.0, .i = d_after.i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         double E_back = ion1.E;
         const double E_mean = (E_front + E_back) / 2.0;
 
-        fprintf(stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV\n", d_before.x/C_TFU, d_after.x/C_TFU, E_front/C_KEV, E_back/C_KEV);
+        fprintf(stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x/C_TFU, d_after.x/C_TFU, E_front/C_KEV, E_back/C_KEV, p_sr);
+        double p_sum = 0.0;
         for(int i_polar = 0; i_polar < ws->sim.ds_steps_polar; i_polar++) {
+           // if(i_polar != 12)
+            //    continue;
             //double cosine = (ws->sim.ds_steps_polar - 2 * i_polar) / (1.0 * ws->sim.ds_steps_polar);
             //double ds_polar = acos(cosine);
-            double ds_polar_step = (160.0*C_DEG/ws->sim.ds_steps_polar);
-            double ds_polar = 20.0*C_DEG + i_polar * ds_polar_step;
-            if(ds_polar < 20.0 * C_DEG) {
-                continue;
-            }
+            double ds_polar_step = (140.0*C_DEG/ws->sim.ds_steps_polar);
+            //double ds_polar = 40.0*C_DEG + i_polar * ds_polar_step;
+            const double ds_polar_min = 20.0*C_DEG;
+            const double ds_polar_max = 180.0*C_DEG;
+            double ds_polar = ds_polar_min + (ds_polar_max-ds_polar_min)*(1.0*i_polar/(ws->sim.ds_steps_polar-1));
             double cs = 0.0;
             for(size_t i = 0; i < ws->n_reactions; i++) {
                 sim_reaction *r = &ws->reactions[i];
@@ -726,23 +733,35 @@ void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is mo
                 if(incident->mass >= target->mass && ds_polar > asin(target->mass / incident->mass)) { /* Scattering not possible */
                     continue;
                 }
+#if 0
                 for(int polar_substep = 0; polar_substep < 9; polar_substep++) {
                     double ds_polar_sub = ds_polar_step*(1.0*(polar_substep-4)/9.0) + ds_polar;
                     cs += c * jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar_sub)/9.0;
                 }
+#else
+                cs += c * jibal_cross_section_rbs(incident, target, ds_polar, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar);
+#endif
             }
-            double p = cs * thick_step * ((2.0 * C_PI) / (1.0 * (ws->sim.ds_steps_azi))) * /* sin(ds_polar) * */ ds_polar_step;
+            double p_tot = cs * thick_step * (2.0 * C_PI) * ds_polar_step;
+            p_sum += p_tot;
+            double p_azi = p_tot / (1.0 * (ws->sim.ds_steps_azi));
             for(int i_azi = 0; i_azi < ws->sim.ds_steps_azi; i_azi++) {
                 ion2 = ion1;
                 double ds_azi = 2.0 * M_PI * (1.0 * i_azi) / (ws->sim.ds_steps_azi * 1.0);
                 ion_rotate(&ion2, ds_polar, ds_azi); /* Dual scattering: first scattering to some angle (scattering angle: ds_polar). Note that this does not follow SimNRA conventions. */
 #ifdef DEBUG
-                fprintf(stderr, "DS step %i/%i: angles %g deg, %g deg. p = %.5lf. cos_theta = %.3lf\n", i_polar*ws->sim.ds_steps_azi+i_azi+1, ws->sim.n_ds, ds_polar/C_DEG, ds_azi/C_DEG, p/C_MB_SR, ion2.cosine_theta);
+                fprintf(stderr, "DS step %i/%i: angles %g deg, %g deg. p_azi = %g. cos_theta = %.3lf\n", i_polar*ws->sim.ds_steps_azi+i_azi+1, ws->sim.n_ds, ds_polar/C_DEG, ds_azi/C_DEG, p_azi, ion2.cosine_theta);
 #endif
-                ws->sim.p_sr = p * p_sr;
-                simulate(&ion2, d_after, ws, sample);
+                ws->sim.p_sr = p_azi * p_sr;
+                if(d_before.x == 0.0) {
+                    fprintf(stderr, "DS polar %.3lf, azi %.3lf, scatter %.3lf\n", ds_polar/C_DEG, ds_azi/C_DEG, scattering_angle(&ion2, ws)/C_DEG);
+                }
+                if(scattering_angle(&ion2, ws) > 40.0*C_DEG) {
+                    simulate(&ion2, d_after, ws, sample);
+                }
             }
         }
+        p_sr -= p_sum*p_sr;
         if(sample->ranges[sample->n_ranges-1].x - d_after.x < 0.01*C_TFU)
             break;
         d_before = d_after;

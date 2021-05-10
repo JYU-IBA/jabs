@@ -37,8 +37,8 @@ simulation *sim_init() {
     sim->emin = E_MIN;
     sim->depthsteps_max = 0; /* Zero: automatic */
     sim->ds = FALSE;
-    sim->ds_steps_polar = 19;
-    sim->ds_steps_azi = 13;
+    sim->ds_steps_polar = 12;
+    sim->ds_steps_azi = 8;
     sim->n_ds = sim->ds_steps_polar * sim->ds_steps_azi;
     sim->channeling = 1.0;
     sim->cs_n_steps = CS_CONC_STEPS;

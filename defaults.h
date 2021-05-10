@@ -9,7 +9,7 @@
 #define THETA (165.0*C_DEG)
 #define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
 #define PARTICLES_SR (1.0e12)
-#define E_MIN (100.0*C_KEV)
+#define E_MIN (50.0*C_KEV)
 #define ENERGY_SLOPE (1.0*C_KEV)
 #define STOP_STEP_INCIDENT (0.0*C_KEV) /* Zero is automatic */
 #define STOP_STEP_EXITING (0.0*C_KEV) /* Zero is automatic */
