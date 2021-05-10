@@ -714,16 +714,11 @@ void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is mo
         fprintf(stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x/C_TFU, d_after.x/C_TFU, E_front/C_KEV, E_back/C_KEV, p_sr);
         double p_sum = 0.0;
         for(int i_polar = 0; i_polar < ws->sim.ds_steps_polar; i_polar++) {
-           // if(i_polar != 12)
-            //    continue;
-            //double cosine = (ws->sim.ds_steps_polar - 2 * i_polar) / (1.0 * ws->sim.ds_steps_polar);
-            //double ds_polar = acos(cosine);
-            double ds_polar_step = (140.0*C_DEG/ws->sim.ds_steps_polar);
-            //double ds_polar = 40.0*C_DEG + i_polar * ds_polar_step;
             const double ds_polar_min = 20.0*C_DEG;
             const double ds_polar_max = 180.0*C_DEG;
-            double ds_polar = ds_polar_min + (ds_polar_max-ds_polar_min)*(1.0*i_polar/(ws->sim.ds_steps_polar-1));
-            double cs = 0.0;
+            double ds_polar_step = (ds_polar_max-ds_polar_min)/(ws->sim.ds_steps_polar-1);
+            double ds_polar = ds_polar_min + i_polar * ds_polar_step;
+            double cs_sum = 0.0;
             for(size_t i = 0; i < ws->n_reactions; i++) {
                 sim_reaction *r = &ws->reactions[i];
                 double c = get_conc(sample, d_halfdepth, r->i_isotope);
@@ -734,29 +729,33 @@ void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is mo
                     continue;
                 }
 #if 0
+                double cs = 0.0;
                 for(int polar_substep = 0; polar_substep < 9; polar_substep++) {
                     double ds_polar_sub = ds_polar_step*(1.0*(polar_substep-4)/9.0) + ds_polar;
-                    cs += c * jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar_sub)/9.0;
+                    cs += jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_RUTHERFORD) * sin(ds_polar_sub)/9.0;
                 }
+                cs_sum += c * cs;
 #else
-                cs += c * jibal_cross_section_rbs(incident, target, ds_polar, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar);
+                /* TODO: integrals over cross sections? Maybe stepwise from ds_polar=PI. */
+                double cs = jibal_cross_section_rbs(incident, target, ds_polar, E_mean, JIBAL_CS_ANDERSEN);
+                cs *= sin(ds_polar); /* spherical coordinates and surface areas... */
+                cs_sum += c * cs;
 #endif
             }
-            double p_tot = cs * thick_step * (2.0 * C_PI) * ds_polar_step;
+            double p_tot = cs_sum * thick_step * (2.0 * C_PI) * ds_polar_step;
             p_sum += p_tot;
             double p_azi = p_tot / (1.0 * (ws->sim.ds_steps_azi));
             for(int i_azi = 0; i_azi < ws->sim.ds_steps_azi; i_azi++) {
                 ion2 = ion1;
                 double ds_azi = 2.0 * M_PI * (1.0 * i_azi) / (ws->sim.ds_steps_azi * 1.0);
                 ion_rotate(&ion2, ds_polar, ds_azi); /* Dual scattering: first scattering to some angle (scattering angle: ds_polar). Note that this does not follow SimNRA conventions. */
-#ifdef DEBUG
-                fprintf(stderr, "DS step %i/%i: angles %g deg, %g deg. p_azi = %g. cos_theta = %.3lf\n", i_polar*ws->sim.ds_steps_azi+i_azi+1, ws->sim.n_ds, ds_polar/C_DEG, ds_azi/C_DEG, p_azi, ion2.cosine_theta);
-#endif
                 ws->sim.p_sr = p_azi * p_sr;
+#ifdef DEBUG
                 if(d_before.x == 0.0) {
                     fprintf(stderr, "DS polar %.3lf, azi %.3lf, scatter %.3lf\n", ds_polar/C_DEG, ds_azi/C_DEG, scattering_angle(&ion2, ws)/C_DEG);
                 }
-                if(scattering_angle(&ion2, ws) > 40.0*C_DEG) {
+#endif
+                if(scattering_angle(&ion2, ws) > 30.0*C_DEG) {
                     simulate(&ion2, d_after, ws, sample);
                 }
             }
