@@ -271,6 +271,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
     depth d_before = depth_start;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
+        r->last_brick = 0;
         r->stop = FALSE;
         r->theta = scatter_theta;
         sim_reaction_recalculate_internal_variables(r);
@@ -390,6 +391,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             } else {
                 b->Q = 0.0;
             }
+            r->last_brick = i_depth;
         }
         d_before = d_after;
         ion1.S = S_back;
@@ -613,10 +615,8 @@ void output_bricks(const char *filename, const sim_workspace *ws) {
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const sim_reaction *r = &ws->reactions[i];
         fprintf(f, "#%s %s\n", reaction_name(r->r), r->r->target->name);
-        for(size_t j = 0; j < r->n_bricks; j++) {
+        for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
-            if(b->Q < 0.0)
-                break;
             fprintf(f, "%2lu %2lu %8.3lf %8.3lf %8.3lf %8.3lf %12.3lf\n",
                     i, j, b->d.x/C_TFU, b->E_0/C_KEV, b->E/C_KEV, sqrt(b->S)/C_KEV, b->Q * ws->sim.p_sr);
         }

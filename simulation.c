@@ -247,7 +247,7 @@ void convolute_bricks(sim_workspace *ws) {
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
-        brick_int2(r->histo, r->bricks, r->n_bricks, ws->sim.det->resolution, ws->sim.p_sr);
+        brick_int2(r->histo, r->bricks, r->last_brick, ws->sim.det->resolution, ws->sim.p_sr);
     }
 }
 

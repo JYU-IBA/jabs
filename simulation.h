@@ -53,6 +53,7 @@ typedef struct sim_reaction {
     gsl_histogram *histo;
     brick *bricks;
     size_t n_bricks;
+    size_t last_brick; /* inclusive, from 0 up to n_bricks-1 */
     int stop;
     double max_depth;
     size_t i_isotope; /* Number of isotope (r->target) in sample->isotopes */
