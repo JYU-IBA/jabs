@@ -85,6 +85,7 @@ typedef struct {
     const jibal_isotope *isotopes;
     double cs_frac; /* Fractional step size 1.0/(sim.cs_n_steps+1) */
     int cs_n_stragg_steps;
+    double S_min_out;
 } sim_workspace;
 
 

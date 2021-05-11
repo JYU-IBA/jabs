@@ -1,5 +1,5 @@
-slope = 1.70 keV
-offset = 25.0 keV
+slope = 1.71 keV
+offset = 15.0 keV
 resolution = 14 keV
 theta = 160 deg
 foil = Si 250tfu

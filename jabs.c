@@ -198,7 +198,7 @@ void post_scatter_exit(ion *p, const depth depth_start, sim_workspace *ws, const
 #ifdef DEBUG_REACTION
         fprintf(stderr, "  Exiting... depth = %g tfu (i = %zu)\n", d.x, d.i);
 #endif
-        depth d_after = stop_step(ws, p, sample, d, ws->sim.stop_step_exiting == 0.0?p->E*0.1+sqrt(p->S):ws->sim.stop_step_exiting); /* TODO: 10% of energy plus straggling is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
+        depth d_after = stop_step(ws, p, sample, d, ws->sim.stop_step_exiting == 0.0?(p->E*0.10+sqrt(p->S)+2.0*C_KEV):ws->sim.stop_step_exiting); /* TODO: 10% of energy plus straggling plus 2 keV is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
         if(p->E < ws->sim.emin) {
 #ifdef DEBUG_REACTION
             fprintf(stderr,
@@ -256,6 +256,7 @@ double scattering_angle(const ion *incident, sim_workspace *ws) { /* Calculate s
 
 void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth */
     assert(sample->n_ranges);
+    int warnings = 0;
     double thickness = sample->ranges[sample->n_ranges-1].x;
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
@@ -267,8 +268,8 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
     fprintf(stderr, "Reaction angles (in sample) %g deg and %g deg\n", theta/C_DEG, phi/C_DEG);
     fprintf(stderr, "Simulate from depth %g tfu (index %zu), sim_theta = %g deg, theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->sim.theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
 #endif
-    double K_min = 1.0;
     depth d_before = depth_start;
+    ws->S_min_out = 0.0;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
         r->last_brick = 0;
@@ -285,8 +286,6 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         b->d = d_before;
         b->E_0 = ion1.E;
         b->Q = 0.0;
-        if(r->K < K_min)
-            K_min = r->K;
         if(r->i_isotope >= sample->n_isotopes) { /* No target isotope for reaction. */
             r->stop = TRUE;
         }
@@ -298,7 +297,6 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
                 i, reaction_name(r->r), r->r->target->name, r->max_depth / C_TFU, r->i_isotope, r->stop, ion1.E/C_KEV, r->cross_section(r, ion1.E)/C_MB_SR, p->E/C_KEV);
 #endif
     }
-    assert(K_min > 0.0);
     i_depth=1;
     if(fabs(ion1.cosine_theta) < 1e-6) {
 #ifdef DEBUG
@@ -309,6 +307,10 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         return;
     }
     while(1) {
+        if(warnings > SIMULATE_WARNING_LIMIT) {
+            fprintf(stderr, "Warning limit reached. Won't calculate anything.\n");
+            break;
+        }
         if(d_before.x >= thickness) /* We're in too deep. */
             break;
         if(ion1.inverse_cosine_theta < 0.0 && d_before.x < 0.001*C_TFU) /* We're coming out of the sample and about to exit */
@@ -321,7 +323,8 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         }
         const double E_front = ion1.E;
         const double S_front = ion1.S;
-        depth d_after = stop_step(ws, &ion1, sample, d_before, ws->sim.stop_step_incident == 0.0?STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(ws->sim.det->resolution+K_min*(ion1.S)):ws->sim.stop_step_incident);
+        double E_step = ws->sim.stop_step_incident == 0.0?STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(ws->sim.det->resolution+ws->S_min_out):ws->sim.stop_step_incident;
+        depth d_after = stop_step(ws, &ion1, sample, d_before, E_step);
 #ifdef DEBUG
         fprintf(stderr, "After:  %g tfu in range %zu\n", d_after.x/C_TFU, d_after.i);
 #endif
@@ -329,9 +332,12 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         /* DEPTH BIN [x, x+d_diff) */
         const double E_back = ion1.E;
         const double S_back = ion1.S;
-        if(fabs(d_diff) < 0.001*C_TFU && E_front-ion1.E < 0.001*C_KEV) {
-            fprintf(stderr, "Error: no progress was made (E = %g keV, depth = %g tfu), check stopping.\n", ion1.E/C_KEV, d_before.x/C_TFU);
-            break;
+        if(fabs(d_diff) < 0.001*C_TFU && E_front-E_back < 0.001*C_KEV) {
+            fprintf(stderr, "Warning: no or very little progress was made (E step (goal) %g keV, E from %g keV to E = %g keV, depth = %g tfu, d_diff = %g tfu), check stopping or step size.\n", E_step/C_KEV, E_front/C_KEV , E_back/C_KEV, d_before.x/C_TFU, d_diff/C_TFU);
+            //sample_print(stderr, sample, FALSE);
+            d_before.x += 0.001*C_TFU;
+            warnings++;
+            continue;
         }
 
 #ifdef DEBUG_VERBOSE
@@ -342,6 +348,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
                         E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ion1.S) / C_KEV);
 #endif
+        double S_min = 100.0*ws->sim.det->resolution; /* A large "upper limit", we calculate the smallest straggling in output (to be used for step size) */
         for (size_t i = 0; i < ws->n_reactions; i++) {
             sim_reaction *r = &ws->reactions[i];
             if (r->stop)
@@ -370,6 +377,8 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
 #endif
             post_scatter_exit(&r->p, d_after, ws, sample);
+            if(r->p.S < S_min)
+                S_min = r->p.S;
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
             if (r->p.E < ws->sim.emin) {
@@ -393,9 +402,11 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             }
             r->last_brick = i_depth;
         }
+        //fprintf(stderr, "Step %zu: smallest S in output is %.3lf keV FWHM, compare with %.3lf keV\n", i_depth, sqrt(S_min)*C_FWHM/C_KEV, sqrt(K_min*(ion1.S))*C_FWHM/C_KEV);
         d_before = d_after;
         ion1.S = S_back;
         ion1.E = E_back;
+        ws->S_min_out = S_min;
         i_depth++;
     }
     convolute_bricks(ws);
@@ -701,6 +712,7 @@ void no_ds(sim_workspace *ws) {
     for(size_t i = 0; i < n_rl; i++) {
         thickness_probability_table_free(tpd[i]);
     }
+    sample_free(sample_rough);
     free(modulos);
     free(index);
     free(tpd);
@@ -712,16 +724,17 @@ void ds(sim_workspace *ws) {
     ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
     ion ion1 = ws->ion;
     ion ion2 = ion1;
+    no_ds(ws);
     depth d_before = depth_seek(ws->sample, 0.0);
-    simulate(&ion2, d_before, ws, ws->sample);
     ws->mean_conc_and_energy = TRUE;
     fprintf(stderr, "\n");
     const jibal_isotope *incident = ws->sim.beam_isotope;
+    ws->S_min_out = 0.0;
     while(1) {
         double E_front = ion1.E;
         if(E_front < ws->sim.emin)
             break;
-        depth d_after = stop_step(ws, &ion1, ws->sample, d_before, 8.0*C_KEV); /* TODO: step? */
+        depth d_after = stop_step(ws, &ion1, ws->sample, d_before, ws->sim.stop_step_incident == 0.0?sqrt(ws->sim.det->resolution+ws->S_min_out):ws->sim.stop_step_incident); /* TODO: step? */
         double thick_step = depth_diff(d_before, d_after);
         const depth d_halfdepth = {.x = (d_before.x + d_after.x)/2.0, .i = d_after.i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         double E_back = ion1.E;

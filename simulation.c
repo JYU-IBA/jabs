@@ -105,6 +105,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *react
     ion_set_isotope(&ws->ion, sim->beam_isotope);
     ws->ion.E = ws->sim.beam_E;
     ws->ion.S = ws->sim.beam_E_broad;
+    ws->S_min_out = 0.0;
 
     int n_isotopes=0; /* TODO: calculate this somewhere else */
     jibal_isotope *isotope;
@@ -160,6 +161,9 @@ sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *react
                 r->n_bricks = (int) ceil(sim->beam_E / (STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(sim->det->resolution)) + sample->n_ranges); /* This is conservative */
             } else {
                 r->n_bricks = (int) ceil(sim->beam_E / sim->stop_step_incident + sample->n_ranges); /* This is conservative */
+            }
+            if(r->n_bricks > 2000) {
+                fprintf(stderr, "Caution: large number of bricks will be used in the simulation (%zu).\n", r->n_bricks);
             }
         }
         assert(r->n_bricks > 0 && r->n_bricks < 10000);
