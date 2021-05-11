@@ -154,10 +154,10 @@ double cross_section_straggling(const sim_reaction *sim_r, int n_steps, double E
 }
 
 
-double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, size_t i_isotope, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
+double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
    if(ws->mean_conc_and_energy) { /* This if-branch is slightly faster (maybe) and also serves as a testing branch, since it is a lot easier to understand... */
         const depth d_halfdepth = {.x = (d_before->x + d_after->x)/2.0, .i = d_after->i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
-        double c = get_conc(sample, d_halfdepth, i_isotope);
+        double c = get_conc(sample, d_halfdepth, sim_r->i_isotope);
         if(c < ABUNDANCE_THRESHOLD)
             return 0.0;
         const double E_mean = (E_front + E_back) / 2.0;
@@ -177,7 +177,7 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
 #ifdef DEBUG
             fprintf(stderr, "i=%i, E = %g keV, (E_front = %g keV, E_back = %g keV)\n", i, E/C_KEV, E_front/C_KEV, E_back/C_KEV);
 #endif
-            double c = get_conc(sample, d, i_isotope);
+            double c = get_conc(sample, d, sim_r->i_isotope);
             double sigma;
             if(ws->cs_n_stragg_steps > 1) { /* Further weighted with straggling */
                 double S = S_front + S_step * i;
@@ -352,27 +352,23 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             post_scatter_exit(&r->p, d_after, ws, sample);
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
-            if (r->p.E > ws->sim.emin) {
-                double sigma_conc = cross_section_concentration_product(ws, sample, r->i_isotope, r, E_front, E_back,
-                                                                        &d_before, &d_after, S_front, S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
-                if(sigma_conc > 0.0) {
-                    if(d_after.i == sample->n_ranges - 2) {
-                        sigma_conc *= ws->sim.channeling;
-                    }
-                    b->Q = ion1.inverse_cosine_theta * sigma_conc * d_diff;
-                    assert(b->Q >= 0.0);
+            if (r->p.E < ws->sim.emin) {
+                r->stop = TRUE;
+                continue;
+            }
+            double sigma_conc = cross_section_concentration_product(ws, sample, r, E_front, E_back, &d_before, &d_after, S_front, S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
+            if(sigma_conc > 0.0) {
+                if(d_after.i == sample->n_ranges - 2) {
+                    sigma_conc *= ws->sim.channeling;
+                }
+                b->Q = ion1.inverse_cosine_theta * sigma_conc * d_diff;
+                assert(b->Q >= 0.0);
 #ifdef DEBUG
-                    fprintf(stderr, "    %s: type=%i, E_front = %.3lf, E_after = %.3lf, E_out = %.3lf (sigma*conc = %g mb/sr, Q = %g (thickness = %.4lf tfu)\n",
+                fprintf(stderr, "    %s: type=%i, E_front = %.3lf, E_after = %.3lf, E_out = %.3lf (sigma*conc = %g mb/sr, Q = %g (thickness = %.4lf tfu)\n",
                                  r->r->target->name, r->r->type, E_front/C_KEV, (ion1.E * r->K)/C_KEV, r->p.E/C_KEV, sigma_conc/C_MB_SR, b->Q, d_diff/C_TFU);
 #endif
-                 } else {
-                    b->Q = 0.0;
-                }
             } else {
-                r->stop = TRUE;
-#ifdef DEBUG
-                fprintf(stderr, "This was last depth for this reaction (and it didn't count anymore)\n");
-#endif
+                b->Q = 0.0;
             }
         }
         d_before = d_after;
