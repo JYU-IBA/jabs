@@ -178,9 +178,9 @@ int main(int argc, char **argv) {
     } else {
         ws = sim_workspace_init(sim, reactions, sample, jibal);
         if(sim->ds) {
-            ds(ws, sample); /* TODO: make it work right. Roughness. */
+            ds(ws); /* TODO: make it work right. Roughness. */
         } else {
-            no_ds(ws, sample);
+            no_ds(ws);
         }
     }
     if(!ws) {

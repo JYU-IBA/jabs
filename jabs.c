@@ -194,7 +194,7 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
 
 void post_scatter_exit(ion *p, const depth depth_start, sim_workspace *ws, const sample *sample) {
     depth d = depth_start;
-    while(1) {
+    while(1) { /* Exit from sample (hopefully) */
 #ifdef DEBUG_REACTION
         fprintf(stderr, "  Exiting... depth = %g tfu (i = %zu)\n", d.x, d.i);
 #endif
@@ -205,7 +205,7 @@ void post_scatter_exit(ion *p, const depth depth_start, sim_workspace *ws, const
                             "  Reaction %lu with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
                             i, r->r->target->name, d_after.x / C_TFU);
 #endif
-            break;
+            return;
         }
         assert(d_after.x <= d.x /*|| (d_exit.x == d.x && d_exit.i != d.i)*/); /* Going towards the surface */
         if(d_after.x <= 1.0e-6 * C_TFU) {
@@ -213,6 +213,24 @@ void post_scatter_exit(ion *p, const depth depth_start, sim_workspace *ws, const
         }
         d = d_after;
     }
+    if(!ws->foil)
+        return;
+    d.i = 0;
+    d.x = 0.0;
+    ion ion_foil = *p;
+    ion_set_angle(&ion_foil, 0.0, 0.0); /* Foils are not tilted. We use a temporary copy of "p" to do this step. */
+    while(1) {
+        depth d_after  = stop_step(ws, &ion_foil, ws->foil, d, ws->sim.stop_step_exiting == 0.0?p->E*0.1+sqrt(p->S):ws->sim.stop_step_exiting);
+        if(p->E < ws->sim.emin) {
+
+            break;
+        }
+        if(d_after.x <= 1.0e-6 * C_TFU) {
+            break;
+        }
+    }
+    p->E = ion_foil.E;
+    p->S = ion_foil.S;
 }
 
 double scattering_angle(const ion *incident, sim_workspace *ws) { /* Calculate scattering angle necessary for ion (in sample coordinate system) to hit detector */
@@ -354,6 +372,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             b->S = r->p.S;
             if (r->p.E < ws->sim.emin) {
                 r->stop = TRUE;
+                b->Q = 0.0;
                 continue;
             }
             double sigma_conc = cross_section_concentration_product(ws, sample, r, E_front, E_back, &d_before, &d_after, S_front, S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
@@ -608,11 +627,11 @@ void output_bricks(const char *filename, const sim_workspace *ws) {
 
 
 
-void no_ds(sim_workspace *ws, const sample *sample) {
+void no_ds(sim_workspace *ws) {
     double p_sr = ws->sim.p_sr;
     size_t n_rl = 0; /* Number of rough layers */
-    for(size_t i = 0; i < sample->n_ranges; i++) {
-        if(sample->ranges[i].rough.model == ROUGHNESS_GAMMA)
+    for(size_t i = 0; i < ws->sample->n_ranges; i++) {
+        if(ws->sample->ranges[i].rough.model == ROUGHNESS_GAMMA)
             n_rl++;
     }
 #ifdef DEBUG
@@ -621,21 +640,21 @@ void no_ds(sim_workspace *ws, const sample *sample) {
     if(!n_rl) {
         ion_set_angle(&ws->ion, 0.0*C_DEG, 0.0);
         ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
-        simulate(&ws->ion, depth_seek(sample, 0.0*C_TFU), ws, sample);
+        simulate(&ws->ion, depth_seek(ws->sample, 0.0*C_TFU), ws, ws->sample);
         return;
     }
-    struct sample *sample_rough = sample_copy(sample);
+    struct sample *sample_rough = sample_copy(ws->sample);
     size_t *index = malloc(sizeof(size_t) * n_rl);
     size_t *modulos = malloc(sizeof(size_t) * n_rl);
     size_t j = 0;
     thick_prob_dist **tpd = malloc(sizeof(thick_prob_dist *) * n_rl);
-    for(size_t i = 0; i < sample->n_ranges; i++) {
-        if(sample->ranges[i].rough.model == ROUGHNESS_GAMMA) {
+    for(size_t i = 0; i < ws->sample->n_ranges; i++) {
+        if(ws->sample->ranges[i].rough.model == ROUGHNESS_GAMMA) {
 #ifdef DEBUG
             fprintf(stderr, "Range %zu is rough (gamma), amount %g tfu, n = %zu spectra\n", i, sample->ranges[i].rough.x/C_TFU, sample->ranges[i].rough.n);
 #endif
             assert(sample->ranges[i].rough.n > 0 && sample->ranges[i].rough.n < 1000);
-            tpd[j] = thickness_probability_table_gen(sample->ranges[i].x, sample->ranges[i].rough.x, sample->ranges[i].rough.n);
+            tpd[j] = thickness_probability_table_gen(ws->sample->ranges[i].x, ws->sample->ranges[i].rough.x, ws->sample->ranges[i].rough.n);
             index[j] = i;
             if(j)
                 modulos[j] = modulos[j-1] *  tpd[j-1]->n;
@@ -650,8 +669,8 @@ void no_ds(sim_workspace *ws, const sample *sample) {
         fprintf(stderr, "Gamma roughness step %zu/%zu\n", i_iter+1, iter_total);
 #endif
         double p = 1.0;
-        for(size_t i_range = 0; i_range < sample->n_ranges; i_range++) { /* Reset ranges for every iter */
-            sample_rough->ranges[i_range].x = sample->ranges[i_range].x;
+        for(size_t i_range = 0; i_range < ws->sample->n_ranges; i_range++) { /* Reset ranges for every iter */
+            sample_rough->ranges[i_range].x = ws->sample->ranges[i_range].x;
         }
         for(size_t i = 0; i < n_rl; i++) {
             j = (i_iter / modulos[i]) % tpd[i]->n; /* "j"th roughness element */
@@ -659,8 +678,8 @@ void no_ds(sim_workspace *ws, const sample *sample) {
 
             size_t i_range = index[i];
             p *= tpd[i]->p[j].prob; /* Probability is multiplied by the "i"th roughness, element "j" */
-            double x_diff = tpd[i]->p[j].x - sample->ranges[i_range].x; /* Amount to change thickness of this and and all subsequent layers */
-            for(; i_range < sample->n_ranges; i_range++) {
+            double x_diff = tpd[i]->p[j].x - ws->sample->ranges[i_range].x; /* Amount to change thickness of this and and all subsequent layers */
+            for(; i_range < ws->sample->n_ranges; i_range++) {
                 sample_rough->ranges[i_range].x += x_diff;
             }
 #ifdef DEBUG
@@ -676,7 +695,7 @@ void no_ds(sim_workspace *ws, const sample *sample) {
         ws->sim.p_sr = p * p_sr;
         ion_set_angle(&ws->ion, 0.0, 0.0);
         ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
-        simulate(&ws->ion, depth_seek(sample, 0.0), ws, sample_rough);
+        simulate(&ws->ion, depth_seek(ws->sample, 0.0), ws, sample_rough);
     }
     for(size_t i = 0; i < n_rl; i++) {
         thickness_probability_table_free(tpd[i]);
@@ -686,14 +705,14 @@ void no_ds(sim_workspace *ws, const sample *sample) {
     free(tpd);
 }
 
-void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is more pseudocode at this stage... */
+void ds(sim_workspace *ws) {
     double p_sr = ws->sim.p_sr;
     ion_set_angle(&ws->ion, 0.0, 0.0);
     ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
     ion ion1 = ws->ion;
     ion ion2 = ion1;
-    depth d_before = depth_seek(sample, 0.0);
-    simulate(&ion2, d_before, ws, sample);
+    depth d_before = depth_seek(ws->sample, 0.0);
+    simulate(&ion2, d_before, ws, ws->sample);
     ws->mean_conc_and_energy = TRUE;
     fprintf(stderr, "\n");
     const jibal_isotope *incident = ws->sim.beam_isotope;
@@ -701,7 +720,7 @@ void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is mo
         double E_front = ion1.E;
         if(E_front < ws->sim.emin)
             break;
-        depth d_after = stop_step(ws, &ion1, sample, d_before, 8.0*C_KEV); /* TODO: step? */
+        depth d_after = stop_step(ws, &ion1, ws->sample, d_before, 8.0*C_KEV); /* TODO: step? */
         double thick_step = depth_diff(d_before, d_after);
         const depth d_halfdepth = {.x = (d_before.x + d_after.x)/2.0, .i = d_after.i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         double E_back = ion1.E;
@@ -717,7 +736,7 @@ void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is mo
             double cs_sum = 0.0;
             for(size_t i = 0; i < ws->n_reactions; i++) {
                 sim_reaction *r = &ws->reactions[i];
-                double c = get_conc(sample, d_halfdepth, r->i_isotope);
+                double c = get_conc(ws->sample, d_halfdepth, r->i_isotope);
                 if(c < ABUNDANCE_THRESHOLD)
                     continue;
                 const jibal_isotope *target = r->r->target;
@@ -752,12 +771,12 @@ void ds(sim_workspace *ws, const sample *sample) { /* TODO: the DS routine is mo
                 }
 #endif
                 if(scattering_angle(&ion2, ws) > 30.0*C_DEG) {
-                    simulate(&ion2, d_after, ws, sample);
+                    simulate(&ion2, d_after, ws, ws->sample);
                 }
             }
         }
         p_sr -= p_sum*p_sr;
-        if(sample->ranges[sample->n_ranges-1].x - d_after.x < 0.01*C_TFU)
+        if(ws->sample->ranges[ws->sample->n_ranges-1].x - d_after.x < 0.01*C_TFU)
             break;
         d_before = d_after;
     }

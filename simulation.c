@@ -94,11 +94,12 @@ void sim_workspace_reset(sim_workspace *ws, const simulation *sim) {
 sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *reactions, const sample *sample, const jibal *jibal) {
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->sim = *sim;
+    ws->sample = sample;
+    ws->foil = NULL;
     ws->n_reactions = reaction_count(reactions);
     ws->gsto = jibal->gsto;
     ws->jibal_config = jibal->config;
     ws->isotopes = jibal->isotopes;
-    ws->c_x = 0.0;
 
     ion_reset(&ws->ion);
     ion_set_isotope(&ws->ion, sim->beam_isotope);
@@ -187,7 +188,6 @@ sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *react
             r->cross_section = NULL;
         }
     }
-    ws->c = calloc(sample->n_isotopes, sizeof(double));
     return ws;
 }
 
@@ -209,7 +209,6 @@ void sim_workspace_free(sim_workspace *ws) {
         }
     }
     free(ws->ion.nucl_stop);
-    free(ws->c);
     free(ws->reactions);
     free(ws);
 }

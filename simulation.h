@@ -22,6 +22,7 @@
 #include "reaction.h"
 #include "brick.h"
 #include "detector.h"
+#include "sample.h"
 
 typedef struct {
     detector det;
@@ -30,8 +31,7 @@ typedef struct {
     double p_sr;
     double sample_theta; /* Polar angle. Kind of. Zero is sample perpendicular to beam. */
     double sample_phi; /* Typically one uses a zero here, unless doing channeling stuff. Note that this is an azimuthal angle. */
-    double alpha, beta, theta; /*  These are for convenience and follow the SimNRA conventions! Don't use them for any physics if you can avoid them. Well, theta *is* very convenient... */
-    //ion ion;
+    double alpha, beta, theta; /*  These are for convenience and follow the SimNRA conventions! Don't use them for any physics (you can double-check some things maybe?) */
     const jibal_isotope *beam_isotope;
     double beam_E;
     double beam_E_broad; /* Variance */
@@ -70,9 +70,9 @@ typedef struct sim_reaction {
 
 typedef struct {
     simulation sim;
+    const sample *sample; /* Note that simulate() can be passed a sample explicitly, but in most cases it should be this */
+    const sample *foil;
     size_t n_reactions; /* Number of reactions is counted on init. */
-    double *c; /* Concentrations for n_isotopes at some arbitrary x */
-    double c_x; /* at this x */
     jibal_gsto *gsto;
     const jibal_config *jibal_config;
     int rk4;

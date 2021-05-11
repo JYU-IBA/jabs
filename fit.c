@@ -44,7 +44,7 @@ int func_f(const gsl_vector *x, void *params, gsl_vector * f)
         return GSL_FAILURE;
     }
     start = clock();
-    no_ds(p->ws, p->sample);
+    no_ds(p->ws);
     end = clock();
     p->cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
     for(size_t i = p->low_ch; i <= p->high_ch; i++) {
