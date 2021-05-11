@@ -213,21 +213,22 @@ void post_scatter_exit(ion *p, const depth depth_start, sim_workspace *ws, const
         }
         d = d_after;
     }
-    if(!ws->foil)
+    const struct sample *foil = ws->sim.det->foil;
+    if(!foil)
         return;
     d.i = 0;
     d.x = 0.0;
     ion ion_foil = *p;
     ion_set_angle(&ion_foil, 0.0, 0.0); /* Foils are not tilted. We use a temporary copy of "p" to do this step. */
     while(1) {
-        depth d_after  = stop_step(ws, &ion_foil, ws->foil, d, ws->sim.stop_step_exiting == 0.0?p->E*0.1+sqrt(p->S):ws->sim.stop_step_exiting);
+        if(d.x >= foil->ranges[foil->n_ranges-1].x) {
+            break;
+        }
+        depth d_after  = stop_step(ws, &ion_foil, foil, d, ws->sim.stop_step_exiting == 0.0?p->E*0.1+sqrt(p->S):ws->sim.stop_step_exiting);
         if(p->E < ws->sim.emin) {
-
             break;
         }
-        if(d_after.x <= 1.0e-6 * C_TFU) {
-            break;
-        }
+        d = d_after;
     }
     p->E = ion_foil.E;
     p->S = ion_foil.S;
@@ -237,14 +238,14 @@ double scattering_angle(const ion *incident, sim_workspace *ws) { /* Calculate s
 
     double scatter_theta, scatter_phi;
 
-    rotate(ws->sim.det.theta, ws->sim.det.phi, incident->theta, incident->phi, &scatter_theta, &scatter_phi);/* Detector in ion system */
+    rotate(ws->sim.det->theta, ws->sim.det->phi, incident->theta, incident->phi, &scatter_theta, &scatter_phi);/* Detector in ion system */
 #ifdef DEBUG
     fprintf(stderr, "Detector in ion system angles %g deg and %g deg.\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
 #endif
     rotate(scatter_theta, scatter_phi, -1.0*ws->sim.sample_theta, ws->sim.sample_phi, &scatter_theta, &scatter_phi); /* Counter sample rotation. Detector in lab (usually). If ion was somehow "deflected" then this is the real scattering angle. Compare to sim->theta.  */
 #ifdef DEBUG
     fprintf(stderr, "Incident angles %g deg and %g deg (in sample)\n", incident->theta/C_DEG, incident->phi/C_DEG);
-    fprintf(stderr, "Sample lab angles %g deg and %g deg, detector lab angles %g deg and %g deg\n", ws->sim.sample_theta/C_DEG, ws->sim.sample_phi/C_DEG, ws->sim.det.theta/C_DEG, ws->sim.det.phi/C_DEG);
+    fprintf(stderr, "Sample lab angles %g deg and %g deg, detector lab angles %g deg and %g deg\n", ws->sim.sample_theta/C_DEG, ws->sim.sample_phi/C_DEG, ws->sim.det->theta/C_DEG, ws->sim.det->phi/C_DEG);
     fprintf(stderr, "Final lab scattering angles %g deg and %g deg\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
     if(!ws->sim.ds) {
         assert(fabs(ws->sim.theta - scatter_theta) < 0.01 * C_DEG); /* with DS this assert will fail */
@@ -259,7 +260,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
     double theta, phi; /* Generic polar and azimuth angles */
-    rotate(ws->sim.det.theta, ws->sim.det.phi, ws->sim.sample_theta, ws->sim.sample_phi, &theta, &phi); /* Detector in sample coordinate system */
+    rotate(ws->sim.det->theta, ws->sim.det->phi, ws->sim.sample_theta, ws->sim.sample_phi, &theta, &phi); /* Detector in sample coordinate system */
     double scatter_theta = scattering_angle(incident, ws);
 #ifdef DEBUG
     ion_print(stderr, incident);
@@ -319,7 +320,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         }
         const double E_front = ion1.E;
         const double S_front = ion1.S;
-        depth d_after = stop_step(ws, &ion1, sample, d_before, ws->sim.stop_step_incident == 0.0?STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(ws->sim.det.resolution+K_min*(ion1.S)):ws->sim.stop_step_incident);
+        depth d_after = stop_step(ws, &ion1, sample, d_before, ws->sim.stop_step_incident == 0.0?STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(ws->sim.det->resolution+K_min*(ion1.S)):ws->sim.stop_step_incident);
 #ifdef DEBUG
         fprintf(stderr, "After:  %g tfu in range %zu\n", d_after.x/C_TFU, d_after.i);
 #endif
@@ -551,18 +552,18 @@ void add_fit_params(global_options *global, simulation *sim, const sample_model 
         fprintf(stderr, "Thing to fit: \"%s\"\n", token);
 #endif
         if(strncmp(token, "calib", 5) == 0) {
-            fit_params_add_parameter(params, &sim->det.slope); /* TODO: prevent adding already added things */
-            fit_params_add_parameter(params, &sim->det.offset);
-            fit_params_add_parameter(params, &sim->det.resolution);
+            fit_params_add_parameter(params, &sim->det->slope); /* TODO: prevent adding already added things */
+            fit_params_add_parameter(params, &sim->det->offset);
+            fit_params_add_parameter(params, &sim->det->resolution);
         }
         if(strcmp(token, "slope") == 0) {
-            fit_params_add_parameter(params, &sim->det.slope);
+            fit_params_add_parameter(params, &sim->det->slope);
         }
         if(strcmp(token, "offset") == 0) {
-            fit_params_add_parameter(params, &sim->det.offset);
+            fit_params_add_parameter(params, &sim->det->offset);
         }
         if(strncmp(token, "reso", 4) == 0) {
-            fit_params_add_parameter(params, &sim->det.resolution);
+            fit_params_add_parameter(params, &sim->det->resolution);
         }
         if(strcmp(token, "fluence") == 0) {
             fit_params_add_parameter(params, &sim->p_sr);
@@ -651,9 +652,9 @@ void no_ds(sim_workspace *ws) {
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
         if(ws->sample->ranges[i].rough.model == ROUGHNESS_GAMMA) {
 #ifdef DEBUG
-            fprintf(stderr, "Range %zu is rough (gamma), amount %g tfu, n = %zu spectra\n", i, sample->ranges[i].rough.x/C_TFU, sample->ranges[i].rough.n);
+            fprintf(stderr, "Range %zu is rough (gamma), amount %g tfu, n = %zu spectra\n", i, ws->sample->ranges[i].rough.x/C_TFU, ws->sample->ranges[i].rough.n);
 #endif
-            assert(sample->ranges[i].rough.n > 0 && sample->ranges[i].rough.n < 1000);
+            assert(ws->sample->ranges[i].rough.n > 0 && ws->sample->ranges[i].rough.n < 1000);
             tpd[j] = thickness_probability_table_gen(ws->sample->ranges[i].x, ws->sample->ranges[i].rough.x, ws->sample->ranges[i].rough.n);
             index[j] = i;
             if(j)
@@ -683,9 +684,9 @@ void no_ds(sim_workspace *ws) {
                 sample_rough->ranges[i_range].x += x_diff;
             }
 #ifdef DEBUG
-            fprintf(stderr, "Gamma roughness diff %g tfu (from %g tfu, index i_range=%zu), probability %.3lf%%)\n", x_diff/C_TFU, sample->ranges[i_range].x/C_TFU, i_range, tpd[i]->p[j].prob*100.0);
+            fprintf(stderr, "Gamma roughness diff %g tfu (from %g tfu, index i_range=%zu), probability %.3lf%%)\n", x_diff/C_TFU, ws->sample->ranges[i_range].x/C_TFU, i_range, tpd[i]->p[j].prob*100.0);
             fprintf(stderr, "Gamma roughness, ranges");
-            for(i_range = 0; i_range < sample->n_ranges; i_range++) {
+            for(i_range = 0; i_range < ws->sample->n_ranges; i_range++) {
                 fprintf(stderr, ", %zu: %g tfu ", i_range, sample_rough->ranges[i_range].x/C_TFU);
             }
             fprintf(stderr, "\n");

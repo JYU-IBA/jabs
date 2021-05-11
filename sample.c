@@ -273,7 +273,7 @@ size_t sample_model_number_of_rough_ranges(const sample_model *sm) {
     return n;
 }
 
-sample_model *sample_model_from_file(jibal *jibal, const char *filename) {
+sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
     FILE *in;
     if(!filename)
         return NULL;
@@ -404,7 +404,7 @@ void sample_model_free(sample_model *sm) {
     free(sm);
 }
 
-sample_model *sample_model_from_argv(jibal *jibal, int argc, char **argv) {
+sample_model *sample_model_from_argv(const jibal *jibal, int argc, char **argv) {
     sample_model *sm = malloc(sizeof(sample_model));
     sm->type = SAMPLE_MODEL_LAYERED;
     size_t n = 0;
@@ -455,6 +455,64 @@ sample_model *sample_model_from_argv(jibal *jibal, int argc, char **argv) {
     for(size_t i = 0; i < sm->n_ranges; i++) {
         *sample_model_conc_bin(sm, i, i) = 1.0;
     }
+    return sm;
+}
+
+char **string_to_argv(const char *str) { /* TODO: move this generic function to elsewhere! */
+    char *s = strdup(str);
+    char *s_split = s;
+    s[strcspn(s, "\r\n")] = 0;
+    size_t len = strlen(s);
+    size_t n = 0;
+    char *col;
+    //fprintf(stderr, "Len %zu\n", len);
+    while((col = strsep(&s_split, " \t")) != NULL) {
+        if(*col == '\0') {
+            continue;
+        }
+        n++;
+        //fprintf(stderr, "%zu: %s\n", n, col);
+    }
+    //fprintf(stderr, "n %zu\n", n);
+    if(!n) {
+        free(s);
+    }
+    char **out = malloc(sizeof(char *) * (n + 1));
+    out[0] = s;
+    size_t pos;
+    size_t i = 1;
+    for(pos = 0; pos < len; pos++) {
+        //fprintf(stderr, "s[%zu] = '%c'\n", pos, s[pos]);
+        if(s[pos] == '\0' /*&& s[pos-1] != '\0'*/) {
+            //fprintf(stderr, "whoop at %zu! i = %zu\n", pos, i);
+            out[i] = s+pos+1;
+            if(*out[i] != '\0') { /* Consecutive delimeters (turned to '\0' by strsep above) are ignored */
+                i++;
+            }
+        }
+    }
+    out[n] = NULL;
+    return out;
+}
+
+sample_model *sample_model_from_string(const jibal *jibal, const char *str) {
+    char **argv = string_to_argv(str);
+    if(!argv)
+        return NULL;
+    char **a = argv;
+    int argc = 0;
+    while(*a != NULL) {
+#ifdef DEBUG
+        fprintf(stderr, "got \"%s\" from string_to_argv\n", *a);
+#endif
+        a++;
+        argc++;
+    }
+    if(argc < 1)
+        return NULL;
+    sample_model *sm = sample_model_from_argv(jibal, argc, argv);
+    free(argv[0]);
+    free(argv);
     return sm;
 }
 

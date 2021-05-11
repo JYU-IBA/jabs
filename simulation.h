@@ -25,7 +25,7 @@
 #include "sample.h"
 
 typedef struct {
-    detector det;
+    detector *det;
     double stop_step_incident;
     double stop_step_exiting;
     double p_sr;
@@ -71,7 +71,6 @@ typedef struct sim_reaction {
 typedef struct {
     simulation sim;
     const sample *sample; /* Note that simulate() can be passed a sample explicitly, but in most cases it should be this */
-    const sample *foil;
     size_t n_reactions; /* Number of reactions is counted on init. */
     jibal_gsto *gsto;
     const jibal_config *jibal_config;

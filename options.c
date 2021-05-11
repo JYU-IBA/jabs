@@ -137,13 +137,13 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 sim->stop_step_exiting = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case '1':
-                sim->det.slope = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                sim->det->slope = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case '2':
-                sim->det.offset = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                sim->det->offset = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 'c':
-                sim->det.compress = atoi(optarg);
+                sim->det->compress = atoi(optarg);
                 break;
             case 'C':
                 sim->channeling = strtod(optarg, NULL);
@@ -188,10 +188,10 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 sim->sample_theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 't':
-                sim->det.theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                sim->det->theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 'p':
-                sim->det.phi = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                sim->det->phi = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 'h':
                 fputs(COPYRIGHT_STRING, stderr);
@@ -247,11 +247,16 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 global->reaction_filenames[global->n_reaction_filenames-1] = strdup(optarg);
                 break;
             case 'R':
-                sim->det.resolution = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg)/C_FWHM;
-                sim->det.resolution *= sim->det.resolution; /* square */
+                sim->det->resolution = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg)/C_FWHM;
+                sim->det->resolution *= sim->det->resolution; /* square */
                 break;
             case 'd':
-                sim->det = detector_from_file(global->jibal->units, optarg);
+                free(sim->det);
+                sim->det = detector_from_file(global->jibal, optarg);
+                if(!sim->det) {
+                    fprintf(stderr, "Reading detector from file %s failed.\n", optarg);
+                    exit(EXIT_FAILURE);
+                }
                 break;
             case 'D':
                 global->detector_out_filename = strdup(optarg);

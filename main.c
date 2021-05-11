@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
 
     gsl_histogram *exp = NULL;
     if(global->exp_filename) {
-        exp = read_experimental_spectrum(global->exp_filename, &sim->det);
+        exp = read_experimental_spectrum(global->exp_filename, sim->det);
         if(!exp) {
             fprintf(stderr, "Error! Can not open file \"%s\".\n", global->exp_filename);
             return EXIT_FAILURE;
@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     if(exp) {
-        set_spectrum_calibration(exp, &ws->sim.det); /* Update the experimental spectra to final calibration */
+        set_spectrum_calibration(exp, ws->sim.det); /* Update the experimental spectra to final calibration */
     }
     print_spectra(global->out_filename, ws, exp);
 
@@ -197,7 +197,7 @@ int main(int argc, char **argv) {
     if(global->detector_out_filename) {
         FILE *f_det;
         if((f_det = fopen(global->detector_out_filename, "w"))) {
-            detector_print(f_det, &ws->sim.det);
+            detector_print(f_det, ws->sim.det);
         } else {
             fprintf(stderr, "Could not write detector to file \"%s\".\n", global->detector_out_filename);
         }
