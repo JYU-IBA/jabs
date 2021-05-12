@@ -269,7 +269,6 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
     fprintf(stderr, "Simulate from depth %g tfu (index %zu), sim_theta = %g deg, theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->sim.theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
 #endif
     depth d_before = depth_start;
-    ws->S_min_out = 0.0;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
         r->last_brick = 0;
@@ -323,7 +322,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         }
         const double E_front = ion1.E;
         const double S_front = ion1.S;
-        double E_step = ws->sim.stop_step_incident == 0.0?STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(ws->sim.det->resolution+ws->S_min_out):ws->sim.stop_step_incident;
+        double E_step = ws->sim.stop_step_incident == 0.0?STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(ws->sim.det->resolution+ion1.S):ws->sim.stop_step_incident;
         depth d_after = stop_step(ws, &ion1, sample, d_before, E_step);
 #ifdef DEBUG
         fprintf(stderr, "After:  %g tfu in range %zu\n", d_after.x/C_TFU, d_after.i);
@@ -348,7 +347,6 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
                         E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ion1.S) / C_KEV);
 #endif
-        double S_min = 100.0*ws->sim.det->resolution; /* A large "upper limit", we calculate the smallest straggling in output (to be used for step size) */
         for (size_t i = 0; i < ws->n_reactions; i++) {
             sim_reaction *r = &ws->reactions[i];
             if (r->stop)
@@ -377,8 +375,6 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
 #endif
             post_scatter_exit(&r->p, d_after, ws, sample);
-            if(r->p.S < S_min)
-                S_min = r->p.S;
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
             if (r->p.E < ws->sim.emin) {
@@ -402,11 +398,9 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             }
             r->last_brick = i_depth;
         }
-        //fprintf(stderr, "Step %zu: smallest S in output is %.3lf keV FWHM, compare with %.3lf keV\n", i_depth, sqrt(S_min)*C_FWHM/C_KEV, sqrt(K_min*(ion1.S))*C_FWHM/C_KEV);
         d_before = d_after;
         ion1.S = S_back;
         ion1.E = E_back;
-        ws->S_min_out = S_min;
         i_depth++;
     }
     convolute_bricks(ws);
@@ -729,12 +723,11 @@ void ds(sim_workspace *ws) {
     ws->mean_conc_and_energy = TRUE;
     fprintf(stderr, "\n");
     const jibal_isotope *incident = ws->sim.beam_isotope;
-    ws->S_min_out = 0.0;
     while(1) {
         double E_front = ion1.E;
         if(E_front < ws->sim.emin)
             break;
-        depth d_after = stop_step(ws, &ion1, ws->sample, d_before, ws->sim.stop_step_incident == 0.0?sqrt(ws->sim.det->resolution+ws->S_min_out):ws->sim.stop_step_incident); /* TODO: step? */
+        depth d_after = stop_step(ws, &ion1, ws->sample, d_before, sqrt(ws->sim.det->resolution+ion1.S)); /* TODO: step? */
         double thick_step = depth_diff(d_before, d_after);
         const depth d_halfdepth = {.x = (d_before.x + d_after.x)/2.0, .i = d_after.i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         double E_back = ion1.E;
