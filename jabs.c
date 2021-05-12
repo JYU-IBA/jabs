@@ -334,7 +334,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         if(fabs(d_diff) < 0.001*C_TFU && E_front-E_back < 0.001*C_KEV) {
             fprintf(stderr, "Warning: no or very little progress was made (E step (goal) %g keV, E from %g keV to E = %g keV, depth = %g tfu, d_diff = %g tfu), check stopping or step size.\n", E_step/C_KEV, E_front/C_KEV , E_back/C_KEV, d_before.x/C_TFU, d_diff/C_TFU);
             //sample_print(stderr, sample, FALSE);
-            d_before.x += 0.001*C_TFU;
+            d_before.x += incident->inverse_cosine_theta*0.001*C_TFU;
             warnings++;
             continue;
         }
@@ -714,12 +714,16 @@ void no_ds(sim_workspace *ws) {
 
 void ds(sim_workspace *ws) {
     double p_sr = ws->sim.p_sr;
+    no_ds(ws);
+    if(!ws->sim.ds)
+        return;
     ion_set_angle(&ws->ion, 0.0, 0.0);
     ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
     ion ion1 = ws->ion;
     ion ion2 = ion1;
-    no_ds(ws);
     depth d_before = depth_seek(ws->sample, 0.0);
+    ws->rk4 = FALSE;
+    ws->nucl_stop_accurate = FALSE;
     ws->mean_conc_and_energy = TRUE;
     fprintf(stderr, "\n");
     const jibal_isotope *incident = ws->sim.beam_isotope;

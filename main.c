@@ -177,11 +177,7 @@ int main(int argc, char **argv) {
         fit_params_free(fit_data.fit_params);
     } else {
         ws = sim_workspace_init(sim, reactions, sample, jibal);
-        if(sim->ds) {
-            ds(ws); /* TODO: make it work right. Roughness. */
-        } else {
-            no_ds(ws);
-        }
+        ds(ws);
     }
     if(!ws) {
         fprintf(stderr, "ERROR! Simulation workspace does not exist after the simulation. This implies something failed spectacularly.\nNo output generated.\n");

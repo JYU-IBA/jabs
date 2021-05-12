@@ -23,7 +23,7 @@
 #include "fit.h"
 #include "jabs.h"
 
-int func_f(const gsl_vector *x, void *params, gsl_vector * f)
+int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
 {
     clock_t start, end;
     struct fit_data *p = (struct fit_data *) params;
@@ -44,7 +44,7 @@ int func_f(const gsl_vector *x, void *params, gsl_vector * f)
         return GSL_FAILURE;
     }
     start = clock();
-    no_ds(p->ws);
+    ds(p->ws);
     end = clock();
     p->cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
     for(size_t i = p->low_ch; i <= p->high_ch; i++) {
@@ -118,7 +118,7 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
         fprintf(stderr, "No experimental data, can not fit.\n");
         return stats;
     }
-    fdf.f = &func_f;
+    fdf.f = &fit_function;
     fdf.df = NULL; /* Jacobian, with NULL using finite difference. TODO: this could be implemented */
     fdf.fvv = NULL; /* No geodesic acceleration */
     fdf.n = (fit_data->high_ch-fit_data->low_ch+1);

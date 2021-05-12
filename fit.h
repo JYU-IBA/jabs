@@ -56,7 +56,7 @@ struct fit_stats {
 };
 
 struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data);
-int func_f(const gsl_vector *x, void *params, gsl_vector *f);
+int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 void fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspace *w);
 fit_params *fit_params_new();
 void fit_params_add_parameter(fit_params *p, double *value);
