@@ -44,7 +44,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
         return GSL_FAILURE;
     }
     start = clock();
-    ds(p->ws);
+    simulate_with_ds(p->ws);
     end = clock();
     p->cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
     for(size_t i = p->low_ch; i <= p->high_ch; i++) {
