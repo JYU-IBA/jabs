@@ -252,7 +252,7 @@ double scattering_angle(const ion *incident, sim_workspace *ws) { /* Calculate s
     fprintf(stderr, "Sample lab angles %g deg and %g deg, detector lab angles %g deg and %g deg\n", ws->sim.sample_theta/C_DEG, ws->sim.sample_phi/C_DEG, ws->sim.det->theta/C_DEG, ws->sim.det->phi/C_DEG);
     fprintf(stderr, "Final lab scattering angles %g deg and %g deg\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
     if(!ws->sim.ds) {
-        assert(fabs(ws->sim.theta - scatter_theta) < 0.01 * C_DEG); /* with DS this assert will fail */
+        assert(fabs(ws->sim.det->theta - scatter_theta) < 0.01 * C_DEG); /* with DS this assert will fail */
     }
 #endif
     return scatter_theta;
@@ -270,7 +270,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
 #ifdef DEBUG
     ion_print(stderr, incident);
     fprintf(stderr, "Reaction angles (in sample) %g deg and %g deg\n", theta/C_DEG, phi/C_DEG);
-    fprintf(stderr, "Simulate from depth %g tfu (index %zu), sim_theta = %g deg, theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->sim.theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
+    fprintf(stderr, "Simulate from depth %g tfu (index %zu), detector theta = %g deg, calculated theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->sim.det->theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
 #endif
     depth d_before = depth_start;
     for(size_t i = 0; i < ws->n_reactions; i++) {
@@ -422,7 +422,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
 reaction **make_reactions(const struct sample *sample, const simulation *sim, jibal_cross_section_type cs_rbs, jibal_cross_section_type cs_erd) { /* Note that sim->ion needs to be set! */
     int rbs = (cs_rbs != JIBAL_CS_NONE);
     int erd = (cs_erd != JIBAL_CS_NONE);
-    if(sim->theta > C_PI/2.0) {
+    if(sim->det->theta > C_PI/2.0) {
         erd = FALSE;
     }
     size_t n_reactions = (sample->n_isotopes*rbs + sample->n_isotopes*erd + 1); /* TODO: we can predict this more accurately */
@@ -430,7 +430,7 @@ reaction **make_reactions(const struct sample *sample, const simulation *sim, ji
     reaction **r = reactions;
     if(rbs) {
         for (size_t i = 0; i < sample->n_isotopes; i++) {
-            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_RBS, cs_rbs, sim->theta, TRUE);
+            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_RBS, cs_rbs, sim->det->theta, TRUE);
             if (!(*r)) {
                 fprintf(stderr, "Failed to make an RBS reaction with isotope %zu (%s)\n", i, sample->isotopes[i]->name);
             } else {
@@ -440,7 +440,7 @@ reaction **make_reactions(const struct sample *sample, const simulation *sim, ji
     }
     if(erd) {
         for (size_t i = 0; i < sample->n_isotopes; i++) {
-            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_ERD, cs_erd, sim->theta, TRUE);
+            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_ERD, cs_erd, sim->det->theta, TRUE);
             if (!(*r)) {
                 fprintf(stderr, "Failed to make an ERD reaction with isotope %zu (%s)\n", i, sample->isotopes[i]->name);
             } else {

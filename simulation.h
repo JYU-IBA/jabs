@@ -31,7 +31,6 @@ typedef struct {
     double p_sr;
     double sample_theta; /* Polar angle. Kind of. Zero is sample perpendicular to beam. */
     double sample_phi; /* Typically one uses a zero here, unless doing channeling stuff. Note that this is an azimuthal angle. */
-    double alpha, beta, theta; /*  These are for convenience and follow the SimNRA conventions! Don't use them for any physics (you can double-check some things maybe?) */
     const jibal_isotope *beam_isotope;
     double beam_E;
     double beam_E_broad; /* Variance */
@@ -91,7 +90,6 @@ typedef struct {
 #include "sample.h"
 simulation *sim_init();
 void sim_free(simulation *sim);
-void sim_calculate_geometry(simulation *sim);
 int sim_sanity_check(const simulation *sim);
 sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *reactions, const sample *sample, const jibal *jibal);
 void sim_workspace_free(sim_workspace *ws);

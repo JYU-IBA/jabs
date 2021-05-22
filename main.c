@@ -99,7 +99,6 @@ int main(int argc, char **argv) {
     if(sm->n_ranges == 0 || sm->n_materials == 0) {
         fprintf(stderr, "Can not simulate nothing.\n");
     }
-    sim_calculate_geometry(sim);
     reaction **reactions = NULL;
     if(global->verbose) {
         fprintf(stderr, "Default RBS cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_rbs));

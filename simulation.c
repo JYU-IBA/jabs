@@ -22,10 +22,6 @@ simulation *sim_init() {
     simulation *sim = malloc(sizeof(simulation));
     sim->sample_theta = ALPHA; /* These defaults are for IBM geometry */
     sim->sample_phi = 0.0;
-    sim->alpha = ALPHA;
-
-    sim->theta = THETA;
-    sim->beta = 180.0*C_DEG-THETA-ALPHA; /* Note: check if this is sane is defaults are changed. This should be (is) recalculated before running simulations. */
     sim->p_sr = PARTICLES_SR;
     sim->det = detector_default();
     sim->stop_step_incident = STOP_STEP_INCIDENT;
@@ -49,15 +45,6 @@ simulation *sim_init() {
 void sim_free(simulation *sim) {
     detector_free(sim->det);
     free(sim);
-}
-
-void sim_calculate_geometry(simulation *sim) {
-    double theta, phi; /* Temporary variables */
-    rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */
-    sim->alpha = theta; /* SimNRA convention, alpha has no sign. */
-    rotate(sim->det->theta, sim->det->phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Detector in sample coordinate system, angles are detector in sample system. Note that for Cornell geometry phi = 90.0 deg! */
-    sim->beta = C_PI - theta;
-    sim->theta = sim->det->theta;
 }
 
 int sim_sanity_check(const simulation *sim) {
@@ -226,12 +213,18 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
 }
 
 void simulation_print(FILE *f, const simulation *sim) {
+    double theta, phi; /* Temporary variables */
+    double alpha, beta; /* Incident and exit angles, SimNRA conventions (no signs). */
+    rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */
+    alpha = theta;
+    rotate(sim->det->theta, sim->det->phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Detector in sample coordinate system, angles are detector in sample system. Note that for Cornell geometry phi = 90.0 deg! */
+    beta = C_PI - theta;
     fprintf(f, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass/C_U);
     fprintf(f, "E = %.3lf keV\n", sim->beam_E/C_KEV);
     fprintf(f, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
-    fprintf(f, "alpha = %.3lf deg\n", sim->alpha/C_DEG);
-    fprintf(f, "beta = %.3lf deg\n", sim->beta/C_DEG);
-    fprintf(f, "theta = %.3lf deg\n", sim->theta/C_DEG);
+    fprintf(f, "alpha = %.3lf deg\n", alpha/C_DEG);
+    fprintf(f, "beta = %.3lf deg\n", beta/C_DEG);
+    fprintf(f, "theta = %.3lf deg\n", sim->det->theta/C_DEG);
     fprintf(f, "particles * sr = %e\n", sim->p_sr);
     fprintf(f, "detector calibration offset = %.3lf keV\n", sim->det->offset/C_KEV);
     fprintf(f, "detector calibration slope = %.5lf keV\n", sim->det->slope/C_KEV);

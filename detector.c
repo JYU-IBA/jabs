@@ -62,7 +62,8 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
 
 detector *detector_default() {
     detector *det = malloc(sizeof(detector));
-    det->theta = THETA;
+    det->theta = DETECTOR_THETA;
+    det->phi = DETECTOR_PHI;
     det->phi = 0.0;
     det->resolution = (DETECTOR_RESOLUTION*DETECTOR_RESOLUTION);
     det->slope = ENERGY_SLOPE;
