@@ -36,7 +36,7 @@
 #include "spectrum.h"
 #include "fit.h"
 #include "jabs.h"
-#include "defaults.h"
+#include "script.h"
 
 int main(int argc, char **argv) {
     global_options *global = global_options_alloc();
@@ -51,15 +51,6 @@ int main(int argc, char **argv) {
     global->jibal = jibal;
     sim->beam_isotope = jibal_isotope_find(jibal->isotopes, NULL, 2, 4); /* Default: 4He */
     read_options(global, sim, &argc, &argv);
-    if(!global->sample_filename && argc < 2) { /* No sample file given and not enough arguments left either. */
-        usage();
-        return EXIT_FAILURE;
-    }
-    fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version());
-    fprintf(stderr, "Compiled using JIBAL %s, current library version %s.\n", JIBAL_VERSION, jibal_version());
-    fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
-                    "This is free software, and you are welcome to redistribute it under certain conditions.\n"
-                    "Run 'jabs -h' for more information.\n\n");
     sim_sanity_check(sim);
 
     gsl_histogram *exp = NULL;
@@ -70,27 +61,37 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         }
     }
-
     sample_model *sm;
     if(global->sample_filename) {
         sm = sample_model_from_file(jibal, global->sample_filename);
-    } else {
-        sample_model *sm_raw  = sample_model_from_argv(jibal, argc, argv);
-        if(!sm_raw) {
-            fprintf(stderr, "Error in reading sample model from command line.\n");
+        if(!sm) {
+            fprintf(stderr, "Could not load a sample model from file \"%s\".\n", global->sample_filename);
             return EXIT_FAILURE;
         }
+        if(argc != 0) {
+            fprintf(stderr, "Unexpected command line parameters, total %i, starting with %s.\n", argc, *argv);
+            return EXIT_FAILURE;
+        }
+    } else if(argc > 0) {
+        sample_model *sm_raw  = sample_model_from_argv(jibal, argc, argv);
 #ifdef DEBUG
         fprintf(stderr, "Sample model, as read from command line.\n");
         sample_model_print(stderr, sm_raw);
 #endif
         sm = sample_model_split_elements(sm_raw);
         sample_model_free(sm_raw);
+        if(!sm) {
+            fprintf(stderr, "Error in reading sample model from command line.\n");
+            return EXIT_FAILURE;
+        }
+    } else {
+        return script_process(jibal, stdin);
     }
-    if(!sm) {
-        fprintf(stderr, "Could not build a sample model from input data.\n");
-        return EXIT_FAILURE;
-    }
+    fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
+    fprintf(stderr, "Compiled using JIBAL %s, current library version %s.\n", JIBAL_VERSION, jibal_version());
+    fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
+                    "This is free software, and you are welcome to redistribute it under certain conditions.\n"
+                    "Run 'jabs -h' for more information.\n\n");
     sample *sample = sample_from_sample_model(sm);
     if(global->verbose) {
         sample_model_print(stderr, sm);

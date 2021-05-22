@@ -77,6 +77,8 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
 }
 
 sample_model *sample_model_split_elements(const sample_model *sm) {
+    if(!sm)
+        return NULL;
     sample_model *out = sample_model_alloc(sample_model_element_count(sm), sm->n_ranges);
     out->type = sm->type;
 #ifdef DEBUG
@@ -405,6 +407,8 @@ void sample_model_free(sample_model *sm) {
 }
 
 sample_model *sample_model_from_argv(const jibal *jibal, int argc, char **argv) {
+    if(argc < 2)
+        return NULL;
     sample_model *sm = malloc(sizeof(sample_model));
     sm->type = SAMPLE_MODEL_LAYERED;
     size_t n = 0;

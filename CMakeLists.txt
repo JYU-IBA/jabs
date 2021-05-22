@@ -10,7 +10,7 @@
 #
 cmake_minimum_required(VERSION 3.15)
 project(jabs
-        VERSION 0.2.9
+        VERSION 0.2.10
         DESCRIPTION "Jaakko's Backscattering Simulator (JaBS)"
         LANGUAGES C
         )
@@ -39,7 +39,7 @@ endif()
 
 add_executable(jabs main.c sample.c sample.h brick.c ion.c ion.h simulation.c simulation.h reaction.c reaction.h
         options.c options.h spectrum.c spectrum.h fit.c fit.h rotate.c rotate.h detector.c detector.h jabs.c jabs.h
-        roughness.c roughness.h)
+        roughness.c roughness.h script.c script.h)
 target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
 
 target_link_libraries(jabs
