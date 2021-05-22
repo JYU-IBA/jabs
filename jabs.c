@@ -558,14 +558,14 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
     return EXIT_SUCCESS;
 }
 
-void add_fit_params(global_options *global, simulation *sim, const sample_model *sm, fit_params *params) {
+void add_fit_params(simulation *sim, const sample_model *sm, fit_params *params, const char *fit_vars) {
 #ifdef DEBUG
-    fprintf(stderr, "fitvars = %s\n", global->fit_vars);
+    fprintf(stderr, "fitvars = %s\n", fit_vars);
 #endif
-    if(!global->fit_vars)
+    if(!fit_vars)
         return;
     char *token, *s, *s_orig;
-    s_orig = s = strdup(global->fit_vars);
+    s_orig = s = strdup(fit_vars);
     assert(s != NULL);
     while ((token = strsep(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
 #ifdef DEBUG

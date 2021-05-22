@@ -22,6 +22,7 @@
 
 #include "fit.h"
 #include "jabs.h"
+#include "defaults.h"
 
 int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
 {
@@ -104,6 +105,40 @@ void fit_params_free(fit_params *p) {
     free(p);
 }
 
+fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm,  reaction * const *reactions, const char *fit_vars, int fit_low, int fit_high, int print_iters) {
+    struct fit_data *f = malloc(sizeof(struct fit_data));
+    f->n_iters_max = FIT_ITERS_MAX;
+    f->low_ch = fit_low;
+    if(f->low_ch <= 0)
+        f->low_ch = (int)(exp->n*0.1);
+    f->high_ch = fit_high;
+    if(f->high_ch <= 0 || f->high_ch >= exp->n)
+        f->high_ch = exp->n - 1;
+    f->jibal = jibal;
+    f->sim = sim;
+    f->exp = exp;
+    f->sample = NULL;
+    f->sm = sm;
+    f->reactions = reactions;
+    f->ws = NULL;
+    f->fit_params = fit_params_new();
+    f->print_iters = print_iters;
+    add_fit_params(sim, sm, f->fit_params, fit_vars);
+    if(f->fit_params->n == 0) {
+        fit_params_free(f->fit_params);
+        free(f);
+        return NULL;
+    }
+    return f;
+}
+
+void fit_data_free(fit_data *f) {
+    if(!f)
+        return;
+    fit_params_free(f->fit_params);
+    free(f);
+}
+
 struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     struct fit_stats stats = {.n_iters = 0, .n_evals = 0, .cputime_actual = 0.0};
     const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
@@ -146,9 +181,9 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     }
     gsl_vector_view wts = gsl_vector_view_array(weights, fit_data->high_ch-fit_data->low_ch+1);
 
-    const double xtol = 1e-8;
-    const double gtol = 1e-8;
-    const double ftol = 1e-8;
+    const double xtol = FIT_XTOL;
+    const double gtol = FIT_GTOL;
+    const double ftol = FIT_FTOL;
 
 /* allocate workspace with default parameters */
     w = gsl_multifit_nlinear_alloc (T, &fdf_params, fdf.n, fdf.p);

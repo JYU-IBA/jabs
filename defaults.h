@@ -24,4 +24,8 @@
 #define CS_STRAGG_HALF_N 3 /* Cross section weighting by straggling, number of steps is this times 2 + 1. Set to zero to disable (aka 1 step). */
 #define DUAL_SCATTER_POLAR_STEPS 20
 #define DUAL_SCATTER_AZI_STEPS 10
+#define FIT_ITERS_MAX 100
+#define FIT_XTOL (1e-7)
+#define FIT_GTOL (1e-7)
+#define FIT_FTOL (1e-7)
 #endif // JABS_DEFAULTS_H

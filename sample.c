@@ -528,6 +528,8 @@ sample *sample_copy(const sample *s_in) {
 }
 
 void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes) {
+    if(!sample)
+        return;
     fprintf(f, "AREAL D(tfu)             ");
     double sum = 0.0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
@@ -545,6 +547,8 @@ void sample_areal_densities_print(FILE *f, const sample *sample, int print_isoto
 
 
 void sample_print(FILE *f, const sample *sample, int print_isotopes) {
+    if(!sample)
+        return;
     fprintf(f, "  DEPTH(tfu)   ROUGH(tfu)");
     int Z = 0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {

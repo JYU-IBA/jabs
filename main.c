@@ -36,6 +36,7 @@
 #include "spectrum.h"
 #include "fit.h"
 #include "jabs.h"
+#include "defaults.h"
 
 int main(int argc, char **argv) {
     global_options *global = global_options_alloc();
@@ -138,42 +139,24 @@ int main(int argc, char **argv) {
     sim_workspace *ws = NULL;
     struct fit_stats fit_stats;
     if(global->fit) {
-        struct fit_data fit_data;
-        fit_data.n_iters_max = 150;
-        fit_data.low_ch = global->fit_low;
-        if(fit_data.low_ch <= 0)
-            fit_data.low_ch = (int)(exp->n*0.1);
-        fit_data.high_ch = global->fit_high;
-        if(fit_data.high_ch <= 0)
-            fit_data.high_ch = exp->n - 1;
-        fprintf(stderr, "Fit range [%lu, %lu]\n", fit_data.low_ch, fit_data.high_ch);
-        fit_data.jibal = jibal;
-        fit_data.sim = sim;
-        fit_data.exp = exp;
-        fit_data.sample = NULL;
-        fit_data.sm = sm;
-        fit_data.reactions = reactions;
-        fit_data.ws = NULL;
-        fit_data.fit_params = fit_params_new();
-        fit_data.print_iters = global->print_iters;
-        add_fit_params(global, sim, sm, fit_data.fit_params);
-        if(fit_data.fit_params->n == 0) {
+        fit_data *f_data = fit_data_new(jibal, sim, exp, sm, reactions, global->fit_vars, global->fit_low, global->fit_high, global->print_iters);
+        if(!f_data) {
             fprintf(stderr, "No parameters to fit!\n");
             return EXIT_FAILURE;
         }
-        fit_stats = fit(exp, &fit_data);
+        fprintf(stderr, "Fit range [%lu, %lu]\n", f_data->low_ch, f_data->high_ch);
+        fit_stats = fit(exp, f_data);
         fprintf(stderr, "\nFinal parameters:\n");
         simulation_print(stderr, sim);
         fprintf(stderr, "\nFinal composition:\n");
-        sample_print(stderr, fit_data.sample, global->print_isotopes);
-        sample_areal_densities_print(stderr, fit_data.sample, global->print_isotopes);
+        sample_print(stderr, f_data->sample, global->print_isotopes);
+        sample_areal_densities_print(stderr, f_data->sample, global->print_isotopes);
         fprintf(stderr, "\nFinal sample model:\n");
         sample_model_print(stderr, sm);
-
-        ws = fit_data.ws;
+        ws = f_data->ws;
         fprintf(stderr,"CPU time used for actual simulation: %.3lf s.\n", fit_stats.cputime_actual);
         fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_stats.cputime_actual/fit_stats.n_evals);
-        fit_params_free(fit_data.fit_params);
+        fit_data_free(f_data);
     } else {
         ws = sim_workspace_init(sim, reactions, sample, jibal);
         simulate_with_ds(ws);
