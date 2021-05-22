@@ -171,8 +171,8 @@ int main(int argc, char **argv) {
         sample_model_print(stderr, sm);
 
         ws = fit_data.ws;
-        fprintf(stderr,"CPU time used for actual simulation: %.3lf s.\n", fit_data.cputime_actual);
-        fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_data.cputime_actual/fit_stats.n_evals);
+        fprintf(stderr,"CPU time used for actual simulation: %.3lf s.\n", fit_stats.cputime_actual);
+        fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_stats.cputime_actual/fit_stats.n_evals);
         fit_params_free(fit_data.fit_params);
     } else {
         ws = sim_workspace_init(sim, reactions, sample, jibal);

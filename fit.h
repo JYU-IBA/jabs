@@ -31,7 +31,11 @@ typedef struct fit_params {
 #include "reaction.h"
 #include "sample.h"
 
-
+struct fit_stats {
+    size_t n_evals;
+    size_t n_iters;
+    double cputime_actual;
+};
 
 struct fit_data {
     gsl_histogram *exp; /* experimental data to be fitted */
@@ -45,15 +49,12 @@ struct fit_data {
     size_t low_ch;
     size_t high_ch;
     size_t n_iters_max;
-    double cputime_actual; /* Statistics! */
     double dof;
     int print_iters;
+    struct fit_stats *stats;
 };
 
-struct fit_stats {
-    size_t n_evals;
-    size_t n_iters;
-};
+
 
 struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data);
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);

@@ -46,7 +46,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     start = clock();
     simulate_with_ds(p->ws);
     end = clock();
-    p->cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
+    p->stats->cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
     for(size_t i = p->low_ch; i <= p->high_ch; i++) {
         double sum = 0.0;
         if(i >= p->ws->n_channels) { /* Outside range of simulated spectrum */
@@ -105,15 +105,15 @@ void fit_params_free(fit_params *p) {
 }
 
 struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
-    struct fit_stats stats = {.n_iters = 0, .n_evals = 0};
+    struct fit_stats stats = {.n_iters = 0, .n_evals = 0, .cputime_actual = 0.0};
     const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
     gsl_multifit_nlinear_workspace *w;
     gsl_multifit_nlinear_parameters fdf_params = gsl_multifit_nlinear_default_parameters();
     fdf_params.trs = gsl_multifit_nlinear_trs_lmaccel;
-    fit_data->cputime_actual = 0.0;
     struct fit_params *fit_params = fit_data->fit_params;
     gsl_multifit_nlinear_fdf fdf;
     fdf.params = fit_data;
+    fit_data->stats = &stats;
     if(!fit_data->exp) {
         fprintf(stderr, "No experimental data, can not fit.\n");
         return stats;

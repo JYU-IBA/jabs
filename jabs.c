@@ -202,7 +202,7 @@ void post_scatter_exit(ion *p, const depth depth_start, sim_workspace *ws, const
 #ifdef DEBUG_REACTION
         fprintf(stderr, "  Exiting... depth = %g tfu (i = %zu)\n", d.x, d.i);
 #endif
-        if(d.x <= 1.0e-6 * C_TFU) {
+        if(d.x <= DEPTH_TOLERANCE) {
             break;
         }
         depth d_after = stop_step(ws, p, sample, d, ws->sim.stop_step_exiting == 0.0?(p->E*0.10+sqrt(p->S)+2.0*C_KEV):ws->sim.stop_step_exiting); /* TODO: 10% of energy plus straggling plus 2 keV is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
