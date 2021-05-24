@@ -47,7 +47,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     start = clock();
     simulate_with_ds(p->ws);
     end = clock();
-    p->stats->cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
+    p->stats.cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
     for(size_t i = p->low_ch; i <= p->high_ch; i++) {
         double sum = 0.0;
         if(i >= p->ws->n_channels) { /* Outside range of simulated spectrum */
@@ -123,11 +123,6 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, 
     f->fit_params = fit_params_new();
     f->print_iters = print_iters;
     add_fit_params(sim, sm, f->fit_params, fit_vars);
-    if(f->fit_params->n == 0) {
-        fit_params_free(f->fit_params);
-        free(f);
-        return NULL;
-    }
     return f;
 }
 
@@ -138,31 +133,37 @@ void fit_data_free(fit_data *f) {
     free(f);
 }
 
-struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
-    struct fit_stats stats = {.n_iters = 0, .n_evals = 0, .cputime_actual = 0.0};
+int fit(gsl_histogram *exp, struct fit_data *fit_data) {
     const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
     gsl_multifit_nlinear_workspace *w;
     gsl_multifit_nlinear_parameters fdf_params = gsl_multifit_nlinear_default_parameters();
     fdf_params.trs = gsl_multifit_nlinear_trs_lmaccel;
     struct fit_params *fit_params = fit_data->fit_params;
+    if(!fit_params || fit_params->n == 0) {
+        fprintf(stderr, "No parameters to fit.\n");
+        return -1;
+    }
     gsl_multifit_nlinear_fdf fdf;
     fdf.params = fit_data;
-    fit_data->stats = &stats;
+    fit_data->stats.cputime_actual = 0.0;
+    fit_data->stats.n_evals = 0;
+    fit_data->stats.n_iters = 0;
     if(!fit_data->exp) {
         fprintf(stderr, "No experimental data, can not fit.\n");
-        return stats;
+        return -1;
     }
     if(fit_data->low_ch <= 0)
         fit_data->low_ch = (int)(exp->n*0.1);
     if(fit_data->high_ch <= 0 || fit_data->high_ch >= exp->n)
         fit_data->high_ch = exp->n - 1;
+    fprintf(stderr, "Fit range [%lu, %lu]\n", fit_data->low_ch, fit_data->high_ch);
     fdf.f = &fit_function;
     fdf.df = NULL; /* Jacobian, with NULL using finite difference. TODO: this could be implemented */
     fdf.fvv = NULL; /* No geodesic acceleration */
     fdf.n = (fit_data->high_ch-fit_data->low_ch+1);
     fdf.p = fit_params->n;
     if(fdf.n < fdf.p) /* insufficient data points */
-        return stats;
+        return -1;
     gsl_vector *f;
     gsl_matrix *J;
     double chisq, chisq0;
@@ -210,9 +211,9 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     gsl_blas_ddot(f, f, &chisq);
     fprintf(stderr, "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
     fprintf(stderr, "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
-    stats.n_iters = gsl_multifit_nlinear_niter(w);
+    fit_data->stats.n_iters = gsl_multifit_nlinear_niter(w);
     fprintf(stderr, "function evaluations: %zu\n", fdf.nevalf);
-    stats.n_evals = fdf.nevalf;
+    fit_data->stats.n_evals = fdf.nevalf;
     fprintf(stderr, "Jacobian evaluations: %zu\n", fdf.nevaldf);
     fprintf(stderr, "reason for stopping: %s\n", (info == 1) ? "small step size" : "small gradient");
     fprintf(stderr, "initial |f(x)| = %f\n", sqrt(chisq0));
@@ -252,5 +253,5 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
     gsl_matrix_free(covar);
     gsl_vector_free(x);
     free(weights);
-    return stats;
+    return 0;
 }

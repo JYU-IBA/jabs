@@ -20,6 +20,7 @@
 
 simulation *sim_init() {
     simulation *sim = malloc(sizeof(simulation));
+    sim->beam_isotope = NULL;
     sim->sample_theta = ALPHA; /* These defaults are for IBM geometry */
     sim->sample_phi = 0.0;
     sim->p_sr = PARTICLES_SR;
@@ -29,7 +30,6 @@ simulation *sim_init() {
     sim->fast = 0;
     sim->beam_E = ENERGY;
     sim->beam_E_broad = 0.0;
-
     sim->emin = E_MIN;
     sim->depthsteps_max = 0; /* Zero: automatic */
     sim->ds = FALSE;
@@ -213,13 +213,20 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
 }
 
 void simulation_print(FILE *f, const simulation *sim) {
+    if(!sim) {
+        return;
+    }
     double theta, phi; /* Temporary variables */
     double alpha, beta; /* Incident and exit angles, SimNRA conventions (no signs). */
     rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */
     alpha = theta;
     rotate(sim->det->theta, sim->det->phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Detector in sample coordinate system, angles are detector in sample system. Note that for Cornell geometry phi = 90.0 deg! */
     beta = C_PI - theta;
-    fprintf(f, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass/C_U);
+    if(sim->beam_isotope) {
+        fprintf(f, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass / C_U);
+    } else {
+        fprintf(f, "ion = None\n");
+    }
     fprintf(f, "E = %.3lf keV\n", sim->beam_E/C_KEV);
     fprintf(f, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
     fprintf(f, "alpha = %.3lf deg\n", alpha/C_DEG);

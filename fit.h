@@ -51,13 +51,12 @@ typedef struct fit_data {
     size_t n_iters_max;
     double dof;
     int print_iters;
-    struct fit_stats *stats;
+    struct fit_stats stats;
 } fit_data;
 
 fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm,  reaction * const *reactions, const char *fit_vars, int fit_low, int fit_high, int print_iters);
 void fit_data_free(struct fit_data *f);
-
-struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data);
+int fit(gsl_histogram *exp, struct fit_data *fit_data);
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 void fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspace *w);
 fit_params *fit_params_new();

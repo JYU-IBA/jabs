@@ -137,26 +137,22 @@ int main(int argc, char **argv) {
     fflush(stderr);
     start = clock();
     sim_workspace *ws = NULL;
-    struct fit_stats fit_stats;
     if(global->fit) {
-        fit_data *f_data = fit_data_new(jibal, sim, exp, sm, reactions, global->fit_vars, global->fit_low, global->fit_high, global->print_iters);
-        if(!f_data) {
-            fprintf(stderr, "No parameters to fit!\n");
+        fit_data *fit_data = fit_data_new(jibal, sim, exp, sm, reactions, global->fit_vars, global->fit_low, global->fit_high, global->print_iters);
+        if(!fit(exp, fit_data)) {
             return EXIT_FAILURE;
         }
-        fprintf(stderr, "Fit range [%lu, %lu]\n", f_data->low_ch, f_data->high_ch);
-        fit_stats = fit(exp, f_data);
         fprintf(stderr, "\nFinal parameters:\n");
         simulation_print(stderr, sim);
         fprintf(stderr, "\nFinal composition:\n");
-        sample_print(stderr, f_data->sample, global->print_isotopes);
-        sample_areal_densities_print(stderr, f_data->sample, global->print_isotopes);
+        sample_print(stderr, fit_data->sample, global->print_isotopes);
+        sample_areal_densities_print(stderr, fit_data->sample, global->print_isotopes);
         fprintf(stderr, "\nFinal sample model:\n");
         sample_model_print(stderr, sm);
-        ws = f_data->ws;
-        fprintf(stderr,"CPU time used for actual simulation: %.3lf s.\n", fit_stats.cputime_actual);
-        fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_stats.cputime_actual/fit_stats.n_evals);
-        fit_data_free(f_data);
+        ws = fit_data->ws;
+        fprintf(stderr,"CPU time used for actual simulation: %.3lf s.\n", fit_data->stats.cputime_actual);
+        fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_data->stats.cputime_actual/fit_data->stats.n_evals);
+        fit_data_free(fit_data); /* Does not free sim, ws, sample or sm */
     } else {
         ws = sim_workspace_init(sim, reactions, sample, jibal);
         simulate_with_ds(ws);

@@ -6,6 +6,8 @@
 
 static const struct script_command commands[] = {
         {"help", &script_help, "Print help."},
+        {"show", &script_show, "Show information on things."},
+        {"reset", &script_show, "Reset something."},
         {"exit", NULL, "Exit."},
         {"quit", NULL, NULL},
         {NULL, NULL, NULL}
@@ -18,6 +20,35 @@ void script_print_commands(FILE *f) {
         fprintf(f, "%22s    %s\n", c->name, c->help_text);
     }
 }
+
+int script_reset(struct fit_data *fit, int argc, char * const *argv) {
+    if(!fit) {
+        return 0; /* TODO: or error? */
+    }
+    fit_params_free(fit->fit_params);
+    fit->fit_params = NULL;
+    sim_workspace_free(fit->ws);
+    fit->ws = NULL;
+    sample_free(fit->sample);
+    fit->sample = NULL;
+    return 0;
+}
+
+int script_show(struct fit_data *fit, int argc, char * const *argv) {
+    if(argc == 0) {
+        fprintf(stderr, "Nothing to show.\n");
+        return 0;
+    }
+     if(strcmp(argv[0], "sim") == 0) {
+         simulation_print(stderr, fit->sim);
+         return 0;
+     } else {
+         fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
+         return -1;
+     }
+    return 0;
+}
+
 
 int script_help(struct fit_data *fit, int argc, char * const *argv) {
     (void) fit; /* Unused */
@@ -55,9 +86,10 @@ int script_help(struct fit_data *fit, int argc, char * const *argv) {
     return -1;
 }
 
+
 int script_process(jibal *jibal, FILE *f) {
     struct fit_data *fit = fit_data_new(jibal, sim_init(), NULL, NULL, NULL, NULL, 0, 0, 0); /* Not just fit, but this conveniently holds everything we need. */
-    char *line=NULL, *arguments;
+    char *line=NULL;
     size_t line_size=0;
     size_t lineno=0;
     int interactive = (f == stdin);
