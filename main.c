@@ -37,8 +37,11 @@
 #include "fit.h"
 #include "jabs.h"
 #include "script.h"
+#include "defaults.h"
 
 int main(int argc, char **argv) {
+    fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
+    fprintf(stderr, "Compiled using JIBAL %s, current library version %s.\n\n", JIBAL_VERSION, jibal_version());
     global_options *global = global_options_alloc();
     simulation *sim = sim_init();
     clock_t start, end;
@@ -87,11 +90,7 @@ int main(int argc, char **argv) {
     } else {
         return script_process(jibal, stdin);
     }
-    fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
-    fprintf(stderr, "Compiled using JIBAL %s, current library version %s.\n", JIBAL_VERSION, jibal_version());
-    fprintf(stderr, "JaBS comes with ABSOLUTELY NO WARRANTY.\n"
-                    "This is free software, and you are welcome to redistribute it under certain conditions.\n"
-                    "Run 'jabs -h' for more information.\n\n");
+    fputs(COPYRIGHT_STRING, stderr);
     sample *sample = sample_from_sample_model(sm);
     if(global->verbose) {
         sample_model_print(stderr, sm);

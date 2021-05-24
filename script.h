@@ -18,5 +18,18 @@
 #include "jabs.h"
 
 
+struct script_command {
+    const char *name;
+    int (*f)(struct fit_data *, int, char * const *);
+    const char *help_text;
+};
+
+struct help_topic {
+    const char *name;
+    const char *help_text;
+};
+
+void script_print_commands(FILE *f);
+int script_help(struct fit_data *fit, int argc, char * const *argv);
 int script_process(jibal *jibal, FILE *f);
 #endif // JABS_SCRIPT_H

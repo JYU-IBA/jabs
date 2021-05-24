@@ -4,14 +4,14 @@
 #include "fit.h"
 #include "generic.h"
 
-struct script_command {
-    const char *name;
-    int (*f)(struct fit_data *, int, char * const *);
-    const char *help_text;
+static const struct script_command commands[] = {
+        {"help", &script_help, "Print help."},
+        {"exit", NULL, "Exit."},
+        {"quit", NULL, NULL},
+        {NULL, NULL, NULL}
 };
 
-void script_print_commands(FILE *f, const struct script_command *commands) {
-    fprintf(f, "I recognize the following commands: \n");
+void script_print_commands(FILE *f) {
     for(const struct script_command *c = commands; c->name != NULL; c++) {
         if(!c->help_text)
             continue;
@@ -21,17 +21,41 @@ void script_print_commands(FILE *f, const struct script_command *commands) {
 
 int script_help(struct fit_data *fit, int argc, char * const *argv) {
     (void) fit; /* Unused */
-    fprintf(stderr, "HEEEEEeeeeeeeellllppp!\n");
-    return 0;
+    static const struct help_topic topics[] = {
+            {"help", "This is help on help. How meta. Help is available on following topics:\n"},
+            {"commands", "I recognize the following commands:\n"},
+            {"version", "JaBS version: "},
+            {NULL, NULL}
+    };
+    if(argc == 0) {
+        fprintf(stderr, "Type help [topic] for information on a particular topic.\n");
+        return 0;
+    }
+    for(const struct help_topic *t = topics; t->name != NULL; t++) {
+        if(strcmp(t->name, argv[0]) == 0) {
+            fputs(t->help_text, stderr);
+            if(strcmp(t->name, "help") == 0) {
+                size_t i = 0;
+                for(const struct help_topic *t2 = topics; t2->name != NULL; t2++) {
+                    fprintf(stderr, "%16s", t2->name);
+                    if(i % 4 != 0) {
+                        fputc('\n', stderr);
+                    }
+                }
+                fprintf(stderr, "\n");
+            } else if(strcmp(t->name, "commands") == 0) {
+                script_print_commands(stderr);
+            } else if(strcmp(t->name, "version") == 0) {
+                fprintf(stderr, "%s\n", jabs_version());
+            }
+            return 0;
+        }
+    }
+    fprintf(stderr, "Sorry, no help for '%s'.\n", argv[0]);
+    return -1;
 }
 
 int script_process(jibal *jibal, FILE *f) {
-    static const struct script_command commands[] = {
-            {"help", &script_help, "Print help."},
-            {"exit", NULL, "Exit."},
-            {"quit", NULL, NULL},
-            {NULL, NULL, NULL}
-    };
     struct fit_data *fit = fit_data_new(jibal, sim_init(), NULL, NULL, NULL, NULL, 0, 0, 0); /* Not just fit, but this conveniently holds everything we need. */
     char *line=NULL, *arguments;
     size_t line_size=0;
@@ -40,7 +64,7 @@ int script_process(jibal *jibal, FILE *f) {
     const char *prompt = "jabs> ";
     if(interactive) {
         fputs(COPYRIGHT_STRING, stderr);
-        fprintf(stderr, "Welcome to interactive mode.\nType \"help\" for help or run \"jabs -h\" for command line help.\n");
+        fprintf(stderr, "Welcome to interactive mode.\nType \"help\" for help or run \"jabs -h\" for command line help.\n\n");
         fputs(prompt, stderr);
     }
     int exit = FALSE;
@@ -81,7 +105,7 @@ int script_process(jibal *jibal, FILE *f) {
             }
             if(!found) {
                 if(interactive) {
-                    fprintf(stderr, "Command \"%s\" not recognized. Type \"exit\" to exit or \"help\" for help.\n", line);
+                    fprintf(stderr, "Command \"%s\" not recognized. See 'help commands'.\n", line);
                 } else {
                     fprintf(stderr, "Command \"%s\" not recognized on line %zu\n", line, lineno);
                     return EXIT_FAILURE;
@@ -99,5 +123,8 @@ int script_process(jibal *jibal, FILE *f) {
         }
     }
     free(line);
+    if(interactive) {
+        fprintf(stderr, "Bye.\n");
+    }
     return EXIT_SUCCESS;
 }
