@@ -15,6 +15,7 @@
 #include <assert.h>
 #include <string.h>
 #include "defaults.h"
+#include "generic.h"
 #include "sample.h"
 
 depth depth_seek(const sample *sample, double x) {
@@ -460,43 +461,6 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char **argv) 
         *sample_model_conc_bin(sm, i, i) = 1.0;
     }
     return sm;
-}
-
-char **string_to_argv(const char *str) { /* TODO: move this generic function to elsewhere! */
-    char *s = strdup(str);
-    char *s_split = s;
-    s[strcspn(s, "\r\n")] = 0;
-    size_t len = strlen(s);
-    size_t n = 0;
-    char *col;
-    //fprintf(stderr, "Len %zu\n", len);
-    while((col = strsep(&s_split, " \t")) != NULL) {
-        if(*col == '\0') {
-            continue;
-        }
-        n++;
-        //fprintf(stderr, "%zu: %s\n", n, col);
-    }
-    //fprintf(stderr, "n %zu\n", n);
-    if(!n) {
-        free(s);
-    }
-    char **out = malloc(sizeof(char *) * (n + 1));
-    out[0] = s;
-    size_t pos;
-    size_t i = 1;
-    for(pos = 0; pos < len; pos++) {
-        //fprintf(stderr, "s[%zu] = '%c'\n", pos, s[pos]);
-        if(s[pos] == '\0' /*&& s[pos-1] != '\0'*/) {
-            //fprintf(stderr, "whoop at %zu! i = %zu\n", pos, i);
-            out[i] = s+pos+1;
-            if(*out[i] != '\0') { /* Consecutive delimeters (turned to '\0' by strsep above) are ignored */
-                i++;
-            }
-        }
-    }
-    out[n] = NULL;
-    return out;
 }
 
 sample_model *sample_model_from_string(const jibal *jibal, const char *str) {

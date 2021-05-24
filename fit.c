@@ -90,7 +90,10 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
 }
 
 fit_params *fit_params_new() {
-    fit_params *p = calloc(1, sizeof(fit_params));
+    fit_params *p = malloc(sizeof(fit_params));
+    p->n = 0;
+    p->func_params = NULL;
+    p->func_params_err = NULL;
     return p;
 }
 void fit_params_add_parameter(fit_params *p, double *value) {
@@ -109,11 +112,7 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, 
     struct fit_data *f = malloc(sizeof(struct fit_data));
     f->n_iters_max = FIT_ITERS_MAX;
     f->low_ch = fit_low;
-    if(f->low_ch <= 0)
-        f->low_ch = (int)(exp->n*0.1);
     f->high_ch = fit_high;
-    if(f->high_ch <= 0 || f->high_ch >= exp->n)
-        f->high_ch = exp->n - 1;
     f->jibal = jibal;
     f->sim = sim;
     f->exp = exp;
@@ -153,6 +152,10 @@ struct fit_stats fit(gsl_histogram *exp, struct fit_data *fit_data) {
         fprintf(stderr, "No experimental data, can not fit.\n");
         return stats;
     }
+    if(fit_data->low_ch <= 0)
+        fit_data->low_ch = (int)(exp->n*0.1);
+    if(fit_data->high_ch <= 0 || fit_data->high_ch >= exp->n)
+        fit_data->high_ch = exp->n - 1;
     fdf.f = &fit_function;
     fdf.df = NULL; /* Jacobian, with NULL using finite difference. TODO: this could be implemented */
     fdf.fvv = NULL; /* No geodesic acceleration */

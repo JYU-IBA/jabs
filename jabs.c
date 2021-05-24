@@ -569,50 +569,54 @@ void add_fit_params(simulation *sim, const sample_model *sm, fit_params *params,
     assert(s != NULL);
     while ((token = strsep(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
 #ifdef DEBUG
-        fprintf(stderr, "Thing to fit: \"%s\"\n", token);
+        fprintf(stderr, "Thing to fit: \"%s\". Sim pointer is %p, sample model pointer is %p\n", token, (void *)sim, (void *)sm);
 #endif
-        if(strncmp(token, "calib", 5) == 0) {
-            fit_params_add_parameter(params, &sim->det->slope); /* TODO: prevent adding already added things */
-            fit_params_add_parameter(params, &sim->det->offset);
-            fit_params_add_parameter(params, &sim->det->resolution);
-        }
-        if(strcmp(token, "slope") == 0) {
-            fit_params_add_parameter(params, &sim->det->slope);
-        }
-        if(strcmp(token, "offset") == 0) {
-            fit_params_add_parameter(params, &sim->det->offset);
-        }
-        if(strncmp(token, "reso", 4) == 0) {
-            fit_params_add_parameter(params, &sim->det->resolution);
-        }
-        if(strcmp(token, "fluence") == 0) {
-            fit_params_add_parameter(params, &sim->p_sr);
-        }
-        if(strcmp(token, "channeling") == 0) {
-            fit_params_add_parameter(params, &sim->channeling);
-        }
-        if(strncmp(token, "rough", 5) == 0 && strlen(token) > 5) {
-            size_t i_layer = strtoul(token+5, NULL, 10);
-            if(i_layer >= 1 && i_layer <= sm->n_ranges) {
-                fit_params_add_parameter(params, &sm->ranges[i_layer-1].rough.x);
-            } else {
-                fprintf(stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
+        if(sim) {
+            if(strncmp(token, "calib", 5) == 0) {
+                fit_params_add_parameter(params, &sim->det->slope); /* TODO: prevent adding already added things */
+                fit_params_add_parameter(params, &sim->det->offset);
+                fit_params_add_parameter(params, &sim->det->resolution);
+            }
+            if(strcmp(token, "slope") == 0) {
+                fit_params_add_parameter(params, &sim->det->slope);
+            }
+            if(strcmp(token, "offset") == 0) {
+                fit_params_add_parameter(params, &sim->det->offset);
+            }
+            if(strncmp(token, "reso", 4) == 0) {
+                fit_params_add_parameter(params, &sim->det->resolution);
+            }
+            if(strcmp(token, "fluence") == 0) {
+                fit_params_add_parameter(params, &sim->p_sr);
+            }
+            if(strcmp(token, "channeling") == 0) {
+                fit_params_add_parameter(params, &sim->channeling);
             }
         }
-        if(strncmp(token, "thickness", 9) == 0 && strlen(token) > 9) {
-            size_t i_layer = strtoul(token+9, NULL, 10);
-            if(i_layer >= 1 && i_layer <= sm->n_ranges) {
-                fit_params_add_parameter(params, &sm->ranges[i_layer-1].x);
-            } else {
-                fprintf(stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
+        if(sm) {
+            if(strncmp(token, "rough", 5) == 0 && strlen(token) > 5) {
+                size_t i_layer = strtoul(token + 5, NULL, 10);
+                if(i_layer >= 1 && i_layer <= sm->n_ranges) {
+                    fit_params_add_parameter(params, &sm->ranges[i_layer - 1].rough.x);
+                } else {
+                    fprintf(stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
+                }
             }
-        }
-        size_t i,j;
-        if(sscanf(token, "conc%lu_%lu", &i, &j) == 2) {
-            if (i >= 1 && i <= sm->n_ranges && j >= 1  && j <= sm->n_materials) {
-                fit_params_add_parameter(params, sample_model_conc_bin(sm, i-1, j-1));
-            } else {
-                fprintf(stderr, "No element %lu in layer %lu\n", j, i);
+            if(strncmp(token, "thickness", 9) == 0 && strlen(token) > 9) {
+                size_t i_layer = strtoul(token + 9, NULL, 10);
+                if(i_layer >= 1 && i_layer <= sm->n_ranges) {
+                    fit_params_add_parameter(params, &sm->ranges[i_layer - 1].x);
+                } else {
+                    fprintf(stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
+                }
+            }
+            size_t i, j;
+            if(sscanf(token, "conc%lu_%lu", &i, &j) == 2) {
+                if(i >= 1 && i <= sm->n_ranges && j >= 1 && j <= sm->n_materials) {
+                    fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, j - 1));
+                } else {
+                    fprintf(stderr, "No element %lu in layer %lu\n", j, i);
+                }
             }
         }
     }
