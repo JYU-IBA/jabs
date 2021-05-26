@@ -1,4 +1,7 @@
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 #include <jibal_units.h>
 #include "defaults.h"
 #include "script.h"
@@ -241,7 +244,7 @@ int script_process(jibal *jibal, FILE *f) { /* TODO: pass initial fit_data (incl
     char *line=NULL;
     size_t line_size=0;
     size_t lineno=0;
-    int interactive = (f == stdin);
+    int interactive = (f == stdin && isatty(fileno(stdin)));
     const char *prompt = "jabs> ";
     if(interactive) {
         fputs(COPYRIGHT_STRING, stderr);
