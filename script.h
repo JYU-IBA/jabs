@@ -30,6 +30,7 @@ struct help_topic {
 };
 
 void script_print_commands(FILE *f);
+int script_load(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
 int script_help(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
 int script_show(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
 int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
