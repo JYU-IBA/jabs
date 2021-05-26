@@ -407,7 +407,7 @@ void sample_model_free(sample_model *sm) {
     free(sm);
 }
 
-sample_model *sample_model_from_argv(const jibal *jibal, int argc, char **argv) {
+sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const *argv) {
     if(argc < 2)
         return NULL;
     sample_model *sm = malloc(sizeof(sample_model));

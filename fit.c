@@ -133,6 +133,14 @@ void fit_data_free(fit_data *f) {
     free(f);
 }
 
+void fit_data_print(FILE *f, const struct fit_data *fit) {
+    if(!fit) {
+        return;
+    }
+    fprintf(stderr, "fit_low = %zu\n", fit->low_ch);
+    fprintf(stderr, "fit_high = %zu\n", fit->high_ch);
+}
+
 int fit(gsl_histogram *exp, struct fit_data *fit_data) {
     const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
     gsl_multifit_nlinear_workspace *w;

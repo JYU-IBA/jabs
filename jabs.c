@@ -420,6 +420,8 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
 }
 
 reaction **make_reactions(const struct sample *sample, const simulation *sim, jibal_cross_section_type cs_rbs, jibal_cross_section_type cs_erd) { /* Note that sim->ion needs to be set! */
+    if(!sim || !sim->beam_isotope || !sample)
+        return NULL;
     int rbs = (cs_rbs != JIBAL_CS_NONE);
     int erd = (cs_erd != JIBAL_CS_NONE);
     if(sim->det->theta > C_PI/2.0) {
@@ -500,6 +502,8 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim, const sample *sampl
 int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histogram *exp) {
     char sep = ' ';
     FILE *f;
+    if(!ws)
+        return EXIT_FAILURE;
     if(filename) {
         f = fopen(filename, "w");
         if(!f) {
