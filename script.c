@@ -62,6 +62,7 @@ int script_load(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
         }
     }
     fprintf(stderr, "I don't know what to load (%s?)\n", argv[0]);
+    return -1;
 }
 
 int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
