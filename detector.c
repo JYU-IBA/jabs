@@ -22,14 +22,14 @@ int detector_sanity_check(const detector *det) {
 }
 
 detector *detector_from_file(const jibal *jibal, const char *filename) {
-    detector *det = detector_default();
-    if(!det)
-        return NULL;
     FILE *f = fopen(filename, "r");
     if(!f) {
         fprintf(stderr, "Could not read detector from file \"%s\".\n", filename);
-        return det;
+        return NULL;
     }
+    detector *det = detector_default();
+    if(!det)
+        return NULL;
     det->resolution = C_FWHM * sqrt(det->resolution); /* Convert resolution to FWHM from variance for the duration of input parsing */
     jibal_config_var vars[] = {
             {JIBAL_CONFIG_VAR_UNIT,   "slope",      &det->slope,      NULL},

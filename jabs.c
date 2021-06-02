@@ -556,8 +556,6 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
     }
     if(f != stdout) {
         fclose(f);
-    } else {
-        fprintf(f, "\n\n");
     }
     return EXIT_SUCCESS;
 }

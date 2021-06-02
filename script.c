@@ -1,4 +1,7 @@
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 #include <jibal_units.h>
 #include "defaults.h"
 #include "script.h"
@@ -10,11 +13,12 @@ static const struct script_command commands[] = {
         {"show",    &script_show,           "Show information on things."},
         {"set",     &script_set,            "Set variables."},
         {"simulate",    &script_simulate,   "Run a simulation."},
+        {"load",    &script_load,           "Load something."},
         {"reset",   &script_show,           "Reset something."},
         {"exit", NULL, "Exit."},
         {"quit", NULL, NULL},
         {NULL, NULL, NULL}
-}; /* TODO: commands: "load", "save" etc... */
+}; /* TODO: more commands, like saving spectra, fitting etc... */
 
 void script_print_commands(FILE *f) {
     for(const struct script_command *c = commands; c->name != NULL; c++) {
@@ -22,6 +26,42 @@ void script_print_commands(FILE *f) {
             continue;
         fprintf(f, "%22s    %s\n", c->name, c->help_text);
     }
+}
+
+int script_load(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
+    if(argc == 0) {
+        fprintf(stderr, "Usage: load [sample|detector] [file]\n");
+        return -1;
+    }
+    if(strcmp(argv[0], "sample") == 0) {
+        if(argc == 2) {
+            sample_model *sm = sample_model_from_file(fit->jibal, argv[1]);
+            if(!sm) {
+                fprintf(stderr, "Sample load from \"%s\" failed.\n", argv[1]);
+                return -1;
+            }
+            sample_model_free(fit->sm);
+            fit->sm = sm;
+            return 0;
+        } else {
+            fprintf(stderr, "Usage: load sample [file]\n");
+        }
+        return 0;
+    }
+    if(strcmp(argv[0], "detector") == 0) {
+        if(argc == 2) {
+            detector *det = detector_from_file(fit->jibal, argv[1]);
+            if(!det) {
+                return -1;
+            }
+            detector_free(fit->sim->det);
+            fit->sim->det = det;
+            return 0;
+        } else {
+            fprintf(stderr, "Usage: load detector [file]\n");
+        }
+    }
+    fprintf(stderr, "I don't know what to load (%s?)\n", argv[0]);
 }
 
 int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
@@ -39,7 +79,7 @@ int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * 
 
 int script_show(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
     if(argc == 0) {
-        fprintf(stderr, "Nothing to show.\n");
+        fprintf(stderr, "Usage show [sim|fit|sample|spectra|detector].\n");
         return 0;
     }
      if(strcmp(argv[0], "sim") == 0) {
@@ -57,13 +97,17 @@ int script_show(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
     if(strcmp(argv[0], "spectra") == 0) {
         return print_spectra(NULL, fit->ws, fit->exp);
     }
+    if(strcmp(argv[0], "detector") == 0) {
+        detector_print(stderr, fit->sim->det);
+        return 0;
+    }
     fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
     return -1;
 }
 
 int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
     if(argc == 0) {
-        fprintf(stderr, "Nothing to set.\n");
+        fprintf(stderr, "Nothing to set. See \"help set\" for more information.\n");
         return 0;
     }
     if(strcmp(argv[0], "ion") == 0) {
@@ -241,7 +285,7 @@ int script_process(jibal *jibal, FILE *f) { /* TODO: pass initial fit_data (incl
     char *line=NULL;
     size_t line_size=0;
     size_t lineno=0;
-    int interactive = (f == stdin);
+    int interactive = (f == stdin && isatty(fileno(stdin)));
     const char *prompt = "jabs> ";
     if(interactive) {
         fputs(COPYRIGHT_STRING, stderr);
