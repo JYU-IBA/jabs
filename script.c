@@ -107,7 +107,7 @@ int script_show(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
 }
 
 int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
-    if(argc == 0) {
+    if(argc < 1) {
         fprintf(stderr, "Nothing to set. See \"help set\" for more information.\n");
         return 0;
     }
@@ -138,15 +138,17 @@ int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * co
         }
         return 0;
     }
-    if(argc == 2) {
-        for(jibal_config_var *var = vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
-            if(strcmp(argv[0], var->name) == 0) {
-                jibal_config_var_set(fit->jibal->units, var, argv[1], NULL);
-#ifdef DEBUG
-                fprintf(stderr, "%s = %g\n", var->name, *((double *)var->variable));
-#endif
-                return 0;
+    for(jibal_config_var *var = vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
+        if(strcmp(argv[0], var->name) == 0) {
+            if(argc != 2) {
+                fprintf(stderr, "Usage: set %s [value]\n", var->name);
+                return -1;
             }
+            jibal_config_var_set(fit->jibal->units, var, argv[1], NULL);
+#ifdef DEBUG
+            fprintf(stderr, "%s = %g\n", var->name, *((double *)var->variable));
+#endif
+            return 0;
         }
     }
     fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
@@ -175,7 +177,7 @@ int script_help(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
                 i = 0;
                 for(const struct help_topic *t2 = topics; t2->name != NULL; t2++) {
                     i++;
-                    fprintf(stderr, "%16s", t2->name);
+                    fprintf(stderr, "%18s", t2->name);
                     if(i % 4 == 0) {
                         fputc('\n', stderr);
                     }
@@ -189,7 +191,7 @@ int script_help(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
                     i = 0;
                 for(jibal_config_var *var = vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
                     i++;
-                    fprintf(stderr, "%16s", var->name);
+                    fprintf(stderr, "%18s", var->name);
                     if(i % 4 == 0) {
                         fputc('\n', stderr);
                     }
