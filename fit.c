@@ -30,10 +30,11 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     struct fit_data *p = (struct fit_data *) params;
     gsl_histogram *exp = p->exp;
     for(size_t i = 0; i < p->fit_params->n; i++) {
-        *(p->fit_params->func_params[i]) = gsl_vector_get(x, i); /* TODO: set some parameters to fit! */
+        *(p->fit_params->func_params[i]) = gsl_vector_get(x, i);
     }
     sim_workspace_free(p->ws);
     sample_free(p->sample);
+    sample_model_renormalize(p->sm); /* TODO: only necessary if sample concentrations are fitted */
     p->sample = sample_from_sample_model(p->sm);
     if(sim_sanity_check(p->sim)) {
         p->ws = NULL; /* Workspace has not been allocated yet. */

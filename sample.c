@@ -77,6 +77,28 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
     return sm;
 }
 
+void sample_model_renormalize(sample_model *sm) {
+#ifdef SAMPLE_MODEL_RENORM_MATERIALS
+    /* This step should be unnecessary, unless materials are modified after they are created. */
+    for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+        jibal_material_normalize(sm->materials[i_mat]);
+    }
+#endif
+    for(size_t i = sm->n_ranges; i--;) {
+        double sum = 0.0;
+        for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+            if(*(sample_model_conc_bin(sm, i, i_mat)) < 0.0)
+                *(sample_model_conc_bin(sm, i, i_mat)) = 0.0;
+            sum += *(sample_model_conc_bin(sm, i, i_mat));
+        }
+        if(sum == 0.0)
+            continue;
+        for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+            *(sample_model_conc_bin(sm, i, i_mat)) /= sum;
+        }
+    }
+}
+
 sample_model *sample_model_split_elements(const sample_model *sm) {
     if(!sm)
         return NULL;

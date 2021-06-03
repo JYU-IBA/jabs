@@ -60,10 +60,12 @@ int sim_sanity_check(const simulation *sim) {
         fprintf(stderr, "Fluence is negative (%g).\n", sim->p_sr);
         return -1;
     }
+#ifdef NO_BLOCKING
     if(sim->channeling > 1.0) {
         fprintf(stderr, "Channeling correction is above 1.0 (%g)\n", sim->channeling);
         return -1;
     }
+#endif
     if(detector_sanity_check(sim->det)) {
         fprintf(stderr, "Detector failed sanity check.\n");
         return -1;
