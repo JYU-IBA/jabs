@@ -41,7 +41,8 @@ typedef struct {
     int ds_steps_azi;
     int ds_steps_polar;
     int n_ds;
-    double channeling; /* a very ad-hoc channeling yield correction */
+    double channeling_offset; /* a very ad-hoc channeling yield correction */
+    double channeling_slope;
     int cs_n_steps; /* Number of steps to take, when calculating cross section * concentration product */
     int cs_stragg_half_n;
 } simulation;

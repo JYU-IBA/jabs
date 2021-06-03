@@ -67,6 +67,7 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             {"noerd",         no_argument,       NULL, '9'},
             {"isotopes",      no_argument,       NULL, 0},
             {"channeling",    required_argument, NULL, 'C'},
+            {"channeling_slope",    required_argument, NULL, 3},
             {"print_iters",   no_argument,       NULL, 0},
             {NULL, 0,                NULL,   0}
     };
@@ -105,7 +106,8 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
             "Don't make an RBS spectrum",
             "Don't make an ERD spectrum (ERD automatically turns on forward angles)",
             "Print isotopes (in concentration table)",
-            "Ad-hoc substrate channeling yield correction",
+            "Ad-hoc substrate channeling yield correction (constant)",
+            "Ad-hoc substrate channeling yield correction (energy slope 1/keV)",
             "Print fits to standard output on every iteration",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
@@ -144,7 +146,10 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 sim->det->compress = atoi(optarg);
                 break;
             case 'C':
-                sim->channeling = strtod(optarg, NULL);
+                sim->channeling_offset = strtod(optarg, NULL);
+                break;
+            case 3:
+                sim->channeling_slope = strtod(optarg, NULL)/C_KEV;
                 break;
             case '3':
                 sim->p_sr = strtod(optarg, NULL);

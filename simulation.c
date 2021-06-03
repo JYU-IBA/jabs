@@ -36,7 +36,8 @@ simulation *sim_init() {
     sim->ds_steps_polar = DUAL_SCATTER_POLAR_STEPS;
     sim->ds_steps_azi = DUAL_SCATTER_AZI_STEPS;
     sim->n_ds = sim->ds_steps_polar * sim->ds_steps_azi;
-    sim->channeling = 1.0;
+    sim->channeling_offset = 1.0;
+    sim->channeling_slope = 0.0;
     sim->cs_n_steps = CS_CONC_STEPS;
     sim->cs_stragg_half_n = CS_STRAGG_HALF_N;
     return sim;
@@ -241,8 +242,9 @@ void simulation_print(FILE *f, const simulation *sim) {
     fprintf(f, "step for incident ions = %.3lf keV\n", sim->stop_step_incident/C_KEV);
     fprintf(f, "step for exiting ions = %.3lf keV\n", sim->stop_step_exiting/C_KEV);
     fprintf(f, "fast level = %i\n", sim->fast);
-    if(sim->channeling != 1.0) {
-        fprintf(f, "substrate channeling yield correction = %.5lf\n", sim->channeling);
+    if(sim->channeling_offset != 1.0 || sim->channeling_slope != 0.0) {
+        fprintf(f, "substrate channeling yield correction offset = %.5lf\n", sim->channeling_offset);
+        fprintf(f, "substrate channeling yield correction slope = %g / keV\n", sim->channeling_slope/(1.0/C_KEV));
     }
 }
 

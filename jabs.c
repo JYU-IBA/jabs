@@ -391,7 +391,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             double sigma_conc = cross_section_concentration_product(ws, sample, r, E_front, E_back, &d_before, &d_after, S_front, S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
             if(sigma_conc > 0.0) {
                 if(d_after.i == sample->n_ranges - 2) {
-                    sigma_conc *= ws->sim.channeling;
+                    sigma_conc *= ws->sim.channeling_offset + ws->sim.channeling_slope * (E_front + E_back)/2.0;
                 }
                 b->Q = ion1.inverse_cosine_theta * sigma_conc * d_diff;
                 assert(b->Q >= 0.0);
@@ -591,9 +591,13 @@ void add_fit_params(simulation *sim, const sample_model *sm, fit_params *params,
             if(strcmp(token, "fluence") == 0) {
                 fit_params_add_parameter(params, &sim->p_sr);
             }
-            if(strcmp(token, "channeling") == 0) {
-                fit_params_add_parameter(params, &sim->channeling);
+            if(strcmp(token, "channeling_slope") == 0) {
+                fit_params_add_parameter(params, &sim->channeling_slope);
             }
+            if(strcmp(token, "channeling") == 0) {
+                fit_params_add_parameter(params, &sim->channeling_offset);
+            }
+
         }
         if(sm) {
             if(strncmp(token, "rough", 5) == 0 && strlen(token) > 5) {
