@@ -40,7 +40,7 @@ struct fit_stats {
 typedef struct fit_data {
     gsl_histogram *exp; /* experimental data to be fitted */
     simulation *sim;
-    reaction * const *reactions;
+    reaction **reactions;
     const jibal *jibal;
     sample *sample;
     sample_model *sm;
@@ -54,8 +54,8 @@ typedef struct fit_data {
     struct fit_stats stats;
 } fit_data;
 
-fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm,  reaction * const *reactions);
-void fit_data_free(struct fit_data *f);
+fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm,  reaction **reactions);
+void fit_data_free(struct fit_data *f); /* Doesn't free everything in fit_data */
 void fit_data_print(FILE *f, const struct fit_data *fit);
 int fit(struct fit_data *fit_data);
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
@@ -63,5 +63,6 @@ void fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspac
 fit_params *fit_params_new();
 void fit_params_add_parameter(fit_params *p, double *value);
 void fit_params_free(fit_params *p);
+void fit_stats_print(FILE *f, const struct fit_stats *stats);
 
 #endif // JABS_FIT_H

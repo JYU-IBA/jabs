@@ -104,12 +104,21 @@ void fit_params_add_parameter(fit_params *p, double *value) {
     p->func_params[p->n-1] = value;
 }
 void fit_params_free(fit_params *p) {
+    if(!p)
+        return;
     free(p->func_params);
     free(p->func_params_err);
     free(p);
 }
 
-fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm,  reaction * const *reactions) {
+void fit_stats_print(FILE *f, const struct fit_stats *stats) {
+    fprintf(f,"CPU time used for actual simulation: %.3lf s.\n", stats->cputime_actual);
+    if(stats->n_evals > 0) {
+        fprintf(f, "Per spectrum simulation: %.3lf ms.\n", 1000.0 * stats->cputime_actual / stats->n_evals);
+    }
+}
+
+fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm,  reaction **reactions) {
     struct fit_data *f = malloc(sizeof(struct fit_data));
     f->n_iters_max = FIT_ITERS_MAX;
     f->low_ch = 0;

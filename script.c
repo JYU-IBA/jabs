@@ -15,7 +15,7 @@ static const struct script_command commands[] = {
         {"set",     &script_set,            "Set variables."},
         {"simulate",    &script_simulate,   "Run a simulation."},
         {"load",    &script_load,           "Load something."},
-        {"reset",   &script_show,           "Reset something."},
+        {"reset",   &script_reset,           "Reset something."},
         {"fit",     &script_fit,            "Do a fit."},
         {"save",    &script_save,           "Save something."},
         {"exit", NULL, "Exit."},
@@ -90,7 +90,7 @@ int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * 
     (void) argc; /* Unused */
     (void) argv; /* Unused */
     if(!fit) {
-        return 0; /* TODO: or error? */
+        return -1;
     }
     fit_params_free(fit->fit_params);
     fit->fit_params = NULL;
@@ -98,6 +98,8 @@ int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * 
     fit->ws = NULL;
     sample_free(fit->sample);
     fit->sample = NULL;
+    sim_free(fit->sim);
+    fit->sim = sim_init();
     return 0;
 }
 
@@ -137,7 +139,7 @@ int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * co
     }
     if(strcmp(argv[0], "ion") == 0) {
         if(argc != 2) {
-            fprintf(stderr, "Usage: set ion [ion]\n");
+            fprintf(stderr, "Usage: set ion [ion]\nExample: set ion 4He\n");
             return -1;
         }
         fit->sim->beam_isotope = jibal_isotope_find(fit->jibal->isotopes, argv[1], 0, 0);
@@ -146,10 +148,9 @@ int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * co
             return -1;
         }
         return 0;
-    }
-    if(strcmp(argv[0], "sample") == 0) {
+    } else if(strcmp(argv[0], "sample") == 0) {
         if(argc < 2) {
-            fprintf(stderr, "Usage: set sample [sample]\n");
+            fprintf(stderr, "Usage: set sample [sample]\nExample: set sample TiO2 1000tfu Si 10000tfu\n");
             return -1;
         }
         sample_model *sm_new = sample_model_from_argv(fit->jibal, argc-1, argv+1);
@@ -158,6 +159,25 @@ int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * co
             fit->sm = sm_new;
         } else {
             fprintf(stderr, "Sample is not valid.\n");
+            return -1;
+        }
+        return 0;
+    } else if(strcmp(argv[0], "foil") == 0) {
+        if(argc < 2) {
+            fprintf(stderr, "Usage: set foil [foil]\nExample: set foil Si 500tfu\n");
+            return -1;
+        }
+        if(!fit->sim->det) {
+            fprintf(stderr, "No detector has been set.\n");
+            return -1;
+        }
+        free(fit->sim->det->foil_description);
+        fit->sim->det->foil_description = argv_to_string(argc-1, argv+1);
+        sample_model *sm = sample_model_from_argv(fit->jibal, argc-1, argv+1);
+        fit->sim->det->foil = sample_from_sample_model(sm);
+        sample_model_free(sm);
+        if(!fit->sim->det->foil) {
+            fprintf(stderr, "Could not set foil.\n");
             return -1;
         }
         return 0;
@@ -187,6 +207,7 @@ int script_help(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
             {"commands", "I recognize the following commands:\n"},
             {"version", "JaBS version: "},
             {"set", "The following variables can be set (unit optional, SI units assumed otherwise):\n"},
+            {"show", "Show things (print to screen).\n"},
             {NULL, NULL}
     };
     if(argc == 0) {
@@ -212,7 +233,7 @@ int script_help(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
             } else if(strcmp(t->name, "version") == 0) {
                 fprintf(stderr, "%s\n", jabs_version());
             } else if(strcmp(t->name, "set") == 0) {
-                    i = 0;
+                i = 0;
                 for(jibal_config_var *var = vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
                     i++;
                     fprintf(stderr, "%18s", var->name);
@@ -221,6 +242,7 @@ int script_help(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
                     }
                 }
                 fputc('\n', stderr);
+                fprintf(stderr, "\nAlso the following things can be set: ion, sample, foil. Special syntax applies for each.\n");
             }
             return 0;
         }
@@ -228,7 +250,6 @@ int script_help(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
     fprintf(stderr, "Sorry, no help for '%s'.\n", argv[0]);
     return -1;
 }
-
 
 jibal_config_var *script_make_vars(struct fit_data *fit) {
     simulation *sim = fit->sim;
@@ -239,10 +260,10 @@ jibal_config_var *script_make_vars(struct fit_data *fit) {
             {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",   &sim->beam_E_broad,NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "alpha",          &sim->sample_theta,NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "sample_azi",     &sim->sample_phi,  NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "channeling",     &sim->channeling_offset,  NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",&sim->channeling_slope,  NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "fit_low",        &fit->low_ch,      NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "fit_high",        &fit->high_ch,      NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "channeling",     &sim->channeling_offset, NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",&sim->channeling_slope, NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "fit_low",        &fit->low_ch,     NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "fit_high",       &fit->high_ch,    NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "slope",          &det->slope,      NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "offset",         &det->offset,     NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "resolution",     &det->resolution, NULL},
@@ -251,14 +272,15 @@ jibal_config_var *script_make_vars(struct fit_data *fit) {
             {JIBAL_CONFIG_VAR_INT,    "number",         &det->number,     NULL},
             {JIBAL_CONFIG_VAR_INT,    "channels",       &det->channels,   NULL},
             {JIBAL_CONFIG_VAR_INT,    "compress",       &det->compress,   NULL},
-            {JIBAL_CONFIG_VAR_STRING, "foil",           &det->foil_description,NULL}, /* TODO: det->foil must also be set somewhere */
             {JIBAL_CONFIG_VAR_NONE,NULL,NULL,NULL}
     };
     int n_vars;
-    for(n_vars=0; vars[n_vars].type != 0; n_vars++);
-    size_t s=sizeof(jibal_config_var)*(n_vars+1); /* +1 because the null termination didn't count */
-    jibal_config_var *vars_out=malloc(s);
-    memcpy(vars_out, vars, s);
+    for(n_vars = 0; vars[n_vars].type != 0; n_vars++);
+    size_t s = sizeof(jibal_config_var)*(n_vars + 1); /* +1 because the null termination didn't count */
+    jibal_config_var *vars_out = malloc(s);
+    if(vars_out) {
+        memcpy(vars_out, vars, s);
+    }
     return vars_out;
 }
 
@@ -294,6 +316,7 @@ int script_fit(struct fit_data *fit_data, jibal_config_var *vars, int argc, char
         fprintf(stderr, "Fit failed!\n");
         return -1;
     }
+    fit_stats_print(stderr, &fit_data->stats);
     return 0;
 }
 
@@ -353,6 +376,7 @@ int script_save(struct fit_data *fit_data, jibal_config_var *vars, int argc, cha
 }
 
 int script_process(jibal *jibal, FILE *f) { /* TODO: pass initial fit_data (includes settings in sim!) */
+    clock_t start, end;
     struct fit_data *fit = fit_data_new(jibal, sim_init(), NULL, NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
     jibal_config_var *vars = script_make_vars(fit);
     char *line=NULL;
@@ -397,7 +421,18 @@ int script_process(jibal *jibal, FILE *f) { /* TODO: pass initial fit_data (incl
                         exit = TRUE;
                         break;
                     }
+                    start = clock();
                     status = c->f(fit, vars, argc - 1, argv + 1);
+                    end  = clock();
+                    if(c->f == script_load || c->f == script_reset) {
+                        free(vars);
+                        vars = script_make_vars(fit); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
+                    }
+                    if((c->f == script_simulate || c->f == script_fit) && status == 0) {
+                        double cputime_total =(((double) (end - start)) / CLOCKS_PER_SEC);
+                        fprintf(stderr, "...finished!\n\n");
+                        fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
+                    }
                     break;
                 }
             }
@@ -458,6 +493,12 @@ int script_prepare_sim_or_fit(struct fit_data *fit) {
     fprintf(stderr, "Simplified sample model for simulation:\n");
     sample_print(stderr, fit->sample, TRUE);
 
+    if(fit->reactions) {
+        for(reaction **r = fit->reactions; *r != NULL; r++) {
+            reaction_free(*r);
+        }
+    }
+    free(fit->reactions);
     fit->reactions = make_reactions(fit->sample, fit->sim, fit->jibal->config->cs_rbs, fit->jibal->config->cs_erd);
     if(!fit->reactions || fit->reactions[0] == NULL ) {
         fprintf(stderr, "No reactions, nothing to do.\n");

@@ -32,26 +32,27 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
         return NULL;
     det->resolution = C_FWHM * sqrt(det->resolution); /* Convert resolution to FWHM from variance for the duration of input parsing */
     jibal_config_var vars[] = {
-            {JIBAL_CONFIG_VAR_UNIT,   "slope",      &det->slope,      NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "offset",     &det->offset,     NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "resolution", &det->resolution, NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "theta",      &det->theta,      NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "phi",        &det->phi,        NULL},
-            {JIBAL_CONFIG_VAR_INT,    "number",     &det->number,     NULL},
-            {JIBAL_CONFIG_VAR_INT,    "channels",   &det->channels,   NULL},
-            {JIBAL_CONFIG_VAR_INT,    "compress",   &det->compress,   NULL},
-            {JIBAL_CONFIG_VAR_STRING, "foil",       &det->foil_description,       NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "slope",      &det->slope,            NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "offset",     &det->offset,           NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "resolution", &det->resolution,       NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "theta",      &det->theta,            NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "phi",        &det->phi,              NULL},
+            {JIBAL_CONFIG_VAR_INT,    "number",     &det->number,           NULL},
+            {JIBAL_CONFIG_VAR_INT,    "channels",   &det->channels,         NULL},
+            {JIBAL_CONFIG_VAR_INT,    "compress",   &det->compress,         NULL},
+            {JIBAL_CONFIG_VAR_STRING, "foil",       &det->foil_description, NULL},
             {JIBAL_CONFIG_VAR_NONE,NULL,NULL,NULL}
     };
     jibal_config_var_read(jibal->units, f, filename, vars);
     det->resolution /= C_FWHM;
     det->resolution *= det->resolution;
     if(det->foil_description) {
-        det->foil = sample_from_sample_model(sample_model_from_string(jibal, det->foil_description));
+        sample_model *sm = sample_model_from_string(jibal, det->foil_description);
+        det->foil = sample_from_sample_model(sm);
         if(!det->foil) {
             fprintf(stderr, "Error: detector foil description %s was not parsed successfully!\n", det->foil_description);
-
         }
+        sample_model_free(sm);
     }
 #ifdef DEBUG
     fprintf(stderr, "Read detector from \"%s\":\n", filename);

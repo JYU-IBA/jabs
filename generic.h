@@ -12,3 +12,4 @@
 
  */
 char **string_to_argv(const char *str);
+char *argv_to_string(int argc, char * const *argv);

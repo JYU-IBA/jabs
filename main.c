@@ -155,8 +155,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\nFinal sample model:\n");
         sample_model_print(stderr, sm);
         ws = fit_data->ws;
-        fprintf(stderr,"CPU time used for actual simulation: %.3lf s.\n", fit_data->stats.cputime_actual);
-        fprintf(stderr,"Per spectrum simulation: %.3lf ms.\n", 1000.0*fit_data->stats.cputime_actual/fit_data->stats.n_evals);
+        fit_stats_print(stderr, &fit_data->stats);
         fit_data_free(fit_data); /* Does not free sim, ws, sample or sm */
     } else {
         ws = sim_workspace_init(sim, reactions, sample, jibal);

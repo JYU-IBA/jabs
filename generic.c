@@ -32,3 +32,23 @@ char **string_to_argv(const char *str) { /* TODO: move this generic function to 
     out[n] = NULL;
     return out;
 }
+
+char *argv_to_string(int argc, char * const *argv) {
+    char *s = NULL;
+    size_t len = 0;
+    for(int i = 0; i < argc; i++) {
+        len += strlen(argv[i]);
+        len++;
+    }
+    s = malloc(sizeof(char) * len);
+    *s = '\0';
+    char *sp = s;
+    for(int i = 0; i < argc; i++) {
+        strcat(sp, argv[i]);
+        sp += strlen(argv[i]);
+        *sp = ' ';
+        sp++;
+    }
+    *sp = '\0';
+    return s;
+}
