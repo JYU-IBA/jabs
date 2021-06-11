@@ -560,7 +560,7 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
     return EXIT_SUCCESS;
 }
 
-void add_fit_params(simulation *sim, const sample_model *sm, fit_params *params, const char *fit_vars) {
+void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, const char *fit_vars) {
 #ifdef DEBUG
     fprintf(stderr, "fitvars = %s\n", fit_vars);
 #endif
@@ -628,6 +628,7 @@ void add_fit_params(simulation *sim, const sample_model *sm, fit_params *params,
     }
     free(s_orig);
 }
+
 
 void output_bricks(const char *filename, const sim_workspace *ws) {
     FILE *f;

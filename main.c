@@ -138,8 +138,12 @@ int main(int argc, char **argv) {
     start = clock();
     sim_workspace *ws = NULL;
     if(global->fit) {
-        fit_data *fit_data = fit_data_new(jibal, sim, exp, sm, reactions, global->fit_vars, global->fit_low, global->fit_high, global->print_iters);
-        if(fit(exp, fit_data)) {
+        fit_data *fit_data = fit_data_new(jibal, sim, exp, sm, reactions);
+        fit_params_add(sim, sm, fit_data->fit_params, global->fit_vars);
+        fit_data->low_ch = global->fit_low;
+        fit_data->high_ch = global->fit_high;
+        fit_data->print_iters = global->print_iters;
+        if(fit(fit_data)) {
             fprintf(stderr, "Fit failed!\n");
             return EXIT_FAILURE;
         }

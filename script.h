@@ -37,5 +37,8 @@ int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * co
 int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
 jibal_config_var *script_make_vars(struct fit_data *fit);
 int script_simulate(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
+int script_fit(struct fit_data *fit_data, jibal_config_var *vars, int argc, char * const *argv);
+int script_save(struct fit_data *fit_data, jibal_config_var *vars, int argc, char * const *argv);
 int script_process(jibal *jibal, FILE *f);
+int script_prepare_sim_or_fit(struct fit_data *fit_data);
 #endif // JABS_SCRIPT_H

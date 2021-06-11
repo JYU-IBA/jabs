@@ -109,11 +109,11 @@ void fit_params_free(fit_params *p) {
     free(p);
 }
 
-fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm,  reaction * const *reactions, const char *fit_vars, int fit_low, int fit_high, int print_iters) {
+fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm,  reaction * const *reactions) {
     struct fit_data *f = malloc(sizeof(struct fit_data));
     f->n_iters_max = FIT_ITERS_MAX;
-    f->low_ch = fit_low;
-    f->high_ch = fit_high;
+    f->low_ch = 0;
+    f->high_ch = 0;
     f->jibal = jibal;
     f->sim = sim;
     f->exp = exp;
@@ -122,8 +122,7 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, 
     f->reactions = reactions;
     f->ws = NULL;
     f->fit_params = fit_params_new();
-    f->print_iters = print_iters;
-    add_fit_params(sim, sm, f->fit_params, fit_vars);
+    f->print_iters = FALSE;
     return f;
 }
 
@@ -142,7 +141,7 @@ void fit_data_print(FILE *f, const struct fit_data *fit) {
     fprintf(f, "fit_high = %zu\n", fit->high_ch);
 }
 
-int fit(gsl_histogram *exp, struct fit_data *fit_data) {
+int fit(struct fit_data *fit_data) {
     const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
     gsl_multifit_nlinear_workspace *w;
     gsl_multifit_nlinear_parameters fdf_params = gsl_multifit_nlinear_default_parameters();
@@ -150,6 +149,10 @@ int fit(gsl_histogram *exp, struct fit_data *fit_data) {
     struct fit_params *fit_params = fit_data->fit_params;
     if(!fit_params || fit_params->n == 0) {
         fprintf(stderr, "No parameters to fit.\n");
+        return -1;
+    }
+    if(!fit_data->exp) {
+        fprintf(stderr, "No experimental spectrum to fit.\n");
         return -1;
     }
     gsl_multifit_nlinear_fdf fdf;
@@ -162,9 +165,9 @@ int fit(gsl_histogram *exp, struct fit_data *fit_data) {
         return -1;
     }
     if(fit_data->low_ch <= 0)
-        fit_data->low_ch = (int)(exp->n*0.1);
-    if(fit_data->high_ch <= 0 || fit_data->high_ch >= exp->n)
-        fit_data->high_ch = exp->n - 1;
+        fit_data->low_ch = (int)(fit_data->exp->n*0.1);
+    if(fit_data->high_ch <= 0 || fit_data->high_ch >= fit_data->exp->n)
+        fit_data->high_ch = fit_data->exp->n - 1;
     fprintf(stderr, "Fit range [%lu, %lu]\n", fit_data->low_ch, fit_data->high_ch);
     fdf.f = &fit_function;
     fdf.df = NULL; /* Jacobian, with NULL using finite difference. TODO: this could be implemented */
@@ -186,8 +189,8 @@ int fit(gsl_histogram *exp, struct fit_data *fit_data) {
     }
     double *weights = malloc(sizeof(double)*(fit_data->high_ch-fit_data->low_ch+1));
     for(i = fit_data->low_ch; i <= fit_data->high_ch; i++) {
-        if(exp->bin[i] > 1.0) {
-            weights[i-fit_data->low_ch] = 1.0 / (exp->bin[i]);
+        if(fit_data->exp->bin[i] > 1.0) {
+            weights[i-fit_data->low_ch] = 1.0 / (fit_data->exp->bin[i]);
         } else {
             weights[i-fit_data->low_ch] = 1.0; /* TODO: ?*/
         }

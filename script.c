@@ -4,9 +4,10 @@
 #include <unistd.h>
 #include <jibal_units.h>
 #include "defaults.h"
-#include "script.h"
 #include "fit.h"
 #include "generic.h"
+#include "spectrum.h"
+#include "script.h"
 
 static const struct script_command commands[] = {
         {"help",    &script_help,           "Print help."},
@@ -15,10 +16,12 @@ static const struct script_command commands[] = {
         {"simulate",    &script_simulate,   "Run a simulation."},
         {"load",    &script_load,           "Load something."},
         {"reset",   &script_show,           "Reset something."},
+        {"fit",     &script_fit,            "Do a fit."},
+        {"save",    &script_save,           "Save something."},
         {"exit", NULL, "Exit."},
         {"quit", NULL, NULL},
         {NULL, NULL, NULL}
-}; /* TODO: more commands, like saving spectra, fitting etc... */
+}; /* TODO: more commands... */
 
 void script_print_commands(FILE *f) {
     for(const struct script_command *c = commands; c->name != NULL; c++) {
@@ -31,7 +34,7 @@ void script_print_commands(FILE *f) {
 int script_load(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
     (void) vars; /* Unused */
     if(argc == 0) {
-        fprintf(stderr, "Usage: load [sample|detector] [file]\n");
+        fprintf(stderr, "Usage: load [sample|detector|exp|reaction] [file]\n");
         return -1;
     }
     if(strcmp(argv[0], "sample") == 0) {
@@ -48,8 +51,7 @@ int script_load(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
             fprintf(stderr, "Usage: load sample [file]\n");
         }
         return 0;
-    }
-    if(strcmp(argv[0], "detector") == 0) {
+    } else if(strcmp(argv[0], "detector") == 0) {
         if(argc == 2) {
             detector *det = detector_from_file(fit->jibal, argv[1]);
             if(!det) {
@@ -61,6 +63,23 @@ int script_load(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
         } else {
             fprintf(stderr, "Usage: load detector [file]\n");
         }
+    } else if(strcmp(argv[0], "exp") == 0) {
+        if(argc == 2) {
+            if(!fit->sim->det) {
+                fprintf(stderr, "No detector has been set, experimental spectrum can not be read.\n");
+                return -1;
+            }
+            fit->exp = read_experimental_spectrum(argv[1], fit->sim->det);
+            if(!fit->exp) {
+                return -1;
+            }
+            return 0;
+        } else {
+            fprintf(stderr, "Usage: load exp [file]\n");
+        }
+    } else if(strcmp(argv[0], "reaction") == 0) {
+        fprintf(stderr, "Loading reactions from files not implemented yet, sorry.\n");
+        return 0;
     }
     fprintf(stderr, "I don't know what to load (%s?)\n", argv[0]);
     return -1;
@@ -232,7 +251,7 @@ jibal_config_var *script_make_vars(struct fit_data *fit) {
             {JIBAL_CONFIG_VAR_INT,    "number",         &det->number,     NULL},
             {JIBAL_CONFIG_VAR_INT,    "channels",       &det->channels,   NULL},
             {JIBAL_CONFIG_VAR_INT,    "compress",       &det->compress,   NULL},
-            {JIBAL_CONFIG_VAR_STRING, "foil",           &det->foil_description,       NULL}, /* TODO: det->foil must also be set somewhere */
+            {JIBAL_CONFIG_VAR_STRING, "foil",           &det->foil_description,NULL}, /* TODO: det->foil must also be set somewhere */
             {JIBAL_CONFIG_VAR_NONE,NULL,NULL,NULL}
     };
     int n_vars;
@@ -247,52 +266,94 @@ int script_simulate(struct fit_data *fit, jibal_config_var *vars, int argc, char
     (void) vars; /* Unused */
     (void) argc; /* Unused */
     (void) argv; /* Unused */
-    /* TODO: free existing data from fit */
-    /* TODO: option to disable RBS or ERD */
-    /* TODO: reactions from files? Should "make_reactions" be somewhere else? */
-    if(!fit->sm) {
-        fprintf(stderr, "Cannot simulate, no sample has been defined.\n");
+    if(script_prepare_sim_or_fit(fit)) {
         return -1;
     }
-    if(!fit->sim->beam_isotope) {
-        fprintf(stderr, "Cannot simulate, no ion has been defined.\n");
-        return -1;
-    }
-    sim_workspace_free(fit->ws);
-    fit->ws = NULL;
-    sample_free(fit->sample);
-    fit->sample = sample_from_sample_model(fit->sm);
-    if(!fit->sample) {
-        fprintf(stderr, "Could not make a sample based on model description. This should never happen.\n");
-        return -1;
-    }
-    fprintf(stderr, "Simplified sample model for simulation:\n");
-    sample_print(stderr, fit->sample, TRUE);
-
-    fit->reactions = make_reactions(fit->sample, fit->sim, fit->jibal->config->cs_rbs, fit->jibal->config->cs_erd);
-    if(!fit->reactions || fit->reactions[0] == NULL ) {
-        fprintf(stderr, "No reactions, nothing to do.\n");
-        return -1;
-    }
-    fprintf(stderr, "Reactions:\n");
-    reactions_print(stderr, fit->reactions);
-
-    jibal_gsto_assign_clear_all(fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
-    if(assign_stopping(fit->jibal->gsto, fit->sim, fit->sample, fit->reactions)) {
-        fprintf(stderr, "Could not assign stopping.\n");
-        return -1;
-    }
-    jibal_gsto_print_assignments(fit->jibal->gsto);
-    jibal_gsto_print_files(fit->jibal->gsto, TRUE);
-    jibal_gsto_load_all(fit->jibal->gsto);
-    simulation_print(stderr, fit->sim);
     fit->ws = sim_workspace_init(fit->sim, fit->reactions, fit->sample, fit->jibal);
     simulate_with_ds(fit->ws);
     return 0;
 }
 
+int script_fit(struct fit_data *fit_data, jibal_config_var *vars, int argc, char * const *argv) {
+    (void) vars; /* Unused */
+    if(argc != 1) {
+        fprintf(stderr, "Usage: fit [fitvar1,fitvar2,...]\n");
+        return -1;
+    }
+    fit_params_free(fit_data->fit_params);
+    fit_data->fit_params = fit_params_new();
+    fit_params_add(fit_data->sim, fit_data->sm, fit_data->fit_params, argv[0]);
+    if(fit_data->fit_params->n == 0) {
+        fprintf(stderr, "No parameters for fit.\n");
+        return -1;
+    }
+    if(script_prepare_sim_or_fit(fit_data)) {
+        return -1;
+    }
+    if(fit(fit_data)) {
+        fprintf(stderr, "Fit failed!\n");
+        return -1;
+    }
+    return 0;
+}
+
+int script_save(struct fit_data *fit_data, jibal_config_var *vars, int argc, char * const *argv) {
+    (void) vars; /* Unused */
+    if(argc < 1) {
+        fprintf(stderr, "Nothing to save. See \"help save\" for more information.\n");
+        return -1;
+    }
+    if(strcmp(argv[0], "spectra") == 0) {
+        if(argc != 2) {
+            fprintf(stderr, "Usage: save spectra [file]\n");
+            return -1;
+        }
+        if(!fit_data->ws) {
+            fprintf(stderr, "No simulation or fit has been made, cannot save spectra.\n");
+            return -1;
+        }
+        print_spectra(argv[1], fit_data->ws, fit_data->exp);
+        return 0;
+    } else if(strcmp(argv[0], "sample") == 0) {
+        if(argc != 2) {
+            fprintf(stderr, "Usage: save sample [file]\n");
+        }
+        if(!fit_data->sm) {
+            fprintf(stderr, "No sample set.\n");
+            return -1;
+        }
+        FILE *f_sout;
+        if((f_sout = fopen(argv[1], "w"))) {
+            sample_model_print(f_sout, fit_data->sm);
+        } else {
+            fprintf(stderr, "Could not write sample to file \"%s\".\n", argv[1]);
+            return -1;
+        }
+        return 0;
+    } else if(strcmp(argv[0], "det") == 0) {
+        if(argc != 2) {
+            fprintf(stderr, "Usage: save det [file]\n");
+            return -1;
+        }
+        if(!fit_data->sim->det) {
+            fprintf(stderr, "No detector set.\n");
+            return -1;
+        }
+        FILE *f_det;
+        if((f_det = fopen(argv[1], "w"))) {
+            detector_print(f_det, fit_data->sim->det); /* TODO: is this the fitted detector? */
+        } else {
+            fprintf(stderr, "Could not write detector to file \"%s\".\n", argv[1]);
+            return -1;
+        }
+        return 0;
+    }
+    fprintf(stderr, "I don't know what to save (%s?)\n", argv[0]);
+    return -1;
+}
+
 int script_process(jibal *jibal, FILE *f) { /* TODO: pass initial fit_data (includes settings in sim!) */
-    struct fit_data *fit = fit_data_new(jibal, sim_init(), NULL, NULL, NULL, NULL, 0, 0, 0); /* Not just fit, but this conveniently holds everything we need. */
+    struct fit_data *fit = fit_data_new(jibal, sim_init(), NULL, NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
     jibal_config_var *vars = script_make_vars(fit);
     char *line=NULL;
     size_t line_size=0;
@@ -357,6 +418,7 @@ int script_process(jibal *jibal, FILE *f) { /* TODO: pass initial fit_data (incl
             fputs(prompt, stderr);
         } else if(status < 0) {
             fprintf(stderr, "Error (%i) on line %zu. Aborting.\n", status, lineno);
+            break;
         }
     }
     free(line);
@@ -368,4 +430,50 @@ int script_process(jibal *jibal, FILE *f) { /* TODO: pass initial fit_data (incl
         fprintf(stderr, "Bye.\n");
     }
     return EXIT_SUCCESS;
+}
+
+int script_prepare_sim_or_fit(struct fit_data *fit) {
+    /* TODO: option to disable RBS or ERD */
+    /* TODO: reactions from files? Should "make_reactions" be somewhere else? */
+    if(!fit->sm) {
+        fprintf(stderr, "No sample has been defined!\n");
+        return -1;
+    }
+    if(!fit->sim->beam_isotope) {
+        fprintf(stderr, "No ion has been defined!\n");
+        return -1;
+    }
+    if(!fit->sim->det) { /* Shouldn't be possible */
+        fprintf(stderr, "No detector has been defined!\n");
+        return -1;
+    }
+    sim_workspace_free(fit->ws);
+    fit->ws = NULL;
+    sample_free(fit->sample);
+    fit->sample = sample_from_sample_model(fit->sm);
+    if(!fit->sample) {
+        fprintf(stderr, "Could not make a sample based on model description. This should never happen.\n");
+        return -1;
+    }
+    fprintf(stderr, "Simplified sample model for simulation:\n");
+    sample_print(stderr, fit->sample, TRUE);
+
+    fit->reactions = make_reactions(fit->sample, fit->sim, fit->jibal->config->cs_rbs, fit->jibal->config->cs_erd);
+    if(!fit->reactions || fit->reactions[0] == NULL ) {
+        fprintf(stderr, "No reactions, nothing to do.\n");
+        return -1;
+    }
+    fprintf(stderr, "Reactions:\n");
+    reactions_print(stderr, fit->reactions);
+
+    jibal_gsto_assign_clear_all(fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
+    if(assign_stopping(fit->jibal->gsto, fit->sim, fit->sample, fit->reactions)) {
+        fprintf(stderr, "Could not assign stopping.\n");
+        return -1;
+    }
+    jibal_gsto_print_assignments(fit->jibal->gsto);
+    jibal_gsto_print_files(fit->jibal->gsto, TRUE);
+    jibal_gsto_load_all(fit->jibal->gsto);
+    simulation_print(stderr, fit->sim);
+    return 0;
 }
