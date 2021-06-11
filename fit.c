@@ -232,7 +232,7 @@ int fit(gsl_histogram *exp, struct fit_data *fit_data) {
     double c = GSL_MAX_DBL(1, sqrt(chisq / fit_data->dof));
     fprintf(stderr, "Final fitted parameters\n");
     for(i = 0; i < fit_params->n; i++) {
-        fprintf(stderr, "    prob[%zu] = %g +- %g (%.2lf%%)\n", i,
+        fprintf(stderr, "    p[%zu] = %g +- %g (%.2lf%%)\n", i,
                 gsl_vector_get(w->x, i),
                 c * sqrt(gsl_matrix_get(covar, i, i)),
                 100.0*(c * sqrt(gsl_matrix_get(covar, i, i)))/gsl_vector_get(w->x, i)

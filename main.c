@@ -145,7 +145,7 @@ int main(int argc, char **argv) {
         }
         fprintf(stderr, "\nFinal parameters:\n");
         simulation_print(stderr, sim);
-        fprintf(stderr, "\nFinal composition:\n");
+        fprintf(stderr, "\nFinal profile:\n");
         sample_print(stderr, fit_data->sample, global->print_isotopes);
         sample_areal_densities_print(stderr, fit_data->sample, global->print_isotopes);
         fprintf(stderr, "\nFinal sample model:\n");
