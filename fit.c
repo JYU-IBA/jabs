@@ -138,8 +138,8 @@ void fit_data_print(FILE *f, const struct fit_data *fit) {
     if(!fit) {
         return;
     }
-    fprintf(stderr, "fit_low = %zu\n", fit->low_ch);
-    fprintf(stderr, "fit_high = %zu\n", fit->high_ch);
+    fprintf(f, "fit_low = %zu\n", fit->low_ch);
+    fprintf(f, "fit_high = %zu\n", fit->high_ch);
 }
 
 int fit(gsl_histogram *exp, struct fit_data *fit_data) {

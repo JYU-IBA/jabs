@@ -29,6 +29,7 @@ void script_print_commands(FILE *f) {
 }
 
 int script_load(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
+    (void) vars; /* Unused */
     if(argc == 0) {
         fprintf(stderr, "Usage: load [sample|detector] [file]\n");
         return -1;
@@ -66,6 +67,9 @@ int script_load(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
 }
 
 int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
+    (void) vars; /* Unused */
+    (void) argc; /* Unused */
+    (void) argv; /* Unused */
     if(!fit) {
         return 0; /* TODO: or error? */
     }
@@ -79,6 +83,7 @@ int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * 
 }
 
 int script_show(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
+    (void) vars; /* Unused */
     if(argc == 0) {
         fprintf(stderr, "Usage show [sim|fit|sample|spectra|detector].\n");
         return 0;
@@ -239,6 +244,9 @@ jibal_config_var *script_make_vars(struct fit_data *fit) {
 }
 
 int script_simulate(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
+    (void) vars; /* Unused */
+    (void) argc; /* Unused */
+    (void) argv; /* Unused */
     /* TODO: free existing data from fit */
     /* TODO: option to disable RBS or ERD */
     /* TODO: reactions from files? Should "make_reactions" be somewhere else? */
