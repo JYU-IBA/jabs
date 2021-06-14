@@ -128,16 +128,26 @@ void fit_stats_print(FILE *f, const struct fit_stats *stats) {
     }
 }
 
-size_t fit_ranges_calculate_number_of_channels(fit_range *fit_ranges, size_t n) {
+size_t fit_ranges_calculate_number_of_channels(fit_range *fit_ranges, size_t n, const detector *det) {
     size_t sum = 0;
+    if(!det)
+        return 0;
     for(size_t i = 0; i < n; i++) {
         fit_range *r = &fit_ranges[i];
-        sum += (r->high - r->low) + 1;
+        if(r->high >= det->channels) { /* Limited by detector */
+            sum += (det->channels - r->low);
+        } else {
+            sum += (r->high - r->low) + 1;
+        }
     }
     return sum;
 }
 
 void fit_range_add(struct fit_data *fit_data, const struct fit_range *range) { /* Makes a deep copy */
+    if(range->low == 0 && range->high == 0) {
+        fprintf(stderr, "No valid range given.\n"); /* Yeah, this is technically valid... */
+        return;
+    }
     fit_data->n_fit_ranges++;
     fit_data->fit_ranges = realloc(fit_data->fit_ranges, fit_data->n_fit_ranges * sizeof(fit_range));
     if(!fit_data->fit_ranges) {
@@ -176,10 +186,12 @@ void fit_data_print(FILE *f, const struct fit_data *fit_data) {
     if(!fit_data) {
         return;
     }
+    fprintf(f, "%zu fit ranges.\n", fit_data->n_fit_ranges);
     for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
         fit_range *range = &fit_data->fit_ranges[i];
-        fprintf(stderr, "Fit range %zu [%lu, %lu]\n", i+1, range->low, range->high);
+        fprintf(f, "Fit range %zu [%lu, %lu]\n", i+1, range->low, range->high);
     }
+    fprintf(f, "%zu channels total (detector has %zu channels).\n", fit_ranges_calculate_number_of_channels(fit_data->fit_ranges, fit_data->n_fit_ranges, fit_data->sim->det), fit_data->sim->det->channels);
 }
 
 int fit(struct fit_data *fit_data) {
@@ -218,7 +230,7 @@ int fit(struct fit_data *fit_data) {
     fdf.f = &fit_function;
     fdf.df = NULL; /* Jacobian, with NULL using finite difference. TODO: this could be implemented */
     fdf.fvv = NULL; /* No geodesic acceleration */
-    fdf.n = fit_ranges_calculate_number_of_channels(fit_data->fit_ranges, fit_data->n_fit_ranges);
+    fdf.n = fit_ranges_calculate_number_of_channels(fit_data->fit_ranges, fit_data->n_fit_ranges, fit_data->sim->det);
     fdf.p = fit_params->n;
     if(fdf.n < fdf.p) {
         fprintf(stderr, "Not enough data (%zu points) for given number of free parameters (%zu)\n", fdf.n, fdf.p);
@@ -240,9 +252,9 @@ int fit(struct fit_data *fit_data) {
 
     double *weights = malloc(sizeof(double) * fdf.n);
     size_t i_w = 0;
-    for(i = 0; i < fit_data->n_fit_ranges; i++) {
-        fit_range *range = &fit_data->fit_ranges[i];
-        for(i = range->low; i <= range->high; i++) {
+    for(size_t  i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) {
+        fit_range *range = &fit_data->fit_ranges[i_range];
+        for(i = range->low; i <= range->high && i < fit_data->sim->det->channels; i++) {
             if(fit_data->exp->bin[i] > 1.0) {
                 weights[i_w] = 1.0 / (fit_data->exp->bin[i]);
             } else {
@@ -251,6 +263,9 @@ int fit(struct fit_data *fit_data) {
             i_w++;
         }
     }
+#ifdef DEBUG
+    fprintf(stderr, "Set %zu weights.\n", i_w);
+#endif
     assert(i_w == fdf.n);
 
     gsl_vector_view wts = gsl_vector_view_array(weights, i_w);

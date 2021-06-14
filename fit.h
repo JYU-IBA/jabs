@@ -40,7 +40,7 @@ struct fit_stats {
 typedef struct fit_range {
     size_t low;
     size_t high;
-} fit_range;
+} fit_range; /* fit_ranges are implicitly detector specific */
 
 typedef struct fit_data {
     gsl_histogram *exp; /* experimental data to be fitted */
@@ -70,6 +70,6 @@ fit_params *fit_params_new();
 void fit_params_add_parameter(fit_params *p, double *value);
 void fit_params_free(fit_params *p);
 void fit_stats_print(FILE *f, const struct fit_stats *stats);
-size_t fit_ranges_calculate_number_of_channels(fit_range *fit_ranges, size_t n);
+size_t fit_ranges_calculate_number_of_channels(fit_range *fit_ranges, size_t n, const detector *det);
 void fit_range_add(struct fit_data *fit, const struct fit_range *range); /* Makes a deep copy */
 #endif // JABS_FIT_H

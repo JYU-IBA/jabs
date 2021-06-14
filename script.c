@@ -13,6 +13,7 @@ static const struct script_command commands[] = {
         {"help",    &script_help,           "Print help."},
         {"show",    &script_show,           "Show information on things."},
         {"set",     &script_set,            "Set variables."},
+        {"add",     &script_add,            "Add things."},
         {"simulate",    &script_simulate,   "Run a simulation."},
         {"load",    &script_load,           "Load something."},
         {"reset",   &script_reset,           "Reset something."},
@@ -92,6 +93,9 @@ int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * 
     if(!fit) {
         return -1;
     }
+    free(fit->fit_ranges);
+    fit->fit_ranges = NULL;
+    fit->n_fit_ranges = 0;
     fit_params_free(fit->fit_params);
     fit->fit_params = NULL;
     sim_workspace_free(fit->ws);
@@ -194,6 +198,26 @@ int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * co
 #endif
             return 0;
         }
+    }
+    fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
+    return -1;
+}
+
+int script_add(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
+    if(argc < 1) {
+        fprintf(stderr, "Nothing to add. See \"help add\" for more information.\n");
+        return 0;
+    }
+    if(strcmp(argv[0], "fit_range") == 0) {
+        if(argc != 3) {
+            fprintf(stderr, "Usage: add fit_range [low] [high]\n");
+            return -1;
+        }
+        fit_range range = {.low = strtoul(argv[1], NULL, 10),
+                           .high = strtoul(argv[2], NULL, 10)
+        };
+        fit_range_add(fit, &range);
+        return 0;
     }
     fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
     return -1;

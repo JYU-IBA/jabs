@@ -34,6 +34,7 @@ int script_load(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
 int script_help(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
 int script_show(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
 int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
+int script_add(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
 int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
 jibal_config_var *script_make_vars(struct fit_data *fit);
 int script_simulate(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
