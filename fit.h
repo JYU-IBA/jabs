@@ -46,7 +46,7 @@ typedef struct fit_data {
     gsl_histogram *exp; /* experimental data to be fitted */
     simulation *sim;
     reaction **reactions;
-    const jibal *jibal;
+    const jibal *jibal; /* This shouldn't be here, but it is the only place I can think of */
     sample *sample;
     sample_model *sm;
     fit_params *fit_params; /* Allocated with fit_data_new() and freed by fit_data_free() */

@@ -88,7 +88,10 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         }
     } else {
-        return script_process(jibal, stdin);
+        script_session *session = script_session_init(jibal);
+        int status = script_process(session, stdin);
+        script_session_free(session);
+        return status;
     }
     fputs(COPYRIGHT_STRING, stderr);
     sample *sample = sample_from_sample_model(sm);

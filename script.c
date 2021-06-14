@@ -276,6 +276,8 @@ int script_help(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
 }
 
 jibal_config_var *script_make_vars(struct fit_data *fit) {
+    if(!fit)
+        return NULL;
     simulation *sim = fit->sim;
     detector *det = fit->sim->det;
     jibal_config_var vars[] = {
@@ -397,9 +399,25 @@ int script_save(struct fit_data *fit_data, jibal_config_var *vars, int argc, cha
     return -1;
 }
 
-int script_process(jibal *jibal, FILE *f) { /* TODO: pass initial fit_data (includes settings in sim!) */
+script_session *script_session_init(jibal *jibal) {
+    struct script_session *s = malloc(sizeof(struct script_session));
+    s->jibal = jibal;
+    s->fit = fit_data_new(jibal, sim_init(), NULL, NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
+    s->vars = script_make_vars(s->fit);
+    return s;
+}
+void script_session_free(script_session *s) {
+    free(s->vars);
+    sim_workspace_free(s->fit->ws);
+    sim_free(s->fit->sim);
+    fit_data_free(s->fit);
+    free(s);
+}
+
+
+int script_process(script_session *s, FILE *f) {
     clock_t start, end;
-    struct fit_data *fit = fit_data_new(jibal, sim_init(), NULL, NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
+    struct fit_data *fit = fit_data_new(s->jibal, sim_init(), NULL, NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
     jibal_config_var *vars = script_make_vars(fit);
     char *line=NULL;
     size_t line_size=0;
@@ -479,10 +497,7 @@ int script_process(jibal *jibal, FILE *f) { /* TODO: pass initial fit_data (incl
         }
     }
     free(line);
-    free(vars);
-    sim_workspace_free(fit->ws);
-    sim_free(fit->sim);
-    fit_data_free(fit);
+
     if(interactive) {
         fprintf(stderr, "Bye.\n");
     }
