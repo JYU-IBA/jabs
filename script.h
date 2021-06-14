@@ -17,10 +17,15 @@
 #include <stdio.h>
 #include "jabs.h"
 
+typedef struct script_session {
+    jibal *jibal;
+    struct fit_data *fit;
+    jibal_config_var *vars;
+} script_session;
 
 struct script_command {
     const char *name;
-    int (*f)(struct fit_data *, jibal_config_var *, int, char * const *);
+    int (*f)(struct script_session *, int, char * const *);
     const char *help_text; /* Short help text */
 };
 
@@ -29,26 +34,23 @@ struct help_topic {
     const char *help_text;
 };
 
-typedef struct script_session {
-    jibal *jibal;
-    struct fit_data *fit;
-    jibal_config_var *vars;
-} script_session;
+
 
 script_session *script_session_init(jibal *jibal);
 void script_session_free(script_session *s);
 
 void script_print_commands(FILE *f);
-int script_load(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
-int script_help(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
-int script_show(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
-int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
-int script_add(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
-int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
 jibal_config_var *script_make_vars(struct fit_data *fit);
-int script_simulate(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv);
-int script_fit(struct fit_data *fit_data, jibal_config_var *vars, int argc, char * const *argv);
-int script_save(struct fit_data *fit_data, jibal_config_var *vars, int argc, char * const *argv);
+
+int script_load(script_session *s, int argc, char * const *argv);
+int script_help(script_session *s, int argc, char * const *argv);
+int script_show(script_session *s, int argc, char * const *argv);
+int script_set(script_session *s, int argc, char * const *argv);
+int script_add(script_session *s, int argc, char * const *argv);
+int script_reset(script_session *s, int argc, char * const *argv);
+int script_simulate(script_session *s, int argc, char * const *argv);
+int script_fit(script_session *s, int argc, char * const *argv);
+int script_save(script_session *s, int argc, char * const *argv);
 int script_process(script_session *s, FILE *f);
 int script_prepare_sim_or_fit(struct fit_data *fit_data);
 #endif // JABS_SCRIPT_H

@@ -32,8 +32,8 @@ void script_print_commands(FILE *f) {
     }
 }
 
-int script_load(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
-    (void) vars; /* Unused */
+int script_load(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
     if(argc == 0) {
         fprintf(stderr, "Usage: load [sample|detector|exp|reaction] [file]\n");
         return -1;
@@ -86,8 +86,8 @@ int script_load(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
     return -1;
 }
 
-int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
-    (void) vars; /* Unused */
+int script_reset(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
     (void) argc; /* Unused */
     (void) argv; /* Unused */
     if(!fit) {
@@ -107,8 +107,8 @@ int script_reset(struct fit_data *fit, jibal_config_var *vars, int argc, char * 
     return 0;
 }
 
-int script_show(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
-    (void) vars; /* Unused */
+int script_show(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
     if(argc == 0) {
         fprintf(stderr, "Usage show [sim|fit|sample|spectra|detector].\n");
         return 0;
@@ -136,7 +136,8 @@ int script_show(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
     return -1;
 }
 
-int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
+int script_set(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
     if(argc < 1) {
         fprintf(stderr, "Nothing to set. See \"help set\" for more information.\n");
         return 0;
@@ -186,7 +187,7 @@ int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * co
         }
         return 0;
     }
-    for(jibal_config_var *var = vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
+    for(jibal_config_var *var = s->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
         if(strcmp(argv[0], var->name) == 0) {
             if(argc != 2) {
                 fprintf(stderr, "Usage: set %s [value]\n", var->name);
@@ -203,7 +204,8 @@ int script_set(struct fit_data *fit, jibal_config_var *vars, int argc, char * co
     return -1;
 }
 
-int script_add(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
+int script_add(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit_data = s->fit;
     if(argc < 1) {
         fprintf(stderr, "Nothing to add. See \"help add\" for more information.\n");
         return 0;
@@ -216,7 +218,7 @@ int script_add(struct fit_data *fit, jibal_config_var *vars, int argc, char * co
         fit_range range = {.low = strtoul(argv[1], NULL, 10),
                            .high = strtoul(argv[2], NULL, 10)
         };
-        fit_range_add(fit, &range);
+        fit_range_add(fit_data, &range);
         return 0;
     }
     fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
@@ -224,7 +226,7 @@ int script_add(struct fit_data *fit, jibal_config_var *vars, int argc, char * co
 }
 
 
-int script_help(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
+int script_help(script_session *s, int argc, char * const *argv) {
     (void) fit; /* Unused */
     static const struct help_topic topics[] = {
             {"help", "This is help on help. How meta. Help is available on following topics:\n"},
@@ -258,7 +260,7 @@ int script_help(struct fit_data *fit, jibal_config_var *vars, int argc, char * c
                 fprintf(stderr, "%s\n", jabs_version());
             } else if(strcmp(t->name, "set") == 0) {
                 i = 0;
-                for(jibal_config_var *var = vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
+                for(jibal_config_var *var = s->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
                     i++;
                     fprintf(stderr, "%18s", var->name);
                     if(i % 4 == 0) {
@@ -308,8 +310,8 @@ jibal_config_var *script_make_vars(struct fit_data *fit) {
     return vars_out;
 }
 
-int script_simulate(struct fit_data *fit, jibal_config_var *vars, int argc, char * const *argv) {
-    (void) vars; /* Unused */
+int script_simulate(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
     (void) argc; /* Unused */
     (void) argv; /* Unused */
     if(script_prepare_sim_or_fit(fit)) {
@@ -320,8 +322,8 @@ int script_simulate(struct fit_data *fit, jibal_config_var *vars, int argc, char
     return 0;
 }
 
-int script_fit(struct fit_data *fit_data, jibal_config_var *vars, int argc, char * const *argv) {
-    (void) vars; /* Unused */
+int script_fit(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit_data = s->fit;
     if(argc != 1) {
         fprintf(stderr, "Usage: fit [fitvar1,fitvar2,...]\n");
         return -1;
@@ -344,8 +346,8 @@ int script_fit(struct fit_data *fit_data, jibal_config_var *vars, int argc, char
     return 0;
 }
 
-int script_save(struct fit_data *fit_data, jibal_config_var *vars, int argc, char * const *argv) {
-    (void) vars; /* Unused */
+int script_save(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit_data = s->fit;
     if(argc < 1) {
         fprintf(stderr, "Nothing to save. See \"help save\" for more information.\n");
         return -1;
@@ -462,7 +464,7 @@ int script_process(script_session *s, FILE *f) {
                         break;
                     }
                     start = clock();
-                    status = c->f(fit, vars, argc - 1, argv + 1);
+                    status = c->f(s, argc - 1, argv + 1);
                     end  = clock();
                     if(c->f == script_load || c->f == script_reset) {
                         free(vars);
