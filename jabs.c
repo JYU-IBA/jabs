@@ -258,7 +258,7 @@ double scattering_angle(const ion *incident, sim_workspace *ws) { /* Calculate s
     return scatter_theta;
 }
 
-void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth */
+void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
     assert(sample->n_ranges);
     int warnings = 0;
     double thickness = sample->ranges[sample->n_ranges-1].x;
@@ -419,9 +419,14 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
     convolute_bricks(ws);
 }
 
-reaction **make_reactions(const struct sample *sample, const simulation *sim, jibal_cross_section_type cs_rbs, jibal_cross_section_type cs_erd) { /* Note that sim->ion needs to be set! */
-    if(!sim || !sim->beam_isotope || !sample)
+reaction **make_reactions(const simulation *sim, jibal_cross_section_type cs_rbs, jibal_cross_section_type cs_erd) { /* Note that sim->ion needs to be set! */
+    if(!sim || !sim->beam_isotope) {
         return NULL;
+    }
+    struct sample *sample = sim->sample;
+    if(!sample) {
+        return NULL;
+    }
     int rbs = (cs_rbs != JIBAL_CS_NONE);
     int erd = (cs_erd != JIBAL_CS_NONE);
     if(sim->det->theta > C_PI/2.0) {
@@ -480,14 +485,19 @@ int process_reaction_files(const jibal_isotope *jibal_isotopes, reaction **react
     return 0;
 }
 
-int assign_stopping(jibal_gsto *gsto, const simulation *sim, const sample *sample, reaction * const *reactions) {
+int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
+    struct sample *sample = sim->sample;
+    if(!sample) {
+        fprintf(stderr, "Could not assign stopping, because sample is not set!\n");
+        return 1;
+    }
     for(size_t i = 0; i < sample->n_isotopes; i++) {
         int Z2 = sample->isotopes[i]->Z;
         if (!jibal_gsto_auto_assign(gsto, sim->beam_isotope->Z, Z2)) { /* This should handle RBS */
             fprintf(stderr, "Can not assign stopping.\n");
             return 1;
         }
-        for(reaction * const *r = reactions; *r != NULL; r++) {
+        for(reaction * const *r = sim->reactions; *r != NULL; r++) {
             if((*r)->type == REACTION_ERD) {
                 if (!jibal_gsto_auto_assign(gsto, (*r)->target->Z, Z2)) {
                     fprintf(stderr, "Can not assign stopping.\n");

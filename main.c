@@ -94,40 +94,39 @@ int main(int argc, char **argv) {
         return status;
     }
     fputs(COPYRIGHT_STRING, stderr);
-    sample *sample = sample_from_sample_model(sm);
+    sim->sample = sample_from_sample_model(sm);
     if(global->verbose) {
         sample_model_print(stderr, sm);
         fprintf(stderr, "\nSimplified sample model for simulation:\n");
-        sample_print(stderr, sample, global->print_isotopes);
+        sample_print(stderr, sim->sample, global->print_isotopes);
     }
     if(sm->n_ranges == 0 || sm->n_materials == 0) {
         fprintf(stderr, "Can not simulate nothing.\n");
     }
-    reaction **reactions = NULL;
     if(global->verbose) {
         fprintf(stderr, "Default RBS cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_rbs));
         fprintf(stderr, "Default ERD cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_erd));
         fprintf(stderr, "\n");
     }
-    reactions = make_reactions(sample, sim, global->rbs?jibal->config->cs_rbs:JIBAL_CS_NONE, global->erd?jibal->config->cs_erd:JIBAL_CS_NONE);
+    sim->reactions = make_reactions(sim, global->rbs?jibal->config->cs_rbs:JIBAL_CS_NONE, global->erd?jibal->config->cs_erd:JIBAL_CS_NONE);
     if(global->reaction_filenames) {
-        if(process_reaction_files(jibal->isotopes, reactions, global->reaction_filenames, global->n_reaction_filenames)) {
+        if(process_reaction_files(jibal->isotopes, sim->reactions, global->reaction_filenames, global->n_reaction_filenames)) {
             fprintf(stderr, "Could not process all reaction files. Aborting.\n");
             return EXIT_FAILURE;
         }
     }
 
-    if(!reactions || reactions[0] == NULL ) {
+    if(!sim->reactions || sim->reactions[0] == NULL ) {
         fprintf(stderr, "No reactions, nothing to do.\n");
         return EXIT_FAILURE;
     } else {
         if(global->verbose) {
-            fprintf(stderr, "%zu reactions.\n", reaction_count(reactions));
-            reactions_print(stderr, reactions);
+            fprintf(stderr, "%zu reactions.\n", reaction_count(sim->reactions));
+            reactions_print(stderr, sim->reactions);
         }
     }
 
-    if(assign_stopping(jibal->gsto, sim, sample, reactions)) {
+    if(assign_stopping(jibal->gsto, sim)) {
         return EXIT_FAILURE;
     }
     if(global->verbose) {
@@ -141,7 +140,7 @@ int main(int argc, char **argv) {
     start = clock();
     sim_workspace *ws = NULL;
     if(global->fit) {
-        fit_data *fit_data = fit_data_new(jibal, sim, exp, sm, reactions);
+        fit_data *fit_data = fit_data_new(jibal, sim, exp, sm);
         fit_params_add(sim, sm, fit_data->fit_params, global->fit_vars);
         fit_range range = {.low = global->fit_low, .high = global->fit_high};
         fit_range_add(fit_data, &range); /* We add just this one range */
@@ -154,15 +153,15 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\nFinal parameters:\n");
         simulation_print(stderr, sim);
         fprintf(stderr, "\nFinal profile:\n");
-        sample_print(stderr, fit_data->sample, global->print_isotopes);
-        sample_areal_densities_print(stderr, fit_data->sample, global->print_isotopes);
+        sample_print(stderr, sim->sample, global->print_isotopes);
+        sample_areal_densities_print(stderr, sim->sample, global->print_isotopes);
         fprintf(stderr, "\nFinal sample model:\n");
-        sample_model_print(stderr, sm);
+        sample_model_print(stderr, fit_data->sm);
         ws = fit_data->ws;
         fit_stats_print(stderr, &fit_data->stats);
         fit_data_free(fit_data); /* Does not free sim, ws, sample or sm */
     } else {
-        ws = sim_workspace_init(sim, reactions, sample, jibal);
+        ws = sim_workspace_init(sim, jibal);
         simulate_with_ds(ws);
     }
     if(!ws) {
@@ -198,13 +197,8 @@ int main(int argc, char **argv) {
     double cputime_total =(((double) (end - start)) / CLOCKS_PER_SEC);
     fprintf(stderr, "...finished!\n\n");
     fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
-    for(reaction **r = reactions; *r != NULL; r++) {
-        reaction_free(*r);
-    }
-    free(reactions);
     sample_model_free(sm);
     sim_free(sim);
-    sample_free(sample);
     jibal_free(jibal);
     free(exp);
     global_options_free(global);

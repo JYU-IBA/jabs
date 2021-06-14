@@ -34,13 +34,13 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
         *(p->fit_params->func_params[i]) = gsl_vector_get(x, i);
     }
     sim_workspace_free(p->ws);
-    sample_free(p->sample);
+    sample_free(p->sim->sample);
     sample_model_renormalize(p->sm); /* TODO: only necessary if sample concentrations are fitted */
-    p->sample = sample_from_sample_model(p->sm);
+    p->sim->sample = sample_from_sample_model(p->sm);
     if(sim_sanity_check(p->sim)) {
         p->ws = NULL; /* Workspace has not been allocated yet. */
     } else {
-        p->ws = sim_workspace_init(p->sim, p->reactions, p->sample, p->jibal); /* We intentionally "leak" this */
+        p->ws = sim_workspace_init(p->sim, p->jibal); /* We intentionally "leak" this */
     }
     if(!p->ws) {
         gsl_vector_set_all(f, 0.0);
@@ -157,7 +157,7 @@ void fit_range_add(struct fit_data *fit_data, const struct fit_range *range) { /
     fit_data->fit_ranges[fit_data->n_fit_ranges-1] = *range;
 }
 
-fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm,  reaction **reactions) {
+fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm) {
     struct fit_data *f = malloc(sizeof(struct fit_data));
     f->n_iters_max = FIT_ITERS_MAX;
     f->n_fit_ranges = 0;
@@ -165,9 +165,7 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, 
     f->jibal = jibal;
     f->sim = sim;
     f->exp = exp;
-    f->sample = NULL;
     f->sm = sm;
-    f->reactions = reactions;
     f->ws = NULL;
     f->fit_params = fit_params_new();
     f->print_iters = FALSE;

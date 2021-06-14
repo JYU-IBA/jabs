@@ -100,8 +100,6 @@ int script_reset(script_session *s, int argc, char * const *argv) {
     fit->fit_params = NULL;
     sim_workspace_free(fit->ws);
     fit->ws = NULL;
-    sample_free(fit->sample);
-    fit->sample = NULL;
     sim_free(fit->sim);
     fit->sim = sim_init();
     return 0;
@@ -317,7 +315,7 @@ int script_simulate(script_session *s, int argc, char * const *argv) {
     if(script_prepare_sim_or_fit(fit)) {
         return -1;
     }
-    fit->ws = sim_workspace_init(fit->sim, fit->reactions, fit->sample, fit->jibal);
+    fit->ws = sim_workspace_init(fit->sim, fit->jibal);
     simulate_with_ds(fit->ws);
     return 0;
 }
@@ -404,7 +402,7 @@ int script_save(script_session *s, int argc, char * const *argv) {
 script_session *script_session_init(jibal *jibal) {
     struct script_session *s = malloc(sizeof(struct script_session));
     s->jibal = jibal;
-    s->fit = fit_data_new(jibal, sim_init(), NULL, NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
+    s->fit = fit_data_new(jibal, sim_init(), NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
     s->vars = script_make_vars(s->fit);
     return s;
 }
@@ -419,7 +417,7 @@ void script_session_free(script_session *s) {
 
 int script_process(script_session *s, FILE *f) {
     clock_t start, end;
-    struct fit_data *fit = fit_data_new(s->jibal, sim_init(), NULL, NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
+    struct fit_data *fit = fit_data_new(s->jibal, sim_init(), NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
     jibal_config_var *vars = script_make_vars(fit);
     char *line=NULL;
     size_t line_size=0;
@@ -523,31 +521,31 @@ int script_prepare_sim_or_fit(struct fit_data *fit) {
     }
     sim_workspace_free(fit->ws);
     fit->ws = NULL;
-    sample_free(fit->sample);
-    fit->sample = sample_from_sample_model(fit->sm);
-    if(!fit->sample) {
+    sample_free(fit->sim->sample);
+    fit->sim->sample = sample_from_sample_model(fit->sm);
+    if(!fit->sim->sample) {
         fprintf(stderr, "Could not make a sample based on model description. This should never happen.\n");
         return -1;
     }
     fprintf(stderr, "Simplified sample model for simulation:\n");
-    sample_print(stderr, fit->sample, TRUE);
+    sample_print(stderr, fit->sim->sample, TRUE);
 
-    if(fit->reactions) {
-        for(reaction **r = fit->reactions; *r != NULL; r++) {
+    if(fit->sim->reactions) {
+        for(reaction **r = fit->sim->reactions; *r != NULL; r++) {
             reaction_free(*r);
         }
     }
-    free(fit->reactions);
-    fit->reactions = make_reactions(fit->sample, fit->sim, fit->jibal->config->cs_rbs, fit->jibal->config->cs_erd);
-    if(!fit->reactions || fit->reactions[0] == NULL ) {
+    free(fit->sim->reactions);
+    fit->sim->reactions = make_reactions(fit->sim, fit->jibal->config->cs_rbs, fit->jibal->config->cs_erd);
+    if(!fit->sim->reactions || fit->sim->reactions[0] == NULL ) {
         fprintf(stderr, "No reactions, nothing to do.\n");
         return -1;
     }
     fprintf(stderr, "Reactions:\n");
-    reactions_print(stderr, fit->reactions);
+    reactions_print(stderr, fit->sim->reactions);
 
     jibal_gsto_assign_clear_all(fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
-    if(assign_stopping(fit->jibal->gsto, fit->sim, fit->sample, fit->reactions)) {
+    if(assign_stopping(fit->jibal->gsto, fit->sim)) {
         fprintf(stderr, "Could not assign stopping.\n");
         return -1;
     }

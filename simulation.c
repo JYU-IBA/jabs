@@ -40,11 +40,20 @@ simulation *sim_init() {
     sim->channeling_slope = 0.0;
     sim->cs_n_steps = CS_CONC_STEPS;
     sim->cs_stragg_half_n = CS_STRAGG_HALF_N;
+    sim->sample = NULL; /* Needs to be set (later) */
+    sim->reactions = NULL; /* Needs to be initialized after sample has been set */
     return sim;
 }
 
 void sim_free(simulation *sim) {
+    sample_free(sim->sample);
     detector_free(sim->det);
+    if(sim->reactions) {
+        for(reaction **r = sim->reactions; *r != NULL; r++) {
+            reaction_free(*r);
+        }
+    }
+    free(sim->reactions);
     free(sim);
 }
 
@@ -82,14 +91,26 @@ void sim_workspace_reset(sim_workspace *ws, const simulation *sim) {
 }
 #endif
 
-sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *reactions, const sample *sample, const jibal *jibal) {
+sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
+    if(!sim || !jibal) {
+        return NULL;
+    }
+    if(!sim->sample) {
+        fprintf(stderr, "No sample has been set. Will not initialize workspace.\n");
+    }
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->sim = *sim;
-    ws->sample = sample;
-    ws->n_reactions = reaction_count(reactions);
+    ws->sample = sim->sample;
+    ws->n_reactions = reaction_count(sim->reactions);
     ws->gsto = jibal->gsto;
     ws->jibal_config = jibal->config;
     ws->isotopes = jibal->isotopes;
+
+    if(ws->n_reactions == 0) {
+        fprintf(stderr, "No reactions! Will not initialize workspace if there is nothing to simulate.\n");
+        free(ws);
+        return NULL;
+    }
 
     ion_reset(&ws->ion);
     ion_set_isotope(&ws->ion, sim->beam_isotope);
@@ -135,15 +156,15 @@ sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *react
     ws->reactions = calloc(ws->n_reactions, sizeof (sim_reaction));
     for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
         sim_reaction *r = &ws->reactions[i_reaction];
-        r->r = reactions[i_reaction];
+        r->r = sim->reactions[i_reaction];
         assert(r->r);
         assert(r->r->product);
         ion *p = &r->p;
         ion_reset(p);
         r->max_depth = 0.0;
-        r->i_isotope = sample->n_isotopes; /* Intentionally not valid */
-        for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
-            if(sample->isotopes[i_isotope] == r->r->target) {
+        r->i_isotope = ws->sample->n_isotopes; /* Intentionally not valid */
+        for(size_t i_isotope = 0; i_isotope < ws->sample->n_isotopes; i_isotope++) {
+            if(ws->sample->isotopes[i_isotope] == r->r->target) {
 #ifdef DEBUG
                 fprintf(stderr, "Reaction %zu target isotope %s is isotope number %zu in sample.\n", i_reaction, r->r->target->name, i_isotope);
 #endif
@@ -154,9 +175,9 @@ sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *react
             r->n_bricks = sim->depthsteps_max;
         } else {
             if(sim->stop_step_incident == 0.0) { /* Automatic incident step size */
-                r->n_bricks = (int) ceil(sim->beam_E / (STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(sim->det->resolution)) + sample->n_ranges); /* This is conservative */
+                r->n_bricks = (int) ceil(sim->beam_E / (STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(sim->det->resolution)) + ws->sample->n_ranges); /* This is conservative */
             } else {
-                r->n_bricks = (int) ceil(sim->beam_E / sim->stop_step_incident + sample->n_ranges); /* This is conservative */
+                r->n_bricks = (int) ceil(sim->beam_E / sim->stop_step_incident + ws->sample->n_ranges); /* This is conservative */
             }
             if(r->n_bricks > 2000) {
                 fprintf(stderr, "Caution: large number of bricks will be used in the simulation (%zu).\n", r->n_bricks);

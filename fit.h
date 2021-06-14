@@ -21,6 +21,10 @@
 #include <gsl/gsl_vector.h>
 #include <jibal.h>
 
+#include "simulation.h"
+#include "detector.h"
+#include "sample.h"
+
 typedef struct fit_params {
     size_t n; /* Number of function parameters */
     double **func_params; /* Function parameters array. Size is n. The contents can be modified. */
@@ -45,9 +49,7 @@ typedef struct fit_range {
 typedef struct fit_data {
     gsl_histogram *exp; /* experimental data to be fitted */
     simulation *sim;
-    reaction **reactions;
     const jibal *jibal; /* This shouldn't be here, but it is the only place I can think of */
-    sample *sample;
     sample_model *sm;
     fit_params *fit_params; /* Allocated with fit_data_new() and freed by fit_data_free() */
     sim_workspace *ws; /* Allocated and leaked by fitting function! */
@@ -60,7 +62,7 @@ typedef struct fit_data {
 } fit_data;
 
 
-fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm,  reaction **reactions);
+fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm);
 void fit_data_free(struct fit_data *f); /* Doesn't free everything in fit_data. Does free fit_params and fit_ranges */
 void fit_data_print(FILE *f, const struct fit_data *fit_data);
 int fit(struct fit_data *fit_data);
