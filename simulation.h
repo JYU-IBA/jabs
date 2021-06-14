@@ -79,7 +79,8 @@ typedef struct {
     int nucl_stop_accurate;
     int mean_conc_and_energy;
     gsto_stopping_type stopping_type;
-    size_t n_channels; /* histogram */
+    size_t n_channels; /* in histograms */
+    gsl_histogram *histo_sum;
     ion ion;
     sim_reaction *reactions;
     const jibal_isotope *isotopes;
@@ -95,6 +96,7 @@ int sim_sanity_check(const simulation *sim);
 sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *reactions, const sample *sample, const jibal *jibal);
 void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);
+void sim_workspace_calculate_sum_spectra(sim_workspace *ws);
 void simulation_print(FILE *f, const simulation *sim);
 void convolute_bricks(sim_workspace *ws);
 void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r);

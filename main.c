@@ -140,8 +140,9 @@ int main(int argc, char **argv) {
     if(global->fit) {
         fit_data *fit_data = fit_data_new(jibal, sim, exp, sm, reactions);
         fit_params_add(sim, sm, fit_data->fit_params, global->fit_vars);
-        fit_data->low_ch = global->fit_low;
-        fit_data->high_ch = global->fit_high;
+        fit_range range = {.low = global->fit_low, .high = global->fit_high};
+        fit_range_add(fit_data, &range); /* We add just this one range */
+        fit_data->n_fit_ranges = 1;
         fit_data->print_iters = global->print_iters;
         if(fit(fit_data)) {
             fprintf(stderr, "Fit failed!\n");

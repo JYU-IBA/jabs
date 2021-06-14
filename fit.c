@@ -17,6 +17,7 @@
 
 #include <string.h>
 #include <time.h>
+#include <assert.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_blas.h>
 
@@ -49,16 +50,25 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     simulate_with_ds(p->ws);
     end = clock();
     p->stats.cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
-    for(size_t i = p->low_ch; i <= p->high_ch; i++) {
-        double sum = 0.0;
-        if(i >= p->ws->n_channels) { /* Outside range of simulated spectrum */
-            gsl_vector_set(f, i-p->low_ch, exp->bin[i]);
-        } else {
-            for (size_t j = 0; j < p->ws->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
-                if(p->ws->reactions[j].histo && i < p->ws->reactions[j].histo->n)
-                    sum += p->ws->reactions[j].histo->bin[i];
+    size_t i_vec = 0;
+    for(size_t i_range = 0; i_range < p->n_fit_ranges; i_range++) {
+        if(i_vec >= f->size) {
+            fprintf(stderr, "Too many channels in fits for the residuals vector. This shouldn't happen.\n");
+            return GSL_FAILURE;
+        }
+        fit_range *range = &p->fit_ranges[i_range];
+        for(size_t i = range->low; i <= range->high; i++) {
+            double sum = 0.0;
+            if(i >= p->ws->n_channels) { /* Outside range of simulated spectrum */
+                gsl_vector_set(f, i_vec, exp->bin[i]);
+            } else {
+                for(size_t j = 0; j < p->ws->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
+                    if(p->ws->reactions[j].histo && i < p->ws->reactions[j].histo->n)
+                        sum += p->ws->reactions[j].histo->bin[i];
+                }
+                gsl_vector_set(f, i_vec, exp->bin[i] - sum);
             }
-            gsl_vector_set(f, i-p->low_ch, exp->bin[i] - sum);
+            i_vec++;
         }
     }
     return GSL_SUCCESS;
@@ -118,11 +128,30 @@ void fit_stats_print(FILE *f, const struct fit_stats *stats) {
     }
 }
 
+size_t fit_ranges_calculate_number_of_channels(fit_range *fit_ranges, size_t n) {
+    size_t sum = 0;
+    for(size_t i = 0; i < n; i++) {
+        fit_range *r = &fit_ranges[i];
+        sum += (r->high - r->low) + 1;
+    }
+    return sum;
+}
+
+void fit_range_add(struct fit_data *fit_data, const struct fit_range *range) { /* Makes a deep copy */
+    fit_data->n_fit_ranges++;
+    fit_data->fit_ranges = realloc(fit_data->fit_ranges, fit_data->n_fit_ranges * sizeof(fit_range));
+    if(!fit_data->fit_ranges) {
+        fit_data->n_fit_ranges = 0;
+        return;
+    }
+    fit_data->fit_ranges[fit_data->n_fit_ranges-1] = *range;
+}
+
 fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm,  reaction **reactions) {
     struct fit_data *f = malloc(sizeof(struct fit_data));
     f->n_iters_max = FIT_ITERS_MAX;
-    f->low_ch = 0;
-    f->high_ch = 0;
+    f->n_fit_ranges = 0;
+    f->fit_ranges = NULL;
     f->jibal = jibal;
     f->sim = sim;
     f->exp = exp;
@@ -139,15 +168,18 @@ void fit_data_free(fit_data *f) {
     if(!f)
         return;
     fit_params_free(f->fit_params);
+    free(f->fit_ranges);
     free(f);
 }
 
-void fit_data_print(FILE *f, const struct fit_data *fit) {
-    if(!fit) {
+void fit_data_print(FILE *f, const struct fit_data *fit_data) {
+    if(!fit_data) {
         return;
     }
-    fprintf(f, "fit_low = %zu\n", fit->low_ch);
-    fprintf(f, "fit_high = %zu\n", fit->high_ch);
+    for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
+        fit_range *range = &fit_data->fit_ranges[i];
+        fprintf(stderr, "Fit range %zu [%lu, %lu]\n", i+1, range->low, range->high);
+    }
 }
 
 int fit(struct fit_data *fit_data) {
@@ -173,22 +205,31 @@ int fit(struct fit_data *fit_data) {
         fprintf(stderr, "No experimental data, can not fit.\n");
         return -1;
     }
-    if(fit_data->low_ch <= 0)
-        fit_data->low_ch = (int)(fit_data->exp->n*0.1);
-    if(fit_data->high_ch <= 0 || fit_data->high_ch >= fit_data->exp->n)
-        fit_data->high_ch = fit_data->exp->n - 1;
-    fprintf(stderr, "Fit range [%lu, %lu]\n", fit_data->low_ch, fit_data->high_ch);
+    if(!fit_data->n_fit_ranges) {
+        fprintf(stderr, "No fit range(s) given, can not fit.\n");
+        return -1;
+    }
+
+    for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
+        fit_range *range = &fit_data->fit_ranges[i];
+        fprintf(stderr, "Fit range %zu [%lu, %lu]\n", i+1, range->low, range->high);
+    }
+
     fdf.f = &fit_function;
     fdf.df = NULL; /* Jacobian, with NULL using finite difference. TODO: this could be implemented */
     fdf.fvv = NULL; /* No geodesic acceleration */
-    fdf.n = (fit_data->high_ch-fit_data->low_ch+1);
+    fdf.n = fit_ranges_calculate_number_of_channels(fit_data->fit_ranges, fit_data->n_fit_ranges);
     fdf.p = fit_params->n;
-    if(fdf.n < fdf.p) /* insufficient data points */
+    if(fdf.n < fdf.p) {
+        fprintf(stderr, "Not enough data (%zu points) for given number of free parameters (%zu)\n", fdf.n, fdf.p);
         return -1;
+    } else {
+        fprintf(stderr, "%zu channels and %zu parameters in fit.\n", fdf.n, fdf.p);
+    }
     gsl_vector *f;
     gsl_matrix *J;
     double chisq, chisq0;
-    fit_data->dof = fdf.n-fdf.p;
+    fit_data->dof = fdf.n - fdf.p;
     int status, info;
     size_t i, j;
     gsl_matrix *covar = gsl_matrix_alloc (fit_params->n, fit_params->n);
@@ -196,15 +237,23 @@ int fit(struct fit_data *fit_data) {
     for(i = 0; i < fit_params->n; i++) {
         gsl_vector_set(x, i, *fit_params->func_params[i]); /* Initial values of fitted parameters from function parameter array */
     }
-    double *weights = malloc(sizeof(double)*(fit_data->high_ch-fit_data->low_ch+1));
-    for(i = fit_data->low_ch; i <= fit_data->high_ch; i++) {
-        if(fit_data->exp->bin[i] > 1.0) {
-            weights[i-fit_data->low_ch] = 1.0 / (fit_data->exp->bin[i]);
-        } else {
-            weights[i-fit_data->low_ch] = 1.0; /* TODO: ?*/
+
+    double *weights = malloc(sizeof(double) * fdf.n);
+    size_t i_w = 0;
+    for(i = 0; i < fit_data->n_fit_ranges; i++) {
+        fit_range *range = &fit_data->fit_ranges[i];
+        for(i = range->low; i <= range->high; i++) {
+            if(fit_data->exp->bin[i] > 1.0) {
+                weights[i_w] = 1.0 / (fit_data->exp->bin[i]);
+            } else {
+                weights[i_w] = 1.0; /* TODO: ?*/
+            }
+            i_w++;
         }
     }
-    gsl_vector_view wts = gsl_vector_view_array(weights, fit_data->high_ch-fit_data->low_ch+1);
+    assert(i_w == fdf.n);
+
+    gsl_vector_view wts = gsl_vector_view_array(weights, i_w);
 
     const double xtol = FIT_XTOL;
     const double gtol = FIT_GTOL;
@@ -221,8 +270,7 @@ int fit(struct fit_data *fit_data) {
     gsl_blas_ddot(f, f, &chisq0);
 
 /* solve the system with a maximum of n_iters_max iterations */
-    status = gsl_multifit_nlinear_driver(fit_data->n_iters_max, xtol, gtol, ftol,
-                                         fit_callback, fit_data, &info, w);
+    status = gsl_multifit_nlinear_driver(fit_data->n_iters_max, xtol, gtol, ftol, fit_callback, fit_data, &info, w);
 
 /* compute covariance of best fit parameters */
     J = gsl_multifit_nlinear_jac(w);

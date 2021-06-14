@@ -262,8 +262,6 @@ jibal_config_var *script_make_vars(struct fit_data *fit) {
             {JIBAL_CONFIG_VAR_UNIT,   "sample_azi",     &sim->sample_phi,  NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "channeling",     &sim->channeling_offset, NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",&sim->channeling_slope, NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "fit_low",        &fit->low_ch,     NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "fit_high",       &fit->high_ch,    NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "slope",          &det->slope,      NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "offset",         &det->offset,     NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "resolution",     &det->resolution, NULL},

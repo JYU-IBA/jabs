@@ -125,6 +125,13 @@ sim_workspace *sim_workspace_init(const simulation *sim, reaction * const *react
         free(ws);
         return NULL;
     }
+    ws->histo_sum = gsl_histogram_alloc(ws->n_channels);
+    if(!ws->histo_sum) {
+        return NULL;
+    }
+    set_spectrum_calibration(ws->histo_sum, ws->sim.det); /* Calibration can be set however already */
+    gsl_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
+
     ws->reactions = calloc(ws->n_reactions, sizeof (sim_reaction));
     for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
         sim_reaction *r = &ws->reactions[i_reaction];
@@ -213,6 +220,18 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
     fprintf(stderr, "Simulating %zu channels\n", i);
 #endif
     ws->n_channels = i;
+}
+
+void sim_workspace_calculate_sum_spectra(sim_workspace *ws) {
+    double sum;
+    for(size_t i = 0; i < ws->histo_sum->n; i++) {
+        sum = 0.0;
+        for(size_t j = 0; j < ws->n_reactions; j++) {
+            if(ws->reactions[j].histo && i < ws->reactions[j].histo->n)
+                sum += ws->reactions[j].histo->bin[i];
+        }
+        ws->histo_sum->bin[i] = sum;
+    }
 }
 
 void simulation_print(FILE *f, const simulation *sim) {

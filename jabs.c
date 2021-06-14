@@ -739,8 +739,10 @@ void simulate_with_roughness(sim_workspace *ws) {
 void simulate_with_ds(sim_workspace *ws) {
     double p_sr = ws->sim.p_sr;
     simulate_with_roughness(ws);
-    if(!ws->sim.ds)
+    if(!ws->sim.ds) {
+        sim_workspace_calculate_sum_spectra(ws);
         return;
+    }
     ion_set_angle(&ws->ion, 0.0, 0.0);
     ion_rotate(&ws->ion, ws->sim.sample_theta, ws->sim.sample_phi);
     ion ion1 = ws->ion;
@@ -815,4 +817,5 @@ void simulate_with_ds(sim_workspace *ws) {
             break;
         d_before = d_after;
     }
+    sim_workspace_calculate_sum_spectra(ws);
 }
