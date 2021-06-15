@@ -238,12 +238,11 @@ int script_help(script_session *s, int argc, char * const *argv) {
         fprintf(stderr, "Type help [topic] for information on a particular topic or \"help help\" for help on help.\n");
         return 0;
     }
-    size_t i = 0;
     for(const struct help_topic *t = topics; t->name != NULL; t++) {
         if(strcmp(t->name, argv[0]) == 0) {
             fputs(t->help_text, stderr);
             if(strcmp(t->name, "help") == 0) {
-                i = 0;
+                size_t i = 0;
                 for(const struct help_topic *t2 = topics; t2->name != NULL; t2++) {
                     i++;
                     fprintf(stderr, "%18s", t2->name);
@@ -257,7 +256,7 @@ int script_help(script_session *s, int argc, char * const *argv) {
             } else if(strcmp(t->name, "version") == 0) {
                 fprintf(stderr, "%s\n", jabs_version());
             } else if(strcmp(t->name, "set") == 0) {
-                i = 0;
+                size_t i = 0;
                 for(jibal_config_var *var = s->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
                     i++;
                     fprintf(stderr, "%18s", var->name);
@@ -504,7 +503,7 @@ int script_process(script_session *s, FILE *f) {
 
 int script_prepare_sim_or_fit(struct fit_data *fit) {
     /* TODO: option to disable RBS or ERD */
-    /* TODO: reactions from files? Should "make_reactions" be somewhere else? */
+    /* TODO: reactions from files? Should "sim_reactions_add" be somewhere else? */
     if(!fit->sm) {
         fprintf(stderr, "No sample has been defined!\n");
         return -1;
