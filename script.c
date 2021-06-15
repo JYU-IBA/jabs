@@ -530,19 +530,21 @@ int script_prepare_sim_or_fit(struct fit_data *fit) {
     fprintf(stderr, "Simplified sample model for simulation:\n");
     sample_print(stderr, fit->sim->sample, TRUE);
 
-    if(fit->sim->reactions) {
-        for(reaction **r = fit->sim->reactions; *r != NULL; r++) {
-            reaction_free(*r);
-        }
+    for(size_t i = 0; i < fit->sim->n_reactions; i++) {
+        reaction_free(&fit->sim->reactions[i]);
     }
     free(fit->sim->reactions);
-    fit->sim->reactions = make_reactions(fit->sim, fit->jibal->config->cs_rbs, fit->jibal->config->cs_erd);
-    if(!fit->sim->reactions || fit->sim->reactions[0] == NULL ) {
+    fit->sim->reactions = NULL;
+    fit->sim->n_reactions = 0;
+    sim_reactions_add(fit->sim, REACTION_RBS, fit->jibal->config->cs_rbs);
+    sim_reactions_add(fit->sim, REACTION_ERD, fit->jibal->config->cs_erd);
+
+    if(fit->sim->n_reactions == 0) {
         fprintf(stderr, "No reactions, nothing to do.\n");
         return -1;
     }
     fprintf(stderr, "Reactions:\n");
-    reactions_print(stderr, fit->sim->reactions);
+    reactions_print(stderr, fit->sim->reactions, fit->sim->n_reactions);
 
     jibal_gsto_assign_clear_all(fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
     if(assign_stopping(fit->jibal->gsto, fit->sim)) {

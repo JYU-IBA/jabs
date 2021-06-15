@@ -108,21 +108,26 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Default ERD cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_erd));
         fprintf(stderr, "\n");
     }
-    sim->reactions = make_reactions(sim, global->rbs?jibal->config->cs_rbs:JIBAL_CS_NONE, global->erd?jibal->config->cs_erd:JIBAL_CS_NONE);
+    if(global->rbs) {
+        sim_reactions_add(sim, REACTION_RBS, jibal->config->cs_rbs);
+    }
+    if(global->erd) {
+        sim_reactions_add(sim, REACTION_ERD, jibal->config->cs_erd);
+    }
     if(global->reaction_filenames) {
-        if(process_reaction_files(jibal->isotopes, sim->reactions, global->reaction_filenames, global->n_reaction_filenames)) {
+        if(process_reaction_files(sim, jibal->isotopes, global->reaction_filenames, global->n_reaction_filenames)) {
             fprintf(stderr, "Could not process all reaction files. Aborting.\n");
             return EXIT_FAILURE;
         }
     }
 
-    if(!sim->reactions || sim->reactions[0] == NULL ) {
+    if(sim->n_reactions == 0) {
         fprintf(stderr, "No reactions, nothing to do.\n");
         return EXIT_FAILURE;
     } else {
         if(global->verbose) {
-            fprintf(stderr, "%zu reactions.\n", reaction_count(sim->reactions));
-            reactions_print(stderr, sim->reactions);
+            fprintf(stderr, "%zu reactions.\n", sim->n_reactions);
+            reactions_print(stderr, sim->reactions, sim->n_reactions);
         }
     }
 

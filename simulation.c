@@ -42,19 +42,51 @@ simulation *sim_init() {
     sim->cs_stragg_half_n = CS_STRAGG_HALF_N;
     sim->sample = NULL; /* Needs to be set (later) */
     sim->reactions = NULL; /* Needs to be initialized after sample has been set */
+    sim->n_reactions = 0;
     return sim;
 }
 
 void sim_free(simulation *sim) {
     sample_free(sim->sample);
     detector_free(sim->det);
-    if(sim->reactions) {
-        for(reaction **r = sim->reactions; *r != NULL; r++) {
-            reaction_free(*r);
-        }
+    for(size_t i = 0; i < sim->n_reactions; i++) {
+        reaction_free(&sim->reactions[i]);
     }
     free(sim->reactions);
     free(sim);
+}
+
+int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_type cs) { /* Note that sim->ion needs to be set! */
+    if(!sim || !sim->beam_isotope) {
+        return -1;
+    }
+    struct sample *sample = sim->sample;
+    if(!sample) {
+        return -1;
+    }
+    if(type == REACTION_NONE || cs ==  JIBAL_CS_NONE) {
+        return 0;
+    }
+    if(type == REACTION_ERD && sim->det->theta > C_PI/2.0) {
+        return 0;
+    }
+    size_t n_reactions = sim->n_reactions + sample->n_isotopes; /* New maximum */
+    sim->reactions = realloc(sim->reactions, n_reactions*sizeof(reaction));
+    if(!sim->reactions) {
+        sim->n_reactions = 0;
+        return -1;
+    }
+    for (size_t i = 0; i < sample->n_isotopes; i++) {
+        reaction *r_new = reaction_make(sim->beam_isotope, sample->isotopes[i], type, cs, sim->det->theta, TRUE);
+        if (!r_new) {
+            fprintf(stderr, "Failed to make an %s reaction with isotope %zu (%s)\n", jibal_cross_section_name(cs), i, sample->isotopes[i]->name);
+            continue;
+        }
+        sim->reactions[sim->n_reactions] = *r_new;
+        free(r_new);
+        sim->n_reactions++;
+    };
+    return 0;
 }
 
 int sim_sanity_check(const simulation *sim) {
@@ -101,7 +133,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->sim = *sim;
     ws->sample = sim->sample;
-    ws->n_reactions = reaction_count(sim->reactions);
+    ws->n_reactions = sim->n_reactions;
     ws->gsto = jibal->gsto;
     ws->jibal_config = jibal->config;
     ws->isotopes = jibal->isotopes;
@@ -156,7 +188,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
     ws->reactions = calloc(ws->n_reactions, sizeof (sim_reaction));
     for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
         sim_reaction *r = &ws->reactions[i_reaction];
-        r->r = sim->reactions[i_reaction];
+        r->r = &sim->reactions[i_reaction];
         assert(r->r);
         assert(r->r->product);
         ion *p = &r->p;

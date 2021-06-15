@@ -17,12 +17,12 @@
 #include "reaction.h"
 
 
-void reactions_print(FILE *f, reaction * const *reactions) {
-    int i = 1;
+void reactions_print(FILE *f, const reaction *reactions, size_t n_reactions) {
     if(!reactions)
         return;
-    for (reaction * const *r = reactions; *r != NULL; r++) {
-        fprintf(f, "Reaction %3i: %s with %5s (reaction product %s).\n", i++, reaction_name(*r), (*r)->target->name, (*r)->product->name);
+    for(size_t i = 0; i < n_reactions; i++) {
+        const reaction *r = &reactions[i];
+        fprintf(f, "Reaction %3zu: %s with %5s (reaction product %s).\n", i + 1, reaction_name(r), r->target->name, r->product->name);
     }
 }
 
@@ -44,18 +44,6 @@ const char *reaction_name(const reaction *r) {
             return "???";
     }
 }
-
-size_t reaction_count(reaction * const *reactions) {
-    size_t n=0;
-    if(!reactions)
-        return 0;
-    for (reaction * const *r = reactions; *r != NULL; r++) {
-        n++;
-    }
-    return n;
-}
-
-
 
 reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta, int force) {
     if(!target || !incident) {
@@ -100,6 +88,8 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
 }
 
 void reaction_free(reaction *r) {
+    if(!r)
+        return;
     free(r->cs_table);
 }
 

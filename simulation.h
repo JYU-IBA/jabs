@@ -25,7 +25,8 @@
 #include "sample.h"
 
 typedef struct {
-    reaction **reactions;
+    reaction *reactions;
+    size_t n_reactions;
     detector *det;
     sample *sample;
     double stop_step_incident;
@@ -74,7 +75,7 @@ typedef struct sim_reaction {
 typedef struct {
     simulation sim;
     const sample *sample; /* Note that simulate() can be passed a sample explicitly, but in most cases it should be this. Also this should be exactly the same as sim->sample. */
-    size_t n_reactions; /* Number of reactions is counted on init. */
+    size_t n_reactions;
     jibal_gsto *gsto;
     const jibal_config *jibal_config;
     int rk4;
@@ -94,6 +95,7 @@ typedef struct {
 #include "sample.h"
 simulation *sim_init();
 void sim_free(simulation *sim);
+int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_type cs); /* Add RBS or ERD reactions automagically */
 int sim_sanity_check(const simulation *sim);
 sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal);
 void sim_workspace_free(sim_workspace *ws);

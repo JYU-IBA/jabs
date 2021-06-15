@@ -419,47 +419,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
     convolute_bricks(ws);
 }
 
-reaction **make_reactions(const simulation *sim, jibal_cross_section_type cs_rbs, jibal_cross_section_type cs_erd) { /* Note that sim->ion needs to be set! */
-    if(!sim || !sim->beam_isotope) {
-        return NULL;
-    }
-    struct sample *sample = sim->sample;
-    if(!sample) {
-        return NULL;
-    }
-    int rbs = (cs_rbs != JIBAL_CS_NONE);
-    int erd = (cs_erd != JIBAL_CS_NONE);
-    if(sim->det->theta > C_PI/2.0) {
-        erd = FALSE;
-    }
-    size_t n_reactions = (sample->n_isotopes*rbs + sample->n_isotopes*erd + 1); /* TODO: we can predict this more accurately */
-    reaction **reactions = malloc(n_reactions*sizeof(reaction *));
-    reaction **r = reactions;
-    if(rbs) {
-        for (size_t i = 0; i < sample->n_isotopes; i++) {
-            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_RBS, cs_rbs, sim->det->theta, TRUE);
-            if (!(*r)) {
-                fprintf(stderr, "Failed to make an RBS reaction with isotope %zu (%s)\n", i, sample->isotopes[i]->name);
-            } else {
-                r++;
-            }
-        };
-    }
-    if(erd) {
-        for (size_t i = 0; i < sample->n_isotopes; i++) {
-            *r = reaction_make(sim->beam_isotope, sample->isotopes[i], REACTION_ERD, cs_erd, sim->det->theta, TRUE);
-            if (!(*r)) {
-                fprintf(stderr, "Failed to make an ERD reaction with isotope %zu (%s)\n", i, sample->isotopes[i]->name);
-            } else {
-                r++;
-            }
-        };
-    }
-    *r = NULL; /* Last reaction is a dummy one */
-    return reactions;
-}
-
-int process_reaction_files(const jibal_isotope *jibal_isotopes, reaction **reactions, char * const *reaction_filenames, size_t n_reaction_filenames) {
+int process_reaction_files(simulation *sim, const jibal_isotope *jibal_isotopes, char * const *reaction_filenames, size_t n_reaction_filenames) {
     for(size_t i = 0; i < n_reaction_filenames; i++) {
         r33_file *rfile = r33_file_read(reaction_filenames[i]);
         if(!rfile) {
@@ -472,12 +432,13 @@ int process_reaction_files(const jibal_isotope *jibal_isotopes, reaction **react
         }
         fprintf(stderr, "File: %s has a reaction with %s -> %s, product %s\n", reaction_filenames[i],
                 reaction_from_file->incident->name, reaction_from_file->target->name, reaction_from_file->product->name);
-        for(reaction **r = reactions; *r != NULL; r++) {
-            if((*r)->target == reaction_from_file->target && (*r)->product ==reaction_from_file->product && (*r)->incident == reaction_from_file->incident) {
+        for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
+            reaction *r = &sim->reactions[i_reaction];
+            if(r->target == reaction_from_file->target && r->product ==reaction_from_file->product && r->incident == reaction_from_file->incident) {
                 fprintf(stderr, "Replacing reaction.\n");
-                reaction_from_file->cs = (*r)->cs; /* Adopt fallback cross-section from the reaction we are replacing */
-                reaction_free(*r);
-                *r = reaction_from_file;
+                reaction_from_file->cs = r->cs; /* Adopt fallback cross-section from the reaction we are replacing */
+                reaction_free(r);
+                *r = *reaction_from_file;
                 break;
             }
         }
@@ -497,9 +458,10 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
             fprintf(stderr, "Can not assign stopping.\n");
             return 1;
         }
-        for(reaction * const *r = sim->reactions; *r != NULL; r++) {
-            if((*r)->type == REACTION_ERD) {
-                if (!jibal_gsto_auto_assign(gsto, (*r)->target->Z, Z2)) {
+        for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
+            const reaction *r = &sim->reactions[i_reaction];
+            if(r->type == REACTION_ERD) {
+                if (!jibal_gsto_auto_assign(gsto, r->target->Z, Z2)) {
                     fprintf(stderr, "Can not assign stopping.\n");
                     return 1;
                 }
