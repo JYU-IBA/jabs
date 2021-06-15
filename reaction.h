@@ -54,5 +54,6 @@ void reactions_print(FILE *f, const reaction *reactions, size_t n_reactions);
 reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta, int force); /* theta is used to check sanity of RBS and ERD reactions */
 const char *reaction_name(const reaction *r);
 void reaction_free(reaction *r);
+int reaction_is_same(const reaction *r1, const reaction *r2); /* TRUE (=1) if r1 and r2 describe the same reaction. Note that "type" can be different. */
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile);
 #endif //JABS_REACTION_H

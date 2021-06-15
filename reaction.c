@@ -72,6 +72,7 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     r->filename = NULL;
     r->cs_table = NULL;
     r->n_cs_table = 0;
+    r->theta = theta;
     switch(type) {
         case REACTION_ERD:
             r->product = target;
@@ -91,6 +92,18 @@ void reaction_free(reaction *r) {
     if(!r)
         return;
     free(r->cs_table);
+}
+
+int reaction_is_same(const reaction *r1, const reaction *r2) {
+    if(r1->incident != r2->incident)
+        return FALSE;
+    if(r1->target != r2->target)
+        return FALSE;
+    if(r1->product != r2->product)
+        return FALSE;
+    if(fabs(r1->theta - r2->theta) > 0.01*C_DEG)
+        return FALSE;
+    return TRUE;
 }
 
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile) {

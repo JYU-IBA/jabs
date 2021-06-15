@@ -430,12 +430,12 @@ int process_reaction_files(simulation *sim, const jibal_isotope *jibal_isotopes,
             r33_file_free(rfile);
             return -1;
         }
-        fprintf(stderr, "File: %s has a reaction with %s -> %s, product %s\n", reaction_filenames[i],
-                reaction_from_file->incident->name, reaction_from_file->target->name, reaction_from_file->product->name);
+        fprintf(stderr, "File: %s has a reaction with %s -> %s, product %s, theta %g deg\n", reaction_filenames[i],
+                reaction_from_file->incident->name, reaction_from_file->target->name, reaction_from_file->product->name, reaction_from_file->theta/C_DEG);
         for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
             reaction *r = &sim->reactions[i_reaction];
-            if(r->target == reaction_from_file->target && r->product ==reaction_from_file->product && r->incident == reaction_from_file->incident) {
-                fprintf(stderr, "Replacing reaction.\n");
+            if(reaction_is_same(r, reaction_from_file)) {
+                fprintf(stderr, "Replacing reaction %zu (%s with %s).\n", i_reaction, reaction_name(r), r->target->name);
                 reaction_from_file->cs = r->cs; /* Adopt fallback cross-section from the reaction we are replacing */
                 reaction_free(r);
                 *r = *reaction_from_file;
