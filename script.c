@@ -417,8 +417,6 @@ void script_session_free(script_session *s) {
 
 int script_process(script_session *s, FILE *f) {
     clock_t start, end;
-    struct fit_data *fit = fit_data_new(s->jibal, sim_init(), NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
-    jibal_config_var *vars = script_make_vars(fit);
     char *line=NULL;
     size_t line_size=0;
     size_t lineno=0;
@@ -465,8 +463,8 @@ int script_process(script_session *s, FILE *f) {
                     status = c->f(s, argc - 1, argv + 1);
                     end  = clock();
                     if(c->f == script_load || c->f == script_reset) {
-                        free(vars);
-                        vars = script_make_vars(fit); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
+                        free(s->vars);
+                        s->vars = script_make_vars(s->fit); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
                     }
                     if((c->f == script_simulate || c->f == script_fit) && status == 0) {
                         double cputime_total =(((double) (end - start)) / CLOCKS_PER_SEC);
