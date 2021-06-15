@@ -452,19 +452,20 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
         fprintf(stderr, "Could not assign stopping, because sample is not set!\n");
         return 1;
     }
+    int Z2 = -1;
     for(size_t i = 0; i < sample->n_isotopes; i++) {
-        int Z2 = sample->isotopes[i]->Z;
+        if(Z2 == sample->isotopes[i]->Z) /* Z2 repeats, skip */
+            continue;
+        Z2 = sample->isotopes[i]->Z;
         if (!jibal_gsto_auto_assign(gsto, sim->beam_isotope->Z, Z2)) { /* This should handle RBS */
             fprintf(stderr, "Can not assign stopping.\n");
             return 1;
         }
         for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
             const reaction *r = &sim->reactions[i_reaction];
-            if(r->type == REACTION_ERD) {
-                if (!jibal_gsto_auto_assign(gsto, r->target->Z, Z2)) {
-                    fprintf(stderr, "Can not assign stopping.\n");
-                    return 1;
-                }
+            if (!jibal_gsto_auto_assign(gsto, r->product->Z, Z2)) {
+                fprintf(stderr, "Can not assign stopping.\n");
+                return 1;
             }
         }
     }
