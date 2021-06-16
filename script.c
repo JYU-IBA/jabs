@@ -18,6 +18,7 @@ static const struct script_command commands[] = {
         {"load",    &script_load,           "Load something."},
         {"reset",   &script_reset,           "Reset something."},
         {"fit",     &script_fit,            "Do a fit."},
+        {"roi",     &script_roi,            "Show information from a region of interest."},
         {"save",    &script_save,           "Save something."},
         {"exit", NULL, "Exit."},
         {"quit", NULL, NULL},
@@ -35,10 +36,18 @@ void script_print_commands(FILE *f) {
 int script_load(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     if(argc == 0) {
-        fprintf(stderr, "Usage: load [sample|detector|exp|reaction] [file]\n");
+        fprintf(stderr, "Usage: load [script|sample|detector|exp|reaction] [file]\n");
         return -1;
     }
-    if(strcmp(argv[0], "sample") == 0) {
+    if(strcmp(argv[0], "script") == 0) {
+        if(argc == 2) {
+            script_process(s, argv[1]);
+            return 0;
+        } else {
+            fprintf(stderr, "Usage: load script [file]\n");
+        }
+        return 0;
+    } else if(strcmp(argv[0], "sample") == 0) {
         if(argc == 2) {
             sample_model *sm = sample_model_from_file(fit->jibal, argv[1]);
             if(!sm) {
@@ -70,7 +79,7 @@ int script_load(script_session *s, int argc, char * const *argv) {
                 fprintf(stderr, "No detector has been set, experimental spectrum can not be read.\n");
                 return -1;
             }
-            fit->exp = read_experimental_spectrum(argv[1], fit->sim->det);
+            fit->exp = spectrum_read(argv[1], fit->sim->det);
             if(!fit->exp) {
                 return -1;
             }
@@ -426,6 +435,16 @@ int script_save(script_session *s, int argc, char * const *argv) {
     return -1;
 }
 
+int script_roi(script_session *s, int argc, char * const *argv) {
+    if(argc != 2) {
+        fprintf(stderr, "Usage: roi [low] [high]");
+    }
+    size_t low = strtoul(argv[0], NULL, 10);
+    size_t high = strtoul(argv[1], NULL, 10);
+    fit_roi_print(stderr, s->fit, low, high);
+    return EXIT_SUCCESS;
+}
+
 script_session *script_session_init(jibal *jibal, simulation *sim) {
     if(!jibal)
         return NULL;
@@ -458,14 +477,20 @@ void script_session_free(script_session *s) {
 }
 
 
-int script_process(script_session *s, FILE *f) {
+int script_process(script_session *s, const char *filename) {
     char *line=NULL;
     size_t line_size=0;
     size_t lineno=0;
+    FILE *f = fopen_file_or_stream(filename, "r");
+    if(!f) {
+        return EXIT_FAILURE;
+    }
     int interactive = (f == stdin && isatty(fileno(stdin)));
     const char *prompt = "jabs> ";
     if(interactive) {
         fputs(prompt, stderr);
+    } else {
+        fprintf(stderr, "\nRunning script \"%s\"\n\n", filename);
     }
     int exit = FALSE;
     while(getline(&line, &line_size, f) > 0) {
@@ -527,9 +552,11 @@ int script_process(script_session *s, FILE *f) {
         }
     }
     free(line);
-
+    fclose_file_or_stream(f);
     if(interactive) {
         fprintf(stderr, "Bye.\n");
+    } else {
+        fprintf(stderr, "Finished running script \"%s\"\n", filename);
     }
     return EXIT_SUCCESS;
 }
@@ -591,8 +618,8 @@ int script_prepare_sim_or_fit(script_session *s) {
 }
 
 int script_finish_sim_or_fit(script_session *s) {
-    s->end  = clock();
-    double cputime_total =(((double) (s->end - s->start)) / CLOCKS_PER_SEC);
+    s->end = clock();
+    double cputime_total = (((double) (s->end - s->start)) / CLOCKS_PER_SEC);
     fprintf(stderr, "...finished!\n\n");
     fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
     struct fit_data *fit = s->fit;

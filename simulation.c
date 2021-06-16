@@ -188,7 +188,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
     if(!ws->histo_sum) {
         return NULL;
     }
-    set_spectrum_calibration(ws->histo_sum, ws->det); /* Calibration can be set however already */
+    spectrum_set_calibration(ws->histo_sum, ws->det); /* Calibration can be set however already */
     gsl_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
 
     ws->reactions = calloc(ws->n_reactions, sizeof (sim_reaction));
@@ -226,7 +226,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
         fprintf(stderr, "Number of bricks for reaction %i: %lu\n", i_reaction, r->n_bricks);
 #endif
         r->histo = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
-        set_spectrum_calibration(r->histo, ws->det);
+        spectrum_set_calibration(r->histo, ws->det);
         gsl_histogram_reset(r->histo);
         r->bricks = calloc(r->n_bricks, sizeof(brick));
         ion_set_isotope(p, r->r->product);

@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
     fit_data->print_iters = cmd_opt->print_iters;
     sim_sanity_check(sim);
     if(cmd_opt->exp_filename) {
-        session->fit->exp = read_experimental_spectrum(cmd_opt->exp_filename, sim->det);
+        session->fit->exp = spectrum_read(cmd_opt->exp_filename, sim->det);
         if(!session->fit->exp) {
             fprintf(stderr, "Error! Can not open file \"%s\".\n", cmd_opt->exp_filename);
             return EXIT_FAILURE;
@@ -107,24 +107,16 @@ int main(int argc, char **argv) {
     if(cmd_opt->interactive || script_files) {
         if(script_files) {
             for(int i = 0; i < argc; i++) {
-                FILE *f_script = fopen(argv[i], "r");
-                if(!f_script) {
-                    fprintf(stderr, "Can not open script from file \"%s\".\n", argv[i]);
-                    return EXIT_FAILURE;
-                }
-                fprintf(stderr, "\nRunning script \"%s\"\n\n", argv[i]);
-                status = script_process(session, f_script);
-                fclose(f_script);
+                status = script_process(session, argv[i]);
                 if(status) {
                     fprintf(stderr, "Error running script \"%s\"\n", argv[i]);
                     return status;
                 }
-                fprintf(stderr, "Finished running script \"%s\"\n", argv[i]);
             }
         }
         if(cmd_opt->interactive) {
             greeting(TRUE);
-            status = script_process(session, stdin);
+            status = script_process(session, NULL);
         }
     } else { /* Non-interactive, pure command line mode. Run a single sim or fit. */
         if(cmd_opt->fit) {

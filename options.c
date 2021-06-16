@@ -126,7 +126,7 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "hvVE:o:a:t:prob:I:r:R:S:s:fe:Fd:D:B:c:C:", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "ihvVE:o:a:t:prob:I:r:R:S:s:fe:Fd:D:B:c:C:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {

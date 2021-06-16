@@ -66,6 +66,7 @@ typedef struct fit_data {
 fit_data *fit_data_new(const jibal *jibal, simulation *sim);
 void fit_data_free(struct fit_data *f); /* Doesn't free everything in fit_data. Does free fit_params and fit_ranges */
 void fit_data_print(FILE *f, const struct fit_data *fit_data);
+void fit_roi_print(FILE *f, const struct fit_data *fit_data, size_t low, size_t high);
 int fit(struct fit_data *fit_data);
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 void fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspace *w);

@@ -16,7 +16,7 @@
 #include <string.h>
 
 
-gsl_histogram *read_experimental_spectrum(const char *filename, const detector *det) {
+gsl_histogram *spectrum_read(const char *filename, const detector *det) {
     char *line=NULL;
     size_t line_size=0;
     FILE *in;
@@ -110,12 +110,36 @@ gsl_histogram *read_experimental_spectrum(const char *filename, const detector *
     if(in != stdin) {
         fclose(in);
     }
-    set_spectrum_calibration(h, det);
+    spectrum_set_calibration(h, det);
     return h;
 }
 
-void set_spectrum_calibration(gsl_histogram *h, const detector *det) {
+void spectrum_set_calibration(gsl_histogram *h, const detector *det) {
     for(size_t i = 0; i < h->n + 1; i++) {
         h->range[i] = detector_calibrated(det, i);
     }
+}
+
+double spectrum_roi(gsl_histogram *h, size_t low, size_t high) {
+    if(!h || h->n == 0)
+        return 0.0;
+    if(low >= h->n)
+        return 0.0;
+    if(high >= h->n)
+        high = h->n - 1;
+    double sum = 0.0;
+    for(size_t i = low; i < high; i++) {
+        sum += h->bin[i];
+    }
+    return sum;
+}
+
+size_t spectrum_channels_in_range(gsl_histogram *h, size_t low, size_t high) {
+    if(!h || h->n == 0)
+        return 0;
+    if(low >= h->n)
+        return 0;
+    if(high >= h->n)
+        high = h->n - 1;
+    return high - low + 1;
 }

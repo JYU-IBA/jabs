@@ -36,7 +36,7 @@ Simulates RBS spectra rapidly.
 
 This is the preferred way of using JaBS. Some command line options (see below) can be used in conjunction with the interactive or scripted mode.
 
-Launch JaBS in interactive mode simply by running `jabs` or `jabs --interactive`. Scripts (i.e. files with commands identical to interactive mode input) can be given as command line parameters e.g. `jabs script.jbs` or piped in `jabs < script.jbs`. Filename must not be `sample` (reserved keyword for giving the sample on the command line, see below).
+Launch JaBS in interactive mode simply by running `jabs` or `jabs --interactive`. Scripts (i.e. files with commands identical to interactive mode input) can be given as command line parameters e.g. `jabs script.jbs`, piped in `jabs < script.jbs` or run using the interactive mode. Filename from command line must not be `sample` (reserved keyword for giving the sample on the command line, see below).
 
 The interactive mode should be self-explanatory and an internal help is provided. Please see [the example script](example/script.jbs) to get started.
 ## Command line usage

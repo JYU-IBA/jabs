@@ -57,7 +57,10 @@ char *argv_to_string(int argc, char * const *argv) {
 FILE *fopen_file_or_stream(const char *filename, const char *mode) {
     FILE *f;
     if(!filename) {
-        f = stderr;
+        if(*mode == 'r')
+            f = stdin;
+        else
+            f = stderr;
     } else if(strlen(filename) == 1 && *filename == '-')
         f = stdout;
     else {
@@ -70,9 +73,7 @@ FILE *fopen_file_or_stream(const char *filename, const char *mode) {
 }
 
 void fclose_file_or_stream(FILE *f) {
-    if(f == stdout)
-        return;
-    if(f == stderr)
+    if(f == stdout || f == stderr || f == stdin)
         return;
     fclose(f);
 }

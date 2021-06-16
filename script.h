@@ -53,7 +53,8 @@ int script_reset(script_session *s, int argc, char * const *argv);
 int script_simulate(script_session *s, int argc, char * const *argv);
 int script_fit(script_session *s, int argc, char * const *argv);
 int script_save(script_session *s, int argc, char * const *argv);
-int script_process(script_session *s, FILE *f);
+int script_roi(script_session *s, int argc, char * const *argv);
+int script_process(script_session *s, const char *filename);
 int script_prepare_sim_or_fit(script_session *s);
 int script_finish_sim_or_fit(script_session *s);
 #endif // JABS_SCRIPT_H

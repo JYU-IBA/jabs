@@ -186,16 +186,51 @@ void fit_data_free(fit_data *f) {
     free(f);
 }
 
+void fit_roi_print(FILE *f, const struct fit_data *fit_data, size_t low, size_t high) {
+    if(!fit_data) {
+        return;
+    }
+    size_t n_exp = spectrum_channels_in_range(fit_data->exp, low, high);
+    size_t n_sim = fit_data->ws?spectrum_channels_in_range  (fit_data->ws->histo_sum, low, high):0;
+    double exp_cts = spectrum_roi(fit_data->exp, low, high);
+    double sim_cts = fit_data->ws?spectrum_roi(fit_data->ws->histo_sum, low, high):0.0;
+
+    fprintf(stderr, "          low = %12zu\n", low);
+    fprintf(stderr, "         high = %12zu\n", high);
+    fprintf(stderr, "        n_exp = %12zu\n", n_exp);
+    fprintf(stderr, "        n_sim = %12zu\n", n_exp);
+    fprintf(stderr, "          exp  = %12g\n", exp_cts);
+    fprintf(stderr, "          sim  = %12g\n", sim_cts);
+    fprintf(stderr, "      exp-sim  = %12g\n", exp_cts - sim_cts);
+    fprintf(stderr, "    sqrt(exp)  = %12.5lf\n", sqrt(exp_cts));
+    fprintf(stderr, "      sim/exp  = %12.5lf\n", sim_cts/exp_cts);
+    fprintf(stderr, "      exp/sim  = %12.5lf\n", exp_cts/sim_cts);
+    fprintf(stderr, "  1/sqrt(exp)  = %12.5lf%%\n", 100.0/sqrt(exp_cts));
+    fprintf(stderr, "(exp-sim)/exp  = %12.5lf%%\n", 100.0*(exp_cts-sim_cts)/exp_cts);
+}
+
 void fit_data_print(FILE *f, const struct fit_data *fit_data) {
     if(!fit_data) {
         return;
     }
-    fprintf(f, "%zu fit ranges.\n", fit_data->n_fit_ranges);
+    if(fit_data->n_fit_ranges == 0) {
+        fprintf(stderr, "No fit ranges.\n");
+        return;
+    }
+    fprintf(stderr, "%zu fit ranges:\n", fit_data->n_fit_ranges);
+    fprintf(stderr, "  i |    low |   high |   exp cts |   sim cts | sim/exp |\n");
     for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
         fit_range *range = &fit_data->fit_ranges[i];
-        fprintf(f, "Fit range %zu [%lu, %lu]\n", i+1, range->low, range->high);
+        double exp_cts = spectrum_roi(fit_data->exp, range->low, range->high);
+        double sim_cts = fit_data->ws?spectrum_roi(fit_data->ws->histo_sum, range->low, range->high):0.0;
+        if(exp_cts == 0.0) {
+            fprintf(f, "%3zu | %6lu | %6lu | %9g | %9g |         |\n", i + 1, range->low, range->high, exp_cts, sim_cts);
+        } else {
+            double ratio = sim_cts/exp_cts;
+            fprintf(f, "%3zu | %6lu | %6lu | %9g | %9g | %7.5lf |\n", i + 1, range->low, range->high, exp_cts, sim_cts, ratio);
+        }
     }
-    fprintf(f, "%zu channels total (detector has %zu channels).\n", fit_ranges_calculate_number_of_channels(fit_data->fit_ranges, fit_data->n_fit_ranges, fit_data->sim->det), fit_data->sim->det->channels);
+    fprintf(f, "\nFit has %zu channels total (detector has %zu channels).\n", fit_ranges_calculate_number_of_channels(fit_data->fit_ranges, fit_data->n_fit_ranges, fit_data->sim->det), fit_data->sim->det->channels);
 }
 
 int fit(struct fit_data *fit_data) {
@@ -338,7 +373,7 @@ int fit(struct fit_data *fit_data) {
         *(fit_params->func_params[i]) = gsl_vector_get(w->x, i);
         fit_params->func_params_err[i] = c * sqrt(gsl_matrix_get(covar, i, i));
     }
-    set_spectrum_calibration(fit_data->exp, fit_data->ws->det); /* Update the experimental spectra to final calibration */
+    spectrum_set_calibration(fit_data->exp, fit_data->ws->det); /* Update the experimental spectra to final calibration */
     gsl_multifit_nlinear_free(w);
     gsl_matrix_free(covar);
     gsl_vector_free(x);
