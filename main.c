@@ -42,7 +42,7 @@
 int main(int argc, char **argv) {
     fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
     fprintf(stderr, "Compiled using JIBAL %s, current library version %s.\n\n", JIBAL_VERSION, jibal_version());
-    global_options *global = global_options_alloc();
+    cmdline_options *global = global_options_alloc();
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -54,6 +54,10 @@ int main(int argc, char **argv) {
     global->jibal = jibal;
     sim->beam_isotope = jibal_isotope_find(jibal->isotopes, NULL, 2, 4); /* Default: 4He */
     read_options(global, sim, &argc, &argv);
+    sim->params = sim_calc_params_defaults(global->ds, global->fast);
+    sim->params.stop_step_incident = global->stop_step_incident;
+    sim->params.stop_step_exiting = global->stop_step_exiting;
+    sim->params.depthsteps_max = global->depthsteps_max;
     sim_sanity_check(sim);
 
     gsl_histogram *exp = NULL;
@@ -174,7 +178,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     if(exp) {
-        set_spectrum_calibration(exp, ws->sim.det); /* Update the experimental spectra to final calibration */
+        set_spectrum_calibration(exp, ws->det); /* Update the experimental spectra to final calibration */
     }
     print_spectra(global->out_filename, ws, exp);
 
@@ -183,7 +187,7 @@ int main(int argc, char **argv) {
     if(global->detector_out_filename) {
         FILE *f_det;
         if((f_det = fopen(global->detector_out_filename, "w"))) {
-            detector_print(f_det, ws->sim.det);
+            detector_print(f_det, ws->det);
         } else {
             fprintf(stderr, "Could not write detector to file \"%s\".\n", global->detector_out_filename);
         }

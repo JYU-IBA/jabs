@@ -46,7 +46,7 @@ typedef struct reaction {
     struct reaction_point *cs_table; /* for REACTION_FILE */
     size_t n_cs_table;
     double theta; /* For REACTION_FILE */
-    double Q;
+    double Q; /* TODO: We ignore this because only elastic reactions are supported at the moment. */
 } reaction;
 
 

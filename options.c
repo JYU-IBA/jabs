@@ -30,7 +30,7 @@ void usage() {
     fprintf(stderr, USAGE_STRING);
 }
 
-void read_options(global_options *global, simulation *sim, int *argc, char ***argv) {
+void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***argv) {
     static struct option long_options[] = {
             {"help",          no_argument,       NULL, 'h'},
             {"version",       no_argument,       NULL, 'V'},
@@ -119,28 +119,28 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
         switch (c) {
             case 0:
                 if(strcmp(long_options[option_index].name, "isotopes") == 0) {
-                    global->print_isotopes = TRUE;
+                    cmd_opt->print_isotopes = TRUE;
                 } else if(strcmp(long_options[option_index].name, "print_iters") == 0) {
-                    global->print_iters = TRUE;
+                    cmd_opt->print_iters = TRUE;
                 }
                 else if(strcmp(long_options[option_index].name, "ds") == 0) {
-                    sim->ds = TRUE;
+                    cmd_opt->ds = TRUE;
                 }
                 break;
             case 'f':
                 if (optarg)
-                    sim->fast = atoi(optarg);
+                    cmd_opt->fast = atoi(optarg);
                 else
-                    sim->fast++;
+                    cmd_opt->fast++;
                 break;
             case 1:
-                sim->stop_step_exiting = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                cmd_opt->stop_step_exiting = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case '1':
-                sim->det->slope = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                sim->det->slope = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case '2':
-                sim->det->offset = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                sim->det->offset = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 'c':
                 sim->det->compress = atoi(optarg);
@@ -155,46 +155,46 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 sim->p_sr = strtod(optarg, NULL);
                 break;
             case '4':
-                global->fit_low = atoi(optarg);
+                cmd_opt->fit_low = atoi(optarg);
                 break;
             case '5':
-                global->fit_high = atoi(optarg);
+                cmd_opt->fit_high = atoi(optarg);
                 break;
             case '6':
-                global->fit_vars = strdup(optarg);
+                cmd_opt->fit_vars = strdup(optarg);
                 break;
             case '7':
-                global->bricks_filename = strdup(optarg);
+                cmd_opt->bricks_filename = strdup(optarg);
                 break;
             case '8':
-                sim->depthsteps_max = atoi(optarg);
+                cmd_opt->depthsteps_max = atoi(optarg);
                 break;
             case '9':
-                global->erd = 0;
+                cmd_opt->erd = 0;
                 break;
             case '#':
-                global->rbs = 0;
+                cmd_opt->rbs = 0;
                 break;
             case 'F':
-                global->fit = 1;
+                cmd_opt->fit = 1;
                 break;
             case 2:
-                sim->stop_step_incident = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                cmd_opt->stop_step_incident = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 's':
-                global->sample_filename = strdup(optarg);
+                cmd_opt->sample_filename = strdup(optarg);
                 break;
             case 'S':
-                global->sample_out_filename = strdup(optarg);
+                cmd_opt->sample_out_filename = strdup(optarg);
                 break;
             case 'a':
-                sim->sample_theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                sim->sample_theta = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 't':
-                sim->det->theta = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                sim->det->theta = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 'p':
-                sim->det->phi = jibal_get_val(global->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                sim->det->phi = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 'h':
                 fputs(COPYRIGHT_STRING, stderr);
@@ -221,48 +221,48 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
                 break; /* Unnecessary */
             case 'v':
                 if (optarg)
-                    global->verbose = atoi(optarg);
+                    cmd_opt->verbose = atoi(optarg);
                 else
-                    global->verbose++;
+                    cmd_opt->verbose++;
                 break;
             case 'o':
-                global->out_filename = strdup(optarg);
+                cmd_opt->out_filename = strdup(optarg);
                 break;
             case 'e':
-                global->exp_filename = strdup(optarg);
+                cmd_opt->exp_filename = strdup(optarg);
                 break;
             case 'E':
-                sim->beam_E = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                sim->beam_E = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 'B':
-                sim->beam_E_broad = pow2(jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg)/C_FWHM);
+                sim->beam_E_broad = pow2(jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg) / C_FWHM);
                 break;
             case 'I':
-                sim->beam_isotope = jibal_isotope_find(global->jibal->isotopes, optarg, 0, 0);
+                sim->beam_isotope = jibal_isotope_find(cmd_opt->jibal->isotopes, optarg, 0, 0);
                 if(!sim->beam_isotope) {
                     fprintf(stderr, "%s is not a valid isotope.\n", optarg);
                     exit(EXIT_FAILURE);
                 }
                 break;
             case 'r':
-                global->n_reaction_filenames++;
-                global->reaction_filenames=realloc(global->reaction_filenames, global->n_reaction_filenames*sizeof(char *));
-                global->reaction_filenames[global->n_reaction_filenames-1] = strdup(optarg);
+                cmd_opt->n_reaction_filenames++;
+                cmd_opt->reaction_filenames=realloc(cmd_opt->reaction_filenames, cmd_opt->n_reaction_filenames * sizeof(char *));
+                cmd_opt->reaction_filenames[cmd_opt->n_reaction_filenames - 1] = strdup(optarg);
                 break;
             case 'R':
-                sim->det->resolution = jibal_get_val(global->jibal->units, UNIT_TYPE_ENERGY, optarg)/C_FWHM;
+                sim->det->resolution = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg) / C_FWHM;
                 sim->det->resolution *= sim->det->resolution; /* square */
                 break;
             case 'd':
                 free(sim->det);
-                sim->det = detector_from_file(global->jibal, optarg);
+                sim->det = detector_from_file(cmd_opt->jibal, optarg);
                 if(!sim->det) {
                     fprintf(stderr, "Reading detector from file %s failed.\n", optarg);
                     exit(EXIT_FAILURE);
                 }
                 break;
             case 'D':
-                global->detector_out_filename = strdup(optarg);
+                cmd_opt->detector_out_filename = strdup(optarg);
                 break;
             default:
                 usage();
@@ -274,15 +274,15 @@ void read_options(global_options *global, simulation *sim, int *argc, char ***ar
     *argv += optind;
 }
 
-global_options *global_options_alloc() {
-    global_options *global = malloc(sizeof(global_options));
-    memset(global, 0, sizeof(global_options));
+cmdline_options *global_options_alloc() {
+    cmdline_options *global = malloc(sizeof(cmdline_options));
+    memset(global, 0, sizeof(cmdline_options)); /* Everything not listed below are zero or NULL by default */
     global->rbs = TRUE;
     global->erd = TRUE;
     return global;
 }
 
-void global_options_free(global_options *global) {
+void global_options_free(cmdline_options *global) {
     free(global->out_filename);
     free(global->exp_filename);
     free(global->bricks_filename);

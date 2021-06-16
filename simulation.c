@@ -25,24 +25,14 @@ simulation *sim_init() {
     sim->sample_phi = 0.0;
     sim->p_sr = PARTICLES_SR;
     sim->det = detector_default();
-    sim->stop_step_incident = STOP_STEP_INCIDENT;
-    sim->stop_step_exiting = STOP_STEP_EXITING;
-    sim->fast = 0;
     sim->beam_E = ENERGY;
     sim->beam_E_broad = 0.0;
-    sim->emin = E_MIN;
-    sim->depthsteps_max = 0; /* Zero: automatic */
-    sim->ds = FALSE;
-    sim->ds_steps_polar = DUAL_SCATTER_POLAR_STEPS;
-    sim->ds_steps_azi = DUAL_SCATTER_AZI_STEPS;
-    sim->n_ds = sim->ds_steps_polar * sim->ds_steps_azi;
     sim->channeling_offset = 1.0;
     sim->channeling_slope = 0.0;
-    sim->cs_n_steps = CS_CONC_STEPS;
-    sim->cs_stragg_half_n = CS_STRAGG_HALF_N;
     sim->sample = NULL; /* Needs to be set (later) */
     sim->reactions = NULL; /* Needs to be initialized after sample has been set */
     sim->n_reactions = 0;
+    sim->params = sim_calc_params_defaults(FALSE, FALSE);
     return sim;
 }
 
@@ -54,6 +44,33 @@ void sim_free(simulation *sim) {
     }
     free(sim->reactions);
     free(sim);
+}
+
+sim_calc_params sim_calc_params_defaults(int ds, int fast) {
+    sim_calc_params p;
+    p.ds = ds;
+    p.ds_steps_azi = DUAL_SCATTER_POLAR_STEPS;
+    p.ds_steps_polar = DUAL_SCATTER_AZI_STEPS;
+    p.n_ds = p.ds_steps_azi *  p.ds_steps_polar;
+    p.stop_step_incident = STOP_STEP_INCIDENT;
+    p.stop_step_exiting = STOP_STEP_EXITING;
+    p.cs_n_steps = CS_CONC_STEPS;
+    p.cs_stragg_half_n = CS_STRAGG_HALF_N;
+    p.emin = E_MIN;
+    p.depthsteps_max = 0; /* automatic */
+    if (fast) {
+        p.rk4 = FALSE;
+        p.nucl_stop_accurate = FALSE;
+        p.mean_conc_and_energy = TRUE;
+    } else {
+        p.rk4 = TRUE;
+        p.nucl_stop_accurate = TRUE;
+        p.mean_conc_and_energy = FALSE;
+    }
+    p.cs_frac = 1.0/(1.0*(p.cs_n_steps+1));
+    assert(p.cs_stragg_half_n >= 0);
+    p.cs_n_stragg_steps = p.cs_stragg_half_n * 2 + 1;
+    return p;
 }
 
 int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_type cs) { /* Note that sim->ion needs to be set! */
@@ -131,8 +148,11 @@ sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
         fprintf(stderr, "No sample has been set. Will not initialize workspace.\n");
     }
     sim_workspace *ws = malloc(sizeof(sim_workspace));
-    ws->sim = *sim;
+    ws->sim = sim;
+    ws->p_sr = sim->p_sr;
+    ws->det = sim->det; /* TODO: multidetector? */
     ws->sample = sim->sample;
+    ws->params = sim->params;
     ws->n_reactions = sim->n_reactions;
     ws->gsto = jibal->gsto;
     ws->jibal_config = jibal->config;
@@ -146,8 +166,8 @@ sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
 
     ion_reset(&ws->ion);
     ion_set_isotope(&ws->ion, sim->beam_isotope);
-    ws->ion.E = ws->sim.beam_E;
-    ws->ion.S = ws->sim.beam_E_broad;
+    ws->ion.E = ws->sim->beam_E;
+    ws->ion.S = ws->sim->beam_E_broad;
 
     int n_isotopes=0; /* TODO: calculate this somewhere else */
     jibal_isotope *isotope;
@@ -158,20 +178,6 @@ sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
     ion_nuclear_stop_fill_params(&ws->ion, jibal->isotopes, n_isotopes);
 
     ws->stopping_type = GSTO_STO_TOT;
-    if (sim->fast) {
-        ws->rk4 = FALSE;
-        ws->nucl_stop_accurate = FALSE;
-        ws->mean_conc_and_energy = TRUE;
-    } else {
-        ws->rk4 = TRUE;
-        ws->nucl_stop_accurate = TRUE;
-        ws->mean_conc_and_energy = FALSE;
-    }
-    ws->cs_frac = 1.0/(1.0*(ws->sim.cs_n_steps+1));
-    assert(sim->cs_stragg_half_n >= 0);
-    ws->cs_n_stragg_steps = sim->cs_stragg_half_n * 2 + 1;
-
-
     sim_workspace_recalculate_n_channels(ws, sim);
 
     if(ws->n_channels == 0) {
@@ -182,7 +188,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
     if(!ws->histo_sum) {
         return NULL;
     }
-    set_spectrum_calibration(ws->histo_sum, ws->sim.det); /* Calibration can be set however already */
+    set_spectrum_calibration(ws->histo_sum, ws->det); /* Calibration can be set however already */
     gsl_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
 
     ws->reactions = calloc(ws->n_reactions, sizeof (sim_reaction));
@@ -203,13 +209,13 @@ sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
                 r->i_isotope = i_isotope;
             }
         }
-        if(sim->depthsteps_max) {
-            r->n_bricks = sim->depthsteps_max;
+        if(ws->params.depthsteps_max) {
+            r->n_bricks = ws->params.depthsteps_max;
         } else {
-            if(sim->stop_step_incident == 0.0) { /* Automatic incident step size */
+            if(ws->params.stop_step_incident == 0.0) { /* Automatic incident step size */
                 r->n_bricks = (int) ceil(sim->beam_E / (STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(sim->det->resolution)) + ws->sample->n_ranges); /* This is conservative */
             } else {
-                r->n_bricks = (int) ceil(sim->beam_E / sim->stop_step_incident + ws->sample->n_ranges); /* This is conservative */
+                r->n_bricks = (int) ceil(sim->beam_E / ws->params.stop_step_incident + ws->sample->n_ranges); /* This is conservative */
             }
             if(r->n_bricks > 2000) {
                 fprintf(stderr, "Caution: large number of bricks will be used in the simulation (%zu).\n", r->n_bricks);
@@ -220,7 +226,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
         fprintf(stderr, "Number of bricks for reaction %i: %lu\n", i_reaction, r->n_bricks);
 #endif
         r->histo = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
-        set_spectrum_calibration(r->histo, ws->sim.det);
+        set_spectrum_calibration(r->histo, ws->det);
         gsl_histogram_reset(r->histo);
         r->bricks = calloc(r->n_bricks, sizeof(brick));
         ion_set_isotope(p, r->r->product);
@@ -311,9 +317,12 @@ void simulation_print(FILE *f, const simulation *sim) {
     fprintf(f, "detector calibration offset = %.3lf keV\n", sim->det->offset/C_KEV);
     fprintf(f, "detector calibration slope = %.5lf keV\n", sim->det->slope/C_KEV);
     fprintf(f, "detector resolution = %.3lf keV FWHM\n", sqrt(sim->det->resolution)*C_FWHM/C_KEV);
-    fprintf(f, "step for incident ions = %.3lf keV\n", sim->stop_step_incident/C_KEV);
-    fprintf(f, "step for exiting ions = %.3lf keV\n", sim->stop_step_exiting/C_KEV);
-    fprintf(f, "fast level = %i\n", sim->fast);
+    fprintf(f, "step for incident ions = %.3lf keV\n", sim->params.stop_step_incident/C_KEV);
+    fprintf(f, "step for exiting ions = %.3lf keV\n", sim->params.stop_step_exiting/C_KEV);
+    fprintf(f, "stopping RK4 = %s\n", sim->params.rk4?"true":"false");
+    fprintf(f, "depth steps max = %zu\n", sim->params.depthsteps_max);
+    fprintf(f, "cross section weighted by straggling = %s\n", sim->params.mean_conc_and_energy?"false":"true");
+    fprintf(f, "accurate nuclear stopping = %s\n", sim->params.nucl_stop_accurate?"true":"false");
     if(sim->channeling_offset != 1.0 || sim->channeling_slope != 0.0) {
         fprintf(f, "substrate channeling yield correction offset = %.5lf\n", sim->channeling_offset);
         fprintf(f, "substrate channeling yield correction slope = %g / keV\n", sim->channeling_slope/(1.0/C_KEV));
@@ -326,7 +335,7 @@ void convolute_bricks(sim_workspace *ws) {
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
-        brick_int2(r->histo, r->bricks, r->last_brick, ws->sim.det->resolution, ws->sim.p_sr);
+        brick_int2(r->histo, r->bricks, r->last_brick, ws->det->resolution, ws->p_sr);
     }
 }
 
@@ -411,6 +420,12 @@ double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E)
     lo = 0;
     if(E < t[lo].E || E > t[hi].E) {
         return sim_reaction_cross_section_rutherford(sim_r, E); /* Fall back quietly to analytical formulae outside tabulated values */
+    }
+    if(sim_r->theta != sim_r->r->theta) {
+#ifdef DEBUG_VERBOSE /* This happens with DS */
+        fprintf(stderr, "Reaction theta %g deg different from one in the file: %g deg\n", sim_r->theta/C_DEG, sim_r->r->theta/C_DEG);
+#endif
+        return sim_reaction_cross_section_rutherford(sim_r, E); /* Fall back quietly if reaction theta has been changed from original scattering angle (in the file) */
     }
     while (hi - lo > 1) {
         mi = (hi + lo) / 2;

@@ -26,6 +26,11 @@ typedef struct {
     int fit_high;
     int print_isotopes;
     int print_iters;
+    int ds;
+    int fast;
+    size_t depthsteps_max;
+    double stop_step_incident;
+    double stop_step_exiting;
     char *out_filename;
     char *exp_filename;
     char *bricks_filename;
@@ -35,14 +40,14 @@ typedef struct {
     char *sample_out_filename;
     char **reaction_filenames;
     size_t n_reaction_filenames;
-} global_options;
+} cmdline_options;
 
 
 #include "simulation.h"
 
-void read_options(global_options *global, simulation *sim, int *argc, char ***argv);
-global_options *global_options_alloc();
-void global_options_free(global_options *global);
+void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***argv);
+cmdline_options *global_options_alloc();
+void global_options_free(cmdline_options *cmd_opt);
 const char *jabs_version();
 void usage();
 

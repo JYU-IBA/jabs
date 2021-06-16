@@ -25,29 +25,37 @@
 #include "sample.h"
 
 typedef struct {
+    int ds;
+    int ds_steps_azi;
+    int ds_steps_polar;
+    int n_ds;
+    int cs_n_steps; /* Number of steps to take, when calculating cross section * concentration product */
+    double cs_frac; /* Fractional step size 1.0/(cs_n_steps+1), calculated from cs_n_steps. */
+    int cs_stragg_half_n;
+    int cs_n_stragg_steps; /* calculated from cs_stragg_half_n */
+    double emin;
+    size_t depthsteps_max;
+    int rk4;
+    int nucl_stop_accurate;
+    int mean_conc_and_energy;
+    double stop_step_incident;
+    double stop_step_exiting;
+} sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
+
+typedef struct {
     reaction *reactions;
     size_t n_reactions;
     detector *det;
     sample *sample;
-    double stop_step_incident;
-    double stop_step_exiting;
     double p_sr;
     double sample_theta; /* Polar angle. Kind of. Zero is sample perpendicular to beam. */
     double sample_phi; /* Typically one uses a zero here, unless doing channeling stuff. Note that this is an azimuthal angle. */
     const jibal_isotope *beam_isotope;
     double beam_E;
     double beam_E_broad; /* Variance */
-    int fast;
-    double emin;
-    size_t depthsteps_max;
-    int ds;
-    int ds_steps_azi;
-    int ds_steps_polar;
-    int n_ds;
     double channeling_offset; /* a very ad-hoc channeling yield correction */
     double channeling_slope;
-    int cs_n_steps; /* Number of steps to take, when calculating cross section * concentration product */
-    int cs_stragg_half_n;
+    sim_calc_params params;
 } simulation;
 
 typedef struct sim_reaction {
@@ -73,28 +81,27 @@ typedef struct sim_reaction {
 
 
 typedef struct {
-    simulation sim;
+    double p_sr; /* With DS can be different from sim->p_sr, otherwise the same */
+    const simulation *sim;
+    const detector *det;
     const sample *sample; /* Note that simulate() can be passed a sample explicitly, but in most cases it should be this. Also this should be exactly the same as sim->sample. */
     size_t n_reactions;
     jibal_gsto *gsto;
     const jibal_config *jibal_config;
-    int rk4;
-    int nucl_stop_accurate;
-    int mean_conc_and_energy;
     gsto_stopping_type stopping_type;
     size_t n_channels; /* in histograms */
     gsl_histogram *histo_sum;
     ion ion;
     sim_reaction *reactions;
     const jibal_isotope *isotopes;
-    double cs_frac; /* Fractional step size 1.0/(sim.cs_n_steps+1) */
-    int cs_n_stragg_steps;
+    sim_calc_params params;
 } sim_workspace;
 
 
 #include "sample.h"
 simulation *sim_init();
 void sim_free(simulation *sim);
+sim_calc_params sim_calc_params_defaults(int ds, int fast);
 int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_type cs); /* Add RBS or ERD reactions automagically */
 int sim_sanity_check(const simulation *sim);
 sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal);
