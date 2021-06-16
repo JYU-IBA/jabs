@@ -1,0 +1,15 @@
+#!/usr/bin/env jabs
+set ion 4He
+set energy 2027keV
+set alpha 0deg
+set fluence 1.0e11
+load detector ../example/detector.txt
+load exp ../example/experimental.dat
+load sample ../example/sample.txt
+add fit_range 100 700
+add fit_range 1050 1107 
+set output tmp2.csv
+fit calib,fluence,thickness1,thickness2,rough1
+save spectra tmp.csv
+save det det_out.txt
+save sample sample_out.txt

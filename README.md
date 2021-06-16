@@ -32,12 +32,19 @@ Simulates RBS spectra rapidly.
         $ cmake ../
         $ make
        
-## Usage
+## Interactive or scripted usage
+
+This is the preferred way of using JaBS. Some command line options (see below) can be used in conjunction with the interactive or scripted mode.
+
+Launch JaBS in interactive mode simply by running `jabs` or `jabs --interactive`. Scripts (i.e. files with commands identical to interactive mode input) can be given as command line parameters e.g. `jabs script.jbs` or piped in `jabs < script.jbs`. Filename must not be `sample` (reserved keyword for giving the sample on the command line, see below).
+
+The interactive mode should be self-explanatory and an internal help is provided. Please see [the example script](example/script.jbs) to get started.
+## Command line usage
 
 Several parameters can be set from the command line. See `jabs -h` and try something like this:
 
 ~~~~
-$ ./jabs -E 2MeV --alpha=10deg --theta=170deg --out=spectrum.csv Au 500tfu SiO2 1000tfu Si 10000tfu
+$ ./jabs -E 2MeV --alpha=10deg --theta=170deg --out=spectrum.csv sample Au 500tfu SiO2 1000tfu Si 10000tfu
 ~~~~
 
 Detector and sample can be read from files. The file formats are simple and human readable. Please see [the example](example).
@@ -73,7 +80,7 @@ Detector and sample can be read from files. The file formats are simple and huma
 
 ## Fitting
 
-There is an experimental fitting feature, activated with the `--fit` or `-F` option. The multidimensional nonlinear least-squares fitting is based on [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html). The accuracy and sanity of fits must be evaluated by the use.
+There is a fitting feature, activated with the `--fit` or `-F` option. The multidimensional nonlinear least-squares fitting is based on [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html). The accuracy and sanity of fits must be evaluated by the use.
 
 The user can currently give only a single range to fit. This is specified with `--fit_low` and `--fit_high`. Default values are 10% of highest channel and the highest channel, respectively.
 

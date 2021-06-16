@@ -21,6 +21,8 @@ typedef struct script_session {
     jibal *jibal;
     struct fit_data *fit;
     jibal_config_var *vars;
+    char *output_filename;
+    clock_t start, end;
 } script_session;
 
 struct script_command {
@@ -38,8 +40,7 @@ script_session *script_session_init(jibal *jibal, simulation *sim, sample_model 
 void script_session_free(script_session *s);
 
 void script_print_commands(FILE *f);
-jibal_config_var *script_make_vars(struct fit_data *fit);
-
+void script_make_vars(script_session *s);
 int script_load(script_session *s, int argc, char * const *argv);
 int script_help(script_session *s, int argc, char * const *argv);
 int script_show(script_session *s, int argc, char * const *argv);
@@ -50,5 +51,6 @@ int script_simulate(script_session *s, int argc, char * const *argv);
 int script_fit(script_session *s, int argc, char * const *argv);
 int script_save(script_session *s, int argc, char * const *argv);
 int script_process(script_session *s, FILE *f);
-int script_prepare_sim_or_fit(struct fit_data *fit_data);
+int script_prepare_sim_or_fit(script_session *s);
+int script_finish_sim_or_fit(script_session *s);
 #endif // JABS_SCRIPT_H

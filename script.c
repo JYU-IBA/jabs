@@ -258,13 +258,25 @@ int script_help(script_session *s, int argc, char * const *argv) {
             } else if(strcmp(t->name, "set") == 0) {
                 size_t i = 0;
                 for(jibal_config_var *var = s->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
+                    if(var->type != JIBAL_CONFIG_VAR_UNIT)
+                        continue;
                     i++;
                     fprintf(stderr, "%18s", var->name);
                     if(i % 4 == 0) {
                         fputc('\n', stderr);
                     }
                 }
-                fputc('\n', stderr);
+                i = 0;
+                fprintf(stderr, "\nThe following variables are not in SI units:\n");
+                for(jibal_config_var *var = s->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
+                    if(var->type == JIBAL_CONFIG_VAR_UNIT)
+                        continue;
+                    i++;
+                    fprintf(stderr, "%18s", var->name);
+                    if(i % 4 == 0) {
+                        fputc('\n', stderr);
+                    }
+                }
                 fprintf(stderr, "\nAlso the following things can be set: ion, sample, foil. Special syntax applies for each.\n");
             }
             return 0;
@@ -274,9 +286,11 @@ int script_help(script_session *s, int argc, char * const *argv) {
     return -1;
 }
 
-jibal_config_var *script_make_vars(struct fit_data *fit) {
+void script_make_vars(script_session *s) {
+    free(s->vars);
+    struct fit_data *fit = s->fit;
     if(!fit)
-        return NULL;
+        return;
     simulation *sim = fit->sim;
     detector *det = fit->sim->det;
     jibal_config_var vars[] = {
@@ -295,27 +309,29 @@ jibal_config_var *script_make_vars(struct fit_data *fit) {
             {JIBAL_CONFIG_VAR_INT,    "number",         &det->number,     NULL},
             {JIBAL_CONFIG_VAR_INT,    "channels",       &det->channels,   NULL},
             {JIBAL_CONFIG_VAR_INT,    "compress",       &det->compress,   NULL},
+            {JIBAL_CONFIG_VAR_STRING, "output",         &s->output_filename, NULL},
             {JIBAL_CONFIG_VAR_NONE,NULL,NULL,NULL}
     };
     int n_vars;
     for(n_vars = 0; vars[n_vars].type != 0; n_vars++);
-    size_t s = sizeof(jibal_config_var)*(n_vars + 1); /* +1 because the null termination didn't count */
-    jibal_config_var *vars_out = malloc(s);
+    size_t var_size = sizeof(jibal_config_var)*(n_vars + 1); /* +1 because the null termination didn't count */
+    jibal_config_var *vars_out = malloc(var_size);
     if(vars_out) {
-        memcpy(vars_out, vars, s);
+        memcpy(vars_out, vars, var_size);
     }
-    return vars_out;
+    s->vars = vars_out;
 }
 
 int script_simulate(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     (void) argc; /* Unused */
     (void) argv; /* Unused */
-    if(script_prepare_sim_or_fit(fit)) {
+    if(script_prepare_sim_or_fit(s)) {
         return -1;
     }
     fit->ws = sim_workspace_init(fit->sim, fit->jibal);
     simulate_with_ds(fit->ws);
+    script_finish_sim_or_fit(s);
     return 0;
 }
 
@@ -332,13 +348,14 @@ int script_fit(script_session *s, int argc, char * const *argv) {
         fprintf(stderr, "No parameters for fit.\n");
         return -1;
     }
-    if(script_prepare_sim_or_fit(fit_data)) {
+    if(script_prepare_sim_or_fit(s)) {
         return -1;
     }
     if(fit(fit_data)) {
         fprintf(stderr, "Fit failed!\n");
         return -1;
     }
+    script_finish_sim_or_fit(s);
     fit_stats_print(stderr, &fit_data->stats);
     return 0;
 }
@@ -407,7 +424,9 @@ script_session *script_session_init(jibal *jibal, simulation *sim, sample_model 
         sim = sim_init();
     }
     s->fit = fit_data_new(jibal, sim, NULL, sm); /* Not just fit, but this conveniently holds everything we need. */
-    s->vars = script_make_vars(s->fit);
+    s->vars = NULL;
+    s->output_filename = NULL;
+    script_make_vars(s);
     return s;
 }
 void script_session_free(script_session *s) {
@@ -421,7 +440,6 @@ void script_session_free(script_session *s) {
 
 
 int script_process(script_session *s, FILE *f) {
-    clock_t start, end;
     char *line=NULL;
     size_t line_size=0;
     size_t lineno=0;
@@ -464,17 +482,9 @@ int script_process(script_session *s, FILE *f) {
                         exit = TRUE;
                         break;
                     }
-                    start = clock();
                     status = c->f(s, argc - 1, argv + 1);
-                    end  = clock();
                     if(c->f == script_load || c->f == script_reset) {
-                        free(s->vars);
-                        s->vars = script_make_vars(s->fit); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
-                    }
-                    if((c->f == script_simulate || c->f == script_fit) && status == 0) {
-                        double cputime_total =(((double) (end - start)) / CLOCKS_PER_SEC);
-                        fprintf(stderr, "...finished!\n\n");
-                        fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
+                        script_make_vars(s); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
                     }
                     break;
                 }
@@ -507,9 +517,10 @@ int script_process(script_session *s, FILE *f) {
     return EXIT_SUCCESS;
 }
 
-int script_prepare_sim_or_fit(struct fit_data *fit) {
+int script_prepare_sim_or_fit(script_session *s) {
     /* TODO: option to disable RBS or ERD */
     /* TODO: reactions from files? Should "sim_reactions_add" be somewhere else? */
+    fit_data *fit = s->fit;
     if(!fit->sm) {
         fprintf(stderr, "No sample has been defined!\n");
         return -1;
@@ -558,5 +569,17 @@ int script_prepare_sim_or_fit(struct fit_data *fit) {
     jibal_gsto_print_files(fit->jibal->gsto, TRUE);
     jibal_gsto_load_all(fit->jibal->gsto);
     simulation_print(stderr, fit->sim);
+    s->start = clock();
+    return 0;
+}
+
+int script_finish_sim_or_fit(script_session *s) {
+    s->end  = clock();
+    double cputime_total =(((double) (s->end - s->start)) / CLOCKS_PER_SEC);
+    fprintf(stderr, "...finished!\n\n");
+    fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
+    if(s->output_filename) {
+        print_spectra(s->output_filename, s->fit->ws, s->fit->exp);
+    }
     return 0;
 }

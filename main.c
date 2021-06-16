@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <string.h>
 
 #include <jibal.h>
 #include <jibal_cs.h>
@@ -42,6 +43,11 @@
 int main(int argc, char **argv) {
     fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
     fprintf(stderr, "Compiled using JIBAL %s, current library version %s.\n\n", JIBAL_VERSION, jibal_version());
+#ifdef DEBUG
+    for(int i = 0; i < argc; i++) {
+        fprintf(stderr, "argv[%i] = \"%s\"\n", i, argv[i]);
+    }
+#endif
     cmdline_options *cmd_opt = global_options_alloc();
     simulation *sim = sim_init();
     clock_t start, end;
@@ -69,6 +75,7 @@ int main(int argc, char **argv) {
         }
     }
     sample_model *sm = NULL;
+    int script_files = FALSE;
     if(cmd_opt->sample_filename) {
         sm = sample_model_from_file(jibal, cmd_opt->sample_filename);
         if(!sm) {
@@ -79,7 +86,9 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Unexpected command line parameters, total %i, starting with %s.\n", argc, *argv);
             return EXIT_FAILURE;
         }
-    } else if(argc > 0) {
+    } else if(argc > 0 && strcmp(argv[0], "sample") == 0) {
+        argc--;
+        argv++;
         sample_model *sm_raw  = sample_model_from_argv(jibal, argc, argv);
 #ifdef DEBUG
         fprintf(stderr, "Sample model, as read from command line.\n");
@@ -91,15 +100,33 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Error in reading sample model from command line.\n");
             return EXIT_FAILURE;
         }
-    } else { /* No sample file, no sample given on command line, fallback to interactive mode */
+    } else if(argc > 0) {
+        script_files = TRUE;
+    } else { /* No sample file, no sample and no files given on command line, fallback to interactive (or script) mode */
         cmd_opt->interactive = TRUE;
     }
     if(sm) {
         sim->sample = sample_from_sample_model(sm);
     }
-    if(cmd_opt->interactive) {
+    if(cmd_opt->interactive || script_files) {
         script_session *session = script_session_init(jibal, sim, sm);
-        int status = script_process(session, stdin);
+        int status = 0;
+        if(script_files) {
+            for(int i = 0; i < argc; i++) {
+                FILE *f_script = fopen(argv[i], "r");
+                if(!f_script) {
+                    fprintf(stderr, "Can not open script from file \"%s\".\n", argv[i]);
+                    return EXIT_FAILURE;
+                }
+                status = script_process(session, f_script);
+                fclose(f_script);
+                if(status)
+                    return status;
+            }
+        }
+        if(cmd_opt->interactive) {
+            status = script_process(session, stdin);
+        }
         script_session_free(session);
         return status;
     }
@@ -205,7 +232,6 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Could not write sample to file \"%s\".\n", cmd_opt->sample_out_filename);
         }
     }
-
     sim_workspace_free(ws);
     end = clock();
     double cputime_total =(((double) (end - start)) / CLOCKS_PER_SEC);
