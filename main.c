@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         }
     } else {
-        script_session *session = script_session_init(jibal);
+        script_session *session = script_session_init(jibal, sim);
         int status = script_process(session, stdin);
         script_session_free(session);
         return status;

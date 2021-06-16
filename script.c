@@ -398,10 +398,15 @@ int script_save(script_session *s, int argc, char * const *argv) {
     return -1;
 }
 
-script_session *script_session_init(jibal *jibal) {
+script_session *script_session_init(jibal *jibal, simulation *sim) {
+    if(!jibal)
+        return NULL;
     struct script_session *s = malloc(sizeof(struct script_session));
     s->jibal = jibal;
-    s->fit = fit_data_new(jibal, sim_init(), NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
+    if(!sim) {
+        sim = sim_init();
+    }
+    s->fit = fit_data_new(jibal, sim, NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
     s->vars = script_make_vars(s->fit);
     return s;
 }
