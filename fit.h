@@ -39,6 +39,7 @@ struct fit_stats {
     size_t n_evals;
     size_t n_iters;
     double cputime_actual;
+    double chisq_dof;
 };
 
 typedef struct fit_range {

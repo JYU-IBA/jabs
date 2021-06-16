@@ -244,20 +244,24 @@ sample *sample_from_sample_model(const sample_model *sm) {
     }
 
 #ifdef DEBUG
-    sample_print(stderr, s, 0);
+    sample_print(NULL, s, 0);
 #endif
     free(sm_copy);
     return s;
 }
 
-void sample_model_print(FILE *f, const sample_model *sm) {
+int sample_model_print(const char *filename, const sample_model *sm) {
     if(!sm)
-        return;
+        return EXIT_FAILURE;
+    FILE *f = fopen_file_or_stream(filename, "w");
+    if(!f) {
+        return EXIT_FAILURE;
+    }
     size_t n_rl = sample_model_number_of_rough_ranges(sm);
     switch(sm->type) {
         case SAMPLE_MODEL_NONE:
-            fprintf(stderr, "Sample model is none.\n");
-            return;
+            fprintf(stderr, "Sample model is none.\n"); /* Not an error as such. No output (to f) is created. */
+            return 0;
             break;
         case SAMPLE_MODEL_POINT_BY_POINT:
             fprintf(f, "       depth");
@@ -285,6 +289,8 @@ void sample_model_print(FILE *f, const sample_model *sm) {
         }
         fprintf(f, "\n");
     }
+    fclose_file_or_stream(f);
+    return 0;
 }
 
 size_t sample_model_number_of_rough_ranges(const sample_model *sm) {
@@ -482,7 +488,9 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const 
     for(size_t i = 0; i < sm->n_ranges; i++) {
         *sample_model_conc_bin(sm, i, i) = 1.0;
     }
-    return sm;
+    sample_model *sm2 = sample_model_split_elements(sm);
+    sample_model_free(sm);
+    return sm2;
 }
 
 sample_model *sample_model_from_string(const jibal *jibal, const char *str) {
@@ -536,9 +544,12 @@ void sample_areal_densities_print(FILE *f, const sample *sample, int print_isoto
 }
 
 
-void sample_print(FILE *f, const sample *sample, int print_isotopes) {
+int sample_print(const char *filename, const sample *sample, int print_isotopes) {
     if(!sample)
-        return;
+        return EXIT_FAILURE;
+    FILE *f = fopen_file_or_stream(filename, "w");
+    if(!f)
+        return EXIT_FAILURE;
     fprintf(f, "  DEPTH(tfu)   ROUGH(tfu)");
     int Z = 0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
@@ -577,6 +588,8 @@ void sample_print(FILE *f, const sample *sample, int print_isotopes) {
         fprintf(f, "\n");
     }
 #endif
+    fclose_file_or_stream(f);
+    return EXIT_SUCCESS;
 }
 
 void sample_free(sample *sample) {

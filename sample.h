@@ -65,7 +65,7 @@ sample_model *sample_model_to_point_by_point(const sample_model *sm);
 size_t sample_model_element_count(const sample_model *sm);
 void sample_model_free(sample_model *sm);
 sample *sample_from_sample_model(const sample_model *sm);
-void sample_model_print(FILE *f, const sample_model *sm);
+int sample_model_print(const char *filename, const sample_model *sm);
 size_t sample_model_number_of_rough_ranges(const sample_model *sm);
 
 depth depth_seek(const sample *sample, double x);
@@ -77,7 +77,7 @@ double get_conc(const sample *s, depth depth, size_t i_isotope);
 sample *sample_alloc(size_t n_isotopes, size_t n_ranges);
 sample *sample_copy(const sample *sample); /* Deep copy */
 void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes);
-void sample_print(FILE *f, const sample *sample, int print_isotopes); /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
+int sample_print(const char *filename, const sample *sample, int print_isotopes);  /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
 void sample_free(sample *sample);
 double sample_isotope_max_depth(const sample *sample, size_t i_isotope);
 inline double *sample_model_conc_bin(const sample_model *sm, size_t i_range, size_t i_material) {

@@ -16,6 +16,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <jibal_defaults.h>
+
 #include "version.h"
 #include "defaults.h"
 #include "options.h"
@@ -30,7 +32,16 @@ void usage() {
     fprintf(stderr, USAGE_STRING);
 }
 
-void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***argv) {
+void greeting(int interactive) {
+    fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
+    fprintf(stderr, "Compiled using JIBAL %s, current library version %s.\n", JIBAL_VERSION, jibal_version());
+    fputs(COPYRIGHT_STRING, stderr);
+    if(interactive) {
+        fprintf(stderr, "Welcome to interactive mode.\nType \"help\" for help or run \"jabs -h\" for command line help.\n\n");
+    }
+}
+
+void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,  int *argc, char ***argv) {
     static struct option long_options[] = {
             {"help",          no_argument,       NULL, 'h'},
             {"version",       no_argument,       NULL, 'V'},
@@ -136,13 +147,13 @@ void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***
                     cmd_opt->fast++;
                 break;
             case 1:
-                cmd_opt->stop_step_exiting = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                cmd_opt->stop_step_exiting = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case '1':
-                sim->det->slope = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                sim->det->slope = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case '2':
-                sim->det->offset = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                sim->det->offset = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 'c':
                 sim->det->compress = atoi(optarg);
@@ -181,7 +192,7 @@ void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***
                 cmd_opt->fit = 1;
                 break;
             case 2:
-                cmd_opt->stop_step_incident = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                cmd_opt->stop_step_incident = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 's':
                 cmd_opt->sample_filename = strdup(optarg);
@@ -190,13 +201,13 @@ void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***
                 cmd_opt->sample_out_filename = strdup(optarg);
                 break;
             case 'a':
-                sim->sample_theta = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                sim->sample_theta = jibal_get_val(jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 't':
-                sim->det->theta = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                sim->det->theta = jibal_get_val(jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 'p':
-                sim->det->phi = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ANGLE, optarg);
+                sim->det->phi = jibal_get_val(jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 'h':
                 fputs(COPYRIGHT_STRING, stderr);
@@ -231,19 +242,19 @@ void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***
                 cmd_opt->interactive = TRUE;
                 break;
             case 'o':
-                cmd_opt->out_filename = strdup(optarg);
+                cmd_opt->output_filename = strdup(optarg);
                 break;
             case 'e':
                 cmd_opt->exp_filename = strdup(optarg);
                 break;
             case 'E':
-                sim->beam_E = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg);
+                sim->beam_E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 'B':
-                sim->beam_E_broad = pow2(jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg) / C_FWHM);
+                sim->beam_E_broad = pow2(jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg) / C_FWHM);
                 break;
             case 'I':
-                sim->beam_isotope = jibal_isotope_find(cmd_opt->jibal->isotopes, optarg, 0, 0);
+                sim->beam_isotope = jibal_isotope_find(jibal->isotopes, optarg, 0, 0);
                 if(!sim->beam_isotope) {
                     fprintf(stderr, "%s is not a valid isotope.\n", optarg);
                     exit(EXIT_FAILURE);
@@ -255,12 +266,12 @@ void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***
                 cmd_opt->reaction_filenames[cmd_opt->n_reaction_filenames - 1] = strdup(optarg);
                 break;
             case 'R':
-                sim->det->resolution = jibal_get_val(cmd_opt->jibal->units, UNIT_TYPE_ENERGY, optarg) / C_FWHM;
+                sim->det->resolution = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg) / C_FWHM;
                 sim->det->resolution *= sim->det->resolution; /* square */
                 break;
             case 'd':
                 free(sim->det);
-                sim->det = detector_from_file(cmd_opt->jibal, optarg);
+                sim->det = detector_from_file(jibal, optarg);
                 if(!sim->det) {
                     fprintf(stderr, "Reading detector from file %s failed.\n", optarg);
                     exit(EXIT_FAILURE);
@@ -288,7 +299,7 @@ cmdline_options *cmdline_options_init() {
 }
 
 void cmdline_options_free(cmdline_options *cmd_opt) {
-    free(cmd_opt->out_filename);
+    free(cmd_opt->output_filename);
     free(cmd_opt->exp_filename);
     free(cmd_opt->bricks_filename);
     free(cmd_opt->fit_vars);

@@ -5,10 +5,11 @@
 #include <jibal_kin.h>
 #include <jibal_r33.h>
 
-#include "defaults.h"
+#include "generic.h"
 #include "rotate.h"
 #include "roughness.h"
 #include "jabs.h"
+#include "defaults.h"
 
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
     double em=E/incident->mass;
@@ -465,13 +466,13 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
         Z2 = sample->isotopes[i]->Z;
         if (!jibal_gsto_auto_assign(gsto, sim->beam_isotope->Z, Z2)) { /* This should handle RBS */
             fprintf(stderr, "Can not assign stopping.\n");
-            return 1;
+            return EXIT_FAILURE;
         }
         for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
             const reaction *r = &sim->reactions[i_reaction];
             if (!jibal_gsto_auto_assign(gsto, r->product->Z, Z2)) {
                 fprintf(stderr, "Can not assign stopping.\n");
-                return 1;
+                return EXIT_SUCCESS;
             }
         }
     }
@@ -480,15 +481,12 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
 
 int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histogram *exp) {
     char sep = ' ';
-    FILE *f;
     if(!ws)
         return EXIT_FAILURE;
+    FILE *f = fopen_file_or_stream(filename, "w");
+    if(!f)
+        return EXIT_FAILURE;
     if(filename) {
-        f = fopen(filename, "w");
-        if(!f) {
-            fprintf(stderr, "Can't open file \"%s\" for output.\n", filename);
-            return EXIT_FAILURE;
-        }
         size_t l = strlen(filename);
         if(l > 4 && strncmp(filename+l-4, ".csv", 4) == 0) { /* For CSV: print header line */
             sep = ','; /* and set the separator! */
@@ -502,8 +500,6 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
             }
             fprintf(f, "\n");
         }
-    } else {
-        f = stdout;
     }
     for(size_t i = 0; i < ws->n_channels; i++) {
         double sum = 0.0;
@@ -522,7 +518,7 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
             } else {
                 fprintf(f, "%c0", sep);
             }
-            fprintf(f,"%c%g", sep, exp->range[i]/C_KEV);
+            fprintf(f,"%c%.3lf", sep, exp->range[i]/C_KEV);
         }
         for (size_t j = 0; j < ws->n_reactions; j++) {
             if(i >= ws->reactions[j].histo->n || ws->reactions[j].histo->bin[i] == 0.0) {
@@ -533,9 +529,7 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
         }
         fprintf(f, "\n");
     }
-    if(f != stdout) {
-        fclose(f);
-    }
+    fclose_file_or_stream(f);
     return EXIT_SUCCESS;
 }
 
@@ -609,15 +603,8 @@ void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params,
 }
 
 
-void output_bricks(const char *filename, const sim_workspace *ws) {
-    FILE *f;
-    if(!filename)
-        return;
-    if(strcmp(filename, "-") == 0)
-        f=stdout;
-    else {
-        f = fopen(filename, "w");
-    }
+void print_bricks(const char *filename, const sim_workspace *ws) {
+    FILE *f = fopen_file_or_stream(filename, "w");
     if(!f)
         return;
     for(size_t i = 0; i < ws->n_reactions; i++) {
@@ -630,7 +617,7 @@ void output_bricks(const char *filename, const sim_workspace *ws) {
         }
         fprintf(f, "\n\n");
     }
-    if(f != stdout)
+    if(!(f == stdout || f == stderr))
         fclose(f);
 }
 

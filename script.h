@@ -21,7 +21,10 @@ typedef struct script_session {
     jibal *jibal;
     struct fit_data *fit;
     jibal_config_var *vars;
-    char *output_filename;
+    char *output_filename; /* File name for automatic spectra saving */
+    char *bricks_out_filename; /* File name for automatic bricks saving */
+    char *sample_out_filename; /* File name for automatic sample saving */
+    char *detector_out_filename; /* File name for automatic detector saving */
     clock_t start, end;
 } script_session;
 

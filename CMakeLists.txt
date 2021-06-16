@@ -48,13 +48,4 @@ target_link_libraries(jabs
     PRIVATE "$<$<BOOL:${UNIX}>:m>" ${GETOPT_LIBRARY}
     )
 
-add_executable(angle_calc angle_calc.c ion.c rotate.c)
-target_link_libraries(angle_calc PRIVATE jibal  PRIVATE "$<$<BOOL:${UNIX}>:m>")
-
-add_executable(test test.c ion.c rotate.c)
-target_link_libraries(test PRIVATE jibal PRIVATE "$<$<BOOL:${UNIX}>:m>")
-
-add_executable(testr33 testr33.c reaction.c)
-target_link_libraries(testr33 PRIVATE jibal PRIVATE "$<$<BOOL:${UNIX}>:m>")
-
 install(TARGETS jabs RUNTIME DESTINATION bin)

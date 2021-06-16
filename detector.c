@@ -56,7 +56,7 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
     }
 #ifdef DEBUG
     fprintf(stderr, "Read detector from \"%s\":\n", filename);
-    detector_print(stderr, det);
+    detector_print(NULL, det);
 #endif
     return det;
 }
@@ -84,7 +84,11 @@ void detector_free(detector *det) {
     free(det);
 }
 
-void detector_print(FILE *f, const detector *det) {
+int detector_print(const char *filename, const detector *det) {
+    FILE *f = fopen(filename, "w");
+    if(!f) {
+        return EXIT_FAILURE;
+    }
     fprintf(f, "slope = %g keV\n", det->slope/C_KEV);
     fprintf(f, "offset = %g keV\n", det->offset/C_KEV);
     fprintf(f, "resolution = %g keV\n", C_FWHM*sqrt(det->resolution)/C_KEV);
@@ -95,4 +99,7 @@ void detector_print(FILE *f, const detector *det) {
     if(det->foil_description) {
         fprintf(f, "foil = %s\n", det->foil_description);
     }
+    if(f != stdout)
+        fclose(f);
+    return EXIT_SUCCESS;
 }

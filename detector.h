@@ -36,5 +36,5 @@ int detector_sanity_check(const detector *det);
 detector *detector_from_file(const jibal *jibal, const char *filename);
 detector *detector_default();
 void detector_free(detector *det);
-void detector_print(FILE *f, const detector *det);
+int detector_print(const char *filename, const detector *det);
 #endif //JABS_DETECTOR_H

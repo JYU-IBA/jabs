@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 char **string_to_argv(const char *str) { /* TODO: move this generic function to elsewhere! */
     char *s = strdup(str);
@@ -51,4 +52,34 @@ char *argv_to_string(int argc, char * const *argv) {
     }
     *sp = '\0';
     return s;
+}
+
+FILE *fopen_file_or_stream(const char *filename, const char *mode) {
+    FILE *f;
+    if(!filename) {
+        f = stderr;
+    } else if(strlen(filename) == 1 && *filename == '-')
+        f = stdout;
+    else {
+        f = fopen(filename, mode);
+    }
+    if(!f && filename) {
+        fprintf(stderr, "Can not open file \"%s\" (mode %s)\n", filename, mode);
+    }
+    return f;
+}
+
+void fclose_file_or_stream(FILE *f) {
+    if(f == stdout)
+        return;
+    if(f == stderr)
+        return;
+    fclose(f);
+}
+
+char *strdup_non_null(const char *s) {
+    if(s)
+        return strdup(s);
+    else
+        return NULL;
 }

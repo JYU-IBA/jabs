@@ -9,6 +9,9 @@ load sample ../example/sample.txt
 add fit_range 100 700
 add fit_range 1050 1107 
 set output tmp2.csv
+set bricks_out bricks.dat
+set sample_out sample_out2.txt
+set det_out det_out2.txt
 fit calib,fluence,thickness1,thickness2,rough1
 save spectra tmp.csv
 save det det_out.txt

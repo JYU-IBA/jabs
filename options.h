@@ -17,7 +17,6 @@
 #include <jibal.h>
 
 typedef struct {
-    jibal *jibal;
     int verbose;
     int interactive;
     int rbs;
@@ -32,7 +31,7 @@ typedef struct {
     size_t depthsteps_max;
     double stop_step_incident;
     double stop_step_exiting;
-    char *out_filename;
+    char *output_filename;
     char *exp_filename;
     char *bricks_filename;
     char *fit_vars;
@@ -46,10 +45,11 @@ typedef struct {
 
 #include "simulation.h"
 
-void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***argv);
+void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,  int *argc, char ***argv);
 cmdline_options *cmdline_options_init();
 void cmdline_options_free(cmdline_options *cmd_opt);
 const char *jabs_version();
 void usage();
+void greeting(int interactive);
 
 #endif // JABS_OPTIONS_H

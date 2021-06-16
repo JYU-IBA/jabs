@@ -87,7 +87,7 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
 #ifndef NO_CHISQ
     double chisq;
     gsl_blas_ddot(f, f, &chisq);
-    fprintf(stderr, ", chisq/dof = %8.4lf", chisq/fit_data->dof);
+    fprintf(stderr, ", chisq/dof = %10.7lf", chisq/fit_data->dof);
 #endif
 #ifdef FIT_PRINT_PARAMS
     size_t i;
@@ -127,6 +127,9 @@ void fit_stats_print(FILE *f, const struct fit_stats *stats) {
     if(stats->n_evals > 0) {
         fprintf(f, "Per spectrum simulation: %.3lf ms.\n", 1000.0 * stats->cputime_actual / stats->n_evals);
     }
+    if(stats->chisq_dof > 0.0) {
+        fprintf(f, "Final chisq/dof = %.7lf\n", stats->chisq_dof);
+    }
 }
 
 size_t fit_ranges_calculate_number_of_channels(fit_range *fit_ranges, size_t n, const detector *det) {
@@ -146,7 +149,9 @@ size_t fit_ranges_calculate_number_of_channels(fit_range *fit_ranges, size_t n, 
 
 void fit_range_add(struct fit_data *fit_data, const struct fit_range *range) { /* Makes a deep copy */
     if(range->low == 0 && range->high == 0) {
-        fprintf(stderr, "No valid range given.\n"); /* Yeah, this is technically valid... */
+#ifdef DEBUG
+        fprintf(stderr, "No valid range given (from zero to zero).\n"); /* Yeah, this is technically valid... */
+#endif
         return;
     }
     fit_data->n_fit_ranges++;
@@ -212,6 +217,7 @@ int fit(struct fit_data *fit_data) {
     fit_data->stats.cputime_actual = 0.0;
     fit_data->stats.n_evals = 0;
     fit_data->stats.n_iters = 0;
+    fit_data->stats.chisq_dof = 0.0;
     if(!fit_data->exp) {
         fprintf(stderr, "No experimental data, can not fit.\n");
         return -1;
@@ -324,7 +330,7 @@ int fit(struct fit_data *fit_data) {
         }
         fprintf(stderr, "\n");
     }
-    fprintf(stderr, "chisq/dof = %g\n", chisq / fit_data->dof);
+    fit_data->stats.chisq_dof = chisq / fit_data->dof;
     for(i = 0; i < fit_params->n; i++) { /* Clear all err values */
         fit_params->func_params_err[i] = 0.0;
     }

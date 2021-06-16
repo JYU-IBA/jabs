@@ -101,7 +101,7 @@ int script_reset(script_session *s, int argc, char * const *argv) {
     sim_workspace_free(fit->ws);
     fit->ws = NULL;
     sim_free(fit->sim);
-    fit->sim = sim_init();
+    fit->sim = sim_init(NULL);
     return 0;
 }
 
@@ -120,14 +120,14 @@ int script_show(script_session *s, int argc, char * const *argv) {
         return 0;
     }
     if(strcmp(argv[0], "sample") == 0) {
-        sample_model_print(stderr, fit->sm);
+        sample_model_print(NULL, fit->sm);
         return 0;
     }
     if(strcmp(argv[0], "spectra") == 0) {
         return print_spectra(NULL, fit->ws, fit->exp);
     }
     if(strcmp(argv[0], "detector") == 0) {
-        detector_print(stderr, fit->sim->det);
+        detector_print(NULL, fit->sim->det);
         return 0;
     }
     fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
@@ -301,16 +301,19 @@ void script_make_vars(script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT,   "sample_azi",     &sim->sample_phi,  NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "channeling",     &sim->channeling_offset, NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",&sim->channeling_slope, NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "slope",          &det->slope,      NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "offset",         &det->offset,     NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "resolution",     &det->resolution, NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "theta",          &det->theta,      NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "phi",            &det->phi,        NULL},
-            {JIBAL_CONFIG_VAR_INT,    "number",         &det->number,     NULL},
-            {JIBAL_CONFIG_VAR_INT,    "channels",       &det->channels,   NULL},
-            {JIBAL_CONFIG_VAR_INT,    "compress",       &det->compress,   NULL},
-            {JIBAL_CONFIG_VAR_STRING, "output",         &s->output_filename, NULL},
-            {JIBAL_CONFIG_VAR_NONE,NULL,NULL,NULL}
+            {JIBAL_CONFIG_VAR_UNIT,   "slope",          &det->slope,             NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "offset",         &det->offset,            NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "resolution",     &det->resolution,        NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "theta",          &det->theta,             NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "phi",            &det->phi,               NULL},
+            {JIBAL_CONFIG_VAR_INT,    "number",         &det->number,            NULL},
+            {JIBAL_CONFIG_VAR_INT,    "channels",       &det->channels,          NULL},
+            {JIBAL_CONFIG_VAR_INT,    "compress",       &det->compress,          NULL},
+            {JIBAL_CONFIG_VAR_STRING, "output",         &s->output_filename,      NULL},
+            {JIBAL_CONFIG_VAR_STRING, "bricks_out",     &s->bricks_out_filename,   NULL},
+            {JIBAL_CONFIG_VAR_STRING, "sample_out",     &s->sample_out_filename,   NULL},
+            {JIBAL_CONFIG_VAR_STRING, "det_out",        &s->detector_out_filename, NULL},
+            {JIBAL_CONFIG_VAR_NONE,NULL,NULL,                              NULL}
     };
     int n_vars;
     for(n_vars = 0; vars[n_vars].type != 0; n_vars++);
@@ -356,6 +359,14 @@ int script_fit(script_session *s, int argc, char * const *argv) {
         return -1;
     }
     script_finish_sim_or_fit(s);
+    fprintf(stderr, "\nFinal parameters:\n");
+    simulation_print(stderr, fit_data->sim);
+    fprintf(stderr, "\nFinal profile:\n");
+    sample_print(NULL, fit_data->sim->sample, FALSE);
+    sample_areal_densities_print(stderr, fit_data->sim->sample, FALSE);
+    fprintf(stderr, "\nFinal sample model:\n");
+    sample_model_print(NULL, fit_data->sm);
+    fprintf(stderr, "\n");
     fit_stats_print(stderr, &fit_data->stats);
     return 0;
 }
@@ -385,10 +396,7 @@ int script_save(script_session *s, int argc, char * const *argv) {
             fprintf(stderr, "No sample set.\n");
             return -1;
         }
-        FILE *f_sout;
-        if((f_sout = fopen(argv[1], "w"))) {
-            sample_model_print(f_sout, fit_data->sm);
-        } else {
+        if(sample_model_print(argv[1], fit_data->sm)) {
             fprintf(stderr, "Could not write sample to file \"%s\".\n", argv[1]);
             return -1;
         }
@@ -402,10 +410,7 @@ int script_save(script_session *s, int argc, char * const *argv) {
             fprintf(stderr, "No detector set.\n");
             return -1;
         }
-        FILE *f_det;
-        if((f_det = fopen(argv[1], "w"))) {
-            detector_print(f_det, fit_data->sim->det); /* TODO: is this the fitted detector? */
-        } else {
+        if(detector_print(argv[1], fit_data->sim->det)) {
             fprintf(stderr, "Could not write detector to file \"%s\".\n", argv[1]);
             return -1;
         }
@@ -421,15 +426,22 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
     struct script_session *s = malloc(sizeof(struct script_session));
     s->jibal = jibal;
     if(!sim) { /* Sim shouldn't be NULL */
-        sim = sim_init();
+        sim = sim_init(NULL);
     }
     s->fit = fit_data_new(jibal, sim); /* Not just fit, but this conveniently holds everything we need. */
     s->vars = NULL;
     s->output_filename = NULL;
+    s->bricks_out_filename = NULL;
+    s->sample_out_filename = NULL;
+    s->detector_out_filename = NULL;
     script_make_vars(s);
     return s;
 }
 void script_session_free(script_session *s) {
+    free(s->output_filename);
+    free(s->bricks_out_filename);
+    free(s->sample_out_filename);
+    free(s->detector_out_filename);
     free(s->vars);
     sim_workspace_free(s->fit->ws);
     sim_free(s->fit->sim);
@@ -447,8 +459,6 @@ int script_process(script_session *s, FILE *f) {
     int interactive = (f == stdin && isatty(fileno(stdin)));
     const char *prompt = "jabs> ";
     if(interactive) {
-        fputs(COPYRIGHT_STRING, stderr);
-        fprintf(stderr, "Welcome to interactive mode.\nType \"help\" for help or run \"jabs -h\" for command line help.\n\n");
         fputs(prompt, stderr);
     }
     int exit = FALSE;
@@ -543,7 +553,7 @@ int script_prepare_sim_or_fit(script_session *s) {
         return -1;
     }
     fprintf(stderr, "Simplified sample model for simulation:\n");
-    sample_print(stderr, fit->sim->sample, TRUE);
+    sample_print(NULL, fit->sim->sample, TRUE);
 
     for(size_t i = 0; i < fit->sim->n_reactions; i++) {
         reaction_free(&fit->sim->reactions[i]);
@@ -558,7 +568,7 @@ int script_prepare_sim_or_fit(script_session *s) {
         fprintf(stderr, "No reactions, nothing to do.\n");
         return -1;
     }
-    fprintf(stderr, "Reactions:\n");
+    fprintf(stderr, "\nReactions:\n");
     reactions_print(stderr, fit->sim->reactions, fit->sim->n_reactions);
 
     jibal_gsto_assign_clear_all(fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
@@ -579,8 +589,18 @@ int script_finish_sim_or_fit(script_session *s) {
     double cputime_total =(((double) (s->end - s->start)) / CLOCKS_PER_SEC);
     fprintf(stderr, "...finished!\n\n");
     fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
+    struct fit_data *fit = s->fit;
     if(s->output_filename) {
-        print_spectra(s->output_filename, s->fit->ws, s->fit->exp);
+        print_spectra(s->output_filename, fit->ws, fit->exp);
+    }
+    if(s->bricks_out_filename) {
+        print_bricks(s->bricks_out_filename, fit->ws);
+    }
+    if(s->sample_out_filename) {
+        sample_model_print(s->sample_out_filename, fit->sm);
+    }
+    if(s->detector_out_filename) {
+        detector_print(s->detector_out_filename, fit->ws->det);
     }
     return 0;
 }
