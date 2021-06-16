@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "argv[%i] = \"%s\"\n", i, argv[i]);
     }
 #endif
-    cmdline_options *cmd_opt = global_options_alloc();
+    cmdline_options *cmd_opt = cmdline_options_init();
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -241,6 +241,6 @@ int main(int argc, char **argv) {
     sim_free(sim);
     jibal_free(jibal);
     free(exp);
-    global_options_free(cmd_opt);
+    cmdline_options_free(cmd_opt);
     return EXIT_SUCCESS;
 }

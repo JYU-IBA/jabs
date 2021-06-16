@@ -47,8 +47,8 @@ typedef struct {
 #include "simulation.h"
 
 void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***argv);
-cmdline_options *global_options_alloc();
-void global_options_free(cmdline_options *cmd_opt);
+cmdline_options *cmdline_options_init();
+void cmdline_options_free(cmdline_options *cmd_opt);
 const char *jabs_version();
 void usage();
 

@@ -279,26 +279,26 @@ void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***
     *argv += optind;
 }
 
-cmdline_options *global_options_alloc() {
-    cmdline_options *global = malloc(sizeof(cmdline_options));
-    memset(global, 0, sizeof(cmdline_options)); /* Everything not listed below are zero or NULL by default */
-    global->rbs = TRUE;
-    global->erd = TRUE;
-    return global;
+cmdline_options *cmdline_options_init() {
+    cmdline_options *cmd_opt = malloc(sizeof(cmdline_options));
+    memset(cmd_opt, 0, sizeof(cmdline_options)); /* Everything not listed below are zero or NULL by default */
+    cmd_opt->rbs = TRUE;
+    cmd_opt->erd = TRUE;
+    return cmd_opt;
 }
 
-void global_options_free(cmdline_options *global) {
-    free(global->out_filename);
-    free(global->exp_filename);
-    free(global->bricks_filename);
-    free(global->fit_vars);
-    free(global->detector_out_filename);
-    free(global->sample_filename);
-    free(global->sample_out_filename);
-    if(global->reaction_filenames) {
-        for(size_t i = 0; i < global->n_reaction_filenames; i++) {
-            free(global->reaction_filenames[i]);
+void cmdline_options_free(cmdline_options *cmd_opt) {
+    free(cmd_opt->out_filename);
+    free(cmd_opt->exp_filename);
+    free(cmd_opt->bricks_filename);
+    free(cmd_opt->fit_vars);
+    free(cmd_opt->detector_out_filename);
+    free(cmd_opt->sample_filename);
+    free(cmd_opt->sample_out_filename);
+    if(cmd_opt->reaction_filenames) {
+        for(size_t i = 0; i < cmd_opt->n_reaction_filenames; i++) {
+            free(cmd_opt->reaction_filenames[i]);
         }
     }
-    free(global->reaction_filenames);
+    free(cmd_opt->reaction_filenames);
 }
