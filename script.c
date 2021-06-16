@@ -349,6 +349,14 @@ int script_fit(script_session *s, int argc, char * const *argv) {
         fprintf(stderr, "No parameters for fit.\n");
         return -1;
     }
+    if(!fit_data->exp) {
+        fprintf(stderr, "No experimental spectrum set.\n");
+        return -1;
+    }
+    if(fit_data->n_fit_ranges == 0) {
+        fprintf(stderr, "No fit range(s) given.\n");
+        return -1;
+    }
     if(script_prepare_sim_or_fit(s)) {
         return -1;
     }
