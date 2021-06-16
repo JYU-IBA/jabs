@@ -398,7 +398,7 @@ int script_save(script_session *s, int argc, char * const *argv) {
     return -1;
 }
 
-script_session *script_session_init(jibal *jibal, simulation *sim) {
+script_session *script_session_init(jibal *jibal, simulation *sim, sample_model *sm) {
     if(!jibal)
         return NULL;
     struct script_session *s = malloc(sizeof(struct script_session));
@@ -406,7 +406,7 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
     if(!sim) {
         sim = sim_init();
     }
-    s->fit = fit_data_new(jibal, sim, NULL, NULL); /* Not just fit, but this conveniently holds everything we need. */
+    s->fit = fit_data_new(jibal, sim, NULL, sm); /* Not just fit, but this conveniently holds everything we need. */
     s->vars = script_make_vars(s->fit);
     return s;
 }
@@ -414,6 +414,7 @@ void script_session_free(script_session *s) {
     free(s->vars);
     sim_workspace_free(s->fit->ws);
     sim_free(s->fit->sim);
+    sample_model_free(s->fit->sm);
     fit_data_free(s->fit);
     free(s);
 }

@@ -42,7 +42,7 @@
 int main(int argc, char **argv) {
     fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
     fprintf(stderr, "Compiled using JIBAL %s, current library version %s.\n\n", JIBAL_VERSION, jibal_version());
-    cmdline_options *global = global_options_alloc();
+    cmdline_options *cmd_opt = global_options_alloc();
     simulation *sim = sim_init();
     clock_t start, end;
     jibal *jibal = jibal_init(NULL);
@@ -51,28 +51,28 @@ int main(int argc, char **argv) {
                 jibal_error_string(jibal->error));
         return 1;
     }
-    global->jibal = jibal;
+    cmd_opt->jibal = jibal;
     sim->beam_isotope = jibal_isotope_find(jibal->isotopes, NULL, 2, 4); /* Default: 4He */
-    read_options(global, sim, &argc, &argv);
-    sim->params = sim_calc_params_defaults(global->ds, global->fast);
-    sim->params.stop_step_incident = global->stop_step_incident;
-    sim->params.stop_step_exiting = global->stop_step_exiting;
-    sim->params.depthsteps_max = global->depthsteps_max;
+    read_options(cmd_opt, sim, &argc, &argv);
+    sim->params = sim_calc_params_defaults(cmd_opt->ds, cmd_opt->fast);
+    sim->params.stop_step_incident = cmd_opt->stop_step_incident;
+    sim->params.stop_step_exiting = cmd_opt->stop_step_exiting;
+    sim->params.depthsteps_max = cmd_opt->depthsteps_max;
     sim_sanity_check(sim);
 
     gsl_histogram *exp = NULL;
-    if(global->exp_filename) {
-        exp = read_experimental_spectrum(global->exp_filename, sim->det);
+    if(cmd_opt->exp_filename) {
+        exp = read_experimental_spectrum(cmd_opt->exp_filename, sim->det);
         if(!exp) {
-            fprintf(stderr, "Error! Can not open file \"%s\".\n", global->exp_filename);
+            fprintf(stderr, "Error! Can not open file \"%s\".\n", cmd_opt->exp_filename);
             return EXIT_FAILURE;
         }
     }
-    sample_model *sm;
-    if(global->sample_filename) {
-        sm = sample_model_from_file(jibal, global->sample_filename);
+    sample_model *sm = NULL;
+    if(cmd_opt->sample_filename) {
+        sm = sample_model_from_file(jibal, cmd_opt->sample_filename);
         if(!sm) {
-            fprintf(stderr, "Could not load a sample model from file \"%s\".\n", global->sample_filename);
+            fprintf(stderr, "Could not load a sample model from file \"%s\".\n", cmd_opt->sample_filename);
             return EXIT_FAILURE;
         }
         if(argc != 0) {
@@ -91,35 +91,40 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Error in reading sample model from command line.\n");
             return EXIT_FAILURE;
         }
-    } else {
-        script_session *session = script_session_init(jibal, sim);
+    } else { /* No sample file, no sample given on command line, fallback to interactive mode */
+        cmd_opt->interactive = TRUE;
+    }
+    if(sm) {
+        sim->sample = sample_from_sample_model(sm);
+    }
+    if(cmd_opt->interactive) {
+        script_session *session = script_session_init(jibal, sim, sm);
         int status = script_process(session, stdin);
         script_session_free(session);
         return status;
     }
     fputs(COPYRIGHT_STRING, stderr);
-    sim->sample = sample_from_sample_model(sm);
-    if(global->verbose) {
+    if(cmd_opt->verbose) {
         sample_model_print(stderr, sm);
         fprintf(stderr, "\nSimplified sample model for simulation:\n");
-        sample_print(stderr, sim->sample, global->print_isotopes);
+        sample_print(stderr, sim->sample, cmd_opt->print_isotopes);
     }
     if(sm->n_ranges == 0 || sm->n_materials == 0) {
         fprintf(stderr, "Can not simulate nothing.\n");
     }
-    if(global->verbose) {
+    if(cmd_opt->verbose) {
         fprintf(stderr, "Default RBS cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_rbs));
         fprintf(stderr, "Default ERD cross section model used: %s\n", jibal_cross_section_name(jibal->config->cs_erd));
         fprintf(stderr, "\n");
     }
-    if(global->rbs) {
+    if(cmd_opt->rbs) {
         sim_reactions_add(sim, REACTION_RBS, jibal->config->cs_rbs);
     }
-    if(global->erd) {
+    if(cmd_opt->erd) {
         sim_reactions_add(sim, REACTION_ERD, jibal->config->cs_erd);
     }
-    if(global->reaction_filenames) {
-        if(process_reaction_files(sim, jibal->isotopes, global->reaction_filenames, global->n_reaction_filenames)) {
+    if(cmd_opt->reaction_filenames) {
+        if(process_reaction_files(sim, jibal->isotopes, cmd_opt->reaction_filenames, cmd_opt->n_reaction_filenames)) {
             fprintf(stderr, "Could not process all reaction files. Aborting.\n");
             return EXIT_FAILURE;
         }
@@ -129,7 +134,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "No reactions, nothing to do.\n");
         return EXIT_FAILURE;
     } else {
-        if(global->verbose) {
+        if(cmd_opt->verbose) {
             fprintf(stderr, "%zu reactions.\n", sim->n_reactions);
             reactions_print(stderr, sim->reactions, sim->n_reactions);
         }
@@ -138,7 +143,7 @@ int main(int argc, char **argv) {
     if(assign_stopping(jibal->gsto, sim)) {
         return EXIT_FAILURE;
     }
-    if(global->verbose) {
+    if(cmd_opt->verbose) {
         jibal_gsto_print_assignments(jibal->gsto);
         jibal_gsto_print_files(jibal->gsto, 1);
     }
@@ -148,13 +153,13 @@ int main(int argc, char **argv) {
     fflush(stderr);
     start = clock();
     sim_workspace *ws = NULL;
-    if(global->fit) {
+    if(cmd_opt->fit) {
         fit_data *fit_data = fit_data_new(jibal, sim, exp, sm);
-        fit_params_add(sim, sm, fit_data->fit_params, global->fit_vars);
-        fit_range range = {.low = global->fit_low, .high = global->fit_high};
+        fit_params_add(sim, sm, fit_data->fit_params, cmd_opt->fit_vars);
+        fit_range range = {.low = cmd_opt->fit_low, .high = cmd_opt->fit_high};
         fit_range_add(fit_data, &range); /* We add just this one range */
         fit_data->n_fit_ranges = 1;
-        fit_data->print_iters = global->print_iters;
+        fit_data->print_iters = cmd_opt->print_iters;
         if(fit(fit_data)) {
             fprintf(stderr, "Fit failed!\n");
             return EXIT_FAILURE;
@@ -162,8 +167,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\nFinal parameters:\n");
         simulation_print(stderr, sim);
         fprintf(stderr, "\nFinal profile:\n");
-        sample_print(stderr, sim->sample, global->print_isotopes);
-        sample_areal_densities_print(stderr, sim->sample, global->print_isotopes);
+        sample_print(stderr, sim->sample, cmd_opt->print_isotopes);
+        sample_areal_densities_print(stderr, sim->sample, cmd_opt->print_isotopes);
         fprintf(stderr, "\nFinal sample model:\n");
         sample_model_print(stderr, fit_data->sm);
         ws = fit_data->ws;
@@ -180,24 +185,24 @@ int main(int argc, char **argv) {
     if(exp) {
         set_spectrum_calibration(exp, ws->det); /* Update the experimental spectra to final calibration */
     }
-    print_spectra(global->out_filename, ws, exp);
+    print_spectra(cmd_opt->out_filename, ws, exp);
 
-    output_bricks(global->bricks_filename, ws);
+    output_bricks(cmd_opt->bricks_filename, ws);
 
-    if(global->detector_out_filename) {
+    if(cmd_opt->detector_out_filename) {
         FILE *f_det;
-        if((f_det = fopen(global->detector_out_filename, "w"))) {
+        if((f_det = fopen(cmd_opt->detector_out_filename, "w"))) {
             detector_print(f_det, ws->det);
         } else {
-            fprintf(stderr, "Could not write detector to file \"%s\".\n", global->detector_out_filename);
+            fprintf(stderr, "Could not write detector to file \"%s\".\n", cmd_opt->detector_out_filename);
         }
     }
-    if(global->sample_out_filename) {
+    if(cmd_opt->sample_out_filename) {
         FILE *f_sout;
-        if((f_sout = fopen(global->sample_out_filename, "w"))) {
+        if((f_sout = fopen(cmd_opt->sample_out_filename, "w"))) {
             sample_model_print(f_sout, sm);
         } else {
-            fprintf(stderr, "Could not write sample to file \"%s\".\n", global->sample_out_filename);
+            fprintf(stderr, "Could not write sample to file \"%s\".\n", cmd_opt->sample_out_filename);
         }
     }
 
@@ -210,6 +215,6 @@ int main(int argc, char **argv) {
     sim_free(sim);
     jibal_free(jibal);
     free(exp);
-    global_options_free(global);
+    global_options_free(cmd_opt);
     return EXIT_SUCCESS;
 }

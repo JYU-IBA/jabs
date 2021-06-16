@@ -34,6 +34,7 @@ void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***
     static struct option long_options[] = {
             {"help",          no_argument,       NULL, 'h'},
             {"version",       no_argument,       NULL, 'V'},
+            {"interactive",   no_argument,       NULL, 'i'},
             {"verbose",       optional_argument, NULL, 'v'},
             {"out",           required_argument, NULL, 'o'},
             {"ion",           required_argument, NULL, 'I'},
@@ -74,6 +75,7 @@ void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***
     static const char *help_texts[] = {
             "Print this message.",
             "Print version number.",
+            "Interactive mode.",
             "Increase or give verbosity level.",
             "Output to file instead of standard output. For CSV use .csv suffix.",
             "Incident ion (without charge state), e.g. 4He",
@@ -224,6 +226,9 @@ void read_options(cmdline_options *cmd_opt, simulation *sim, int *argc, char ***
                     cmd_opt->verbose = atoi(optarg);
                 else
                     cmd_opt->verbose++;
+                break;
+            case 'i':
+                cmd_opt->interactive = TRUE;
                 break;
             case 'o':
                 cmd_opt->out_filename = strdup(optarg);

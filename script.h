@@ -34,9 +34,7 @@ struct help_topic {
     const char *help_text;
 };
 
-
-
-script_session *script_session_init(jibal *jibal, simulation *sim); /* sim can be NULL or a previously initialized sim can be given. Note that sim will be free'd by script_session_free()! */
+script_session *script_session_init(jibal *jibal, simulation *sim, sample_model *sm); /* sim and sm can be NULL or a previously initialized sim/sm can be given. Note that these will be free'd by script_session_free()! */
 void script_session_free(script_session *s);
 
 void script_print_commands(FILE *f);
