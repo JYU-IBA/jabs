@@ -210,7 +210,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
                 sim->det->phi = jibal_get_val(jibal->units, UNIT_TYPE_ANGLE, optarg);
                 break;
             case 'h':
-                fputs(COPYRIGHT_STRING, stderr);
                 usage();
                 fprintf(stderr, "\nThe following options (prefix with --, e.g. --energy=2MeV) are supported: \n");
                 struct option *o = long_options;

@@ -120,15 +120,13 @@ int script_show(script_session *s, int argc, char * const *argv) {
         return 0;
     }
     if(strcmp(argv[0], "sample") == 0) {
-        sample_model_print(NULL, fit->sm);
-        return 0;
+        return sample_model_print(NULL, fit->sm);
     }
     if(strcmp(argv[0], "spectra") == 0) {
         return print_spectra(NULL, fit->ws, fit->exp);
     }
     if(strcmp(argv[0], "detector") == 0) {
-        detector_print(NULL, fit->sim->det);
-        return 0;
+        return detector_print(NULL, fit->sim->det);
     }
     fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
     return -1;
