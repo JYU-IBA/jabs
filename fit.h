@@ -62,7 +62,7 @@ typedef struct fit_data {
 } fit_data;
 
 
-fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm);
+fit_data *fit_data_new(const jibal *jibal, simulation *sim);
 void fit_data_free(struct fit_data *f); /* Doesn't free everything in fit_data. Does free fit_params and fit_ranges */
 void fit_data_print(FILE *f, const struct fit_data *fit_data);
 int fit(struct fit_data *fit_data);

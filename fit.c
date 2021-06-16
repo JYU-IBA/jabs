@@ -24,6 +24,7 @@
 #include "fit.h"
 #include "jabs.h"
 #include "defaults.h"
+#include "spectrum.h"
 
 int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
 {
@@ -157,16 +158,16 @@ void fit_range_add(struct fit_data *fit_data, const struct fit_range *range) { /
     fit_data->fit_ranges[fit_data->n_fit_ranges-1] = *range;
 }
 
-fit_data *fit_data_new(const jibal *jibal, simulation *sim, gsl_histogram *exp, sample_model *sm) {
+fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     struct fit_data *f = malloc(sizeof(struct fit_data));
     f->n_iters_max = FIT_ITERS_MAX;
     f->n_fit_ranges = 0;
     f->fit_ranges = NULL;
     f->jibal = jibal;
     f->sim = sim;
-    f->exp = exp;
-    f->sm = sm;
-    f->ws = NULL;
+    f->exp = NULL; /* Can be set later */
+    f->sm = NULL; /* Can be set later. */
+    f->ws = NULL; /* Initialized later */
     f->fit_params = fit_params_new();
     f->print_iters = FALSE;
     return f;
@@ -331,6 +332,7 @@ int fit(struct fit_data *fit_data) {
         *(fit_params->func_params[i]) = gsl_vector_get(w->x, i);
         fit_params->func_params_err[i] = c * sqrt(gsl_matrix_get(covar, i, i));
     }
+    set_spectrum_calibration(fit_data->exp, fit_data->ws->det); /* Update the experimental spectra to final calibration */
     gsl_multifit_nlinear_free(w);
     gsl_matrix_free(covar);
     gsl_vector_free(x);

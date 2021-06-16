@@ -110,6 +110,7 @@ gsl_histogram *read_experimental_spectrum(const char *filename, const detector *
     if(in != stdin) {
         fclose(in);
     }
+    set_spectrum_calibration(h, det);
     return h;
 }
 

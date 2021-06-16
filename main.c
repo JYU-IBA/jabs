@@ -109,7 +109,12 @@ int main(int argc, char **argv) {
         sim->sample = sample_from_sample_model(sm);
     }
     if(cmd_opt->interactive || script_files) {
-        script_session *session = script_session_init(jibal, sim, sm);
+        script_session *session = script_session_init(jibal, sim);
+        if(!session) {
+            fprintf(stderr, "Error in session initialization.\n");
+            return EXIT_FAILURE;
+        }
+        session->fit->sm = sm;
         int status = 0;
         if(script_files) {
             for(int i = 0; i < argc; i++) {
@@ -181,7 +186,9 @@ int main(int argc, char **argv) {
     start = clock();
     sim_workspace *ws = NULL;
     if(cmd_opt->fit) {
-        fit_data *fit_data = fit_data_new(jibal, sim, exp, sm);
+        fit_data *fit_data = fit_data_new(jibal, sim);
+        fit_data->exp = exp;
+        fit_data->sm = sm;
         fit_params_add(sim, sm, fit_data->fit_params, cmd_opt->fit_vars);
         fit_range range = {.low = cmd_opt->fit_low, .high = cmd_opt->fit_high};
         fit_range_add(fit_data, &range); /* We add just this one range */
@@ -208,9 +215,6 @@ int main(int argc, char **argv) {
     if(!ws) {
         fprintf(stderr, "ERROR! Simulation workspace does not exist after the simulation. This implies something failed spectacularly.\nNo output generated.\n");
         return EXIT_FAILURE;
-    }
-    if(exp) {
-        set_spectrum_calibration(exp, ws->det); /* Update the experimental spectra to final calibration */
     }
     print_spectra(cmd_opt->out_filename, ws, exp);
 
