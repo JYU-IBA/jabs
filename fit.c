@@ -197,6 +197,8 @@ void fit_roi_print(FILE *f, const struct fit_data *fit_data, size_t low, size_t 
 
     fprintf(stderr, "          low = %12zu\n", low);
     fprintf(stderr, "         high = %12zu\n", high);
+    fprintf(stderr, "        E_low = %12.3lf keV (low energy edge of bin)\n", detector_calibrated(fit_data->ws->det, low)/C_KEV);
+    fprintf(stderr, "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(fit_data->ws->det, high+1)/C_KEV);
     fprintf(stderr, "        n_exp = %12zu\n", n_exp);
     fprintf(stderr, "        n_sim = %12zu\n", n_exp);
     fprintf(stderr, "          exp  = %12g\n", exp_cts);

@@ -128,7 +128,7 @@ double spectrum_roi(gsl_histogram *h, size_t low, size_t high) {
     if(high >= h->n)
         high = h->n - 1;
     double sum = 0.0;
-    for(size_t i = low; i < high; i++) {
+    for(size_t i = low; i <= high; i++) {
         sum += h->bin[i];
     }
     return sum;
