@@ -341,10 +341,6 @@ void simulation_print(FILE *f, const simulation *sim) {
     double alpha; /* Incident angle, SimNRA convention (no signs). */
     rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */
     alpha = theta;
-#ifdef MULTIDET_FIXED
-    rotate(sim->det->theta, sim->det->phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Detector in sample coordinate system, angles are detector in sample system. Note that for Cornell geometry phi = 90.0 deg! */
-    beta = C_PI - theta;
-#endif
     if(sim->beam_isotope) {
         fprintf(f, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass / C_U);
     } else {
@@ -356,13 +352,6 @@ void simulation_print(FILE *f, const simulation *sim) {
     fprintf(f, "n_detectors = %zu\n", sim->n_det);
     fprintf(f, "n_reactions = %zu\n", sim->n_reactions);
     fprintf(f, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence*C_E*1.0e6);
-#ifdef MULTIDET_FIXED
-    fprintf(f, "beta = %.3lf deg\n", beta/C_DEG);
-    fprintf(f, "theta = %.3lf deg\n", sim->det->theta/C_DEG);
-    fprintf(f, "detector calibration offset = %.3lf keV\n", sim->det->offset/C_KEV);
-    fprintf(f, "detector calibration slope = %.5lf keV\n", sim->det->slope/C_KEV);
-    fprintf(f, "detector resolution = %.3lf keV FWHM\n", sqrt(sim->det->resolution)*C_FWHM/C_KEV);
-#endif
     fprintf(f, "step for incident ions = %.3lf keV\n", sim->params.stop_step_incident/C_KEV);
     fprintf(f, "step for exiting ions = %.3lf keV\n", sim->params.stop_step_exiting/C_KEV);
     fprintf(f, "stopping RK4 = %s\n", sim->params.rk4?"true":"false");
@@ -482,4 +471,10 @@ double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E)
         }
     }
     return t[lo].sigma+((t[lo+1].sigma-t[lo].sigma)/(t[lo+1].E-t[lo].E))*(E-t[lo].E);
+}
+
+double sim_calculate_exit_angle(const simulation *sim, const detector *det) {
+    double theta, phi;
+    rotate(det->theta, det->phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Detector in sample coordinate system, angles are detector in sample system. Note that for Cornell geometry phi = 90.0 deg! */
+    return C_PI - theta;
 }

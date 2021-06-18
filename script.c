@@ -143,7 +143,7 @@ int script_show(script_session *s, int argc, char * const *argv) {
     }
     if(strcmp(argv[0], "det") == 0) {
 
-        for(size_t i_det = 0 ; i_det < fit->sim->n_det; i_det++) {  /* TODO: prettier output */
+        for(size_t i_det = 0 ; i_det < fit->sim->n_det; i_det++) {  /* TODO: prettier output, maybe a table */
             fprintf(stderr, "DETECTOR %zu\n", i_det);
             detector_print(NULL, fit->sim->det[i_det]);
             fprintf(stderr, "\n");
@@ -185,32 +185,7 @@ int script_set(script_session *s, int argc, char * const *argv) {
             return -1;
         }
         return 0;
-    }
-#if 0
-    else if(strcmp(argv[0], "foil") == 0) {
-        if(argc < 3) {
-            fprintf(stderr, "Usage: set foil detector elem thickness ...\nExample: set foil 1 Si 500tfu\n");
-            return EXIT_FAILURE;
-        }
-        size_t i_det = strtoul(argv[1], NULL, 10);
-        detector *det = sim_det(fit->sim, i_det);
-        if(!det) {
-            fprintf(stderr, "No detector \"%s\"\n", argv[1]);
-            return EXIT_FAILURE;
-        }
-        char *arg_str = argv_to_string(argc-2, argv+2);
-        if(!arg_str) {
-            fprintf(stderr, "What foil?\n");
-            return EXIT_FAILURE;
-        }
-        if(detector_set_foil(s->jibal, det, strdup(arg_str))) {
-            fprintf(stderr, "Could not set foil.\n");
-            return EXIT_FAILURE;
-        }
-        return EXIT_SUCCESS;
-    }
-#endif
-    else if(strcmp(argv[0], "det") == 0) {
+    } else if(strcmp(argv[0], "det") == 0) {
         size_t i_det = 0;
         if(argc == 4) {
             i_det = strtoul(argv[1], NULL, 10);
@@ -349,9 +324,6 @@ void script_make_vars(script_session *s) {
     if(!fit)
         return;
     simulation *sim = fit->sim;
-#ifdef MULTIDET_FIX
-    detector *det = fit->sim->det;
-#endif
     jibal_config_var vars[] = {
             {JIBAL_CONFIG_VAR_UNIT, "fluence", &sim->fluence, NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "energy",         &sim->beam_E,      NULL},
@@ -360,16 +332,6 @@ void script_make_vars(script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT,   "sample_azi",     &sim->sample_phi,  NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "channeling",     &sim->channeling_offset, NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",&sim->channeling_slope, NULL},
-#ifdef MULTIDET_FIX
-            {JIBAL_CONFIG_VAR_UNIT,   "slope",          &det->slope,             NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "offset",         &det->offset,            NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "resolution",     &det->resolution,        NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "theta",          &det->theta,             NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "phi",            &det->phi,               NULL},
-            {JIBAL_CONFIG_VAR_INT,    "number",         &det->number,            NULL},
-            {JIBAL_CONFIG_VAR_INT,    "channels",       &det->channels,          NULL},
-            {JIBAL_CONFIG_VAR_INT,    "compress",       &det->compress,          NULL},
-#endif
             {JIBAL_CONFIG_VAR_STRING, "output",         &s->output_filename,      NULL},
             {JIBAL_CONFIG_VAR_STRING, "bricks_out",     &s->bricks_out_filename,   NULL},
             {JIBAL_CONFIG_VAR_STRING, "sample_out",     &s->sample_out_filename,   NULL},

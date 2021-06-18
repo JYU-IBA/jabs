@@ -2,14 +2,14 @@
 #include <string.h>
 #include <stdio.h>
 
-char **string_to_argv(const char *str) { /* TODO: move this generic function to elsewhere! */
+char **string_to_argv(const char *str) {
     char *s = strdup(str);
     char *s_split = s;
     s[strcspn(s, "\r\n")] = 0;
     size_t len = strlen(s);
     size_t n = 0;
     char *col;
-    while((col = strsep(&s_split, " \t")) != NULL) {
+    while((col = strsep(&s_split, " \t")) != NULL) { /* TODO: parse quotation marks so that 'foo "bar baz"' becomes out[0] == "foo", out[1] == "bar baz"; */
         if(*col == '\0') {
             continue;
         }
