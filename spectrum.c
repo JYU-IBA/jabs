@@ -12,21 +12,17 @@
 
  */
 
-#include "spectrum.h"
 #include <string.h>
+
+#include "generic.h"
+#include "spectrum.h"
+
 
 
 gsl_histogram *spectrum_read(const char *filename, const detector *det) {
     char *line=NULL;
     size_t line_size=0;
-    FILE *in;
-    if(!filename)
-        return NULL;
-    if(strcmp(filename, "-") == 0) {
-        in = stdin;
-    } else {
-        in = fopen(filename, "r");
-    }
+    FILE *in = fopen_file_or_stream(filename, "r");
     if(!in)
         return NULL;
     gsl_histogram *h = gsl_histogram_alloc(det->channels);
@@ -107,9 +103,7 @@ gsl_histogram *spectrum_read(const char *filename, const detector *det) {
     }
     free(line);
     free(columns);
-    if(in != stdin) {
-        fclose(in);
-    }
+    fclose_file_or_stream(in);
     spectrum_set_calibration(h, det);
     return h;
 }

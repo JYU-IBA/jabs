@@ -75,6 +75,10 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
             i_vec++;
         }
     }
+    if(i_vec != f->size) {
+        fprintf(stderr, "Not enough channels in fits for the residuals vector. This shouldn't happen.\n");
+        return GSL_FAILURE;
+    }
     return GSL_SUCCESS;
 }
 
@@ -125,7 +129,7 @@ void fit_params_free(fit_params *p) {
 void fit_stats_print(FILE *f, const struct fit_stats *stats) {
     fprintf(f,"CPU time used for actual simulation: %.3lf s.\n", stats->cputime_actual);
     if(stats->n_evals > 0) {
-        fprintf(f, "Per spectrum simulation: %.3lf ms.\n", 1000.0 * stats->cputime_actual / stats->n_evals);
+        fprintf(f, "One simulation: %.3lf ms.\n", 1000.0 * stats->cputime_actual / stats->n_evals);
     }
     if(stats->chisq_dof > 0.0) {
         fprintf(f, "Final chisq/dof = %.7lf\n", stats->chisq_dof);

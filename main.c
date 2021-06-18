@@ -108,7 +108,6 @@ int main(int argc, char **argv) {
             for(int i = 0; i < argc; i++) {
                 status = script_process(session, argv[i]);
                 if(status) {
-                    fprintf(stderr, "Error running script \"%s\"\n", argv[i]);
                     return status;
                 }
             }

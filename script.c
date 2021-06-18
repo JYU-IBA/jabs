@@ -42,8 +42,7 @@ int script_load(script_session *s, int argc, char * const *argv) {
     }
     if(strcmp(argv[0], "script") == 0) {
         if(argc == 2) {
-            script_process(s, argv[1]);
-            return 0;
+            return script_process(s, argv[1]);
         } else {
             fprintf(stderr, "Usage: load script [file]\n");
         }
@@ -96,6 +95,7 @@ int script_load(script_session *s, int argc, char * const *argv) {
         }
         fit->exp[i_det] = spectrum_read(argv[1], sim_det(fit->sim, i_det));
         if(!fit->exp[i_det]) {
+            fprintf(stderr, "Reading spectrum from file \"%s\" was not successful.\n", argv[1]);
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
@@ -262,6 +262,16 @@ int script_add(script_session *s, int argc, char * const *argv) {
         }
         fit_data_fit_range_add(fit_data, &range);
         return 0;
+    } else if(strcmp(argv[0], "det") == 0) {
+        if(argc != 2) {
+            fprintf(stderr, "Usage: add det filename\n");
+            return EXIT_FAILURE;
+        }
+        detector *det = detector_from_file(s->jibal, argv[1]);
+        if(!det) {
+            return EXIT_FAILURE;
+        }
+        return fit_data_add_det(fit_data, det);
     }
     fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
     return -1;
@@ -450,7 +460,7 @@ int script_save(script_session *s, int argc, char * const *argv) {
             return EXIT_FAILURE;
         }
         if(print_spectra(argv[1], fit_data_ws(fit_data, i_det), fit_data_exp(fit_data, i_det))) {
-            fprintf(stderr, "Could not save spectra of detector %zu to file \"%s\"!\n", i_det, argv[2]);
+            fprintf(stderr, "Could not save spectra of detector %zu to file \"%s\"!\n", i_det, argv[1]);
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
@@ -553,8 +563,8 @@ int script_process(script_session *s, const char *filename) {
         fprintf(stderr, "\nRunning script \"%s\"\n\n", filename);
     }
     int exit = FALSE;
+    int status = 0;
     while(getline(&line, &line_size, f) > 0) {
-        int status = 0;
         lineno++;
         line[strcspn(line, "\r\n")] = 0; /* Strip newlines */
         if(*line == '#') /* Comment */
@@ -606,7 +616,7 @@ int script_process(script_session *s, const char *filename) {
             break;
         if(interactive) {
             fputs(prompt, stderr);
-        } else if(status < 0) {
+        } else if(status) {
             fprintf(stderr, "Error (%i) on line %zu. Aborting.\n", status, lineno);
             break;
         }
@@ -616,9 +626,13 @@ int script_process(script_session *s, const char *filename) {
     if(interactive) {
         fprintf(stderr, "Bye.\n");
     } else if(filename) {
-        fprintf(stderr, "Finished running script \"%s\"\n", filename);
+        if(status) {
+            fprintf(stderr, "Error running script \"%s\"\n", filename);
+        } else {
+            fprintf(stderr, "Finished running script \"%s\"\n", filename);
+        }
     }
-    return EXIT_SUCCESS;
+    return status;
 }
 
 int script_prepare_sim_or_fit(script_session *s) {
@@ -670,6 +684,7 @@ int script_prepare_sim_or_fit(script_session *s) {
     }
     jibal_gsto_print_assignments(fit->jibal->gsto);
     jibal_gsto_print_files(fit->jibal->gsto, TRUE);
+    fprintf(stderr, "Loading stopping data.\n");
     jibal_gsto_load_all(fit->jibal->gsto);
     simulation_print(stderr, fit->sim);
     s->start = clock();
