@@ -1,8 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include <jibal_config.h>
+
 #include "defaults.h"
 #include "detector.h"
+
 extern inline double detector_calibrated(const detector *det, size_t ch);
 
 int detector_sanity_check(const detector *det) {
@@ -31,6 +35,7 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
     if(!det)
         return NULL;
     det->resolution = C_FWHM * sqrt(det->resolution); /* Convert resolution to FWHM from variance for the duration of input parsing */
+    char *foil_description = NULL; /* We use detector_set_foil() to actually set det->foil_description. We need another (temporary) pointer here. */
     jibal_config_var vars[] = {
             {JIBAL_CONFIG_VAR_UNIT,   "slope",      &det->slope,            NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "offset",     &det->offset,           NULL},
@@ -40,20 +45,14 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
             {JIBAL_CONFIG_VAR_INT,    "number",     &det->number,           NULL},
             {JIBAL_CONFIG_VAR_INT,    "channels",   &det->channels,         NULL},
             {JIBAL_CONFIG_VAR_INT,    "compress",   &det->compress,         NULL},
-            {JIBAL_CONFIG_VAR_STRING, "foil",       &det->foil_description, NULL},
+            {JIBAL_CONFIG_VAR_STRING, "foil",       &foil_description, NULL},
             {JIBAL_CONFIG_VAR_NONE,NULL,NULL,NULL}
     };
     jibal_config_var_read(jibal->units, f, filename, vars);
     det->resolution /= C_FWHM;
     det->resolution *= det->resolution;
-    if(det->foil_description) {
-        sample_model *sm = sample_model_from_string(jibal, det->foil_description);
-        det->foil = sample_from_sample_model(sm);
-        if(!det->foil) {
-            fprintf(stderr, "Error: detector foil description %s was not parsed successfully!\n", det->foil_description);
-        }
-        sample_model_free(sm);
-    }
+    detector_set_foil(jibal, det, foil_description);
+    free(foil_description);
 #ifdef DEBUG
     fprintf(stderr, "Read detector from \"%s\":\n", filename);
     detector_print(NULL, det);
@@ -101,5 +100,25 @@ int detector_print(const char *filename, const detector *det) {
     }
     if(f != stdout)
         fclose(f);
+    return EXIT_SUCCESS;
+}
+
+int detector_set_foil(const jibal *jibal, detector *det, const char *foil_description) {
+    if(!det)
+        return EXIT_FAILURE;
+    sample_free(det->foil);
+    det->foil = NULL;
+    free(det->foil_description);
+    det->foil_description = NULL;
+    if(!foil_description)
+        return EXIT_SUCCESS;
+    sample_model *sm = sample_model_from_string(jibal, foil_description);
+    det->foil = sample_from_sample_model(sm);
+    sample_model_free(sm);
+    if(!det->foil) {
+        fprintf(stderr, "Error: detector foil description %s was not parsed successfully!\n", foil_description);
+    }  else {
+        det->foil_description = strdup(foil_description);
+    }
     return EXIT_SUCCESS;
 }

@@ -29,45 +29,49 @@
 int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
 {
     clock_t start, end;
-    struct fit_data *p = (struct fit_data *) params;
-    gsl_histogram *exp = p->exp;
-    for(size_t i = 0; i < p->fit_params->n; i++) {
-        *(p->fit_params->func_params[i]) = gsl_vector_get(x, i);
+    struct fit_data *fit_data = (struct fit_data *) params;
+
+    for(size_t i = 0; i < fit_data->fit_params->n; i++) {
+        *(fit_data->fit_params->func_params[i]) = gsl_vector_get(x, i);
     }
-    sim_workspace_free(p->ws);
-    sample_free(p->sim->sample);
-    sample_model_renormalize(p->sm); /* TODO: only necessary if sample concentrations are fitted */
-    p->sim->sample = sample_from_sample_model(p->sm);
-    if(sim_sanity_check(p->sim)) {
-        p->ws = NULL; /* Workspace has not been allocated yet. */
-    } else {
-        p->ws = sim_workspace_init(p->sim, p->jibal); /* We intentionally "leak" this */
-    }
-    if(!p->ws) {
+
+    sample_free(fit_data->sim->sample);
+    sample_model_renormalize(fit_data->sm); /* TODO: only necessary if sample concentrations are fitted */
+    fit_data->sim->sample = sample_from_sample_model(fit_data->sm);
+    fit_data_workspaces_free(fit_data);
+    if(sim_sanity_check(fit_data->sim) || fit_data_workspaces_init(fit_data)) { /* Either fails: clean up and return */
+        fit_data_workspaces_free(fit_data); /* Some workspaces may have already been allocated */
         gsl_vector_set_all(f, 0.0);
         return GSL_FAILURE;
     }
-    start = clock();
-    simulate_with_ds(p->ws);
-    end = clock();
-    p->stats.cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
+    for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
+        start = clock();
+        simulate_with_ds(fit_data->ws[i_det]);
+        end = clock();
+        fit_data->stats.cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
+    }
     size_t i_vec = 0;
-    for(size_t i_range = 0; i_range < p->n_fit_ranges; i_range++) {
+    for(size_t i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) {
         if(i_vec >= f->size) {
             fprintf(stderr, "Too many channels in fits for the residuals vector. This shouldn't happen.\n");
             return GSL_FAILURE;
         }
-        fit_range *range = &p->fit_ranges[i_range];
+
+        roi *range = &fit_data->fit_ranges[i_range];
+        if(range->i_det >= fit_data->sim->n_det) {
+            fprintf(stderr, "Fit range %zu has detector %zu, but we're only supposed to have %zu detectors!\n", i_range+1, range->i_det, fit_data->sim->n_det);
+            return GSL_FAILURE;
+        }
+        sim_workspace *ws = fit_data->ws[range->i_det];
+        assert(ws);
+        gsl_histogram *exp = fit_data->exp[range->i_det];
+        assert(exp);
         for(size_t i = range->low; i <= range->high; i++) {
             double sum = 0.0;
-            if(i >= p->ws->n_channels) { /* Outside range of simulated spectrum */
+            if(i >= ws->n_channels) { /* Outside range of simulated spectrum */
                 gsl_vector_set(f, i_vec, exp->bin[i]);
             } else {
-                for(size_t j = 0; j < p->ws->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
-                    if(p->ws->reactions[j].histo && i < p->ws->reactions[j].histo->n)
-                        sum += p->ws->reactions[j].histo->bin[i];
-                }
-                gsl_vector_set(f, i_vec, exp->bin[i] - sum);
+                gsl_vector_set(f, i_vec, exp->bin[i] - ws->histo_sum->bin[i]);
             }
             i_vec++;
         }
@@ -95,9 +99,12 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
         fprintf(stderr, ", prob[%zu] = %12.6e", i, gsl_vector_get(w->x, i));
     }
 #endif
+
+#ifdef MULTIDET_FIXED
     if(fit_data->print_iters) {
         print_spectra(NULL, fit_data->ws, fit_data->exp);
     }
+#endif
     fprintf(stderr, "\n");
 }
 
@@ -132,22 +139,7 @@ void fit_stats_print(FILE *f, const struct fit_stats *stats) {
     }
 }
 
-size_t fit_ranges_calculate_number_of_channels(fit_range *fit_ranges, size_t n, const detector *det) {
-    size_t sum = 0;
-    if(!det)
-        return 0;
-    for(size_t i = 0; i < n; i++) {
-        fit_range *r = &fit_ranges[i];
-        if(r->high >= det->channels) { /* Limited by detector */
-            sum += (det->channels - r->low);
-        } else {
-            sum += (r->high - r->low) + 1;
-        }
-    }
-    return sum;
-}
-
-void fit_range_add(struct fit_data *fit_data, const struct fit_range *range) { /* Makes a deep copy */
+void fit_range_add(struct fit_data *fit_data, const struct roi *range) { /* Makes a deep copy */
     if(range->low == 0 && range->high == 0) {
 #ifdef DEBUG
         fprintf(stderr, "No valid range given (from zero to zero).\n"); /* Yeah, this is technically valid... */
@@ -155,7 +147,7 @@ void fit_range_add(struct fit_data *fit_data, const struct fit_range *range) { /
         return;
     }
     fit_data->n_fit_ranges++;
-    fit_data->fit_ranges = realloc(fit_data->fit_ranges, fit_data->n_fit_ranges * sizeof(fit_range));
+    fit_data->fit_ranges = realloc(fit_data->fit_ranges, fit_data->n_fit_ranges * sizeof(roi));
     if(!fit_data->fit_ranges) {
         fit_data->n_fit_ranges = 0;
         return;
@@ -186,29 +178,112 @@ void fit_data_free(fit_data *f) {
     free(f);
 }
 
-void fit_roi_print(FILE *f, const struct fit_data *fit_data, size_t low, size_t high) {
+void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct roi *roi) {
     if(!fit_data) {
         return;
     }
-    size_t n_exp = spectrum_channels_in_range(fit_data->exp, low, high);
-    size_t n_sim = fit_data->ws?spectrum_channels_in_range  (fit_data->ws->histo_sum, low, high):0;
-    double exp_cts = spectrum_roi(fit_data->exp, low, high);
-    double sim_cts = fit_data->ws?spectrum_roi(fit_data->ws->histo_sum, low, high):0.0;
+    sim_workspace *ws = fit_data_ws(fit_data, roi->i_det);
+    gsl_histogram *exp = fit_data_exp(fit_data, roi->i_det);
+    if(!ws || !exp)
+        return;
+    size_t n_exp = spectrum_channels_in_range(exp, roi->low, roi->high);
+    size_t n_sim = fit_data->ws?spectrum_channels_in_range(ws->histo_sum, roi->low, roi->high):0;
+    double exp_cts = spectrum_roi(fit_data_exp(fit_data, roi->i_det), roi->low, roi->high);
+    double sim_cts = fit_data->ws?spectrum_roi(ws->histo_sum, roi->low, roi->high):0.0;
 
-    fprintf(stderr, "          low = %12zu\n", low);
-    fprintf(stderr, "         high = %12zu\n", high);
-    fprintf(stderr, "        E_low = %12.3lf keV (low energy edge of bin)\n", detector_calibrated(fit_data->ws->det, low)/C_KEV);
-    fprintf(stderr, "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(fit_data->ws->det, high+1)/C_KEV);
-    fprintf(stderr, "        n_exp = %12zu\n", n_exp);
-    fprintf(stderr, "        n_sim = %12zu\n", n_exp);
-    fprintf(stderr, "          exp  = %12g\n", exp_cts);
-    fprintf(stderr, "          sim  = %12g\n", sim_cts);
-    fprintf(stderr, "      exp-sim  = %12g\n", exp_cts - sim_cts);
-    fprintf(stderr, "    sqrt(exp)  = %12.5lf\n", sqrt(exp_cts));
-    fprintf(stderr, "      sim/exp  = %12.5lf\n", sim_cts/exp_cts);
-    fprintf(stderr, "      exp/sim  = %12.5lf\n", exp_cts/sim_cts);
-    fprintf(stderr, "  1/sqrt(exp)  = %12.5lf%%\n", 100.0/sqrt(exp_cts));
-    fprintf(stderr, "(exp-sim)/exp  = %12.5lf%%\n", 100.0*(exp_cts-sim_cts)/exp_cts);
+    fprintf(f, "          low = %12zu\n", roi->low);
+    fprintf(f, "         high = %12zu\n", roi->high);
+    fprintf(f, "        E_low = %12.3lf keV (low energy edge of bin)\n", detector_calibrated(ws->det, roi->low)/C_KEV);
+    fprintf(f, "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(ws->det, roi->high+1)/C_KEV);
+    fprintf(f, "        n_exp = %12zu\n", n_exp);
+    fprintf(f, "        n_sim = %12zu\n", n_sim);
+    fprintf(f, "          exp  = %12g\n", exp_cts);
+    fprintf(f, "          sim  = %12g\n", sim_cts);
+    fprintf(f, "      exp-sim  = %12g\n", exp_cts - sim_cts);
+    fprintf(f, "    sqrt(exp)  = %12.5lf\n", sqrt(exp_cts));
+    fprintf(f, "      sim/exp  = %12.5lf\n", sim_cts/exp_cts);
+    fprintf(f, "      exp/sim  = %12.5lf\n", exp_cts/sim_cts);
+    fprintf(f, "  1/sqrt(exp)  = %12.5lf%%\n", 100.0/sqrt(exp_cts));
+    fprintf(f, "(exp-sim)/exp  = %12.5lf%%\n", 100.0*(exp_cts-sim_cts)/exp_cts);
+}
+
+gsl_histogram *fit_data_exp(const struct fit_data *fit_data, size_t i_det) {
+    if(!fit_data || !fit_data->exp)
+        return NULL;
+    if(i_det >= fit_data->sim->n_det)
+        return NULL;
+    return fit_data->exp[i_det];
+}
+
+sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det) {
+    if(!fit_data || !fit_data->ws)
+        return NULL;
+    if(i_det >= fit_data->sim->n_det)
+        return NULL;
+    return fit_data->ws[i_det];
+}
+
+
+size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data) {
+    size_t sum = 0;
+    for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
+        roi *r = &fit_data->fit_ranges[i];
+        detector *det = sim_det(fit_data->sim, r->i_det);
+        if(!det) {
+            continue;
+        }
+        if(r->high >= det->channels) { /* Limited by detector */
+            sum += (det->channels - r->low);
+        } else {
+            sum += (r->high - r->low) + 1;
+        }
+    }
+    return sum;
+}
+
+int fit_data_workspaces_init(struct fit_data *fit_data) {
+    int status = EXIT_SUCCESS;
+    fit_data_workspaces_free(fit_data);
+    for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
+        if(detector_sanity_check(fit_data->sim->det[i_det])) {
+            fprintf(stderr, "Detector %zu failed sanity check!\n", i_det + 1);
+            status = EXIT_FAILURE;
+            break;
+        }
+        fit_data->ws[i_det] = sim_workspace_init(fit_data->jibal, fit_data->sim, fit_data->sim->det[i_det]);
+        if(!fit_data->ws[i_det]) {
+            fprintf(stderr, "Workspace %zu failed to initialize!\n", i_det + 1);
+            status = EXIT_FAILURE;
+        }
+    }
+    if(status == EXIT_FAILURE) {
+        fit_data_workspaces_free(fit_data);
+    }
+    return status;
+}
+
+void fit_data_workspaces_free(struct fit_data *fit_data) {
+    if(!fit_data->ws) {
+        return;
+    }
+    for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
+        sim_workspace_free(fit_data->ws[i_det]);
+        fit_data->ws[i_det] = NULL;
+    }
+    free(fit_data->ws);
+    fit_data->ws = NULL;
+}
+void fit_data_exp_free(struct fit_data *fit_data) {
+    if(!fit_data->exp)
+        return;
+    for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
+        if(fit_data->exp[i_det]) {
+            gsl_histogram_free(fit_data->exp[i_det]);
+            fit_data->ws[i_det] = NULL;
+        }
+    }
+    free(fit_data->exp);
+    fit_data->exp = NULL;
 }
 
 void fit_data_print(FILE *f, const struct fit_data *fit_data) {
@@ -222,9 +297,9 @@ void fit_data_print(FILE *f, const struct fit_data *fit_data) {
     fprintf(stderr, "%zu fit ranges:\n", fit_data->n_fit_ranges);
     fprintf(stderr, "  i |    low |   high |   exp cts |   sim cts | sim/exp |\n");
     for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
-        fit_range *range = &fit_data->fit_ranges[i];
-        double exp_cts = spectrum_roi(fit_data->exp, range->low, range->high);
-        double sim_cts = fit_data->ws?spectrum_roi(fit_data->ws->histo_sum, range->low, range->high):0.0;
+        roi *range = &fit_data->fit_ranges[i];
+        double exp_cts = spectrum_roi(fit_data->exp[range->i_det], range->low, range->high);
+        double sim_cts = fit_data->ws?spectrum_roi(fit_data->ws[range->i_det]->histo_sum, range->low, range->high):0.0;
         if(exp_cts == 0.0) {
             fprintf(f, "%3zu | %6lu | %6lu | %9g | %9g |         |\n", i + 1, range->low, range->high, exp_cts, sim_cts);
         } else {
@@ -232,7 +307,7 @@ void fit_data_print(FILE *f, const struct fit_data *fit_data) {
             fprintf(f, "%3zu | %6lu | %6lu | %9g | %9g | %7.5lf |\n", i + 1, range->low, range->high, exp_cts, sim_cts, ratio);
         }
     }
-    fprintf(f, "\nFit has %zu channels total (detector has %zu channels).\n", fit_ranges_calculate_number_of_channels(fit_data->fit_ranges, fit_data->n_fit_ranges, fit_data->sim->det), fit_data->sim->det->channels);
+    fprintf(f, "\nFit has %zu channels total.\n", fit_data_ranges_calculate_number_of_channels(fit_data));
 }
 
 int fit(struct fit_data *fit_data) {
@@ -265,14 +340,14 @@ int fit(struct fit_data *fit_data) {
     }
 
     for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
-        fit_range *range = &fit_data->fit_ranges[i];
+        roi *range = &fit_data->fit_ranges[i];
         fprintf(stderr, "Fit range %zu [%lu, %lu]\n", i+1, range->low, range->high);
     }
 
     fdf.f = &fit_function;
     fdf.df = NULL; /* Jacobian, with NULL using finite difference. TODO: this could be implemented */
     fdf.fvv = NULL; /* No geodesic acceleration */
-    fdf.n = fit_ranges_calculate_number_of_channels(fit_data->fit_ranges, fit_data->n_fit_ranges, fit_data->sim->det);
+    fdf.n = fit_data_ranges_calculate_number_of_channels(fit_data);
     fdf.p = fit_params->n;
     if(fdf.n < fdf.p) {
         fprintf(stderr, "Not enough data (%zu points) for given number of free parameters (%zu)\n", fdf.n, fdf.p);
@@ -295,10 +370,15 @@ int fit(struct fit_data *fit_data) {
     double *weights = malloc(sizeof(double) * fdf.n);
     size_t i_w = 0;
     for(size_t  i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) {
-        fit_range *range = &fit_data->fit_ranges[i_range];
-        for(i = range->low; i <= range->high && i < fit_data->sim->det->channels; i++) {
-            if(fit_data->exp->bin[i] > 1.0) {
-                weights[i_w] = 1.0 / (fit_data->exp->bin[i]);
+        roi *range = &fit_data->fit_ranges[i_range];
+        assert(range);
+        detector *det = sim_det(fit_data->sim, range->i_det);
+        gsl_histogram *exp = fit_data_exp(fit_data, range->i_det);
+        if(!det || !exp)
+            continue;
+        for(i = range->low; i <= range->high && i < det->channels; i++) {
+            if(exp->bin[i] > 1.0) {
+                weights[i_w] = 1.0 / (exp->bin[i]);
             } else {
                 weights[i_w] = 1.0; /* TODO: ?*/
             }
@@ -375,7 +455,9 @@ int fit(struct fit_data *fit_data) {
         *(fit_params->func_params[i]) = gsl_vector_get(w->x, i);
         fit_params->func_params_err[i] = c * sqrt(gsl_matrix_get(covar, i, i));
     }
-    spectrum_set_calibration(fit_data->exp, fit_data->ws->det); /* Update the experimental spectra to final calibration */
+    for(i = 0; i < fit_data->sim->n_det; i++) {
+        spectrum_set_calibration(fit_data_exp(fit_data, i), sim_det(fit_data->sim, i)); /* Update the experimental spectra to final calibration */
+    }
     gsl_multifit_nlinear_free(w);
     gsl_matrix_free(covar);
     gsl_vector_free(x);

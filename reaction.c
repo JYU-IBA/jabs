@@ -45,10 +45,11 @@ const char *reaction_name(const reaction *r) {
     }
 }
 
-reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs, double theta, int force) {
+reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs) {
     if(!target || !incident) {
         return NULL;
     }
+#if 0
     if(!force) {
         if(type == REACTION_RBS) {
             double theta_max = asin(target->mass / incident->mass);
@@ -64,6 +65,7 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
             }
         }
     }
+#endif
     reaction *r = malloc(sizeof(reaction));
     r->type = type;
     r->cs = cs;
@@ -72,7 +74,6 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     r->filename = NULL;
     r->cs_table = NULL;
     r->n_cs_table = 0;
-    r->theta = theta;
     switch(type) {
         case REACTION_ERD:
             r->product = target;

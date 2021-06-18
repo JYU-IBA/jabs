@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <jibal_units.h>
+#include <jibal_generic.h>
 #include "defaults.h"
 #include "fit.h"
 #include "generic.h"
@@ -62,37 +63,57 @@ int script_load(script_session *s, int argc, char * const *argv) {
         }
         return 0;
     } else if(strcmp(argv[0], "detector") == 0) {
+        int status;
+        size_t i_det;
+        char *det_arg;
         if(argc == 2) {
-            detector *det = detector_from_file(fit->jibal, argv[1]);
-            if(!det) {
-                return -1;
-            }
-            detector_free(fit->sim->det);
-            fit->sim->det = det;
-            return 0;
+            i_det = 0;
+            det_arg = argv[1];
+        } else if(argc == 3) {
+            i_det = strtoul(argv[1], NULL, 10);
+            det_arg = argv[2];
         } else {
-            fprintf(stderr, "Usage: load detector [file]\n");
+            fprintf(stderr, "Usage: load detector [number] file\n");
+            return EXIT_SUCCESS;
         }
+        detector *det = detector_from_file(fit->jibal, det_arg);
+        if(!det)
+            return EXIT_FAILURE;
+        if(fit->sim->n_det == 0) {
+            status = sim_det_add(fit->sim, det);
+        } else {
+            status = sim_det_replace(fit->sim, det, i_det);
+        }
+        return status;
     } else if(strcmp(argv[0], "exp") == 0) {
+        size_t i_det;
+        char *exp_arg;
         if(argc == 2) {
-            if(!fit->sim->det) {
-                fprintf(stderr, "No detector has been set, experimental spectrum can not be read.\n");
-                return -1;
-            }
-            fit->exp = spectrum_read(argv[1], fit->sim->det);
-            if(!fit->exp) {
-                return -1;
-            }
-            return 0;
+            i_det = 0;
+            exp_arg = argv[1];
+        } else if(argc == 3) {
+            i_det = strtoul(argv[1], NULL, 10);
+            exp_arg = argv[2];
         } else {
-            fprintf(stderr, "Usage: load exp [file]\n");
+            fprintf(stderr, "Usage: load exp [number] file\n");
+            return EXIT_SUCCESS;
         }
+        detector *det = sim_det(fit->sim, i_det);
+        if(!det) {
+            fprintf(stderr, "No detector (%zu) has been set, experimental spectrum can not be read.\n", i_det + 1);
+            return EXIT_FAILURE;
+        }
+        fit->exp[i_det] = spectrum_read(exp_arg, fit->sim->det[i_det]);
+        if(!fit->exp[i_det]) {
+            return EXIT_FAILURE;
+        }
+        return EXIT_SUCCESS;
     } else if(strcmp(argv[0], "reaction") == 0) {
         fprintf(stderr, "Loading reactions from files not implemented yet, sorry.\n");
-        return 0;
+        return EXIT_SUCCESS;
     }
     fprintf(stderr, "I don't know what to load (%s?)\n", argv[0]);
-    return -1;
+    return EXIT_FAILURE;
 }
 
 int script_reset(script_session *s, int argc, char * const *argv) {
@@ -107,7 +128,7 @@ int script_reset(script_session *s, int argc, char * const *argv) {
     fit->n_fit_ranges = 0;
     fit_params_free(fit->fit_params);
     fit->fit_params = NULL;
-    sim_workspace_free(fit->ws);
+    fit_data_workspaces_free(fit);
     fit->ws = NULL;
     sim_free(fit->sim);
     fit->sim = sim_init(NULL);
@@ -131,12 +152,14 @@ int script_show(script_session *s, int argc, char * const *argv) {
     if(strcmp(argv[0], "sample") == 0) {
         return sample_model_print(NULL, fit->sm);
     }
+#ifdef MULTIDET_FIX
     if(strcmp(argv[0], "spectra") == 0) {
         return print_spectra(NULL, fit->ws, fit->exp);
     }
     if(strcmp(argv[0], "detector") == 0) {
         return detector_print(NULL, fit->sim->det);
     }
+#endif
     fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
     return -1;
 }
@@ -173,24 +196,22 @@ int script_set(script_session *s, int argc, char * const *argv) {
         }
         return 0;
     } else if(strcmp(argv[0], "foil") == 0) {
-        if(argc < 2) {
-            fprintf(stderr, "Usage: set foil [foil]\nExample: set foil Si 500tfu\n");
-            return -1;
+        if(argc < 3) {
+            fprintf(stderr, "Usage: set foil detector elem thickness ...\nExample: set foil 1 Si 500tfu\n");
+            return EXIT_FAILURE;
         }
-        if(!fit->sim->det) {
-            fprintf(stderr, "No detector has been set.\n");
-            return -1;
+        size_t i_det = strtoul(argv[1], NULL, 10);
+        detector *det = sim_det(fit->sim, i_det);
+        if(!det) {
+            fprintf(stderr, "No detector \"%s\"\n", argv[1]);
+            return EXIT_FAILURE;
         }
-        free(fit->sim->det->foil_description);
-        fit->sim->det->foil_description = argv_to_string(argc-1, argv+1);
-        sample_model *sm = sample_model_from_argv(fit->jibal, argc-1, argv+1);
-        fit->sim->det->foil = sample_from_sample_model(sm);
-        sample_model_free(sm);
-        if(!fit->sim->det->foil) {
+        char *arg_str = argv_to_string(argc-2, argv+2);
+        if(detector_set_foil(s->jibal, det, arg_str)) {
             fprintf(stderr, "Could not set foil.\n");
-            return -1;
+            return EXIT_FAILURE;
         }
-        return 0;
+        return EXIT_SUCCESS;
     }
     for(jibal_config_var *var = s->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
         if(strcmp(argv[0], var->name) == 0) {
@@ -220,7 +241,7 @@ int script_add(script_session *s, int argc, char * const *argv) {
             fprintf(stderr, "Usage: add fit_range [low] [high]\n");
             return -1;
         }
-        fit_range range = {.low = strtoul(argv[1], NULL, 10),
+        roi range = {.low = strtoul(argv[1], NULL, 10),
                            .high = strtoul(argv[2], NULL, 10)
         };
         fit_range_add(fit_data, &range);
@@ -299,7 +320,9 @@ void script_make_vars(script_session *s) {
     if(!fit)
         return;
     simulation *sim = fit->sim;
+#ifdef MULTIDET_FIX
     detector *det = fit->sim->det;
+#endif
     jibal_config_var vars[] = {
             {JIBAL_CONFIG_VAR_UNIT,   "fluence",        &sim->p_sr,        NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "energy",         &sim->beam_E,      NULL},
@@ -308,6 +331,7 @@ void script_make_vars(script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT,   "sample_azi",     &sim->sample_phi,  NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "channeling",     &sim->channeling_offset, NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",&sim->channeling_slope, NULL},
+#ifdef MULTIDET_FIX
             {JIBAL_CONFIG_VAR_UNIT,   "slope",          &det->slope,             NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "offset",         &det->offset,            NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "resolution",     &det->resolution,        NULL},
@@ -316,6 +340,7 @@ void script_make_vars(script_session *s) {
             {JIBAL_CONFIG_VAR_INT,    "number",         &det->number,            NULL},
             {JIBAL_CONFIG_VAR_INT,    "channels",       &det->channels,          NULL},
             {JIBAL_CONFIG_VAR_INT,    "compress",       &det->compress,          NULL},
+#endif
             {JIBAL_CONFIG_VAR_STRING, "output",         &s->output_filename,      NULL},
             {JIBAL_CONFIG_VAR_STRING, "bricks_out",     &s->bricks_out_filename,   NULL},
             {JIBAL_CONFIG_VAR_STRING, "sample_out",     &s->sample_out_filename,   NULL},
@@ -337,10 +362,15 @@ int script_simulate(script_session *s, int argc, char * const *argv) {
     (void) argc; /* Unused */
     (void) argv; /* Unused */
     if(script_prepare_sim_or_fit(s)) {
-        return -1;
+        return EXIT_FAILURE;
     }
-    fit->ws = sim_workspace_init(fit->sim, fit->jibal);
-    simulate_with_ds(fit->ws);
+    if(fit_data_workspaces_init(fit)) {
+        fprintf(stderr, "Could not initialize simulation workspace(s).\n");
+        return EXIT_FAILURE;
+    }
+    for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
+        simulate_with_ds(fit->ws[i_det]);
+    }
     script_finish_sim_or_fit(s);
     return 0;
 }
@@ -397,11 +427,13 @@ int script_save(script_session *s, int argc, char * const *argv) {
             fprintf(stderr, "Usage: save spectra [file]\n");
             return -1;
         }
+#ifdef MULTIDET_FIX
         if(!fit_data->ws) {
             fprintf(stderr, "No simulation or fit has been made, cannot save spectra.\n");
             return -1;
         }
         print_spectra(argv[1], fit_data->ws, fit_data->exp);
+#endif
         return 0;
     } else if(strcmp(argv[0], "sample") == 0) {
         if(argc != 2) {
@@ -421,6 +453,7 @@ int script_save(script_session *s, int argc, char * const *argv) {
             fprintf(stderr, "Usage: save det [file]\n");
             return -1;
         }
+#ifdef MULTIDET_FIX
         if(!fit_data->sim->det) {
             fprintf(stderr, "No detector set.\n");
             return -1;
@@ -429,6 +462,7 @@ int script_save(script_session *s, int argc, char * const *argv) {
             fprintf(stderr, "Could not write detector to file \"%s\".\n", argv[1]);
             return -1;
         }
+#endif
         return 0;
     }
     fprintf(stderr, "I don't know what to save (%s?)\n", argv[0]);
@@ -436,12 +470,19 @@ int script_save(script_session *s, int argc, char * const *argv) {
 }
 
 int script_roi(script_session *s, int argc, char * const *argv) {
-    if(argc != 2) {
-        fprintf(stderr, "Usage: roi [low] [high]");
+    struct roi r;
+    if(argc == 3) {
+        r.i_det = strtoul(argv[0], NULL, 10);
+        argv++;
+        argc--;
     }
-    size_t low = strtoul(argv[0], NULL, 10);
-    size_t high = strtoul(argv[1], NULL, 10);
-    fit_roi_print(stderr, s->fit, low, high);
+    if (argc == 2) {
+        r.low = strtoul(argv[0], NULL, 10);
+        r.high = strtoul(argv[1], NULL, 10);
+    } else {
+        fprintf(stderr, "Usage: roi [det] low high");
+    }
+    fit_data_roi_print(stderr, s->fit, &r);
     return EXIT_SUCCESS;
 }
 
@@ -468,9 +509,9 @@ void script_session_free(script_session *s) {
     free(s->sample_out_filename);
     free(s->detector_out_filename);
     free(s->vars);
-    sim_workspace_free(s->fit->ws);
+    fit_data_workspaces_free(s->fit);
+    fit_data_exp_free(s->fit);
     sim_free(s->fit->sim);
-    gsl_histogram_free(s->fit->exp);
     sample_model_free(s->fit->sm);
     fit_data_free(s->fit);
     free(s);
@@ -577,8 +618,7 @@ int script_prepare_sim_or_fit(script_session *s) {
         fprintf(stderr, "No detector has been defined!\n");
         return -1;
     }
-    sim_workspace_free(fit->ws);
-    fit->ws = NULL;
+    fit_data_workspaces_free(s->fit);
     sample_free(fit->sim->sample);
     fit->sim->sample = sample_from_sample_model(fit->sm);
     if(!fit->sim->sample) {
@@ -594,8 +634,8 @@ int script_prepare_sim_or_fit(script_session *s) {
     free(fit->sim->reactions);
     fit->sim->reactions = NULL;
     fit->sim->n_reactions = 0;
-    sim_reactions_add(fit->sim, REACTION_RBS, fit->jibal->config->cs_rbs);
-    sim_reactions_add(fit->sim, REACTION_ERD, fit->jibal->config->cs_erd);
+    sim_reactions_add(fit->sim, REACTION_RBS, fit->jibal->config->cs_rbs, 0.0); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
+    sim_reactions_add(fit->sim, REACTION_ERD, fit->jibal->config->cs_erd, 0.0);
 
     if(fit->sim->n_reactions == 0) {
         fprintf(stderr, "No reactions, nothing to do.\n");
@@ -623,17 +663,21 @@ int script_finish_sim_or_fit(script_session *s) {
     fprintf(stderr, "...finished!\n\n");
     fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
     struct fit_data *fit = s->fit;
+#ifdef MULTIDET_FIXED
     if(s->output_filename) {
         print_spectra(s->output_filename, fit->ws, fit->exp);
     }
     if(s->bricks_out_filename) {
         print_bricks(s->bricks_out_filename, fit->ws);
     }
+#endif
     if(s->sample_out_filename) {
         sample_model_print(s->sample_out_filename, fit->sm);
     }
+#ifdef MULTIDET_FIXED
     if(s->detector_out_filename) {
         detector_print(s->detector_out_filename, fit->ws->det);
     }
+#endif
     return 0;
 }

@@ -35,6 +35,8 @@ char **string_to_argv(const char *str) { /* TODO: move this generic function to 
 }
 
 char *argv_to_string(int argc, char * const *argv) {
+    if(argc < 1)
+        return NULL;
     char *s = NULL;
     size_t len = 0;
     for(int i = 0; i < argc; i++) {

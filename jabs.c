@@ -547,6 +547,7 @@ void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params,
         fprintf(stderr, "Thing to fit: \"%s\". Sim pointer is %p, sample model pointer is %p\n", token, (void *)sim, (void *)sm);
 #endif
         if(sim) {
+#ifdef MULTIDET_FIX
             if(strncmp(token, "calib", 5) == 0) {
                 fit_params_add_parameter(params, &sim->det->slope); /* TODO: prevent adding already added things */
                 fit_params_add_parameter(params, &sim->det->offset);
@@ -561,6 +562,7 @@ void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params,
             if(strncmp(token, "reso", 4) == 0) {
                 fit_params_add_parameter(params, &sim->det->resolution);
             }
+#endif
             if(strcmp(token, "fluence") == 0) {
                 fit_params_add_parameter(params, &sim->p_sr);
             }
@@ -703,6 +705,10 @@ void simulate_with_roughness(sim_workspace *ws) {
 }
 
 void simulate_with_ds(sim_workspace *ws) {
+    if(!ws) {
+        fprintf(stderr, "No workspace, no simulation.\n");
+        return;
+    }
     double p_sr = ws->p_sr;
     simulate_with_roughness(ws);
     if(!ws->params.ds) {

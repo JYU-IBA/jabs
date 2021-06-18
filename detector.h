@@ -37,4 +37,5 @@ detector *detector_from_file(const jibal *jibal, const char *filename);
 detector *detector_default();
 void detector_free(detector *det);
 int detector_print(const char *filename, const detector *det);
+int detector_set_foil(const jibal *jibal, detector *det, const char *foil_description);
 #endif //JABS_DETECTOR_H

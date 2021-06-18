@@ -45,7 +45,8 @@ typedef struct {
 typedef struct {
     reaction *reactions;
     size_t n_reactions;
-    detector *det;
+    detector **det; /* Array of n_det detector pointers */
+    size_t n_det;
     sample *sample;
     double p_sr;
     double sample_theta; /* Polar angle. Kind of. Zero is sample perpendicular to beam. */
@@ -102,9 +103,12 @@ typedef struct {
 simulation *sim_init();
 void sim_free(simulation *sim);
 sim_calc_params sim_calc_params_defaults(int ds, int fast);
-int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_type cs); /* Add RBS or ERD reactions automagically */
+int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_type cs, double theta); /* Add RBS or ERD reactions automagically */
 int sim_sanity_check(const simulation *sim);
-sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal);
+detector *sim_det(const simulation *sim, size_t i_det);
+int sim_det_add(simulation *sim, detector *det);
+int sim_det_replace(simulation *sim, detector *det, size_t i_det);
+sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det);
 void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);
 void sim_workspace_calculate_sum_spectra(sim_workspace *ws);

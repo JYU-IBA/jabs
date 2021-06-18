@@ -24,7 +24,6 @@ simulation *sim_init() {
     sim->sample_theta = ALPHA; /* These defaults are for IBM geometry */
     sim->sample_phi = 0.0;
     sim->p_sr = PARTICLES_SR;
-    sim->det = detector_default();
     sim->beam_E = ENERGY;
     sim->beam_E_broad = 0.0;
     sim->channeling_offset = 1.0;
@@ -33,12 +32,16 @@ simulation *sim_init() {
     sim->reactions = NULL; /* Needs to be initialized after sample has been set */
     sim->n_reactions = 0;
     sim->params = sim_calc_params_defaults(FALSE, FALSE);
+    sim_det_add(sim, detector_default());
     return sim;
 }
 
 void sim_free(simulation *sim) {
     sample_free(sim->sample);
-    detector_free(sim->det);
+    for(size_t i = 0; i < sim->n_det; i++) {
+        detector_free(sim->det[i]);
+    }
+    free(sim->det);
     for(size_t i = 0; i < sim->n_reactions; i++) {
         reaction_free(&sim->reactions[i]);
     }
@@ -73,7 +76,7 @@ sim_calc_params sim_calc_params_defaults(int ds, int fast) {
     return p;
 }
 
-int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_type cs) { /* Note that sim->ion needs to be set! */
+int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_type cs, double theta) { /* Note that sim->ion needs to be set! */
     if(!sim || !sim->beam_isotope) {
         return -1;
     }
@@ -84,9 +87,11 @@ int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_t
     if(type == REACTION_NONE || cs ==  JIBAL_CS_NONE) {
         return 0;
     }
-    if(type == REACTION_ERD && sim->det->theta > C_PI/2.0) {
+#if 0
+    if(type == REACTION_ERD && theta > C_PI/2.0) {
         return 0;
     }
+#endif
     size_t n_reactions = sim->n_reactions + sample->n_isotopes; /* New maximum */
     sim->reactions = realloc(sim->reactions, n_reactions*sizeof(reaction));
     if(!sim->reactions) {
@@ -94,7 +99,7 @@ int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_t
         return -1;
     }
     for (size_t i = 0; i < sample->n_isotopes; i++) {
-        reaction *r_new = reaction_make(sim->beam_isotope, sample->isotopes[i], type, cs, sim->det->theta, TRUE);
+        reaction *r_new = reaction_make(sim->beam_isotope, sample->isotopes[i], type, cs);
         if (!r_new) {
             fprintf(stderr, "Failed to make an %s reaction with isotope %zu (%s)\n", jibal_cross_section_name(cs), i, sample->isotopes[i]->name);
             continue;
@@ -125,10 +130,6 @@ int sim_sanity_check(const simulation *sim) {
         return -1;
     }
 #endif
-    if(detector_sanity_check(sim->det)) {
-        fprintf(stderr, "Detector failed sanity check.\n");
-        return -1;
-    }
     return 0;
 }
 
@@ -140,8 +141,45 @@ void sim_workspace_reset(sim_workspace *ws, const simulation *sim) {
 }
 #endif
 
-sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
-    if(!sim || !jibal) {
+detector *sim_det(const simulation *sim, size_t i_det) {
+    if(!sim->det)
+        return NULL;
+    if(i_det >= sim->n_det)
+        return NULL;
+    return sim->det[i_det];
+}
+
+int sim_det_add(simulation *sim, detector *det) {
+    if(!sim) {
+        return EXIT_FAILURE;
+    }
+    if(!det) {
+        return EXIT_SUCCESS; /* Not an error */
+    }
+    sim->n_det++;
+    sim->det = realloc(sim->det, sizeof(detector *) * sim->n_det);
+    if(!sim->det)
+        return EXIT_FAILURE;
+    sim->det[sim->n_det - 1] = det;
+    return EXIT_SUCCESS;
+}
+
+int sim_det_replace(simulation *sim, detector *det, size_t i_det) {
+    if(!sim) {
+        return EXIT_FAILURE;
+    }
+    if(!det) {
+        return EXIT_FAILURE;
+    }
+    if(i_det >= sim->n_det)
+        return EXIT_FAILURE;
+    detector_free(sim->det[i_det]);
+    sim->det[i_det] = det;
+    return EXIT_SUCCESS;
+}
+
+sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det) {
+    if(!jibal || !sim || !det) {
         return NULL;
     }
     if(!sim->sample) {
@@ -150,7 +188,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->sim = sim;
     ws->p_sr = sim->p_sr;
-    ws->det = sim->det; /* TODO: multidetector? */
+    ws->det = det;
     ws->sample = sim->sample;
     ws->params = sim->params;
     ws->n_reactions = sim->n_reactions;
@@ -213,7 +251,7 @@ sim_workspace *sim_workspace_init(const simulation *sim, const jibal *jibal) {
             r->n_bricks = ws->params.depthsteps_max;
         } else {
             if(ws->params.stop_step_incident == 0.0) { /* Automatic incident step size */
-                r->n_bricks = (int) ceil(sim->beam_E / (STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(sim->det->resolution)) + ws->sample->n_ranges); /* This is conservative */
+                r->n_bricks = (int) ceil(sim->beam_E / (STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(ws->det->resolution)) + ws->sample->n_ranges); /* This is conservative */
             } else {
                 r->n_bricks = (int) ceil(sim->beam_E / ws->params.stop_step_incident + ws->sample->n_ranges); /* This is conservative */
             }
@@ -274,7 +312,7 @@ void sim_workspace_free(sim_workspace *ws) {
 
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim) { /* TODO: assumes calibration function is increasing */
     size_t i=0;
-    while(detector_calibrated(sim->det, i) < 1.1*sim->beam_E) {i++;}
+    while(detector_calibrated(ws->det, i) < 1.1*sim->beam_E) {i++;}
 #ifdef DEBUG
     fprintf(stderr, "Simulating %zu channels\n", i);
 #endif
@@ -301,8 +339,10 @@ void simulation_print(FILE *f, const simulation *sim) {
     double alpha, beta; /* Incident and exit angles, SimNRA conventions (no signs). */
     rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */
     alpha = theta;
+#ifdef MULTIDET_FIXED
     rotate(sim->det->theta, sim->det->phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Detector in sample coordinate system, angles are detector in sample system. Note that for Cornell geometry phi = 90.0 deg! */
     beta = C_PI - theta;
+#endif
     if(sim->beam_isotope) {
         fprintf(f, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass / C_U);
     } else {
@@ -311,12 +351,14 @@ void simulation_print(FILE *f, const simulation *sim) {
     fprintf(f, "E = %.3lf keV\n", sim->beam_E/C_KEV);
     fprintf(f, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
     fprintf(f, "alpha = %.3lf deg\n", alpha/C_DEG);
+#ifdef MULTIDET_FIXED
     fprintf(f, "beta = %.3lf deg\n", beta/C_DEG);
     fprintf(f, "theta = %.3lf deg\n", sim->det->theta/C_DEG);
     fprintf(f, "particles * sr = %e\n", sim->p_sr);
     fprintf(f, "detector calibration offset = %.3lf keV\n", sim->det->offset/C_KEV);
     fprintf(f, "detector calibration slope = %.5lf keV\n", sim->det->slope/C_KEV);
     fprintf(f, "detector resolution = %.3lf keV FWHM\n", sqrt(sim->det->resolution)*C_FWHM/C_KEV);
+#endif
     fprintf(f, "step for incident ions = %.3lf keV\n", sim->params.stop_step_incident/C_KEV);
     fprintf(f, "step for exiting ions = %.3lf keV\n", sim->params.stop_step_exiting/C_KEV);
     fprintf(f, "stopping RK4 = %s\n", sim->params.rk4?"true":"false");
