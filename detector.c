@@ -4,6 +4,7 @@
 
 #include <jibal_config.h>
 
+#include "generic.h"
 #include "defaults.h"
 #include "detector.h"
 
@@ -84,10 +85,11 @@ void detector_free(detector *det) {
 }
 
 int detector_print(const char *filename, const detector *det) {
-    FILE *f = fopen(filename, "w");
-    if(!f) {
+    if(!det)
         return EXIT_FAILURE;
-    }
+    FILE *f = fopen_file_or_stream(filename, "w");
+    if(!f)
+        return EXIT_FAILURE;
     fprintf(f, "slope = %g keV\n", det->slope/C_KEV);
     fprintf(f, "offset = %g keV\n", det->offset/C_KEV);
     fprintf(f, "resolution = %g keV\n", C_FWHM*sqrt(det->resolution)/C_KEV);
@@ -98,8 +100,7 @@ int detector_print(const char *filename, const detector *det) {
     if(det->foil_description) {
         fprintf(f, "foil = %s\n", det->foil_description);
     }
-    if(f != stdout)
-        fclose(f);
+    fclose_file_or_stream(f);
     return EXIT_SUCCESS;
 }
 

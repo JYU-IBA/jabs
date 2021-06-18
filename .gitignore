@@ -1,5 +1,7 @@
 *build*/
 *data/*
 *plots/*
+tests/
 .idea/
 .tmp/
+qjabs/

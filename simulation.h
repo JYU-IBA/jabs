@@ -107,7 +107,7 @@ int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_t
 int sim_sanity_check(const simulation *sim);
 detector *sim_det(const simulation *sim, size_t i_det);
 int sim_det_add(simulation *sim, detector *det);
-int sim_det_replace(simulation *sim, detector *det, size_t i_det);
+int sim_det_set(simulation *sim, detector *det, size_t i_det); /* Will free existing detector (can be NULL too) */
 sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det);
 void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);

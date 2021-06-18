@@ -64,46 +64,37 @@ int script_load(script_session *s, int argc, char * const *argv) {
         return 0;
     } else if(strcmp(argv[0], "detector") == 0) {
         int status;
-        size_t i_det;
-        char *det_arg;
-        if(argc == 2) {
-            i_det = 0;
-            det_arg = argv[1];
-        } else if(argc == 3) {
+        size_t i_det = 0;
+        if(argc == 3) {
             i_det = strtoul(argv[1], NULL, 10);
-            det_arg = argv[2];
-        } else {
+            argc--;
+            argv++;
+        }
+        if(argc != 2) {
             fprintf(stderr, "Usage: load detector [number] file\n");
             return EXIT_SUCCESS;
         }
-        detector *det = detector_from_file(fit->jibal, det_arg);
+        detector *det = detector_from_file(fit->jibal, argv[1]);
         if(!det)
             return EXIT_FAILURE;
-        if(fit->sim->n_det == 0) {
-            status = sim_det_add(fit->sim, det);
+        if(fit->sim->n_det == 0 && i_det == 0) {
+            status = fit_data_add_det(fit, det); /* Adds a new detector (and space for experimental spectrum) */
         } else {
-            status = sim_det_replace(fit->sim, det, i_det);
+            status = sim_det_set(fit->sim, det, i_det);
         }
         return status;
     } else if(strcmp(argv[0], "exp") == 0) {
-        size_t i_det;
-        char *exp_arg;
-        if(argc == 2) {
-            i_det = 0;
-            exp_arg = argv[1];
-        } else if(argc == 3) {
+        size_t i_det = 0;
+        if(argc == 3) {
             i_det = strtoul(argv[1], NULL, 10);
-            exp_arg = argv[2];
-        } else {
+            argc--;
+            argv++;
+        }
+        if(argc != 2) {
             fprintf(stderr, "Usage: load exp [number] file\n");
             return EXIT_SUCCESS;
         }
-        detector *det = sim_det(fit->sim, i_det);
-        if(!det) {
-            fprintf(stderr, "No detector (%zu) has been set, experimental spectrum can not be read.\n", i_det + 1);
-            return EXIT_FAILURE;
-        }
-        fit->exp[i_det] = spectrum_read(exp_arg, fit->sim->det[i_det]);
+        fit->exp[i_det] = spectrum_read(argv[1], sim_det(fit->sim, i_det));
         if(!fit->exp[i_det]) {
             return EXIT_FAILURE;
         }
@@ -117,31 +108,29 @@ int script_load(script_session *s, int argc, char * const *argv) {
 }
 
 int script_reset(script_session *s, int argc, char * const *argv) {
-    struct fit_data *fit = s->fit;
+    struct fit_data *fit_data = s->fit;
     (void) argc; /* Unused */
     (void) argv; /* Unused */
-    if(!fit) {
+    if(!fit_data) {
         return -1;
     }
-    free(fit->fit_ranges);
-    fit->fit_ranges = NULL;
-    fit->n_fit_ranges = 0;
-    fit_params_free(fit->fit_params);
-    fit->fit_params = NULL;
-    fit_data_workspaces_free(fit);
-    fit->ws = NULL;
-    sim_free(fit->sim);
-    fit->sim = sim_init(NULL);
+    fit_data_fit_ranges_free(fit_data);
+    fit_params_free(fit_data->fit_params);
+    fit_data->fit_params = NULL;
+    fit_data_workspaces_free(fit_data);
+    fit_data->ws = NULL;
+    sim_free(fit_data->sim);
+    fit_data->sim = sim_init(NULL);
     return 0;
 }
 
 int script_show(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     if(argc == 0) {
-        fprintf(stderr, "Usage show [sim|fit|sample|spectra|detector].\n");
+        fprintf(stderr, "Usage show [sim|fit|sample|detector].\n");
         return 0;
     }
-     if(strcmp(argv[0], "sim") == 0) {
+    if(strcmp(argv[0], "sim") == 0) {
          simulation_print(stderr, fit->sim);
          return 0;
      }
@@ -152,14 +141,12 @@ int script_show(script_session *s, int argc, char * const *argv) {
     if(strcmp(argv[0], "sample") == 0) {
         return sample_model_print(NULL, fit->sm);
     }
-#ifdef MULTIDET_FIX
-    if(strcmp(argv[0], "spectra") == 0) {
-        return print_spectra(NULL, fit->ws, fit->exp);
+    if(strcmp(argv[0], "det") == 0) {
+        for(size_t i_det = 0 ; i_det < fit->sim->n_det; i_det++) {  /* TODO: prettier output */
+            detector_print(NULL, fit->sim->det[i_det]);
+        }
+        return EXIT_SUCCESS;
     }
-    if(strcmp(argv[0], "detector") == 0) {
-        return detector_print(NULL, fit->sim->det);
-    }
-#endif
     fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
     return -1;
 }
@@ -237,14 +224,20 @@ int script_add(script_session *s, int argc, char * const *argv) {
         return 0;
     }
     if(strcmp(argv[0], "fit_range") == 0) {
-        if(argc != 3) {
-            fprintf(stderr, "Usage: add fit_range [low] [high]\n");
+        roi range = {.i_det = 0};
+        if(argc == 4) {
+            range.i_det = strtoul(argv[1], NULL, 10);
+            argc--;
+            argv++;
+        }
+        if(argc == 3) {
+            range.low = strtoul(argv[1], NULL, 10);
+            range.high = strtoul(argv[2], NULL, 10);
+        } else {
+            fprintf(stderr, "Usage: add fit_range [detector] low high\n");
             return -1;
         }
-        roi range = {.low = strtoul(argv[1], NULL, 10),
-                           .high = strtoul(argv[2], NULL, 10)
-        };
-        fit_range_add(fit_data, &range);
+        fit_data_fit_range_add(fit_data, &range);
         return 0;
     }
     fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
@@ -388,7 +381,7 @@ int script_fit(script_session *s, int argc, char * const *argv) {
         fprintf(stderr, "No parameters for fit.\n");
         return -1;
     }
-    if(!fit_data->exp) {
+    if(!fit_data->exp) { /* TODO: not enough to check this */
         fprintf(stderr, "No experimental spectrum set.\n");
         return -1;
     }
@@ -423,18 +416,21 @@ int script_save(script_session *s, int argc, char * const *argv) {
         return -1;
     }
     if(strcmp(argv[0], "spectra") == 0) {
+        size_t i_det = 0;
+        if(argc == 3) {
+            i_det = strtoul(argv[1], NULL, 10);
+            argc--;
+            argv++;
+        }
         if(argc != 2) {
-            fprintf(stderr, "Usage: save spectra [file]\n");
-            return -1;
+            fprintf(stderr, "Usage: save spectra [detector] file\n");
+            return EXIT_FAILURE;
         }
-#ifdef MULTIDET_FIX
-        if(!fit_data->ws) {
-            fprintf(stderr, "No simulation or fit has been made, cannot save spectra.\n");
-            return -1;
+        if(print_spectra(argv[1], fit_data_ws(fit_data, i_det), fit_data_exp(fit_data, i_det))) {
+            fprintf(stderr, "Could not save spectra of detector %zu to file \"%s\"!\n", i_det, argv[2]);
+            return EXIT_FAILURE;
         }
-        print_spectra(argv[1], fit_data->ws, fit_data->exp);
-#endif
-        return 0;
+        return EXIT_SUCCESS;
     } else if(strcmp(argv[0], "sample") == 0) {
         if(argc != 2) {
             fprintf(stderr, "Usage: save sample [file]\n");
@@ -449,20 +445,20 @@ int script_save(script_session *s, int argc, char * const *argv) {
         }
         return 0;
     } else if(strcmp(argv[0], "det") == 0) {
+        size_t i_det = 0;
+        if(argc == 3) {
+            i_det = strtoul(argv[1], NULL, 10);
+            argc--;
+            argv++;
+        }
         if(argc != 2) {
-            fprintf(stderr, "Usage: save det [file]\n");
+            fprintf(stderr, "Usage: save det [detector] file\n");
+            return EXIT_FAILURE;
+        }
+        if(detector_print(argv[1], sim_det(fit_data->sim, i_det))) {
+            fprintf(stderr, "Could not write detector %zu to file \"%s\".\n", i_det, argv[1]);
             return -1;
         }
-#ifdef MULTIDET_FIX
-        if(!fit_data->sim->det) {
-            fprintf(stderr, "No detector set.\n");
-            return -1;
-        }
-        if(detector_print(argv[1], fit_data->sim->det)) {
-            fprintf(stderr, "Could not write detector to file \"%s\".\n", argv[1]);
-            return -1;
-        }
-#endif
         return 0;
     }
     fprintf(stderr, "I don't know what to save (%s?)\n", argv[0]);
@@ -530,7 +526,7 @@ int script_process(script_session *s, const char *filename) {
     const char *prompt = "jabs> ";
     if(interactive) {
         fputs(prompt, stderr);
-    } else {
+    } else if(filename) {
         fprintf(stderr, "\nRunning script \"%s\"\n\n", filename);
     }
     int exit = FALSE;
@@ -596,7 +592,7 @@ int script_process(script_session *s, const char *filename) {
     fclose_file_or_stream(f);
     if(interactive) {
         fprintf(stderr, "Bye.\n");
-    } else {
+    } else if(filename) {
         fprintf(stderr, "Finished running script \"%s\"\n", filename);
     }
     return EXIT_SUCCESS;

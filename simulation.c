@@ -31,6 +31,8 @@ simulation *sim_init() {
     sim->sample = NULL; /* Needs to be set (later) */
     sim->reactions = NULL; /* Needs to be initialized after sample has been set */
     sim->n_reactions = 0;
+    sim->n_det = 0;
+    sim->det = NULL;
     sim->params = sim_calc_params_defaults(FALSE, FALSE);
     sim_det_add(sim, detector_default());
     return sim;
@@ -164,7 +166,7 @@ int sim_det_add(simulation *sim, detector *det) {
     return EXIT_SUCCESS;
 }
 
-int sim_det_replace(simulation *sim, detector *det, size_t i_det) {
+int sim_det_set(simulation *sim, detector *det, size_t i_det) {
     if(!sim) {
         return EXIT_FAILURE;
     }
@@ -336,7 +338,7 @@ void simulation_print(FILE *f, const simulation *sim) {
         return;
     }
     double theta, phi; /* Temporary variables */
-    double alpha, beta; /* Incident and exit angles, SimNRA conventions (no signs). */
+    double alpha; /* Incident angle, SimNRA convention (no signs). */
     rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */
     alpha = theta;
 #ifdef MULTIDET_FIXED
@@ -351,6 +353,8 @@ void simulation_print(FILE *f, const simulation *sim) {
     fprintf(f, "E = %.3lf keV\n", sim->beam_E/C_KEV);
     fprintf(f, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
     fprintf(f, "alpha = %.3lf deg\n", alpha/C_DEG);
+    fprintf(f, "n_detectors = %zu\n", sim->n_det);
+    fprintf(f, "n_reactions = %zu\n", sim->n_reactions);
 #ifdef MULTIDET_FIXED
     fprintf(f, "beta = %.3lf deg\n", beta/C_DEG);
     fprintf(f, "theta = %.3lf deg\n", sim->det->theta/C_DEG);
@@ -402,7 +406,7 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) { /* Calcu
     } else if(product == target) { /* ERD */
         if(sim_r->theta > C_PI/2.0) {
 #ifdef DEBUG
-            fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)", target->name, sim_r->theta);
+            fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)\n", target->name, sim_r->theta);
 #endif
             sim_r->K = 0.0;
             sim_r->cs_constant = 0.0;

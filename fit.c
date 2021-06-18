@@ -67,7 +67,6 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
         gsl_histogram *exp = fit_data->exp[range->i_det];
         assert(exp);
         for(size_t i = range->low; i <= range->high; i++) {
-            double sum = 0.0;
             if(i >= ws->n_channels) { /* Outside range of simulated spectrum */
                 gsl_vector_set(f, i_vec, exp->bin[i]);
             } else {
@@ -139,7 +138,7 @@ void fit_stats_print(FILE *f, const struct fit_stats *stats) {
     }
 }
 
-void fit_range_add(struct fit_data *fit_data, const struct roi *range) { /* Makes a deep copy */
+void fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range) { /* Makes a deep copy */
     if(range->low == 0 && range->high == 0) {
 #ifdef DEBUG
         fprintf(stderr, "No valid range given (from zero to zero).\n"); /* Yeah, this is technically valid... */
@@ -152,7 +151,15 @@ void fit_range_add(struct fit_data *fit_data, const struct roi *range) { /* Make
         fit_data->n_fit_ranges = 0;
         return;
     }
-    fit_data->fit_ranges[fit_data->n_fit_ranges-1] = *range;
+    fit_data->fit_ranges[fit_data->n_fit_ranges - 1] = *range;
+}
+
+void fit_data_fit_ranges_free(struct fit_data *fit_data) {
+    if(!fit_data)
+        return;
+    free(fit_data->fit_ranges);
+    fit_data->fit_ranges = NULL;
+    fit_data->n_fit_ranges = 0;
 }
 
 fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
@@ -162,7 +169,7 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     f->fit_ranges = NULL;
     f->jibal = jibal;
     f->sim = sim;
-    f->exp = NULL; /* Can be set later */
+    f->exp = calloc(sim->n_det, sizeof(gsl_histogram *)); /* Allocating based on initial number of detectors. */
     f->sm = NULL; /* Can be set later. */
     f->ws = NULL; /* Initialized later */
     f->fit_params = fit_params_new();
@@ -174,7 +181,7 @@ void fit_data_free(fit_data *f) {
     if(!f)
         return;
     fit_params_free(f->fit_params);
-    free(f->fit_ranges);
+    fit_data_fit_ranges_free(f);
     free(f);
 }
 
@@ -215,6 +222,30 @@ gsl_histogram *fit_data_exp(const struct fit_data *fit_data, size_t i_det) {
     return fit_data->exp[i_det];
 }
 
+void fit_data_exp_free(struct fit_data *fit_data) {
+    if(!fit_data->exp)
+        return;
+    for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
+        if(fit_data->exp[i_det]) {
+            gsl_histogram_free(fit_data->exp[i_det]);
+            fit_data->exp[i_det] = NULL;
+        }
+    }
+    free(fit_data->exp);
+    fit_data->exp = NULL;
+}
+
+int fit_data_add_det(struct fit_data *fit_data, detector *det) {
+    if(!fit_data || !det)
+        return EXIT_FAILURE;
+    if(sim_det_add(fit_data->sim, det)) {
+        return EXIT_FAILURE;
+    }
+    fit_data->exp = realloc(fit_data->exp, sizeof(gsl_histogram *) * fit_data->sim->n_det);
+    fit_data->exp[fit_data->sim->n_det - 1] = NULL;
+    return EXIT_SUCCESS;
+}
+
 sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det) {
     if(!fit_data || !fit_data->ws)
         return NULL;
@@ -244,15 +275,18 @@ size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_d
 int fit_data_workspaces_init(struct fit_data *fit_data) {
     int status = EXIT_SUCCESS;
     fit_data_workspaces_free(fit_data);
+    fit_data->ws = calloc(fit_data->sim->n_det, sizeof(sim_workspace *));
+    if(!fit_data->ws)
+        return EXIT_FAILURE;
     for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
         if(detector_sanity_check(fit_data->sim->det[i_det])) {
-            fprintf(stderr, "Detector %zu failed sanity check!\n", i_det + 1);
+            fprintf(stderr, "Detector %zu failed sanity check!\n", i_det);
             status = EXIT_FAILURE;
             break;
         }
         fit_data->ws[i_det] = sim_workspace_init(fit_data->jibal, fit_data->sim, fit_data->sim->det[i_det]);
         if(!fit_data->ws[i_det]) {
-            fprintf(stderr, "Workspace %zu failed to initialize!\n", i_det + 1);
+            fprintf(stderr, "Workspace %zu failed to initialize!\n", i_det);
             status = EXIT_FAILURE;
         }
     }
@@ -272,18 +306,6 @@ void fit_data_workspaces_free(struct fit_data *fit_data) {
     }
     free(fit_data->ws);
     fit_data->ws = NULL;
-}
-void fit_data_exp_free(struct fit_data *fit_data) {
-    if(!fit_data->exp)
-        return;
-    for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
-        if(fit_data->exp[i_det]) {
-            gsl_histogram_free(fit_data->exp[i_det]);
-            fit_data->ws[i_det] = NULL;
-        }
-    }
-    free(fit_data->exp);
-    fit_data->exp = NULL;
 }
 
 void fit_data_print(FILE *f, const struct fit_data *fit_data) {

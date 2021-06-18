@@ -286,6 +286,10 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         r->stop = FALSE;
         r->theta = scatter_theta;
         sim_reaction_recalculate_internal_variables(r);
+        if(r->stop) {
+            r->max_depth = 0.0;
+            continue;
+        }
         ion *p = &r->p;
         p->E = ion1.E * r->K;
         p->S = ion1.S * r->K;
@@ -361,10 +365,10 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         int all_stop = 1; /* Do we have any reactions left (or are we too deep in the sample) */
         for (size_t i = 0; i < ws->n_reactions; i++) {
             sim_reaction *r = &ws->reactions[i];
-            if (r->stop)
+            if(r->stop)
                 continue;
             all_stop = 0;
-            if (i_depth >= r->n_bricks) {
+            if(i_depth >= r->n_bricks) {
                 fprintf(stderr, "Too many bricks. Data partial.\n");
                 r->stop = TRUE;
                 continue;
