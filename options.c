@@ -161,7 +161,7 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
                 sim->channeling_slope = strtod(optarg, NULL)/C_KEV;
                 break;
             case '3':
-                sim->p_sr = strtod(optarg, NULL);
+                sim->fluence = strtod(optarg, NULL);
                 break;
             case '4':
                 cmd_opt->fit_low = atoi(optarg);

@@ -23,7 +23,7 @@ simulation *sim_init() {
     sim->beam_isotope = NULL;
     sim->sample_theta = ALPHA; /* These defaults are for IBM geometry */
     sim->sample_phi = 0.0;
-    sim->p_sr = PARTICLES_SR;
+    sim->fluence = FLUENCE;
     sim->beam_E = ENERGY;
     sim->beam_E_broad = 0.0;
     sim->channeling_offset = 1.0;
@@ -122,8 +122,8 @@ int sim_sanity_check(const simulation *sim) {
         fprintf(stderr, "Hmm...? Check your numbers. Your energy is %.5lf MeV!\n", sim->beam_E);
         return -1;
     }
-    if(sim->p_sr < 0.0) {
-        fprintf(stderr, "Fluence is negative (%g).\n", sim->p_sr);
+    if(sim->fluence < 0.0) {
+        fprintf(stderr, "Fluence is negative (%g).\n", sim->fluence);
         return -1;
     }
 #ifdef NO_BLOCKING
@@ -189,7 +189,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     }
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->sim = sim;
-    ws->p_sr = sim->p_sr;
+    ws->fluence = sim->fluence;
     ws->det = det;
     ws->sample = sim->sample;
     ws->params = sim->params;
@@ -355,10 +355,10 @@ void simulation_print(FILE *f, const simulation *sim) {
     fprintf(f, "alpha = %.3lf deg\n", alpha/C_DEG);
     fprintf(f, "n_detectors = %zu\n", sim->n_det);
     fprintf(f, "n_reactions = %zu\n", sim->n_reactions);
+    fprintf(f, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence*C_E*1.0e6);
 #ifdef MULTIDET_FIXED
     fprintf(f, "beta = %.3lf deg\n", beta/C_DEG);
     fprintf(f, "theta = %.3lf deg\n", sim->det->theta/C_DEG);
-    fprintf(f, "particles * sr = %e\n", sim->p_sr);
     fprintf(f, "detector calibration offset = %.3lf keV\n", sim->det->offset/C_KEV);
     fprintf(f, "detector calibration slope = %.5lf keV\n", sim->det->slope/C_KEV);
     fprintf(f, "detector resolution = %.3lf keV FWHM\n", sqrt(sim->det->resolution)*C_FWHM/C_KEV);
@@ -381,7 +381,7 @@ void convolute_bricks(sim_workspace *ws) {
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
-        brick_int2(r->histo, r->bricks, r->last_brick, ws->det->resolution, ws->p_sr);
+        brick_int2(r->histo, r->bricks, r->last_brick, ws->det->resolution, ws->fluence * ws->det->solid);
     }
 }
 

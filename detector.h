@@ -24,6 +24,7 @@ typedef struct detector {
     double resolution; /* Stored as variance, i.e. energy squared (in SI-units J^2) */
     double theta; /* Polar angle [0, pi] */
     double phi; /* Azimuthal angle [0, 2pi] */
+    double solid;
     size_t number;
     size_t channels;
     size_t compress;

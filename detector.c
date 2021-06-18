@@ -53,7 +53,7 @@ detector *detector_default() {
     detector *det = malloc(sizeof(detector));
     det->theta = DETECTOR_THETA;
     det->phi = DETECTOR_PHI;
-    det->phi = 0.0;
+    det->solid = DETECTOR_SOLID;
     det->resolution = (DETECTOR_RESOLUTION*DETECTOR_RESOLUTION);
     det->slope = ENERGY_SLOPE;
     det->offset = 0.0*C_KEV;
@@ -83,6 +83,7 @@ int detector_print(const char *filename, const detector *det) {
     fprintf(f, "resolution = %g keV\n", C_FWHM*sqrt(det->resolution)/C_KEV);
     fprintf(f, "theta = %g deg\n", det->theta/C_DEG);
     fprintf(f, "phi = %g deg\n", det->phi/C_DEG);
+    fprintf(f, "solid = %g msr\n", det->solid/C_MSR);
     fprintf(f, "number = %zu\n", det->number);
     fprintf(f, "channels = %zu\n", det->channels);
     if(det->foil_description) {
@@ -148,6 +149,7 @@ jibal_config_var *detector_make_vars(detector *det) {
             {JIBAL_CONFIG_VAR_UNIT, "resolution", &det->resolution,     NULL},
             {JIBAL_CONFIG_VAR_UNIT, "theta",      &det->theta,          NULL},
             {JIBAL_CONFIG_VAR_UNIT, "phi",        &det->phi,            NULL},
+            {JIBAL_CONFIG_VAR_UNIT, "solid",      &det->solid,          NULL},
             {JIBAL_CONFIG_VAR_INT,  "number",     &det->number,         NULL},
             {JIBAL_CONFIG_VAR_INT,  "channels",   &det->channels,       NULL},
             {JIBAL_CONFIG_VAR_INT,  "compress",   &det->compress,       NULL},

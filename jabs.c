@@ -567,9 +567,12 @@ void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params,
                 if(strncmp(token, "reso", 4) == 0) {
                     fit_params_add_parameter(params, &det->resolution);
                 }
+                if(strncmp(token, "solid", 5) == 0) {
+                    fit_params_add_parameter(params, &det->solid);
+                }
             }
             if(strcmp(token, "fluence") == 0) {
-                fit_params_add_parameter(params, &sim->p_sr);
+                fit_params_add_parameter(params, &sim->fluence);
             }
             if(strcmp(token, "channeling_slope") == 0) {
                 fit_params_add_parameter(params, &sim->channeling_slope);
@@ -620,7 +623,7 @@ void print_bricks(const char *filename, const sim_workspace *ws) {
         for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
             fprintf(f, "%2lu %2lu %8.3lf %8.3lf %8.3lf %8.3lf %12.3lf\n",
-                    i, j, b->d.x/C_TFU, b->E_0/C_KEV, b->E/C_KEV, sqrt(b->S)/C_KEV, b->Q * ws->sim->p_sr);
+                    i, j, b->d.x/C_TFU, b->E_0/C_KEV, b->E/C_KEV, sqrt(b->S)/C_KEV, b->Q * ws->sim->fluence);
         }
         fprintf(f, "\n\n");
     }
@@ -631,7 +634,7 @@ void print_bricks(const char *filename, const sim_workspace *ws) {
 
 
 void simulate_with_roughness(sim_workspace *ws) {
-    double p_sr = ws->sim->p_sr;
+    double p_sr = ws->sim->fluence;
     size_t n_rl = 0; /* Number of rough layers */
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
         if(ws->sample->ranges[i].rough.model == ROUGHNESS_GAMMA)
@@ -695,7 +698,7 @@ void simulate_with_roughness(sim_workspace *ws) {
 #endif
         }
         //fprintf(stderr, "\n");
-        ws->p_sr = p * p_sr;
+        ws->fluence = p * p_sr;
         ion_set_angle(&ws->ion, 0.0, 0.0);
         ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
         simulate(&ws->ion, depth_seek(ws->sample, 0.0), ws, sample_rough);
@@ -714,7 +717,7 @@ void simulate_with_ds(sim_workspace *ws) {
         fprintf(stderr, "No workspace, no simulation.\n");
         return;
     }
-    double p_sr = ws->p_sr;
+    double fluence = ws->fluence;
     simulate_with_roughness(ws);
     if(!ws->params.ds) {
         sim_workspace_calculate_sum_spectra(ws);
@@ -740,7 +743,7 @@ void simulate_with_ds(sim_workspace *ws) {
         double E_back = ion1.E;
         const double E_mean = (E_front + E_back) / 2.0;
 
-        fprintf(stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x/C_TFU, d_after.x/C_TFU, E_front/C_KEV, E_back/C_KEV, p_sr);
+        fprintf(stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x/C_TFU, d_after.x/C_TFU, E_front/C_KEV, E_back/C_KEV, fluence);
         double p_sum = 0.0;
         for(int i_polar = 0; i_polar < ws->params.ds_steps_polar; i_polar++) {
             const double ds_polar_min = 20.0*C_DEG;
@@ -771,14 +774,14 @@ void simulate_with_ds(sim_workspace *ws) {
                 cs_sum += c * cs;
 #endif
             }
-            double p_tot = cs_sum * thick_step * (2.0 * C_PI) * ds_polar_step;
-            p_sum += p_tot;
-            double p_azi = p_tot / (1.0 * (ws->params.ds_steps_azi));
+            double fluence_tot = cs_sum * thick_step * (2.0 * C_PI) * ds_polar_step; /* TODO: check calculation after moving from p_sr to fluence!*/
+            p_sum += fluence_tot;
+            double fluence_azi = fluence_tot / (1.0 * (ws->params.ds_steps_azi));
             for(int i_azi = 0; i_azi < ws->params.ds_steps_azi; i_azi++) {
                 ion2 = ion1;
                 double ds_azi = 2.0 * M_PI * (1.0 * i_azi) / (ws->params.ds_steps_azi * 1.0);
                 ion_rotate(&ion2, ds_polar, ds_azi); /* Dual scattering: first scattering to some angle (scattering angle: ds_polar). Note that this does not follow SimNRA conventions. */
-                ws->p_sr = p_azi * p_sr;
+                ws->fluence = fluence_azi * fluence;
 #ifdef DEBUG
                 if(d_before.x == 0.0) {
                     fprintf(stderr, "DS polar %.3lf, azi %.3lf, scatter %.3lf\n", ds_polar/C_DEG, ds_azi/C_DEG, scattering_angle(&ion2, ws)/C_DEG);
@@ -789,7 +792,7 @@ void simulate_with_ds(sim_workspace *ws) {
                 }
             }
         }
-        p_sr -= p_sum*p_sr;
+        fluence -= p_sum * fluence;
         if(ws->sample->ranges[ws->sample->n_ranges-1].x - d_after.x < 0.01*C_TFU)
             break;
         d_before = d_after;

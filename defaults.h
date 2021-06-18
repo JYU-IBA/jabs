@@ -22,7 +22,8 @@
 #define DETECTOR_THETA (165.0*C_DEG)
 #define DETECTOR_PHI (0.0 * C_DEG) /* IBM geometry */
 #define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
-#define PARTICLES_SR (1.0e12)
+#define DETECTOR_SOLID (10.0 * C_MSR)
+#define FLUENCE (1.0e14)
 #define E_MIN (50.0*C_KEV)
 #define ENERGY_SLOPE (1.0*C_KEV)
 #define STOP_STEP_INCIDENT (0.0*C_KEV) /* Zero is automatic */

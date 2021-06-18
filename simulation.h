@@ -48,7 +48,7 @@ typedef struct {
     detector **det; /* Array of n_det detector pointers */
     size_t n_det;
     sample *sample;
-    double p_sr;
+    double fluence;
     double sample_theta; /* Polar angle. Kind of. Zero is sample perpendicular to beam. */
     double sample_phi; /* Typically one uses a zero here, unless doing channeling stuff. Note that this is an azimuthal angle. */
     const jibal_isotope *beam_isotope;
@@ -82,7 +82,7 @@ typedef struct sim_reaction {
 
 
 typedef struct {
-    double p_sr; /* With DS can be different from sim->p_sr, otherwise the same */
+    double fluence; /* With DS can be different from sim->fluence, otherwise the same */
     const simulation *sim;
     const detector *det;
     const sample *sample; /* Note that simulate() can be passed a sample explicitly, but in most cases it should be this. Also this should be exactly the same as sim->sample. */

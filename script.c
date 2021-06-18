@@ -142,8 +142,11 @@ int script_show(script_session *s, int argc, char * const *argv) {
         return sample_model_print(NULL, fit->sm);
     }
     if(strcmp(argv[0], "det") == 0) {
+
         for(size_t i_det = 0 ; i_det < fit->sim->n_det; i_det++) {  /* TODO: prettier output */
+            fprintf(stderr, "DETECTOR %zu\n", i_det);
             detector_print(NULL, fit->sim->det[i_det]);
+            fprintf(stderr, "\n");
         }
         return EXIT_SUCCESS;
     }
@@ -350,7 +353,7 @@ void script_make_vars(script_session *s) {
     detector *det = fit->sim->det;
 #endif
     jibal_config_var vars[] = {
-            {JIBAL_CONFIG_VAR_UNIT,   "fluence",        &sim->p_sr,        NULL},
+            {JIBAL_CONFIG_VAR_UNIT, "fluence", &sim->fluence, NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "energy",         &sim->beam_E,      NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",   &sim->beam_E_broad,NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "alpha",          &sim->sample_theta,NULL},
