@@ -66,6 +66,7 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Arbitrary cross sections (R33 files). Support is very preliminary and results are not to be trusted!
  - Weighting of cross-sections by straggling
  - Dual scattering model (although it needs improvements before it is usable)
+ - Simultaneous multi-detector simulation and fitting.
 
 ### Not (yet) implemented, but planned
  - More accurate handling of sharp peaks in cross sections (resonances)
@@ -75,17 +76,35 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Stopping corrections supplied by user (Bragg correction etc)
  - Non-linear detector response
  - Simulation of time-of-flight spectra
- - Simultaneous multi-detector simulation and fitting
+
+
+### Distant future
+ - Parallel processing of independent simulations
  - Advanced fitting algorithms
+
+
+### Known issues
+ - Detector numbering and usability issues with multidetector mode 
+ - Point-by-point profiles are not tested (but should work)
+ - Ad-hoc channeling correction is the same for all detectors
+ - Zero reaction Q-value assumed (no NRA, only EBS)
+ - Command to load R33 files interactively / from scripts not implemented
+ - R33 files can not be used if there are multiple detectors with different scattering angle. E.g. if you load 4He(16O, 16O)4He for theta = 160 deg reaction from an R33 file, you can't load another one with theta = 170 deg.
+ - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).
+ - Dual scattering is benchmarked against SimNRA and is known to produce different results.
+ - Adding detector related fit variables will add those for all detectors 
+
 
 ## Fitting
 
-There is a fitting feature, activated with the `--fit` or `-F` option. The multidimensional nonlinear least-squares fitting is based on [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html). The accuracy and sanity of fits must be evaluated by the use.
+There is a fitting feature, activated with the `--fit` or `-F` option or `fit` script command. The multidimensional nonlinear least-squares fitting is based on [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html). The accuracy and sanity of fits must be evaluated by the user.
 
-The user can currently give only a single range to fit. This is specified with `--fit_low` and `--fit_high`. Default values are 10% of highest channel and the highest channel, respectively.
+The user can give only a single range to fit from the command line. This is specified with `--fit_low` and `--fit_high`.
 
-Use `--fit_vars` to give a comma separate list of variables to fit. Currently supported variables are `slope,offset,resolution` related to detector parameters, 
-`calib`which is equivalent to the previous triplet, `fluence`, and `channeling`.
+Use `--fit_vars` to give a comma separate list of variables to fit. Currently supported detector related variables are `slope,offset,resolution`
+`calib` which is equivalent to the previous triplet and `solid`. Currently adding fit variables will add all them for each detector.
+
+Beam `fluence` can be fitted. Don't try to combine this with `solid` for all detectors.
 
 Layer thickness can be also fitted using variable `thicknessN` where `N` is number of a layer, numbering starts from 1 (surface). Roughness can be fitted similarly to thickness, use `roughN`. Concentrations can be fitted using `concN_I`, where `N` is the layer and `I` the element.
 
