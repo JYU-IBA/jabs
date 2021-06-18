@@ -67,7 +67,6 @@ int main(int argc, char **argv) {
     session->detector_out_filename = strdup_non_null(cmd_opt->detector_out_filename);
     roi range = {.low = cmd_opt->fit_low, .high = cmd_opt->fit_high};
     fit_data_fit_range_add(fit_data, &range); /* We add just this one range (or none) */
-    fit_data->print_iters = cmd_opt->print_iters;
     sim_sanity_check(sim);
     if(cmd_opt->exp_filename) {
         session->fit->exp[0] = spectrum_read(cmd_opt->exp_filename, sim->det[0]);

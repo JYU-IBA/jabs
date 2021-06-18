@@ -98,12 +98,6 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
         fprintf(stderr, ", prob[%zu] = %12.6e", i, gsl_vector_get(w->x, i));
     }
 #endif
-
-#ifdef MULTIDET_FIXED
-    if(fit_data->print_iters) {
-        print_spectra(NULL, fit_data->ws, fit_data->exp);
-    }
-#endif
     fprintf(stderr, "\n");
 }
 
@@ -173,7 +167,6 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     f->sm = NULL; /* Can be set later. */
     f->ws = NULL; /* Initialized later */
     f->fit_params = fit_params_new();
-    f->print_iters = FALSE;
     return f;
 }
 

@@ -25,7 +25,6 @@ typedef struct {
     int fit_low;
     int fit_high;
     int print_isotopes;
-    int print_iters;
     int ds;
     int fast;
     size_t depthsteps_max;

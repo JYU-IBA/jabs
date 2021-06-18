@@ -59,7 +59,6 @@ typedef struct fit_data {
     size_t n_fit_ranges;
     size_t n_iters_max;
     double dof;
-    int print_iters;
     struct fit_stats stats;
 } fit_data;
 

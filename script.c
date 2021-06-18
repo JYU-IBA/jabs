@@ -62,7 +62,7 @@ int script_load(script_session *s, int argc, char * const *argv) {
             fprintf(stderr, "Usage: load sample [file]\n");
         }
         return 0;
-    } else if(strcmp(argv[0], "detector") == 0) {
+    } else if(strcmp(argv[0], "det") == 0) {
         int status;
         size_t i_det = 0;
         if(argc == 3) {
@@ -71,7 +71,7 @@ int script_load(script_session *s, int argc, char * const *argv) {
             argv++;
         }
         if(argc != 2) {
-            fprintf(stderr, "Usage: load detector [number] file\n");
+            fprintf(stderr, "Usage: load det [number] file\n");
             return EXIT_SUCCESS;
         }
         detector *det = detector_from_file(fit->jibal, argv[1]);
@@ -182,7 +182,9 @@ int script_set(script_session *s, int argc, char * const *argv) {
             return -1;
         }
         return 0;
-    } else if(strcmp(argv[0], "foil") == 0) {
+    }
+#if 0
+    else if(strcmp(argv[0], "foil") == 0) {
         if(argc < 3) {
             fprintf(stderr, "Usage: set foil detector elem thickness ...\nExample: set foil 1 Si 500tfu\n");
             return EXIT_FAILURE;
@@ -194,9 +196,30 @@ int script_set(script_session *s, int argc, char * const *argv) {
             return EXIT_FAILURE;
         }
         char *arg_str = argv_to_string(argc-2, argv+2);
-        if(detector_set_foil(s->jibal, det, arg_str)) {
+        if(!arg_str) {
+            fprintf(stderr, "What foil?\n");
+            return EXIT_FAILURE;
+        }
+        if(detector_set_foil(s->jibal, det, strdup(arg_str))) {
             fprintf(stderr, "Could not set foil.\n");
             return EXIT_FAILURE;
+        }
+        return EXIT_SUCCESS;
+    }
+#endif
+    else if(strcmp(argv[0], "det") == 0) {
+        size_t i_det = 0;
+        if(argc == 4) {
+            i_det = strtoul(argv[1], NULL, 10);
+            argc--;
+            argv++;
+        }
+        if(argc != 3) {
+            fprintf(stderr, "Usage: set det [number] variable value\n");
+            return EXIT_FAILURE;
+        }
+        if(detector_set_var(s->jibal, sim_det(fit->sim, i_det), argv[1], argv[2])) {
+            fprintf(stderr, "Can't set \"%s\" to be \"%s\"!\n", argv[1], argv[2]);
         }
         return EXIT_SUCCESS;
     }

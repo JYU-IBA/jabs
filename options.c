@@ -80,7 +80,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
             {"isotopes",      no_argument,       NULL, 0},
             {"channeling",    required_argument, NULL, 'C'},
             {"channeling_slope",    required_argument, NULL, 3},
-            {"print_iters",   no_argument,       NULL, 0},
             {NULL, 0,                NULL,   0}
     };
     static const char *help_texts[] = {
@@ -121,7 +120,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
             "Print isotopes (in concentration table)",
             "Ad-hoc substrate channeling yield correction (constant)",
             "Ad-hoc substrate channeling yield correction (energy slope 1/keV)",
-            "Print fits to standard output on every iteration",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
@@ -133,8 +131,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
             case 0:
                 if(strcmp(long_options[option_index].name, "isotopes") == 0) {
                     cmd_opt->print_isotopes = TRUE;
-                } else if(strcmp(long_options[option_index].name, "print_iters") == 0) {
-                    cmd_opt->print_iters = TRUE;
                 }
                 else if(strcmp(long_options[option_index].name, "ds") == 0) {
                     cmd_opt->ds = TRUE;

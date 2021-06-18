@@ -551,22 +551,23 @@ void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params,
         fprintf(stderr, "Thing to fit: \"%s\". Sim pointer is %p, sample model pointer is %p\n", token, (void *)sim, (void *)sm);
 #endif
         if(sim) {
-#ifdef MULTIDET_FIX
-            if(strncmp(token, "calib", 5) == 0) {
-                fit_params_add_parameter(params, &sim->det->slope); /* TODO: prevent adding already added things */
-                fit_params_add_parameter(params, &sim->det->offset);
-                fit_params_add_parameter(params, &sim->det->resolution);
+            for(size_t i_det = 0; i_det < sim->n_det; i_det++) { /* TODO: this adds parameters of all detectors, make this controllable for an individual detector */
+                detector *det = sim->det[i_det];
+                if(strncmp(token, "calib", 5) == 0) {
+                    fit_params_add_parameter(params, &det->slope); /* TODO: prevent adding already added things */
+                    fit_params_add_parameter(params, &det->offset);
+                    fit_params_add_parameter(params, &det->resolution);
+                }
+                if(strcmp(token, "slope") == 0) {
+                    fit_params_add_parameter(params, &det->slope);
+                }
+                if(strcmp(token, "offset") == 0) {
+                    fit_params_add_parameter(params, &det->offset);
+                }
+                if(strncmp(token, "reso", 4) == 0) {
+                    fit_params_add_parameter(params, &det->resolution);
+                }
             }
-            if(strcmp(token, "slope") == 0) {
-                fit_params_add_parameter(params, &sim->det->slope);
-            }
-            if(strcmp(token, "offset") == 0) {
-                fit_params_add_parameter(params, &sim->det->offset);
-            }
-            if(strncmp(token, "reso", 4) == 0) {
-                fit_params_add_parameter(params, &sim->det->resolution);
-            }
-#endif
             if(strcmp(token, "fluence") == 0) {
                 fit_params_add_parameter(params, &sim->p_sr);
             }
