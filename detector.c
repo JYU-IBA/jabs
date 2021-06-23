@@ -36,12 +36,19 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
     if(!det)
         return NULL;
     det->resolution = C_FWHM * sqrt(det->resolution); /* Convert resolution to FWHM from variance for the duration of input parsing */
-    jibal_config_var *vars = detector_make_vars(det);
-    jibal_config_var_read(jibal->units, f, filename, vars);
+    jibal_config_file *cf = jibal_config_file_init(jibal->units);
+    jibal_config_var *vars = detector_make_vars(det); /* Will be freed when config is free'd */
+    jibal_config_file_set_vars(cf, vars);
+    if(jibal_config_file_read(cf, filename)) {
+        fprintf(stderr, "Could not read detector from \"%s\"\n", filename);
+        detector_free(det);
+        jibal_config_file_free(cf);
+        return NULL;
+    }
+    jibal_config_file_free(cf);
     det->resolution /= C_FWHM;
     det->resolution *= det->resolution;
     detector_update_foil(jibal, det);
-    free(vars);
 #ifdef DEBUG
     fprintf(stderr, "Read detector from \"%s\":\n", filename);
     detector_print(NULL, det);
@@ -143,6 +150,8 @@ int detector_set_var(const jibal *jibal, detector *det, const char *var_str, con
 }
 
 jibal_config_var *detector_make_vars(detector *det) {
+    if(!det)
+        return NULL;
     jibal_config_var vars[] = {
             {JIBAL_CONFIG_VAR_UNIT, "slope",      &det->slope,          NULL},
             {JIBAL_CONFIG_VAR_UNIT, "offset",     &det->offset,         NULL},
