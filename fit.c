@@ -188,27 +188,29 @@ void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct r
     }
     sim_workspace *ws = fit_data_ws(fit_data, roi->i_det);
     gsl_histogram *exp = fit_data_exp(fit_data, roi->i_det);
-    if(!ws || !exp)
+    if(!ws)
         return;
     size_t n_exp = spectrum_channels_in_range(exp, roi->low, roi->high);
-    size_t n_sim = fit_data->ws?spectrum_channels_in_range(ws->histo_sum, roi->low, roi->high):0;
-    double exp_cts = spectrum_roi(fit_data_exp(fit_data, roi->i_det), roi->low, roi->high);
-    double sim_cts = fit_data->ws?spectrum_roi(ws->histo_sum, roi->low, roi->high):0.0;
+    size_t n_sim = spectrum_channels_in_range(ws->histo_sum, roi->low, roi->high);
+    double exp_cts = spectrum_roi(exp, roi->low, roi->high);
+    double sim_cts = spectrum_roi(ws->histo_sum, roi->low, roi->high);
 
     fprintf(f, "          low = %12zu\n", roi->low);
     fprintf(f, "         high = %12zu\n", roi->high);
     fprintf(f, "        E_low = %12.3lf keV (low energy edge of bin)\n", detector_calibrated(ws->det, roi->low)/C_KEV);
     fprintf(f, "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(ws->det, roi->high+1)/C_KEV);
-    fprintf(f, "        n_exp = %12zu\n", n_exp);
     fprintf(f, "        n_sim = %12zu\n", n_sim);
-    fprintf(f, "          exp  = %12g\n", exp_cts);
     fprintf(f, "          sim  = %12g\n", sim_cts);
-    fprintf(f, "      exp-sim  = %12g\n", exp_cts - sim_cts);
-    fprintf(f, "    sqrt(exp)  = %12.5lf\n", sqrt(exp_cts));
-    fprintf(f, "      sim/exp  = %12.5lf\n", sim_cts/exp_cts);
-    fprintf(f, "      exp/sim  = %12.5lf\n", exp_cts/sim_cts);
-    fprintf(f, "  1/sqrt(exp)  = %12.5lf%%\n", 100.0/sqrt(exp_cts));
-    fprintf(f, "(exp-sim)/exp  = %12.5lf%%\n", 100.0*(exp_cts-sim_cts)/exp_cts);
+    if(exp) {
+        fprintf(f, "        n_exp = %12zu\n", n_exp);
+        fprintf(f, "          exp  = %12g\n", exp_cts);
+        fprintf(f, "      exp-sim  = %12g\n", exp_cts - sim_cts);
+        fprintf(f, "    sqrt(exp)  = %12.5lf\n", sqrt(exp_cts));
+        fprintf(f, "      sim/exp  = %12.5lf\n", sim_cts / exp_cts);
+        fprintf(f, "      exp/sim  = %12.5lf\n", exp_cts / sim_cts);
+        fprintf(f, "  1/sqrt(exp)  = %12.5lf%%\n", 100.0 / sqrt(exp_cts));
+        fprintf(f, "(exp-sim)/exp  = %12.5lf%%\n", 100.0 * (exp_cts - sim_cts) / exp_cts);
+    }
 }
 
 gsl_histogram *fit_data_exp(const struct fit_data *fit_data, size_t i_det) {

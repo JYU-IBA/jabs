@@ -471,6 +471,7 @@ int script_roi(script_session *s, int argc, char * const *argv) {
         argc--;
     }
     if (argc == 2) {
+        r.i_det = 0;
         r.low = strtoul(argv[0], NULL, 10);
         r.high = strtoul(argv[1], NULL, 10);
     } else {
