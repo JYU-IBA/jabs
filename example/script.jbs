@@ -3,7 +3,7 @@
 set ion 4He
 set energy 2027keV
 set alpha 0deg
-set fluence 1.0e11
+set fluence 2.0e13
 load det ../example/detector.txt
 load exp ../example/experimental.dat
 load sample ../example/sample.txt

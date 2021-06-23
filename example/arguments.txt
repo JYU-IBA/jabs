@@ -1,7 +1,7 @@
 --energy=2.027MeV
 --alpha=0deg
 --theta=160deg
---fluence=1.0e11
+--fluence=2.0e13
 --exp=experimental.dat
 --detector=detector.txt
 --detector_out=detector_fitted.txt

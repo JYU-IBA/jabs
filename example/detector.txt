@@ -5,3 +5,4 @@ theta = 160 deg
 foil = Si 250tfu
 #the detector is in Cornell geometry. And this is a comment...
 phi = 90 deg
+solid = 5 msr
