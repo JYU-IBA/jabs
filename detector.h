@@ -34,8 +34,9 @@ typedef struct detector {
 
 inline double detector_calibrated(const detector *det, size_t ch) {return det->offset + det->slope * (unsigned int)(ch*det->compress);}
 int detector_sanity_check(const detector *det);
-detector *detector_from_file(const jibal *jibal, const char *filename);
-detector *detector_default();
+detector *detector_from_file(const jibal *jibal, const char *filename); /* one detector from JIBAL configuration style file */
+detector *detectors_from_file(const jibal *jibal, const char *filename, size_t *n_detectors_out); /* multiple detectors in a table. TODO: work in progress */
+detector *detector_default(detector *det); /* if det is NULL, this returns pointer to a newly allocated det */
 void detector_free(detector *det);
 int detector_print(const char *filename, const detector *det);
 int detector_update_foil(const jibal *jibal, detector *det);

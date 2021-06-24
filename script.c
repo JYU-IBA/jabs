@@ -201,21 +201,15 @@ int script_set(script_session *s, int argc, char * const *argv) {
         }
         return EXIT_SUCCESS;
     }
-    for(jibal_config_var *var = s->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
-        if(strcmp(argv[0], var->name) == 0) {
-            if(argc != 2) {
-                fprintf(stderr, "Usage: set %s [value]\n", var->name);
-                return -1;
-            }
-            jibal_config_var_set(fit->jibal->units, var, argv[1], NULL);
-#ifdef DEBUG
-            fprintf(stderr, "%s = %g\n", var->name, *((double *)var->variable));
-#endif
-            return 0;
-        }
+    if(argc != 2) {
+        fprintf(stderr, "Usage: set variable [value]\n");
+        return -1;
     }
-    fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
-    return -1;
+    if(jibal_config_file_var_set(s->cf, argv[0], argv[1])) {
+        fprintf(stderr, "Error in setting \"%s\" to \"%s\"\n", argv[0], argv[1]);
+        return -1;
+    }
+    return 0;
 }
 
 int script_add(script_session *s, int argc, char * const *argv) {
@@ -288,8 +282,10 @@ int script_help(script_session *s, int argc, char * const *argv) {
             } else if(strcmp(t->name, "version") == 0) {
                 fprintf(stderr, "%s\n", jabs_version());
             } else if(strcmp(t->name, "set") == 0) {
+                if(!s->cf || !s->cf->vars)
+                    break;
                 size_t i = 0;
-                for(jibal_config_var *var = s->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
+                for(jibal_config_var *var = s->cf->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
                     if(var->type != JIBAL_CONFIG_VAR_UNIT)
                         continue;
                     i++;
@@ -300,7 +296,7 @@ int script_help(script_session *s, int argc, char * const *argv) {
                 }
                 i = 0;
                 fprintf(stderr, "\nThe following variables are not in SI units:\n");
-                for(jibal_config_var *var = s->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
+                for(jibal_config_var *var = s->cf->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
                     if(var->type == JIBAL_CONFIG_VAR_UNIT)
                         continue;
                     i++;
@@ -309,6 +305,7 @@ int script_help(script_session *s, int argc, char * const *argv) {
                         fputc('\n', stderr);
                     }
                 }
+
                 fprintf(stderr, "\nAlso the following things can be set: ion, sample, foil. Special syntax applies for each.\n");
             }
             return 0;
@@ -318,11 +315,10 @@ int script_help(script_session *s, int argc, char * const *argv) {
     return -1;
 }
 
-void script_make_vars(script_session *s) {
-    free(s->vars);
+jibal_config_var *script_make_vars(script_session *s) {
     struct fit_data *fit = s->fit;
     if(!fit)
-        return;
+        return NULL;
     simulation *sim = fit->sim;
     jibal_config_var vars[] = {
             {JIBAL_CONFIG_VAR_UNIT, "fluence", &sim->fluence, NULL},
@@ -345,7 +341,7 @@ void script_make_vars(script_session *s) {
     if(vars_out) {
         memcpy(vars_out, vars, var_size);
     }
-    s->vars = vars_out;
+    return vars_out;
 }
 
 int script_simulate(script_session *s, int argc, char * const *argv) {
@@ -486,16 +482,21 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
         return NULL;
     struct script_session *s = malloc(sizeof(struct script_session));
     s->jibal = jibal;
-    if(!sim) { /* Sim shouldn't be NULL */
+    if(!sim) { /* Sim shouldn't be NULL. If it is, we make a new one. */
         sim = sim_init(NULL);
     }
     s->fit = fit_data_new(jibal, sim); /* Not just fit, but this conveniently holds everything we need. */
-    s->vars = NULL;
+    s->cf = jibal_config_file_init(jibal->units);
+    if(!s->fit || !s->cf) {
+        fprintf(stderr, "Script session initialization failed.\n");
+        free(s);
+        return NULL;
+    }
+    jibal_config_file_set_vars(s->cf, script_make_vars(s));
     s->output_filename = NULL;
     s->bricks_out_filename = NULL;
     s->sample_out_filename = NULL;
     s->detector_out_filename = NULL;
-    script_make_vars(s);
     return s;
 }
 void script_session_free(script_session *s) {
@@ -503,7 +504,7 @@ void script_session_free(script_session *s) {
     free(s->bricks_out_filename);
     free(s->sample_out_filename);
     free(s->detector_out_filename);
-    free(s->vars);
+    jibal_config_file_free(s->cf);
     fit_data_workspaces_free(s->fit);
     fit_data_exp_free(s->fit);
     sim_free(s->fit->sim);
@@ -562,7 +563,7 @@ int script_process(script_session *s, const char *filename) {
                     }
                     status = c->f(s, argc - 1, argv + 1);
                     if(c->f == script_load || c->f == script_reset) {
-                        script_make_vars(s); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
+                        jibal_config_file_set_vars(s->cf, script_make_vars(s)); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
                     }
                     break;
                 }

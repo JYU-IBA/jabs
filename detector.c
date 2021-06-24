@@ -32,7 +32,7 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
         fprintf(stderr, "Could not read detector from file \"%s\".\n", filename);
         return NULL;
     }
-    detector *det = detector_default();
+    detector *det = detector_default(NULL);
     if(!det)
         return NULL;
     det->resolution = C_FWHM * sqrt(det->resolution); /* Convert resolution to FWHM from variance for the duration of input parsing */
@@ -56,8 +56,70 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
     return det;
 }
 
-detector *detector_default() {
-    detector *det = malloc(sizeof(detector));
+detector *detectors_from_file(const jibal *jibal, const char *filename, size_t *n_detectors_out) {
+    /* TODO: make more generic table parser.
+     * Needs to have:
+     *  1. name of variable,
+     *  2. type for parsing (int, double, string),
+     *  3. conversion factor (doubles to SI units)
+     *  */
+    char *line = NULL;
+    size_t line_size = 0;
+    size_t lineno = 0;
+    *n_detectors_out = 0;
+
+    int headers = 1;
+    size_t n_detectors = 0;
+    detector *detectors = NULL;
+    detector *det = NULL;
+    size_t i_slope = 0;
+
+
+    FILE *in = fopen_file_or_stream(filename, "r");
+    if(!in)
+        return NULL;
+
+    while(getline(&line, &line_size, in) > 0) {
+        lineno++;
+        line[strcspn(line, "\r\n")] = 0; /* Strips all kinds of newlines! */
+        if(strlen(line) >= 1 && *line == '#') /* Comment */
+            continue;
+        char *line_split = line;
+        char *col;
+        size_t n = 0; /* Number of columns on this row */
+        size_t i_material = 0;
+        while((col = strsep(&line_split, " \t")) != NULL) {
+            if(*col == '\0') {/* Multiple separators are treated as one */
+                continue;
+            }
+            if(headers) { /* Headers */
+                if(strncmp(col, "slope", 5) == 0) {
+                    i_slope = n;
+                }
+                n++;
+                continue;
+            }
+            if(n == 0) { /* First column, (re)allocate space for a new detector */
+                n_detectors++;
+                detectors = realloc(detectors, sizeof(detector) * (n_detectors));
+                det = detector_default(&detectors[n_detectors-1]);
+            }
+            double x = strtod(col, NULL);
+            if(n == i_slope) {
+                det->slope = x*C_KEV;
+            }
+            n++;
+        }
+        headers = 0;
+    }
+    *n_detectors_out = n_detectors;
+    return detectors;
+}
+
+detector *detector_default(detector *det) {
+    if(!det) {
+        det = malloc(sizeof(detector));
+    }
     det->theta = DETECTOR_THETA;
     det->phi = DETECTOR_PHI;
     det->solid = DETECTOR_SOLID;

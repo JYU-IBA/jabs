@@ -20,7 +20,7 @@
 typedef struct script_session {
     jibal *jibal;
     struct fit_data *fit;
-    jibal_config_var *vars;
+    jibal_config_file *cf; /* a pseudo-configuration "file" for our session */
     char *output_filename; /* File name for automatic spectra saving */ /* TODO: multidetector! */
     char *bricks_out_filename; /* File name for automatic bricks saving */
     char *sample_out_filename; /* File name for automatic sample saving */
@@ -43,7 +43,7 @@ script_session *script_session_init(jibal *jibal, simulation *sim); /* sim can b
 void script_session_free(script_session *s);
 
 void script_print_commands(FILE *f);
-void script_make_vars(script_session *s);
+jibal_config_var *script_make_vars(script_session *s);
 int script_load(script_session *s, int argc, char * const *argv);
 int script_help(script_session *s, int argc, char * const *argv);
 int script_show(script_session *s, int argc, char * const *argv);

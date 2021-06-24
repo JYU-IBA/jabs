@@ -34,7 +34,7 @@ simulation *sim_init() {
     sim->n_det = 0;
     sim->det = NULL;
     sim->params = sim_calc_params_defaults(FALSE, FALSE);
-    sim_det_add(sim, detector_default());
+    sim_det_add(sim, detector_default(NULL));
     return sim;
 }
 
