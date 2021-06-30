@@ -382,21 +382,26 @@ int fit(struct fit_data *fit_data) {
     fit_data->dof = fdf.n - fdf.p;
     int status, info;
     size_t i, j;
-    gsl_matrix *covar = gsl_matrix_alloc (fit_params->n, fit_params->n);
-    gsl_vector *x = gsl_vector_alloc(fit_params->n);
-    for(i = 0; i < fit_params->n; i++) {
-        gsl_vector_set(x, i, *fit_params->func_params[i]); /* Initial values of fitted parameters from function parameter array */
-    }
 
     double *weights = malloc(sizeof(double) * fdf.n);
+    if(!weights)
+        return 1;
     size_t i_w = 0;
     for(size_t  i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) {
         roi *range = &fit_data->fit_ranges[i_range];
         assert(range);
         detector *det = sim_det(fit_data->sim, range->i_det);
         gsl_histogram *exp = fit_data_exp(fit_data, range->i_det);
-        if(!det || !exp)
-            continue;
+        if(!det) {
+            fprintf(stderr, "Detector %zu (fit range %zu) does not exist.\n", range->i_det, i_range);
+            free(weights);
+            return 1;
+        }
+        if(!exp) {
+            fprintf(stderr, "Experimental spectrum for detector %zu (fit range %zu) does not exist.\n", range->i_det, i_range);
+            free(weights);
+            return 1;
+        }
         for(i = range->low; i <= range->high && i < det->channels; i++) {
             if(exp->bin[i] > 1.0) {
                 weights[i_w] = 1.0 / (exp->bin[i]);
@@ -410,6 +415,13 @@ int fit(struct fit_data *fit_data) {
     fprintf(stderr, "Set %zu weights.\n", i_w);
 #endif
     assert(i_w == fdf.n);
+
+    gsl_matrix *covar = gsl_matrix_alloc (fit_params->n, fit_params->n);
+    gsl_vector *x = gsl_vector_alloc(fit_params->n);
+    for(i = 0; i < fit_params->n; i++) {
+        gsl_vector_set(x, i, *fit_params->func_params[i]); /* Initial values of fitted parameters from function parameter array */
+    }
+
 
     gsl_vector_view wts = gsl_vector_view_array(weights, i_w);
 

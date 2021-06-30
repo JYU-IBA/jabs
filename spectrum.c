@@ -20,6 +20,8 @@
 
 
 gsl_histogram *spectrum_read(const char *filename, const detector *det) {
+    if(!det)
+        return NULL;
     char *line=NULL;
     size_t line_size=0;
     FILE *in = fopen_file_or_stream(filename, "r");

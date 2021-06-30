@@ -9,6 +9,7 @@
 #include "generic.h"
 #include "spectrum.h"
 #include "script.h"
+#include "jabs.h"
 
 static const struct script_command commands[] = {
         {"help",    &script_help,           "Print help."},
@@ -92,6 +93,10 @@ int script_load(script_session *s, int argc, char * const *argv) {
         if(argc != 2) {
             fprintf(stderr, "Usage: load exp [number] file\n");
             return EXIT_SUCCESS;
+        }
+        if(i_det >= fit->sim->n_det) {
+            fprintf(stderr, "Detector number %zu too high (must be below %zu)\n", i_det, fit->sim->n_det);
+            return EXIT_FAILURE;
         }
         fit->exp[i_det] = spectrum_read(argv[1], sim_det(fit->sim, i_det));
         if(!fit->exp[i_det]) {

@@ -553,6 +553,7 @@ void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params,
         if(sim) {
             for(size_t i_det = 0; i_det < sim->n_det; i_det++) { /* TODO: this adds parameters of all detectors, make this controllable for an individual detector */
                 detector *det = sim->det[i_det];
+                assert(det);
                 if(strncmp(token, "calib", 5) == 0) {
                     fit_params_add_parameter(params, &det->slope); /* TODO: prevent adding already added things */
                     fit_params_add_parameter(params, &det->offset);
