@@ -51,7 +51,6 @@ int main(int argc, char **argv) {
     }
     struct fit_data *fit_data = session->fit;
     simulation *sim = fit_data->sim;
-    sample_model *sm = fit_data->sm;
     cmdline_options *cmd_opt = cmdline_options_init();
     read_options(jibal, sim, cmd_opt, &argc, &argv);
     if(!sim->beam_isotope) {
@@ -76,28 +75,25 @@ int main(int argc, char **argv) {
         }
     }
     if(cmd_opt->sample_filename) {
-        sm = sample_model_from_file(jibal, cmd_opt->sample_filename);
-        if(!sm) {
+        fit_data->sm = sample_model_from_file(jibal, cmd_opt->sample_filename);
+        if(!fit_data->sm) {
             fprintf(stderr, "Could not load a sample model from file \"%s\".\n", cmd_opt->sample_filename);
             return EXIT_FAILURE;
         }
     } else if(argc > 0 && strcmp(argv[0], "sample") == 0) {
         argc--;
         argv++;
-        sm  = sample_model_from_argv(jibal, argc, argv);
-        if(!sm) {
-            fprintf(stderr, "Error in reading sample model from command line.\n");
+        fit_data->sm  = sample_model_from_argv(jibal, argc, argv);
+        if(!fit_data->sm) {
+            fprintf(stderr, "Error in reading sample model from command line (%i args were given)\n", argc);
             return EXIT_FAILURE;
         }
         argc = 0;
     }
     if(argc > 0) {
         script_files = TRUE;
-    } else if(!sm) { /* No sample file, no sample and no files given on command line, fallback to interactive (or script) mode */
+    } else if(!fit_data->sm) { /* No sample file, no sample and no files given on command line, fallback to interactive (or script) mode */
         cmd_opt->interactive = TRUE;
-    }
-    if(sm) {
-        sim->sample = sample_from_sample_model(sm);
     }
     if(!cmd_opt->interactive) {
         greeting(FALSE);
@@ -118,8 +114,10 @@ int main(int argc, char **argv) {
         }
     } else { /* Non-interactive, pure command line mode. Run a single sim or fit. */
         if(cmd_opt->fit) {
+            fprintf(stderr, "Running a fit in non-interactive mode.\n");
             status = script_fit(session, 1, &cmd_opt->fit_vars);
         } else {
+            fprintf(stderr, "Running a simulation in non-interactive mode.\n");
             status = script_simulate(session, 0, NULL);
         }
     }

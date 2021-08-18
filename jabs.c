@@ -487,7 +487,12 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
     char sep = ' ';
     if(!ws)
         return EXIT_FAILURE;
-    FILE *f = fopen_file_or_stream(filename, "w");
+    FILE *f;
+    if(!filename) {
+        f = stdout; /* Another dirty hack, fopen_file_or_stream() should handle this */
+    } else {
+        f = fopen_file_or_stream(filename, "w");
+    }
     if(!f)
         return EXIT_FAILURE;
     if(filename) {

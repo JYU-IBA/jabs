@@ -87,7 +87,6 @@ detector *detectors_from_file(const jibal *jibal, const char *filename, size_t *
         char *line_split = line;
         char *col;
         size_t n = 0; /* Number of columns on this row */
-        size_t i_material = 0;
         while((col = strsep(&line_split, " \t")) != NULL) {
             if(*col == '\0') {/* Multiple separators are treated as one */
                 continue;

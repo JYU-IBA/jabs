@@ -669,21 +669,25 @@ int script_finish_sim_or_fit(script_session *s) {
     fprintf(stderr, "...finished!\n\n");
     fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
     struct fit_data *fit = s->fit;
-#ifdef MULTIDET_FIXED
-    if(s->output_filename) {
-        print_spectra(s->output_filename, fit->ws, fit->exp);
+
+    if(fit->sim->n_det == 1) { /* TODO: multidetector automatic spectra saving! */
+        size_t i_det = 0;
+        sim_workspace *ws = fit_data_ws(fit, i_det);
+        if(ws) {
+            if(print_spectra(s->output_filename, ws, fit_data_exp(fit, i_det))) {
+                fprintf(stderr, "Could not save spectra of detector %zu!\n", i_det);
+                return EXIT_FAILURE;
+            }
+            if(s->bricks_out_filename) {
+                print_bricks(s->bricks_out_filename, ws);
+            }
+            if(s->detector_out_filename) {
+                detector_print(s->detector_out_filename, ws->det);
+            }
+        }
     }
-    if(s->bricks_out_filename) {
-        print_bricks(s->bricks_out_filename, fit->ws);
-    }
-#endif
     if(s->sample_out_filename) {
         sample_model_print(s->sample_out_filename, fit->sm);
     }
-#ifdef MULTIDET_FIXED
-    if(s->detector_out_filename) {
-        detector_print(s->detector_out_filename, fit->ws->det);
-    }
-#endif
     return 0;
 }
