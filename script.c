@@ -678,9 +678,11 @@ int script_finish_sim_or_fit(script_session *s) {
         size_t i_det = 0;
         sim_workspace *ws = fit_data_ws(fit, i_det);
         if(ws) {
-            if(print_spectra(s->output_filename, ws, fit_data_exp(fit, i_det))) {
-                fprintf(stderr, "Could not save spectra of detector %zu!\n", i_det);
-                return EXIT_FAILURE;
+            if(s->output_filename) {
+                if(print_spectra(s->output_filename, ws, fit_data_exp(fit, i_det))) {
+                    fprintf(stderr, "Could not save spectra of detector %zu to file \"%s\"\n", i_det, s->output_filename);
+                    return EXIT_FAILURE;
+                }
             }
             if(s->bricks_out_filename) {
                 print_bricks(s->bricks_out_filename, ws);

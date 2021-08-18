@@ -115,6 +115,9 @@ int main(int argc, char **argv) {
             status = script_process(session, NULL);
         }
     } else { /* Non-interactive, pure command line mode. Run a single sim or fit. */
+        if(!session->output_filename) {
+            session->output_filename = strdup("-"); /* If no output filename given, set it to "-" (interpreted as stdout) */
+        }
         if(cmd_opt->fit) {
             fprintf(stderr, "Running a fit in non-interactive mode.\n");
             status = script_fit(session, 1, &cmd_opt->fit_vars);
