@@ -639,8 +639,12 @@ int script_prepare_sim_or_fit(script_session *s) {
     free(fit->sim->reactions);
     fit->sim->reactions = NULL;
     fit->sim->n_reactions = 0;
-    sim_reactions_add(fit->sim, REACTION_RBS, fit->jibal->config->cs_rbs, 0.0); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
-    sim_reactions_add(fit->sim, REACTION_ERD, fit->jibal->config->cs_erd, 0.0);
+    if(fit->rbs) {
+        sim_reactions_add(fit->sim, REACTION_RBS, fit->jibal->config->cs_rbs,0.0); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
+    }
+    if(fit->erd) {
+        sim_reactions_add(fit->sim, REACTION_ERD, fit->jibal->config->cs_erd, 0.0);
+    }
 
     if(fit->sim->n_reactions == 0) {
         fprintf(stderr, "No reactions, nothing to do.\n");

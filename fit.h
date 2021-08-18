@@ -60,6 +60,8 @@ typedef struct fit_data {
     size_t n_iters_max;
     double dof;
     struct fit_stats stats;
+    int erd; /* Add ERD reactions */
+    int rbs; /* Add RBS reactions */
 } fit_data;
 
 
