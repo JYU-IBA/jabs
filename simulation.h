@@ -33,7 +33,6 @@ typedef struct {
     double cs_frac; /* Fractional step size 1.0/(cs_n_steps+1), calculated from cs_n_steps. */
     int cs_stragg_half_n;
     int cs_n_stragg_steps; /* calculated from cs_stragg_half_n */
-    double emin;
     size_t depthsteps_max;
     int rk4;
     int nucl_stop_accurate;
@@ -54,6 +53,7 @@ typedef struct {
     const jibal_isotope *beam_isotope;
     double beam_E;
     double beam_E_broad; /* Variance */
+    double emin;
     double channeling_offset; /* a very ad-hoc channeling yield correction */
     double channeling_slope;
     sim_calc_params params;

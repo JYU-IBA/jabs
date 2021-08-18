@@ -329,6 +329,7 @@ jibal_config_var *script_make_vars(script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT, "fluence", &sim->fluence, NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "energy",         &sim->beam_E,      NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",   &sim->beam_E_broad,NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "emin",           &sim->emin,NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "alpha",          &sim->sample_theta,NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "sample_azi",     &sim->sample_phi,  NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "channeling",     &sim->channeling_offset, NULL},

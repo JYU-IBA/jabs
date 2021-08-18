@@ -25,6 +25,7 @@ simulation *sim_init() {
     sim->sample_phi = 0.0;
     sim->fluence = FLUENCE;
     sim->beam_E = ENERGY;
+    sim->emin = E_MIN;
     sim->beam_E_broad = 0.0;
     sim->channeling_offset = 1.0;
     sim->channeling_slope = 0.0;
@@ -61,7 +62,6 @@ sim_calc_params sim_calc_params_defaults(int ds, int fast) {
     p.stop_step_exiting = STOP_STEP_EXITING;
     p.cs_n_steps = CS_CONC_STEPS;
     p.cs_stragg_half_n = CS_STRAGG_HALF_N;
-    p.emin = E_MIN;
     p.depthsteps_max = 0; /* automatic */
     if (fast) {
         p.rk4 = FALSE;
@@ -348,6 +348,7 @@ void simulation_print(FILE *f, const simulation *sim) {
     }
     fprintf(f, "E = %.3lf keV\n", sim->beam_E/C_KEV);
     fprintf(f, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
+    fprintf(f, "E_min = %.3lf keV\n", sim->emin/C_KEV);
     fprintf(f, "alpha = %.3lf deg\n", alpha/C_DEG);
     fprintf(f, "n_detectors = %zu\n", sim->n_det);
     fprintf(f, "n_reactions = %zu\n", sim->n_reactions);

@@ -207,7 +207,7 @@ void post_scatter_exit(ion *p, const depth depth_start, sim_workspace *ws, const
             break;
         }
         depth d_after = stop_step(ws, p, sample, d, ws->params.stop_step_exiting == 0.0?(p->E*0.10+sqrt(p->S)+2.0*C_KEV):ws->params.stop_step_exiting); /* TODO: 10% of energy plus straggling plus 2 keV is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
-        if(p->E < ws->params.emin) {
+        if(p->E < ws->sim->emin) {
 #ifdef DEBUG_REACTION
             fprintf(stderr,
                             "  Reaction %lu with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
@@ -230,7 +230,7 @@ void post_scatter_exit(ion *p, const depth depth_start, sim_workspace *ws, const
             break;
         }
         depth d_after  = stop_step(ws, &ion_foil, foil, d, ws->params.stop_step_exiting == 0.0?p->E*0.1+sqrt(p->S):ws->params.stop_step_exiting);
-        if(p->E < ws->params.emin) {
+        if(p->E < ws->sim->emin) {
             break;
         }
         d = d_after;
@@ -329,7 +329,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             break;
         if(ion1.inverse_cosine_theta < 0.0 && d_before.x < 0.001*C_TFU) /* We're coming out of the sample and about to exit */
             break;
-        if (ion1.E < ws->params.emin) {
+        if (ion1.E < ws->sim->emin) {
 #ifdef DEBUG
             fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %lu.\n", ion1.E/C_KEV, ws->params.emin/C_KEV, d_before.x/C_TFU, d_before.i);
 #endif
@@ -394,7 +394,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             post_scatter_exit(&r->p, d_after, ws, sample);
             b->E = r->p.E; /* Now exited from sample */
             b->S = r->p.S;
-            if (r->p.E < ws->params.emin) {
+            if (r->p.E < ws->sim->emin) {
                 r->stop = TRUE;
                 b->Q = 0.0;
                 continue;
@@ -736,7 +736,7 @@ void simulate_with_ds(sim_workspace *ws) {
     const jibal_isotope *incident = ws->sim->beam_isotope;
     while(1) {
         double E_front = ion1.E;
-        if(E_front < ws->params.emin)
+        if(E_front < ws->sim->emin)
             break;
         depth d_after = stop_step(ws, &ion1, ws->sample, d_before, sqrt(ws->det->resolution+ion1.S)); /* TODO: step? */
         double thick_step = depth_diff(d_before, d_after);
