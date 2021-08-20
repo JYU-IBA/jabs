@@ -18,9 +18,9 @@
 #include "rotate.h"
 #include "spectrum.h"
 
-simulation *sim_init() {
+simulation *sim_init(jibal_isotope *isotopes) {
     simulation *sim = malloc(sizeof(simulation));
-    sim->beam_isotope = NULL;
+    sim->beam_isotope = jibal_isotope_find(isotopes, NULL, 2, 4);
     sim->sample_theta = ALPHA; /* These defaults are for IBM geometry */
     sim->sample_phi = 0.0;
     sim->fluence = FLUENCE;

@@ -57,4 +57,19 @@ int script_roi(script_session *s, int argc, char * const *argv);
 int script_process(script_session *s, const char *filename);
 int script_prepare_sim_or_fit(script_session *s);
 int script_finish_sim_or_fit(script_session *s);
+static const struct script_command script_commands[] = {
+        {"help",    &script_help,           "Print help."},
+        {"show",    &script_show,           "Show information on things."},
+        {"set",     &script_set,            "Set variables."},
+        {"add",     &script_add,            "Add things."},
+        {"simulate",    &script_simulate,   "Run a simulation."},
+        {"load",    &script_load,           "Load something."},
+        {"reset",   &script_reset,           "Reset something."},
+        {"fit",     &script_fit,            "Do a fit."},
+        {"roi",     &script_roi,            "Show information from a region of interest."},
+        {"save",    &script_save,           "Save something."},
+        {"exit", NULL, "Exit."},
+        {"quit", NULL, NULL},
+        {NULL, NULL, NULL}
+}; /* TODO: more commands... */
 #endif // JABS_SCRIPT_H

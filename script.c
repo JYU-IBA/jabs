@@ -11,24 +11,9 @@
 #include "script.h"
 #include "jabs.h"
 
-static const struct script_command commands[] = {
-        {"help",    &script_help,           "Print help."},
-        {"show",    &script_show,           "Show information on things."},
-        {"set",     &script_set,            "Set variables."},
-        {"add",     &script_add,            "Add things."},
-        {"simulate",    &script_simulate,   "Run a simulation."},
-        {"load",    &script_load,           "Load something."},
-        {"reset",   &script_reset,           "Reset something."},
-        {"fit",     &script_fit,            "Do a fit."},
-        {"roi",     &script_roi,            "Show information from a region of interest."},
-        {"save",    &script_save,           "Save something."},
-        {"exit", NULL, "Exit."},
-        {"quit", NULL, NULL},
-        {NULL, NULL, NULL}
-}; /* TODO: more commands... */
 
 void script_print_commands(FILE *f) {
-    for(const struct script_command *c = commands; c->name != NULL; c++) {
+    for(const struct script_command *c = script_commands; c->name != NULL; c++) {
         if(!c->help_text)
             continue;
         fprintf(f, "%22s    %s\n", c->name, c->help_text);
@@ -125,7 +110,10 @@ int script_reset(script_session *s, int argc, char * const *argv) {
     fit_data_workspaces_free(fit_data);
     fit_data->ws = NULL;
     sim_free(fit_data->sim);
-    fit_data->sim = sim_init(NULL);
+    sample_model_free(fit_data->sm);
+    fit_data->sm = NULL;
+    fit_data->sim = sim_init(s->jibal->isotopes);
+    jibal_gsto_assign_clear_all(fit_data->jibal->gsto);
     return 0;
 }
 
@@ -491,7 +479,7 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
     struct script_session *s = malloc(sizeof(struct script_session));
     s->jibal = jibal;
     if(!sim) { /* Sim shouldn't be NULL. If it is, we make a new one. */
-        sim = sim_init(NULL);
+        sim = sim_init(jibal->isotopes);
     }
     s->fit = fit_data_new(jibal, sim); /* Not just fit, but this conveniently holds everything we need. */
     s->cf = jibal_config_file_init(jibal->units);
@@ -537,7 +525,7 @@ int script_process(script_session *s, const char *filename) {
     } else if(filename) {
         fprintf(stderr, "\nRunning script \"%s\"\n\n", filename);
     }
-    int exit = FALSE;
+    int exit_session = FALSE;
     int status = 0;
     while(getline(&line, &line_size, f) > 0) {
         lineno++;
@@ -562,11 +550,11 @@ int script_process(script_session *s, const char *filename) {
 #endif
         if(argc) {
             int found = FALSE;
-            for(const struct script_command *c = commands; c->name != NULL; c++) {
+            for(const struct script_command *c = script_commands; c->name != NULL; c++) {
                 if(strcmp(c->name, argv[0]) == 0) {
                     found = TRUE;
                     if(c->f == NULL) {
-                        exit = TRUE;
+                        exit_session = TRUE;
                         break;
                     }
                     status = c->f(s, argc - 1, argv + 1);
@@ -587,7 +575,7 @@ int script_process(script_session *s, const char *filename) {
         }
         free(argv[0]);
         free(argv);
-        if(exit)
+        if(exit_session)
             break;
         if(interactive) {
             fputs(prompt, stderr);
