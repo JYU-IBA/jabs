@@ -57,6 +57,8 @@ typedef struct {
     double channeling_offset; /* a very ad-hoc channeling yield correction */
     double channeling_slope;
     sim_calc_params params;
+    int erd; /* Add ERD reactions */
+    int rbs; /* Add RBS reactions */
 } simulation;
 
 typedef struct sim_reaction {

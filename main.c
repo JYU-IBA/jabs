@@ -60,8 +60,8 @@ int main(int argc, char **argv) {
     sim->params.stop_step_incident = cmd_opt->stop_step_incident;
     sim->params.stop_step_exiting = cmd_opt->stop_step_exiting;
     sim->params.depthsteps_max = cmd_opt->depthsteps_max;
-    fit_data->rbs = cmd_opt->rbs;
-    fit_data->erd = cmd_opt->erd;
+    sim->rbs = cmd_opt->rbs;
+    sim->erd = cmd_opt->erd;
     session->output_filename = strdup_non_null(cmd_opt->output_filename);
     session->bricks_out_filename = strdup_non_null(cmd_opt->bricks_filename);
     session->sample_out_filename = strdup_non_null(cmd_opt->sample_filename);

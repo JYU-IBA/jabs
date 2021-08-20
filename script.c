@@ -338,6 +338,8 @@ jibal_config_var *script_make_vars(script_session *s) {
             {JIBAL_CONFIG_VAR_STRING, "bricks_out",     &s->bricks_out_filename,   NULL},
             {JIBAL_CONFIG_VAR_STRING, "sample_out",     &s->sample_out_filename,   NULL},
             {JIBAL_CONFIG_VAR_STRING, "det_out",        &s->detector_out_filename, NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "erd",            &sim->erd, NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "rbs",            &sim->rbs, NULL},
             {JIBAL_CONFIG_VAR_NONE,NULL,NULL,                              NULL}
     };
     int n_vars;
@@ -640,10 +642,10 @@ int script_prepare_sim_or_fit(script_session *s) {
     free(fit->sim->reactions);
     fit->sim->reactions = NULL;
     fit->sim->n_reactions = 0;
-    if(fit->rbs) {
+    if(fit->sim->rbs) {
         sim_reactions_add(fit->sim, REACTION_RBS, fit->jibal->config->cs_rbs,0.0); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
     }
-    if(fit->erd) {
+    if(fit->sim->erd) {
         sim_reactions_add(fit->sim, REACTION_ERD, fit->jibal->config->cs_erd, 0.0);
     }
 
