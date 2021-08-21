@@ -1,0 +1,5 @@
+#define jabs_VERSION "@qjabs_VERSION@"
+#define jabs_VERSION_MAJOR @qjabs_VERSION_MAJOR@
+#define jabs_VERSION_MINOR @qjabs_VERSION_MINOR@
+#define jabs_VERSION_PATCH @qjabs_VERSION_PATCH@
+#define jabs_DESCRIPTION "@qjabs_DESCRIPTION@"
