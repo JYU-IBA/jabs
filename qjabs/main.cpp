@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QLocale>
 #include <cstdarg>
+#include <clocale>
 #include "mainwindow.h"
 extern "C" {
 #include <stdio.h>
@@ -14,9 +15,9 @@ MainWindow *mainWindow; /* Dirty trick! jabs_message needs to know the address o
 
 int main(int argc, char *argv[])
 {
-    std::setlocale(LC_NUMERIC,"C");
+    setlocale(LC_NUMERIC,"C");
     QApplication a(argc, argv);
-    std::setlocale(LC_NUMERIC,"C");  /* This should force C part of JaBS to use "." as a decimal separator even when locale says it is ",". */
+    setlocale(LC_NUMERIC,"C");  /* This should force C part of JaBS to use "." as a decimal separator even when locale says it is ",". */
     MainWindow w;
     mainWindow = &w;
     w.show();
