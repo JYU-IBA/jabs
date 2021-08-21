@@ -10,6 +10,7 @@
 #include "spectrum.h"
 #include "script.h"
 #include "jabs.h"
+#include "message.h"
 
 
 void script_print_commands(FILE *f) {
@@ -646,12 +647,12 @@ int script_prepare_sim_or_fit(script_session *s) {
 
     jibal_gsto_assign_clear_all(fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
     if(assign_stopping(fit->jibal->gsto, fit->sim)) {
-        fprintf(stderr, "Could not assign stopping.\n");
+        jabs_message(MSG_ERROR, "Could not assign stopping.\n");
         return -1;
     }
     jibal_gsto_print_assignments(fit->jibal->gsto);
     jibal_gsto_print_files(fit->jibal->gsto, TRUE);
-    fprintf(stderr, "Loading stopping data.\n");
+    jabs_message(MSG_VERBOSE, "Loading stopping data.\n");
     jibal_gsto_load_all(fit->jibal->gsto);
     simulation_print(stderr, fit->sim);
     s->start = clock();
@@ -661,8 +662,8 @@ int script_prepare_sim_or_fit(script_session *s) {
 int script_finish_sim_or_fit(script_session *s) {
     s->end = clock();
     double cputime_total = (((double) (s->end - s->start)) / CLOCKS_PER_SEC);
-    fprintf(stderr, "...finished!\n\n");
-    fprintf(stderr, "Total CPU time: %.3lf s.\n", cputime_total);
+    jabs_message(MSG_INFO, "...finished! Total CPU time: %.3lf s.\n", cputime_total);
+
     struct fit_data *fit = s->fit;
 
     if(fit->sim->n_det == 1) { /* TODO: multidetector automatic spectra saving! */

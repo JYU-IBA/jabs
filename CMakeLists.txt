@@ -21,7 +21,7 @@ configure_file(version.h.in version.h @ONLY)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 find_package(GSL 2.6 REQUIRED)
-find_package(Jibal 0.3.1 REQUIRED)
+find_package(Jibal 0.3.3 REQUIRED)
 
 if(WIN32)
     find_path(GETOPT_INCLUDE_DIR getopt.h)
@@ -39,7 +39,7 @@ endif()
 
 add_executable(jabs main.c sample.c sample.h brick.c ion.c ion.h simulation.c simulation.h reaction.c reaction.h
         options.c options.h spectrum.c spectrum.h fit.c fit.h rotate.c rotate.h detector.c detector.h jabs.c jabs.h
-        roughness.c roughness.h script.c script.h generic.c generic.h)
+        roughness.c roughness.h script.c script.h generic.c generic.h message.c message.h)
 target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
 
 target_link_libraries(jabs
