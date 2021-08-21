@@ -2,6 +2,7 @@
 #include "./ui_mainwindow.h"
 #include <QFontDatabase>
 #include <QDebug>
+#include <QTextStream>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -39,7 +40,7 @@ void MainWindow::on_actionRun_triggered()
     }
     script_reset(session, 0, NULL);
     QString text = ui->textEdit->toPlainText();
-    QTextStream stream = QTextStream(&text , QIODevice::ReadOnly);
+    QTextStream stream = QTextStream(&text, QIODevice::ReadOnly);
     size_t lineno = 0;
     int status = 0;
     int exit_session = FALSE;

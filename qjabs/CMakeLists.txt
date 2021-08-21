@@ -15,8 +15,10 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 configure_file(version.h.in version.h @ONLY)
-find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets REQUIRED)
+find_package(QT NAMES Qt6 COMPONENTS Widgets REQUIRED Charts REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED Charts REQUIRED)
+
+message("Qt major version is ${QT_VERSION_MAJOR} ")
 
 find_package(GSL 2.6 REQUIRED)
 find_package(Jibal 0.3.3 REQUIRED)
@@ -64,6 +66,7 @@ set(PROJECT_SOURCES
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(qjabs
+        MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
     )
 else()
@@ -82,3 +85,13 @@ target_link_libraries(qjabs
     PRIVATE GSL::gsl
     PRIVATE "$<$<BOOL:${UNIX}>:m>"
     )
+
+set_target_properties(qjabs PROPERTIES
+    MACOSX_BUNDLE_GUI_IDENTIFIER jyu.fi
+    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+)
+
+if(QT_VERSION_MAJOR EQUAL 6)
+    qt_finalize_executable(qjabs)
+endif()

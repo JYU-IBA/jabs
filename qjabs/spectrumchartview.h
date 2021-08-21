@@ -2,10 +2,9 @@
 #define BPMCHARTVIEW_H
 
 #include <QChartView>
+#include <QChart>
 #include <QLineSeries>
 #include <QValueAxis>
-
-//QT_CHARTS_USE_NAMESPACE
 
 class SpectrumChartView : public QChartView
 {

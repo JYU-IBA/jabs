@@ -35,7 +35,7 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
-    jibal *jibal;
+    struct jibal *jibal;
     script_session *session;
 
 };
