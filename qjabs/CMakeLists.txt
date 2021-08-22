@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 project(qjabs
-    VERSION 0.4.1
+    VERSION 0.4.2
     DESCRIPTION "Jaakko's Backscattering Simulator (JaBS) for Qt"
     LANGUAGES C CXX)
 
