@@ -68,6 +68,7 @@ void fit_data_free(struct fit_data *f); /* Doesn't free everything in fit_data. 
 void fit_data_print(FILE *f, const struct fit_data *fit_data);
 void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct roi *roi);
 gsl_histogram *fit_data_exp(const struct fit_data *fit_data, size_t i_det);
+gsl_histogram *fit_data_sim(const struct fit_data *fit_data, size_t i_det);
 void fit_data_exp_free(struct fit_data *fit_data);
 int fit_data_add_det(struct fit_data *fit_data, detector *det);
 sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det);

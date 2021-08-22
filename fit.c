@@ -221,6 +221,14 @@ gsl_histogram *fit_data_exp(const struct fit_data *fit_data, size_t i_det) {
     return fit_data->exp[i_det];
 }
 
+gsl_histogram *fit_data_sim(const struct fit_data *fit_data, size_t i_det) {
+    sim_workspace *ws = fit_data_ws(fit_data, i_det);
+    if(ws)
+        return ws->histo_sum;
+    else
+        return NULL;
+}
+
 void fit_data_exp_free(struct fit_data *fit_data) {
     if(!fit_data->exp)
         return;
