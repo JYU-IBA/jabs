@@ -115,13 +115,15 @@ int script_reset(script_session *s, int argc, char * const *argv) {
     fit_data->sm = NULL;
     fit_data->sim = sim_init(s->jibal->isotopes);
     jibal_gsto_assign_clear_all(fit_data->jibal->gsto);
+    free(s->cf->vars);
+    jibal_config_file_set_vars(s->cf, script_make_vars(s));
     return 0;
 }
 
 int script_show(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     if(argc == 0) {
-        fprintf(stderr, "Usage show [sim|fit|sample|detector].\n");
+        fprintf(stderr, "Usage show [sim|fit|sample|detector|vars].\n");
         return 0;
     }
     if(strcmp(argv[0], "sim") == 0) {
@@ -142,6 +144,10 @@ int script_show(script_session *s, int argc, char * const *argv) {
             detector_print(NULL, fit->sim->det[i_det]);
             fprintf(stderr, "\n");
         }
+        return EXIT_SUCCESS;
+    }
+    if(strcmp(argv[0], "vars") == 0) {
+        jibal_config_file_write(s->cf, NULL);
         return EXIT_SUCCESS;
     }
     fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
@@ -315,21 +321,21 @@ jibal_config_var *script_make_vars(script_session *s) {
         return NULL;
     simulation *sim = fit->sim;
     jibal_config_var vars[] = {
-            {JIBAL_CONFIG_VAR_UNIT, "fluence", &sim->fluence, NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "energy",         &sim->beam_E,      NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",   &sim->beam_E_broad,NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "emin",           &sim->emin,NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "alpha",          &sim->sample_theta,NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "sample_azi",     &sim->sample_phi,  NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "channeling",     &sim->channeling_offset, NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",&sim->channeling_slope, NULL},
-            {JIBAL_CONFIG_VAR_STRING, "output",         &s->output_filename,      NULL},
-            {JIBAL_CONFIG_VAR_STRING, "bricks_out",     &s->bricks_out_filename,   NULL},
-            {JIBAL_CONFIG_VAR_STRING, "sample_out",     &s->sample_out_filename,   NULL},
-            {JIBAL_CONFIG_VAR_STRING, "det_out",        &s->detector_out_filename, NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "erd",            &sim->erd, NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "rbs",            &sim->rbs, NULL},
-            {JIBAL_CONFIG_VAR_NONE,NULL,NULL,                              NULL}
+            {JIBAL_CONFIG_VAR_UNIT,     "fluence",          &sim->fluence,              NULL},
+            {JIBAL_CONFIG_VAR_UNIT,     "energy",           &sim->beam_E,               NULL},
+            {JIBAL_CONFIG_VAR_UNIT,     "energy_broad",     &sim->beam_E_broad,         NULL},
+            {JIBAL_CONFIG_VAR_UNIT,     "emin",             &sim->emin,                 NULL},
+            {JIBAL_CONFIG_VAR_UNIT,     "alpha",            &sim->sample_theta,         NULL},
+            {JIBAL_CONFIG_VAR_UNIT,     "sample_azi",       &sim->sample_phi,           NULL},
+            {JIBAL_CONFIG_VAR_UNIT,     "channeling",       &sim->channeling_offset,    NULL},
+            {JIBAL_CONFIG_VAR_UNIT,     "channeling_slope", &sim->channeling_slope,     NULL},
+            {JIBAL_CONFIG_VAR_STRING,   "output",           &s->output_filename,        NULL},
+            {JIBAL_CONFIG_VAR_STRING,   "bricks_out",       &s->bricks_out_filename,    NULL},
+            {JIBAL_CONFIG_VAR_STRING,   "sample_out",       &s->sample_out_filename,    NULL},
+            {JIBAL_CONFIG_VAR_STRING,   "det_out",          &s->detector_out_filename,  NULL},
+            {JIBAL_CONFIG_VAR_BOOL,     "erd",              &sim->erd,                  NULL},
+            {JIBAL_CONFIG_VAR_BOOL,     "rbs",              &sim->rbs,                  NULL},
+            {JIBAL_CONFIG_VAR_NONE, NULL, NULL, NULL}
     };
     int n_vars;
     for(n_vars = 0; vars[n_vars].type != 0; n_vars++);
@@ -560,6 +566,8 @@ int script_process(script_session *s, const char *filename) {
                     }
                     status = c->f(s, argc - 1, argv + 1);
                     if(c->f == script_load || c->f == script_reset) {
+                        free(s->cf->vars);
+                        s->cf->vars = NULL;
                         jibal_config_file_set_vars(s->cf, script_make_vars(s)); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
                     }
                     break;
