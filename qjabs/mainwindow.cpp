@@ -112,15 +112,21 @@ void MainWindow::on_plotSpinBox_valueChanged(int arg1)
 
 void MainWindow::plotSpectrum(size_t i_det)
 {
+    ui->widget->clearAll();
     if(!session || !session->fit || !session->fit->sim) {
         qDebug() << "Nothing to plot.";
         return;
     }
     if(i_det >= session->fit->sim->n_det)
         return;
-    sim_workspace *ws = fit_data_ws(session->fit, i_det);
-    if(ws) {
-        ui->widget->drawDataToChart(session->fit->ws[i_det]->histo_sum->bin, session->fit->ws[i_det]->histo_sum->n);
+    gsl_histogram *sim = fit_data_sim(session->fit, i_det);
+    gsl_histogram *exp = fit_data_exp(session->fit, i_det);
+    if(sim) {
+        ui->widget->drawDataToChart("Simulated", sim->bin, sim->n, QColor("Blue"), true);
     }
+    if(exp) {
+        ui->widget->drawDataToChart("Experimental", exp->bin, exp->n, QColor("Black"), false);
+    }
+    ui->widget->replot();
 }
 

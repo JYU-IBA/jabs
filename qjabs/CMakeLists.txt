@@ -15,10 +15,12 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 configure_file(version.h.in version.h @ONLY)
-find_package(QT NAMES Qt6 COMPONENTS Widgets REQUIRED Charts REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED Charts REQUIRED)
 
-message("Qt major version is ${QT_VERSION_MAJOR} ")
+find_package(Qt6 COMPONENTS Widgets REQUIRED PrintSupport REQUIRED)
+
+if(${QT_VERSION_MAJOR} NOT EQUAL 6)
+    message("Qt major version is ${QT_VERSION_MAJOR}. This program is only for Qt6.")
+endif()
 
 find_package(GSL 2.6 REQUIRED)
 find_package(Jibal 0.3.3 REQUIRED)
@@ -60,27 +62,22 @@ set(PROJECT_SOURCES
        mainwindow.cpp
        mainwindow.h
        mainwindow.ui
-       spectrumchartview.cpp
-       spectrumchartview.h
+       qcustomplot.cpp
+       qcustomplot.h
+       spectrumplot.cpp
+       spectrumplot.h
 )
 
-if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(qjabs
-        MANUAL_FINALIZATION
-        ${PROJECT_SOURCES}
-    )
-else()
-    add_executable(qjabs
-        ${PROJECT_SOURCES}
-    )
-endif()
-
+qt_add_executable(qjabs
+    MANUAL_FINALIZATION
+    ${PROJECT_SOURCES}
+)
 
 target_include_directories(qjabs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 target_link_libraries(qjabs
-    PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
-    PRIVATE Qt${QT_VERSION_MAJOR}::Charts
+    PRIVATE Qt6::Widgets
+    PRIVATE Qt6::PrintSupport
     PRIVATE jibal
     PRIVATE GSL::gsl
     PRIVATE "$<$<BOOL:${UNIX}>:m>"
@@ -92,6 +89,4 @@ set_target_properties(qjabs PROPERTIES
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
 )
 
-if(QT_VERSION_MAJOR EQUAL 6)
-    qt_finalize_executable(qjabs)
-endif()
+qt_finalize_executable(qjabs)

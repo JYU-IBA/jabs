@@ -49,6 +49,10 @@ $ ./jabs -E 2MeV --alpha=10deg --theta=170deg --out=spectrum.csv sample Au 500tf
 
 Detector and sample can be read from files. The file formats are simple and human readable. Please see [the example](example).
 
+## Graphical user interface
+
+Extremely crude Qt-based [GUI](qjabs/) is provided. Scripts can be edited and run, simulated spectra and experimental spectra are plotted (if available). Many GUI-specific features are missing, such as loading and saving scripts, but the scripts themselves should work as described above. Note that some things are reset between runs, some are not. This will also be improved in the future.
+
 ## Features
 ### Implemented
  - Basic RBS spectrum simulation with atomic data, cross sections, electronic stopping and straggling given by [JIBAL](https://github.com/JYU-IBA/jibal)
