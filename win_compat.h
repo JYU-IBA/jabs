@@ -8,6 +8,7 @@ char *strsep(char **, const char *);
 char *dirname(char *path);
 #endif
 #ifdef _MSC_VER
+#include <stdarg.h>
 #define vscprintf _vscprintf
 int asprintf(char **strp, const char *format, ...);
 int vasprintf(char **strp, const char *format, va_list ap);

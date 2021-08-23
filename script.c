@@ -571,6 +571,7 @@ int script_process(script_session *s, const char *filename) {
                         free(s->cf->vars);
                         s->cf->vars = NULL;
                         jibal_config_file_set_vars(s->cf, script_make_vars(s)); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
+                        fflush(stderr);
                     }
                     break;
                 }
@@ -606,6 +607,7 @@ int script_process(script_session *s, const char *filename) {
             fprintf(stderr, "Finished running script \"%s\"\n", filename);
         }
     }
+    fflush(stderr);
     return status;
 }
 

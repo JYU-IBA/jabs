@@ -103,6 +103,7 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
     }
 #endif
     fprintf(stderr, "\n");
+    fflush(stderr);
 }
 
 fit_params *fit_params_new() {
