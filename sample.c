@@ -456,7 +456,6 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
 void sample_model_free(sample_model *sm) {
     if(!sm)
         return;
-
     for(size_t i = 0; i < sm->n_materials; i++) {
         jibal_material_free(sm->materials[i]);
     }

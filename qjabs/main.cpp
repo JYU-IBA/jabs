@@ -6,6 +6,7 @@
 extern "C" {
 #include <stdio.h>
 #include "message.h"
+#include "win_compat.h"
 }
 
 

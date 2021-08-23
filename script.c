@@ -111,13 +111,13 @@ int script_reset(script_session *s, int argc, char * const *argv) {
     fit_params_free(fit_data->fit_params);
     fit_data->fit_params = NULL;
     fit_data_workspaces_free(fit_data);
-    fit_data->ws = NULL;
-    sim_free(fit_data->sim);
     sample_model_free(fit_data->sm);
     fit_data->sm = NULL;
+    sim_free(fit_data->sim);
     fit_data->sim = sim_init(s->jibal->isotopes);
     jibal_gsto_assign_clear_all(fit_data->jibal->gsto);
     free(s->cf->vars);
+    s->cf->vars = NULL;
     jibal_config_file_set_vars(s->cf, script_make_vars(s));
     return 0;
 }

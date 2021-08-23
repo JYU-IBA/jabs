@@ -1,4 +1,4 @@
-#ifdef WIN_COMPAT_H
+#ifndef WIN_COMPAT_H
 #define WIN_COMPAT_H
 #ifdef WIN32
 #define F_OK 0

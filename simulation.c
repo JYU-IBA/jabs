@@ -42,6 +42,8 @@ simulation *sim_init(jibal_isotope *isotopes) {
 }
 
 void sim_free(simulation *sim) {
+    if(!sim)
+        return;
     sample_free(sim->sample);
     for(size_t i = 0; i < sim->n_det; i++) {
         detector_free(sim->det[i]);
