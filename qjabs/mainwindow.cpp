@@ -12,7 +12,11 @@ MainWindow::MainWindow(QWidget *parent)
     ui->splitter->setSizes(QList<int>() << 1 << 3);
     ui->splitter_2->setSizes(QList<int>() << 1 << 2);
     setWindowTitle(QString("JaBS ") + jabs_version());
+#ifdef WIN32
+    QFont fixedFont = QFont("Courier New");
+#else
     QFont fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+#endif
     fixedFont.setPointSize(14);
     ui->textEdit->setFont(fixedFont);
     jibal = jibal_init(nullptr);
@@ -80,6 +84,8 @@ void MainWindow::on_actionRun_triggered()
                     }
                     status = c->f(session, argc - 1, argv + 1);
                     if(c->f == script_load || c->f == script_reset) {
+                        free(session->cf->vars);
+                        session->cf->vars = NULL;
                         jibal_config_file_set_vars(session->cf, script_make_vars(session)); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
                     }
                     break;

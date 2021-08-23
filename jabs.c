@@ -10,6 +10,7 @@
 #include "roughness.h"
 #include "jabs.h"
 #include "defaults.h"
+#include "win_compat.h"
 
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
     double em=E/incident->mass;

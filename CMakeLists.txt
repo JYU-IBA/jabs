@@ -9,6 +9,11 @@
 #   See LICENSE.txt for the full license.
 #
 cmake_minimum_required(VERSION 3.15)
+if(WIN32 AND DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+  set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      CACHE STRING "")
+  message(STATUS "CMake toolchain file ${CMAKE_TOOLCHAIN_FILE}")
+endif()
 project(jabs
         VERSION 0.4.2
         DESCRIPTION "Jaakko's Backscattering Simulator (JaBS)"
@@ -45,7 +50,8 @@ target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
 target_link_libraries(jabs
     PRIVATE jibal
     PRIVATE GSL::gsl
-    PRIVATE "$<$<BOOL:${UNIX}>:m>" ${GETOPT_LIBRARY}
+    PRIVATE "$<$<BOOL:${UNIX}>:m>"
+    ${GETOPT_LIBRARY}
     )
 
 install(TARGETS jabs RUNTIME DESTINATION bin)

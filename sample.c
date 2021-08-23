@@ -17,6 +17,7 @@
 #include "defaults.h"
 #include "generic.h"
 #include "sample.h"
+#include "win_compat.h"
 
 depth depth_seek(const sample *sample, double x) {
     depth depth;

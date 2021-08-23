@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "win_compat.h"
 
 char **string_to_argv(const char *str) {
     char *s = strdup(str);
@@ -22,7 +23,7 @@ char **string_to_argv(const char *str) {
     out[0] = s;
     size_t pos;
     size_t i = 1;
-    for(pos = 0; pos < len; pos++) {
+    for(pos = 0; pos < len && i < n; pos++) {
         if(s[pos] == '\0' /*&& s[pos-1] != '\0'*/) {
             out[i] = s+pos+1;
             if(*out[i] != '\0') { /* Consecutive delimeters (turned to '\0' by strsep above) are ignored */

@@ -7,6 +7,7 @@
 #include "generic.h"
 #include "defaults.h"
 #include "detector.h"
+#include "win_compat.h"
 
 extern inline double detector_calibrated(const detector *det, size_t ch);
 

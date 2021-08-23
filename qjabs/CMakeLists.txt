@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
-
+if(WIN32 AND DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            CACHE STRING "")
+    message(STATUS "CMake toolchain file ${CMAKE_TOOLCHAIN_FILE}")
+endif()
 project(qjabs
     VERSION 0.4.2
     DESCRIPTION "Jaakko's Backscattering Simulator (JaBS) for Qt"
@@ -24,6 +28,10 @@ endif()
 
 find_package(GSL 2.6 REQUIRED)
 find_package(Jibal 0.3.3 REQUIRED)
+if(WIN32)
+    find_path(GETOPT_INCLUDE_DIR getopt.h)
+    find_library(GETOPT_LIBRARY getopt)
+endif()
 
 set(PROJECT_SOURCES
         ../sample.c
@@ -58,6 +66,8 @@ set(PROJECT_SOURCES
        ../options.c
        ../options.h
        ../message.h
+        ../win_compat.c
+        ../win_compat.h
        main.cpp
        mainwindow.cpp
        mainwindow.h
@@ -73,7 +83,10 @@ qt_add_executable(qjabs
     ${PROJECT_SOURCES}
 )
 
-target_include_directories(qjabs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
+target_include_directories(qjabs
+        PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/.."
+        ${GETOPT_INCLUDE_DIR}
+        )
 
 target_link_libraries(qjabs
     PRIVATE Qt6::Widgets
@@ -81,6 +94,7 @@ target_link_libraries(qjabs
     PRIVATE jibal
     PRIVATE GSL::gsl
     PRIVATE "$<$<BOOL:${UNIX}>:m>"
+    ${GETOPT_LIBRARY}
     )
 
 set_target_properties(qjabs PROPERTIES

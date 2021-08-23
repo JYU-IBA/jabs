@@ -1,10 +1,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#ifdef WIN32
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 #include <jibal_units.h>
-#include <jibal_generic.h>
-#include "defaults.h"
 #include "fit.h"
 #include "generic.h"
 #include "spectrum.h"

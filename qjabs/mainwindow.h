@@ -10,6 +10,9 @@ extern "C" {
 #include "sample.h"
 #include "script.h"
 #include "generic.h"
+#ifdef WIN32
+#include "win_compat.h"
+#endif
 }
 
 

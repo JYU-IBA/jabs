@@ -11,6 +11,8 @@
     See LICENSE.txt for the full license.
 
  */
+#ifndef JABS_GENERIC_H
+#define JABS_GENERIC_H
 #include <stdio.h>
 
 char **string_to_argv(const char *str);
@@ -21,3 +23,4 @@ void fclose_file_or_stream(FILE *f); /* fclose() if f is not stdout or stderr */
 
 char *strdup_non_null(const char *s); /* if s is NULL, returns NULL, else strdup(s) */
 int str_true_false(const char *s);
+#endif //JABS_GENERIC_H

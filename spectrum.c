@@ -16,7 +16,7 @@
 
 #include "generic.h"
 #include "spectrum.h"
-
+#include "win_compat.h"
 
 
 gsl_histogram *spectrum_read(const char *filename, const detector *det) {
