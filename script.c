@@ -505,6 +505,8 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
     return s;
 }
 void script_session_free(script_session *s) {
+    if(!s)
+        return;
     free(s->output_filename);
     free(s->bricks_out_filename);
     free(s->sample_out_filename);

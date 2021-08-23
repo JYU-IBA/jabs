@@ -45,10 +45,12 @@ void sim_free(simulation *sim) {
     if(!sim)
         return;
     sample_free(sim->sample);
-    for(size_t i = 0; i < sim->n_det; i++) {
-        detector_free(sim->det[i]);
+    if(sim->det) {
+        for(size_t i = 0; i < sim->n_det; i++) {
+            detector_free(sim->det[i]);
+        }
+        free(sim->det);
     }
-    free(sim->det);
     for(size_t i = 0; i < sim->n_reactions; i++) {
         reaction_free(&sim->reactions[i]);
     }
