@@ -322,6 +322,8 @@ jibal_config_var *script_make_vars(script_session *s) {
     if(!fit)
         return NULL;
     simulation *sim = fit->sim;
+    if(!sim)
+        return NULL;
     jibal_config_var vars[] = {
             {JIBAL_CONFIG_VAR_UNIT,     "fluence",          &sim->fluence,              NULL},
             {JIBAL_CONFIG_VAR_UNIT,     "energy",           &sim->beam_E,               NULL},
