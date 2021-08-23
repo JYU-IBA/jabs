@@ -110,7 +110,7 @@ sample_model *sample_model_split_elements(const sample_model *sm) {
     size_t i = 0; /* Material index in output */
     for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
         for(size_t i_elem = 0; i_elem < sm->materials[i_mat]->n_elements; i_elem++) {
-            jibal_element *e = jibal_element_copy(&sm->materials[i_mat]->elements[i_elem], 0);
+            jibal_element *e = jibal_element_copy(&sm->materials[i_mat]->elements[i_elem], JIBAL_ALL_ISOTOPES);
             out->materials[i] = malloc(sizeof(jibal_material));
             jibal_material *mat = out->materials[i];
             mat->elements = malloc(sizeof(jibal_element));
@@ -175,6 +175,16 @@ sample *sample_from_sample_model(const sample_model *sm) {
         return NULL;
 #ifdef DEBUG
     fprintf(stderr, "Sample model is type %i, it has %zu materials and %zu ranges.\n", sm->type, sm->n_materials, sm->n_ranges);
+    for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+        fprintf(stderr, "Material %zu is %s. There are %zu elements.\n", i_mat, sm->materials[i_mat]->name, sm->materials[i_mat]->n_elements);
+        for(size_t i_elem = 0; i_elem < sm->materials[i_mat]->n_elements; i_elem++) {
+            fprintf(stderr, "  element %zu (%s: Z = %i): %zu isotopes.\n",  i_mat, sm->materials[i_mat]->elements[i_elem].name, sm->materials[i_mat]->elements[i_elem].Z, sm->materials[i_mat]->elements[i_elem].n_isotopes);
+            for(size_t i_isotope = 0; i_isotope < sm->materials[i_mat]->elements[i_elem].n_isotopes; i_isotope++) {
+                const jibal_isotope *isotope = sm->materials[i_mat]->elements[i_elem].isotopes[i_isotope];
+                fprintf(stderr, "    isotope %zu: %s, A=%i, abundance %g, conc %g\n", i_isotope, isotope->name, isotope->A, isotope->abundance, sm->materials[i_mat]->elements[i_elem].concs[i_isotope]);
+            }
+        }
+    }
 #endif
     sample *s = malloc(sizeof(sample));
     sample_model *sm_copy = NULL;
@@ -189,10 +199,17 @@ sample *sample_from_sample_model(const sample_model *sm) {
     } else {
         s->no_conc_gradients = FALSE;
     }
+#ifdef DEBUG
+    fprintf(stderr, "Point-by-point sample model for simulation:\n");
+    sample_model_print(NULL, sm);
+#endif
     size_t n_isotopes = 0;
     for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
         for(size_t i_elem = 0; i_elem < sm->materials[i_mat]->n_elements; i_elem++) {
             n_isotopes += sm->materials[i_mat]->elements[i_elem].n_isotopes;
+#ifdef DEBUG
+            fprintf(stderr, "Material %zu element %zu has %zu isotopes.\n", i_mat, i_elem, sm->materials[i_mat]->elements[i_elem].n_isotopes);
+#endif
         }
     }
     size_t i = 0;
@@ -207,9 +224,22 @@ sample *sample_from_sample_model(const sample_model *sm) {
         }
     }
     s->n_isotopes = n_isotopes;
+
     s->n_ranges = sm->n_ranges;
     s->isotopes = isotopes;
+#ifdef DEBUG
+    fprintf(stderr, "%zu isotopes before duplicates have been removed, they are:\n", s->n_isotopes);
+    for(i = 0; i < s->n_isotopes; i++) {
+        fprintf(stderr, "%zu: %s  (Z = %i, A = %i)\n", i, s->isotopes[i]->name, s->isotopes[i]->Z, s->isotopes[i]->A);
+    }
+#endif
     sample_sort_and_remove_duplicate_isotopes(s);
+#ifdef DEBUG
+    fprintf(stderr, "%zu isotopes remain after duplicates have been removed, they are:\n", s->n_isotopes);
+    for(i = 0; i < s->n_isotopes; i++) {
+        fprintf(stderr, "%zu: %s  (Z = %i, A = %i)\n", i, s->isotopes[i]->name, s->isotopes[i]->Z, s->isotopes[i]->A);
+    }
+#endif
     s->ranges = malloc(s->n_ranges * sizeof(struct sample_range));
     s->cbins = calloc(s->n_ranges * s->n_isotopes, sizeof(double));
     memcpy(s->ranges, sm->ranges, sizeof (struct sample_range) * sm->n_ranges);
@@ -473,6 +503,9 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const 
                 free(sm->materials);
                 return NULL;
             }
+#ifdef DEBUG
+            fprintf(stderr, "Material from formula \"%s\" was created\n", argv[0]);
+#endif
             sample_range *range = &sm->ranges[sm->n_ranges];
             range->x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]);
             range->rough.x = 0.0;
@@ -488,7 +521,15 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const 
     for(size_t i = 0; i < sm->n_ranges; i++) {
         *sample_model_conc_bin(sm, i, i) = 1.0;
     }
+#ifdef DEBUG
+    fprintf(stderr, "Sample model from argv before splitting elements:\n");
+    sample_model_print(NULL, sm);
+#endif
     sample_model *sm2 = sample_model_split_elements(sm);
+#ifdef DEBUG
+    fprintf(stderr, "Sample model after splitting elements:\n");
+    sample_model_print(NULL, sm2);
+#endif
     sample_model_free(sm);
     return sm2;
 }

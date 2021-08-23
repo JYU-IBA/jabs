@@ -625,6 +625,10 @@ int script_prepare_sim_or_fit(script_session *s) {
     }
     fit_data_workspaces_free(s->fit);
     sample_free(fit->sim->sample);
+#ifdef DEBUG
+    fprintf(stderr, "Original sample model:\n");
+    sample_model_print(NULL, fit->sm);
+#endif
     fit->sim->sample = sample_from_sample_model(fit->sm);
     if(!fit->sim->sample) {
         fprintf(stderr, "Could not make a sample based on model description. This should never happen.\n");
