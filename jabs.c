@@ -331,7 +331,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             break;
         if (ion1.E < ws->sim->emin) {
 #ifdef DEBUG
-            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %lu.\n", ion1.E/C_KEV, ws->params.emin/C_KEV, d_before.x/C_TFU, d_before.i);
+            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %lu.\n", ion1.E/C_KEV, ws->sim->emin/C_KEV, d_before.x/C_TFU, d_before.i);
 #endif
             break;
         }
