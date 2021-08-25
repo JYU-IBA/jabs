@@ -667,7 +667,7 @@ int script_prepare_sim_or_fit(script_session *s) {
 
     jibal_gsto_assign_clear_all(fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
     if(assign_stopping(fit->jibal->gsto, fit->sim)) {
-        jabs_message(MSG_ERROR, "Could not assign stopping.\n");
+        jabs_message(MSG_ERROR, "Could not assign stopping or straggling. Failure. Provide more data, check that JIBAL Z2_max is sufficiently large (currently %i) or disable unwanted reactions (e.g. ERD).\n", s->jibal->config->Z_max);
         return -1;
     }
     jibal_gsto_print_assignments(fit->jibal->gsto);

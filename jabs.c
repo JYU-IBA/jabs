@@ -459,29 +459,49 @@ int process_reaction_files(simulation *sim, const jibal_isotope *jibal_isotopes,
 }
 
 int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
+    /* TODO: simplify this by finding all possible Z1, Z2 combinations, considering target elements, beam and reactions before attempting to assign stopping/straggling (GSTO) */
     struct sample *sample = sim->sample;
     if(!sample) {
         fprintf(stderr, "Could not assign stopping, because sample is not set!\n");
         return 1;
     }
     int Z2 = -1;
+    int fail = FALSE; /* We don't return immediately on failure since the user might want to know ALL failures at one go. */
     for(size_t i = 0; i < sample->n_isotopes; i++) {
         if(Z2 == sample->isotopes[i]->Z) /* Z2 repeats, skip */
             continue;
         Z2 = sample->isotopes[i]->Z;
         if (!jibal_gsto_auto_assign(gsto, sim->beam_isotope->Z, Z2)) { /* This should handle RBS */
-            fprintf(stderr, "Can not assign stopping.\n");
-            return EXIT_FAILURE;
+            fprintf(stderr, "Can not assign stopping or straggling for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
+            fail = TRUE;
+        }
+        if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, sim->beam_isotope->Z, Z2)) {
+            fprintf(stderr, "Could not assign stopping for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
+            fail = TRUE;
+        }
+        if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, sim->beam_isotope->Z, Z2)) {
+            fprintf(stderr, "Could not assign straggling for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
+            fail = TRUE;
         }
         for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
             const reaction *r = &sim->reactions[i_reaction];
             if (!jibal_gsto_auto_assign(gsto, r->product->Z, Z2)) {
-                fprintf(stderr, "Can not assign stopping.\n");
-                return EXIT_SUCCESS;
+                fprintf(stderr, "Can not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
+                fail = TRUE;
+            }
+            if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, r->product->Z, Z2)) {
+                fprintf(stderr, "Could not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
+                fail = TRUE;
+            }
+            if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, r->product->Z, Z2)) {
+                fprintf(stderr, "Could not assign straggling for reaction product  (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
+                fail = TRUE;
             }
         }
     }
-    return 0;
+    if(fail)
+        return EXIT_FAILURE;
+    return EXIT_SUCCESS;
 }
 
 int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histogram *exp) {
