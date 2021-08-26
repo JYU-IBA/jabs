@@ -121,6 +121,7 @@ void MainWindow::plotSpectrum(size_t i_det)
     ui->widget->clearAll();
     if(!session || !session->fit || !session->fit->sim) {
         qDebug() << "Nothing to plot.";
+        ui->widget->replot();
         return;
     }
     if(i_det >= session->fit->sim->n_det)
@@ -131,7 +132,7 @@ void MainWindow::plotSpectrum(size_t i_det)
         ui->widget->drawDataToChart("Simulated", sim->bin, sim->n, QColor("Blue"), true);
     }
     if(exp) {
-        ui->widget->drawDataToChart("Experimental", exp->bin, exp->n, QColor("Black"), false);
+        ui->widget->drawDataToChart("Experimental", exp->bin, exp->n, QColor("Black"), sim?false:true);
     }
     ui->widget->replot();
 }
