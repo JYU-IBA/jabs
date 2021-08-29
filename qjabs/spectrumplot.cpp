@@ -9,12 +9,15 @@ SpectrumPlot::SpectrumPlot(QWidget *parent) : QCustomPlot(parent) {
     subLayout->setMargins(QMargins(0, 0, 5, 5));
     subLayout->addElement(0, 0, legend);
     legend->setFillOrder(QCPLegend::foColumnsFirst);
+    legend->setWrap(5);
     plotLayout()->setRowStretchFactor(1, 0.001);
     legend->setSelectableParts(QCPLegend::spItems);
     legend->setVisible(true);
+    legendFont = QFont(font());
     clearAll();
     connect(xAxis, qOverload<const QCPRange &>(&QCPAxis::rangeChanged), this, &SpectrumPlot::plotxRangeChanged);
     connect(yAxis, qOverload<const QCPRange &>(&QCPAxis::rangeChanged), this, &SpectrumPlot::plotyRangeChanged);
+    connect(this, &SpectrumPlot::legendClick, this, &SpectrumPlot::legendClicked);
 }
 
 void SpectrumPlot::drawDataToChart(const QString &name, double *data, int n, const QColor &color, bool rescale)
@@ -85,4 +88,25 @@ void SpectrumPlot::plotyRangeChanged(const QCPRange &range)
         newrange.upper = ymin+w;
     }
     yAxis->setRange(newrange);
+}
+
+void SpectrumPlot::legendClicked(QCPLegend *legend, QCPAbstractLegendItem *item, QMouseEvent *event)
+{
+    for (int i=0; i< graphCount(); ++i) {
+        if(item == legend->itemWithPlottable(graph(i))) {
+            setGraphVisibility(graph(i), !graph(i)->visible());
+            replot();
+            return;
+        }
+    }
+}
+
+void SpectrumPlot::setGraphVisibility(QCPGraph *g, bool visible) {
+
+    g->setVisible(visible);
+    QCPAbstractLegendItem *item = legend->itemWithPlottable(g);
+    if(item) {
+        legendFont.setStrikeOut(!visible);
+        item->setFont(legendFont);
+    }
 }

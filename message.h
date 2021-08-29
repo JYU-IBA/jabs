@@ -11,6 +11,8 @@
     See LICENSE.txt for the full license.
 
  */
+#ifndef _JABS_MESSAGE_H_
+#define _JABS_MESSAGE_H_
 
 typedef enum jabs_msg_level {
     MSG_DEBUG = 0,
@@ -21,3 +23,4 @@ typedef enum jabs_msg_level {
 } jabs_msg_level;
 
 void jabs_message(jabs_msg_level level, const char *format, ...);
+#endif // _JABS_MESSAGE_H_

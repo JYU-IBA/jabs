@@ -2,7 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-
+#include "highlighter.h"
 
 extern "C" {
 #include <jibal_units.h>
@@ -10,6 +10,7 @@ extern "C" {
 #include "sample.h"
 #include "script.h"
 #include "generic.h"
+#include "message.h"
 #ifdef WIN32
 #include "win_compat.h"
 #endif
@@ -30,16 +31,20 @@ public:
     ~MainWindow();
 
 private slots:
-    void on_actionRun_triggered();
+    void on_action_Run_triggered();
 
     void on_plotSpinBox_valueChanged(int arg1);
 
     void plotSpectrum(size_t i_det);
 
+    void on_action_Open_triggered();
+
+    void on_action_Quit_triggered();
+
 private:
     Ui::MainWindow *ui;
     struct jibal *jibal;
     script_session *session;
-
+    Highlighter *highlighter;
 };
 #endif // MAINWINDOW_H

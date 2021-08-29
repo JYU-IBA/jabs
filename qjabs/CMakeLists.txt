@@ -76,6 +76,11 @@ set(PROJECT_SOURCES
        qcustomplot.h
        spectrumplot.cpp
        spectrumplot.h
+       icons.qrc
+       codeeditor.cpp
+       codeeditor.h
+       highlighter.cpp
+       highlighter.h
 )
 
 qt_add_executable(qjabs

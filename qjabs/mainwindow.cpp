@@ -18,10 +18,17 @@ MainWindow::MainWindow(QWidget *parent)
     QFont fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
 #endif
     fixedFont.setPointSize(14);
-    ui->textEdit->setFont(fixedFont);
+    ui->plainTextEdit->setFont(fixedFont);
     jibal = jibal_init(nullptr);
     jibal_status_print(stderr, jibal);
     session = script_session_init(jibal, NULL);
+    ui->action_Run->setShortcutContext(Qt::ApplicationShortcut);
+    highlighter = new Highlighter(ui->plainTextEdit->document());
+    ui->action_New_file->setShortcut(QKeySequence::New);
+    ui->action_Open->setShortcut(QKeySequence::Open);
+    ui->action_Run->setShortcut(QKeySequence::Refresh);
+    ui->action_Run->setShortcutVisibleInContextMenu(true);
+    ui->action_Quit->setShortcut(QKeySequence::Quit);
 }
 
 void MainWindow::addMessage(const char *msg)
@@ -33,17 +40,18 @@ MainWindow::~MainWindow()
 {
     script_session_free(session);
     jibal_free(jibal);
+    delete highlighter;
     delete ui;
 }
 
 
-void MainWindow::on_actionRun_triggered()
+void MainWindow::on_action_Run_triggered()
 {
     if(!session) {
         return;
     }
     script_reset(session, 0, NULL);
-    QString text = ui->textEdit->toPlainText();
+    QString text = ui->plainTextEdit->toPlainText();
     QTextStream stream = QTextStream(&text, QIODevice::ReadOnly);
     size_t lineno = 0;
     int status = 0;
@@ -92,7 +100,7 @@ void MainWindow::on_actionRun_triggered()
                 }
             }
             if(!found) {
-                    fprintf(stderr, "Command \"%s\" not recognized on line %zu\n", argv[0], lineno);
+                    jabs_message(MSG_ERROR, "Command \"%s\" not recognized on line %zu\n", argv[0], lineno);
                     exit_session = TRUE;
             }
             free(argv[0]);
@@ -126,14 +134,47 @@ void MainWindow::plotSpectrum(size_t i_det)
     }
     if(i_det >= session->fit->sim->n_det)
         return;
-    gsl_histogram *sim = fit_data_sim(session->fit, i_det);
-    gsl_histogram *exp = fit_data_exp(session->fit, i_det);
-    if(sim) {
-        ui->widget->drawDataToChart("Simulated", sim->bin, sim->n, QColor("Blue"), true);
+    gsl_histogram *sim_histo = fit_data_sim(session->fit, i_det);
+    gsl_histogram *exp_histo = fit_data_exp(session->fit, i_det);
+    sim_workspace *ws = fit_data_ws(session->fit, i_det);
+    if(exp_histo) {
+        ui->widget->drawDataToChart("Experimental", exp_histo->bin, exp_histo->n, QColor("Black"), sim_histo?false:true);
     }
-    if(exp) {
-        ui->widget->drawDataToChart("Experimental", exp->bin, exp->n, QColor("Black"), sim?false:true);
+    if(sim_histo) {
+        ui->widget->drawDataToChart("Simulated", sim_histo->bin, sim_histo->n, QColor("Blue"), true);
+    }
+    if(ws) {
+        for(int i = 0; i < session->fit->sim->n_reactions; ++i) {
+            sim_reaction *r = &ws->reactions[i];
+            if(!r)
+                continue;
+            if(r->last_brick == 0)
+                continue;
+            if(r->n_bricks > 0 && r->histo->n > 0) {
+                ui->widget->drawDataToChart(QString("") + reaction_name(&session->fit->sim->reactions[i]) + " " + session->fit->sim->reactions[i].target->name, r->histo->bin, r->histo->n, QColor("Red"), false);
+                ui->widget->setGraphVisibility(ui->widget->graph(), false);
+            }
+        }
     }
     ui->widget->replot();
+}
+
+
+void MainWindow::on_action_Open_triggered()
+{
+    QString filename = QFileDialog::getOpenFileName(nullptr, "Import measurements from file", "", tr("JaBS script files (*.jbs)"));
+    if(filename.isEmpty()) {
+        return;
+    }
+    QFile file(filename);
+    if (file.open(QFile::ReadOnly | QFile::Text)) {
+        ui->plainTextEdit->setPlainText(file.readAll());
+    }
+}
+
+
+void MainWindow::on_action_Quit_triggered()
+{
+    close();
 }
 

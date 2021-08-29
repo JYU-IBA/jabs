@@ -380,7 +380,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             b->d = d_after;
             b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
             assert(r->p.E > 0.0);
-            if (d_before.x >= r->max_depth) {
+            if (d_before.x >= r->max_depth) { /* TODO: check that this is OK when DS is enabled */
 #ifdef DEBUG
                 fprintf(stderr, "Reaction %lu with %s stops, because maximum depth is reached at x = %.3lf tfu.\n",
                         i, r->r->target->name, d_before.x / C_TFU); /* TODO: give reactions a name */
