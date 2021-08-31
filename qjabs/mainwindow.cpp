@@ -11,7 +11,6 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     ui->splitter->setSizes(QList<int>() << 1 << 3);
     ui->splitter_2->setSizes(QList<int>() << 1 << 2);
-    setWindowTitle(QString("JaBS ") + jabs_version());
 #ifdef WIN32
     QFont fixedFont = QFont("Courier New");
 #else
@@ -24,11 +23,15 @@ MainWindow::MainWindow(QWidget *parent)
     session = script_session_init(jibal, NULL);
     ui->action_Run->setShortcutContext(Qt::ApplicationShortcut);
     highlighter = new Highlighter(ui->plainTextEdit->document());
-    ui->action_New_file->setShortcut(QKeySequence::New);
-    ui->action_Open->setShortcut(QKeySequence::Open);
+    ui->action_New_File->setShortcut(QKeySequence::New);
+    ui->action_Open_File->setShortcut(QKeySequence::Open);
+    ui->action_Save_File->setShortcut(QKeySequence::Save);
+    ui->action_Save_File_as->setShortcut(QKeySequence::SaveAs);
     ui->action_Run->setShortcut(QKeySequence::Refresh);
     ui->action_Run->setShortcutVisibleInContextMenu(true);
     ui->action_Quit->setShortcut(QKeySequence::Quit);
+    needsSaving = false;
+    updateWindowTitle();
 }
 
 void MainWindow::addMessage(const char *msg)
@@ -160,15 +163,20 @@ void MainWindow::plotSpectrum(size_t i_det)
 }
 
 
-void MainWindow::on_action_Open_triggered()
+void MainWindow::on_action_Open_File_triggered()
 {
-    QString filename = QFileDialog::getOpenFileName(nullptr, "Import measurements from file", "", tr("JaBS script files (*.jbs)"));
+    QString filename = QFileDialog::getOpenFileName(this, "Open script file", "", tr("JaBS script files (*.jbs)"));
     if(filename.isEmpty()) {
         return;
     }
     QFile file(filename);
-    if (file.open(QFile::ReadOnly | QFile::Text)) {
+    if(file.open(QFile::ReadOnly | QFile::Text)) {
         ui->plainTextEdit->setPlainText(file.readAll());
+        file.close();
+        clearPlotAndOutput();
+        setFilename(filename);
+        needsSaving = false;
+        updateWindowTitle();
     }
 }
 
@@ -176,5 +184,98 @@ void MainWindow::on_action_Open_triggered()
 void MainWindow::on_action_Quit_triggered()
 {
     close();
+}
+
+void MainWindow::updateWindowTitle()
+{
+    bool newfile;
+    QString title = QString("JaBS ") + jabs_version() + " - ";
+    if(filename.isEmpty()) {
+        title.append("New file");
+        newfile = true;
+    } else {
+        title.append(filebasename);
+        newfile = false;
+    }
+    if(needsSaving) {
+        title.append("*");
+    } else {
+        ui->action_Save_File->setEnabled(false);
+    }
+    ui->action_Save_File->setEnabled(needsSaving && !newfile);
+    setWindowTitle(title);
+}
+
+void MainWindow::setFilename(const QString &filename)
+{
+    MainWindow::filename = filename;
+    QFile file(filename);
+    QFileInfo fi(file);
+    MainWindow::filebasename = fi.baseName();
+}
+
+
+void MainWindow::on_action_New_File_triggered()
+{
+    ui->plainTextEdit->clear();
+    clearPlotAndOutput();
+    filename.clear();
+    filebasename.clear();
+    needsSaving = false;
+    updateWindowTitle();
+}
+
+
+void MainWindow::on_plainTextEdit_textChanged()
+{
+    if(!needsSaving) {
+        needsSaving = true;
+        updateWindowTitle();
+    }
+}
+
+
+void MainWindow::on_action_Save_File_as_triggered()
+{
+    QString filename = QFileDialog::getSaveFileName(this, "Save script to file", MainWindow::filename, tr("JaBS script files (*.jbs)"));
+    if(!filename.isEmpty()) {
+        if(saveScriptToFile(filename)) {
+            setFilename(filename);
+            needsSaving = false;
+            updateWindowTitle();
+        }
+    }
+}
+
+bool MainWindow::saveScriptToFile(const QString &filename)
+{
+    QFile file(filename);
+    if(file.open(QFile::WriteOnly | QFile::Text)) {
+        QTextStream stream(&file);
+        stream << ui->plainTextEdit->toPlainText();
+        file.close();
+    } else {
+         QMessageBox::critical(this, tr("Error"), tr("Can not save to file."));
+         return false;
+    }
+    return true;
+}
+
+
+void MainWindow::on_action_Save_File_triggered()
+{
+    if(filename.isEmpty())
+        return;
+    if(saveScriptToFile(filename)) {
+        needsSaving = false;
+        updateWindowTitle();
+    }
+}
+
+void MainWindow::clearPlotAndOutput()
+{
+    ui->widget->clearAll();
+    ui->widget->replot();
+    ui->msgTextEdit->clear();
 }
 

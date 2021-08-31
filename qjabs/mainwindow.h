@@ -37,14 +37,31 @@ private slots:
 
     void plotSpectrum(size_t i_det);
 
-    void on_action_Open_triggered();
+    void on_action_Open_File_triggered();
 
     void on_action_Quit_triggered();
 
+    void on_action_New_File_triggered();
+
+    void on_plainTextEdit_textChanged();
+
+    void on_action_Save_File_as_triggered();
+
+    bool saveScriptToFile(const QString &filename);
+
+    void on_action_Save_File_triggered();
+
+    void clearPlotAndOutput();
+
 private:
+    void updateWindowTitle();
+    void setFilename(const QString &filename);
     Ui::MainWindow *ui;
     struct jibal *jibal;
     script_session *session;
     Highlighter *highlighter;
+    QString filename;
+    QString filebasename;
+    bool needsSaving;
 };
 #endif // MAINWINDOW_H
