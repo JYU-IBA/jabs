@@ -9,6 +9,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    ui->groupBox->setVisible(false); //TODO: remove
     ui->splitter->setSizes(QList<int>() << 1 << 3);
     ui->splitter_2->setSizes(QList<int>() << 1 << 2);
 #ifdef WIN32
@@ -147,15 +148,32 @@ void MainWindow::plotSpectrum(size_t i_det)
         ui->widget->drawDataToChart("Simulated", sim_histo->bin, sim_histo->n, QColor("Blue"), true);
     }
     if(ws) {
+        gsl_histogram *histo = NULL;
         for(int i = 0; i < session->fit->sim->n_reactions; ++i) {
             sim_reaction *r = &ws->reactions[i];
+            sim_reaction *r_next = NULL;
+            if(i+1 < session->fit->sim->n_reactions) {
+                r_next = &ws->reactions[i+1];
+            }
             if(!r)
                 continue;
             if(r->last_brick == 0)
                 continue;
             if(r->n_bricks > 0 && r->histo->n > 0) {
-                ui->widget->drawDataToChart(QString("") + reaction_name(&session->fit->sim->reactions[i]) + " " + session->fit->sim->reactions[i].target->name, r->histo->bin, r->histo->n, QColor("Red"), false);
-                ui->widget->setGraphVisibility(ui->widget->graph(), false);
+                if(histo) {
+                    // TODO: check binning
+                    gsl_histogram_add(histo, r->histo);
+                } else {
+                    histo = gsl_histogram_clone(r->histo);
+                }
+                if(!r_next || (r->r->type != r_next->r->type || r->r->target->Z != r_next->r->target->Z)) {
+                    if(histo) {
+                      ui->widget->drawDataToChart(QString("") + reaction_name(r->r) + " " + jibal_element_name(jibal->elements, r->r->target->Z), histo->bin, histo->n, QColor("Red"), false);
+                      ui->widget->setGraphVisibility(ui->widget->graph(), false);
+                      gsl_histogram_free(histo);
+                      histo = NULL;
+                    }
+                }
             }
         }
     }
