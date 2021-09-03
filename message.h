@@ -22,5 +22,5 @@ typedef enum jabs_msg_level {
     MSG_ERROR = 4
 } jabs_msg_level;
 
-void jabs_message(jabs_msg_level level, const char *format, ...);
+void jabs_message(jabs_msg_level level, FILE *f, const char *format, ...);
 #endif // _JABS_MESSAGE_H_

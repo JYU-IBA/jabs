@@ -17,8 +17,10 @@ MainWindow::MainWindow(QWidget *parent)
 #else
     QFont fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
 #endif
-    fixedFont.setPointSize(14);
+    fixedFont.setPointSize(12);
     ui->plainTextEdit->setFont(fixedFont);
+    fixedFont.setPointSize(11);
+    ui->msgPlainTextEdit->setFont(fixedFont);
     jibal = jibal_init(nullptr);
     jibal_status_print(stderr, jibal);
     session = script_session_init(jibal, NULL);
@@ -37,7 +39,10 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::addMessage(const char *msg)
 {
-    ui->msgTextEdit->append(msg);
+    ui->msgPlainTextEdit->moveCursor(QTextCursor::End);
+    ui->msgPlainTextEdit->insertPlainText(msg);
+    repaint();
+    //ui->msgTextEdit->append(msg);
 }
 
 MainWindow::~MainWindow()
@@ -104,7 +109,7 @@ void MainWindow::on_action_Run_triggered()
                 }
             }
             if(!found) {
-                    jabs_message(MSG_ERROR, "Command \"%s\" not recognized on line %zu\n", argv[0], lineno);
+                    jabs_message(MSG_ERROR, stderr, "Command \"%s\" not recognized on line %zu\n", argv[0], lineno);
                     exit_session = TRUE;
             }
             free(argv[0]);
@@ -294,6 +299,6 @@ void MainWindow::clearPlotAndOutput()
 {
     ui->widget->clearAll();
     ui->widget->replot();
-    ui->msgTextEdit->clear();
+    ui->msgPlainTextEdit->clear();
 }
 

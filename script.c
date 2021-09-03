@@ -26,28 +26,28 @@ void script_print_commands(FILE *f) {
 int script_load(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     if(argc == 0) {
-        fprintf(stderr, "Usage: load [script|sample|detector|exp|reaction] [file]\n");
+        jabs_message(MSG_INFO, stderr, "Usage: load [script|sample|detector|exp|reaction] [file]\n");
         return -1;
     }
     if(strcmp(argv[0], "script") == 0) {
         if(argc == 2) {
             return script_process(s, argv[1]);
         } else {
-            fprintf(stderr, "Usage: load script [file]\n");
+            jabs_message(MSG_INFO, stderr, "Usage: load script [file]\n");
         }
         return 0;
     } else if(strcmp(argv[0], "sample") == 0) {
         if(argc == 2) {
             sample_model *sm = sample_model_from_file(fit->jibal, argv[1]);
             if(!sm) {
-                fprintf(stderr, "Sample load from \"%s\" failed.\n", argv[1]);
+                jabs_message(MSG_INFO, stderr,"Sample load from \"%s\" failed.\n", argv[1]);
                 return -1;
             }
             sample_model_free(fit->sm);
             fit->sm = sm;
             return 0;
         } else {
-            fprintf(stderr, "Usage: load sample [file]\n");
+            jabs_message(MSG_INFO, stderr, "Usage: load sample [file]\n");
         }
         return 0;
     } else if(strcmp(argv[0], "det") == 0) {
@@ -59,7 +59,7 @@ int script_load(script_session *s, int argc, char * const *argv) {
             argv++;
         }
         if(argc != 2) {
-            fprintf(stderr, "Usage: load det [number] file\n");
+            jabs_message(MSG_INFO, stderr, "Usage: load det [number] file\n");
             return EXIT_SUCCESS;
         }
         detector *det = detector_from_file(fit->jibal, argv[1]);
@@ -79,24 +79,24 @@ int script_load(script_session *s, int argc, char * const *argv) {
             argv++;
         }
         if(argc != 2) {
-            fprintf(stderr, "Usage: load exp [number] file\n");
+            jabs_message(MSG_INFO, stderr, "Usage: load exp [number] file\n");
             return EXIT_SUCCESS;
         }
         if(i_det >= fit->sim->n_det) {
-            fprintf(stderr, "Detector number %zu too high (must be below %zu)\n", i_det, fit->sim->n_det);
+            jabs_message(MSG_ERROR, stderr, "Detector number %zu too high (must be below %zu)\n", i_det, fit->sim->n_det);
             return EXIT_FAILURE;
         }
         fit->exp[i_det] = spectrum_read(argv[1], sim_det(fit->sim, i_det));
         if(!fit->exp[i_det]) {
-            fprintf(stderr, "Reading spectrum from file \"%s\" was not successful.\n", argv[1]);
+            jabs_message(MSG_ERROR,  stderr,"Reading spectrum from file \"%s\" was not successful.\n", argv[1]);
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
     } else if(strcmp(argv[0], "reaction") == 0) {
-        fprintf(stderr, "Loading reactions from files not implemented yet, sorry.\n");
+        jabs_message(MSG_ERROR, stderr, "Loading reactions from files not implemented yet, sorry.\n");
         return EXIT_SUCCESS;
     }
-    fprintf(stderr, "I don't know what to load (%s?)\n", argv[0]);
+    jabs_message(MSG_ERROR, stderr, "I don't know what to load (%s?)\n", argv[0]);
     return EXIT_FAILURE;
 }
 
@@ -125,7 +125,7 @@ int script_reset(script_session *s, int argc, char * const *argv) {
 int script_show(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     if(argc == 0) {
-        fprintf(stderr, "Usage show [sim|fit|sample|detector|vars].\n");
+        jabs_message(MSG_INFO, stderr, "Usage show [sim|fit|sample|detector|vars].\n");
         return 0;
     }
     if(strcmp(argv[0], "sim") == 0) {
@@ -164,18 +164,18 @@ int script_set(script_session *s, int argc, char * const *argv) {
     }
     if(strcmp(argv[0], "ion") == 0) {
         if(argc != 2) {
-            fprintf(stderr, "Usage: set ion [ion]\nExample: set ion 4He\n");
+            jabs_message(MSG_ERROR, stderr, "Usage: set ion [ion]\nExample: set ion 4He\n");
             return -1;
         }
         fit->sim->beam_isotope = jibal_isotope_find(fit->jibal->isotopes, argv[1], 0, 0);
         if(!fit->sim->beam_isotope) {
-            fprintf(stderr, "No such isotope: %s\n", argv[1]);
+            jabs_message(MSG_ERROR, stderr,"No such isotope: %s\n", argv[1]);
             return -1;
         }
         return 0;
     } else if(strcmp(argv[0], "sample") == 0) {
         if(argc < 2) {
-            fprintf(stderr, "Usage: set sample [sample]\nExample: set sample TiO2 1000tfu Si 10000tfu\n");
+            jabs_message(MSG_ERROR, stderr, "Usage: set sample [sample]\nExample: set sample TiO2 1000tfu Si 10000tfu\n");
             return -1;
         }
         sample_model *sm_new = sample_model_from_argv(fit->jibal, argc-1, argv+1);
@@ -183,7 +183,7 @@ int script_set(script_session *s, int argc, char * const *argv) {
             sample_model_free(fit->sm);
             fit->sm = sm_new;
         } else {
-            fprintf(stderr, "Sample is not valid.\n");
+            jabs_message(MSG_ERROR, stderr, "Sample is not valid.\n");
             return -1;
         }
         return 0;
@@ -195,20 +195,20 @@ int script_set(script_session *s, int argc, char * const *argv) {
             argv++;
         }
         if(argc != 3) {
-            fprintf(stderr, "Usage: set det [number] variable value\n");
+            jabs_message(MSG_ERROR, stderr, "Usage: set det [number] variable value\n");
             return EXIT_FAILURE;
         }
         if(detector_set_var(s->jibal, sim_det(fit->sim, i_det), argv[1], argv[2])) {
-            fprintf(stderr, "Can't set \"%s\" to be \"%s\"!\n", argv[1], argv[2]);
+            jabs_message(MSG_ERROR, stderr, "Can't set \"%s\" to be \"%s\"!\n", argv[1], argv[2]);
         }
         return EXIT_SUCCESS;
     }
     if(argc != 2) {
-        fprintf(stderr, "Usage: set variable [value]\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: set variable [value]\n");
         return -1;
     }
     if(jibal_config_file_var_set(s->cf, argv[0], argv[1])) {
-        fprintf(stderr, "Error in setting \"%s\" to \"%s\"\n", argv[0], argv[1]);
+        jabs_message(MSG_ERROR, stderr,"Error in setting \"%s\" to \"%s\"\n", argv[0], argv[1]);
         return -1;
     }
     return 0;
@@ -217,7 +217,7 @@ int script_set(script_session *s, int argc, char * const *argv) {
 int script_add(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit_data = s->fit;
     if(argc < 1) {
-        fprintf(stderr, "Nothing to add. See \"help add\" for more information.\n");
+        jabs_message(MSG_ERROR, stderr, "Nothing to add. See \"help add\" for more information.\n");
         return 0;
     }
     if(strcmp(argv[0], "fit_range") == 0) {
@@ -231,14 +231,14 @@ int script_add(script_session *s, int argc, char * const *argv) {
             range.low = strtoul(argv[1], NULL, 10);
             range.high = strtoul(argv[2], NULL, 10);
         } else {
-            fprintf(stderr, "Usage: add fit_range [detector] low high\n");
+            jabs_message(MSG_ERROR, stderr, "Usage: add fit_range [detector] low high\n");
             return -1;
         }
         fit_data_fit_range_add(fit_data, &range);
         return 0;
     } else if(strcmp(argv[0], "det") == 0) {
         if(argc != 2) {
-            fprintf(stderr, "Usage: add det filename\n");
+            jabs_message(MSG_ERROR, stderr, "Usage: add det filename\n");
             return EXIT_FAILURE;
         }
         detector *det = detector_from_file(s->jibal, argv[1]);
@@ -247,7 +247,7 @@ int script_add(script_session *s, int argc, char * const *argv) {
         }
         return fit_data_add_det(fit_data, det);
     }
-    fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
+    jabs_message(MSG_ERROR, stderr, "Don't know what \"%s\" is.\n", argv[0]);
     return -1;
 }
 
@@ -263,26 +263,26 @@ int script_help(script_session *s, int argc, char * const *argv) {
             {NULL, NULL}
     };
     if(argc == 0) {
-        fprintf(stderr, "Type help [topic] for information on a particular topic or \"help help\" for help on help.\n");
+        jabs_message(MSG_INFO, stderr, "Type help [topic] for information on a particular topic or \"help help\" for help on help.\n");
         return 0;
     }
     for(const struct help_topic *t = topics; t->name != NULL; t++) {
         if(strcmp(t->name, argv[0]) == 0) {
-            fputs(t->help_text, stderr);
+            jabs_message(MSG_INFO, stderr, "%s", t->help_text);
             if(strcmp(t->name, "help") == 0) {
                 size_t i = 0;
                 for(const struct help_topic *t2 = topics; t2->name != NULL; t2++) {
                     i++;
-                    fprintf(stderr, "%18s", t2->name);
+                    jabs_message(MSG_INFO, stderr, "%18s", t2->name);
                     if(i % 4 == 0) {
-                        fputc('\n', stderr);
+                        jabs_message(MSG_INFO, stderr, "\n");
                     }
                 }
-                fprintf(stderr, "\n");
+                jabs_message(MSG_INFO, stderr, "\n");
             } else if(strcmp(t->name, "commands") == 0) {
                 script_print_commands(stderr);
             } else if(strcmp(t->name, "version") == 0) {
-                fprintf(stderr, "%s\n", jabs_version());
+                jabs_message(MSG_INFO, stderr, "%s\n", jabs_version());
             } else if(strcmp(t->name, "set") == 0) {
                 if(!s->cf || !s->cf->vars)
                     break;
@@ -291,7 +291,7 @@ int script_help(script_session *s, int argc, char * const *argv) {
                     if(var->type != JIBAL_CONFIG_VAR_UNIT)
                         continue;
                     i++;
-                    fprintf(stderr, "%18s", var->name);
+                    jabs_message(MSG_INFO, stderr,"%18s", var->name);
                     if(i % 4 == 0) {
                         fputc('\n', stderr);
                     }
@@ -302,18 +302,17 @@ int script_help(script_session *s, int argc, char * const *argv) {
                     if(var->type == JIBAL_CONFIG_VAR_UNIT)
                         continue;
                     i++;
-                    fprintf(stderr, "%18s", var->name);
+                    jabs_message(MSG_INFO, stderr, "%18s", var->name);
                     if(i % 4 == 0) {
-                        fputc('\n', stderr);
+                        jabs_message(MSG_INFO, stderr,"\n");
                     }
                 }
-
-                fprintf(stderr, "\nAlso the following things can be set: ion, sample, foil. Special syntax applies for each.\n");
+                jabs_message(MSG_INFO, stderr,"\nAlso the following things can be set: ion, sample, foil. Special syntax applies for each.\n");
             }
             return 0;
         }
     }
-    fprintf(stderr, "Sorry, no help for '%s'.\n", argv[0]);
+    jabs_message(MSG_ERROR, stderr,"No help for '%s' available.\n", argv[0]);
     return -1;
 }
 
@@ -360,7 +359,7 @@ int script_simulate(script_session *s, int argc, char * const *argv) {
         return EXIT_FAILURE;
     }
     if(fit_data_workspaces_init(fit)) {
-        fprintf(stderr, "Could not initialize simulation workspace(s).\n");
+        jabs_message(MSG_ERROR, stderr, "Could not initialize simulation workspace(s).\n");
         return EXIT_FAILURE;
     }
     for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
@@ -380,33 +379,33 @@ int script_fit(script_session *s, int argc, char * const *argv) {
     fit_data->fit_params = fit_params_new();
     fit_params_add(fit_data->sim, fit_data->sm, fit_data->fit_params, argv[0]);
     if(fit_data->fit_params->n == 0) {
-        fprintf(stderr, "No parameters for fit.\n");
+        jabs_message(MSG_ERROR, stderr, "No parameters for fit.\n");
         return -1;
     }
     if(!fit_data->exp) { /* TODO: not enough to check this */
-        fprintf(stderr, "No experimental spectrum set.\n");
+        jabs_message(MSG_ERROR, stderr, "No experimental spectrum set.\n");
         return -1;
     }
     if(fit_data->n_fit_ranges == 0) {
-        fprintf(stderr, "No fit range(s) given.\n");
+        jabs_message(MSG_ERROR, stderr, "No fit range(s) given.\n");
         return -1;
     }
     if(script_prepare_sim_or_fit(s)) {
         return -1;
     }
     if(fit(fit_data)) {
-        fprintf(stderr, "Fit failed!\n");
+        jabs_message(MSG_ERROR, stderr, "Fit failed!\n");
         return -1;
     }
     script_finish_sim_or_fit(s);
-    fprintf(stderr, "\nFinal parameters:\n");
+    jabs_message(MSG_INFO, stderr, "\nFinal parameters:\n");
     simulation_print(stderr, fit_data->sim);
-    fprintf(stderr, "\nFinal profile:\n");
+    jabs_message(MSG_INFO, stderr, "\nFinal profile:\n");
     sample_print(NULL, fit_data->sim->sample, FALSE);
     sample_areal_densities_print(stderr, fit_data->sim->sample, FALSE);
-    fprintf(stderr, "\nFinal sample model:\n");
+    jabs_message(MSG_INFO, stderr, "\nFinal sample model:\n");
     sample_model_print(NULL, fit_data->sm);
-    fprintf(stderr, "\n");
+    jabs_message(MSG_INFO, stderr, "\n");
     fit_stats_print(stderr, &fit_data->stats);
     return 0;
 }
@@ -454,16 +453,16 @@ int script_save(script_session *s, int argc, char * const *argv) {
             argv++;
         }
         if(argc != 2) {
-            fprintf(stderr, "Usage: save det [detector] file\n");
+            jabs_message(MSG_ERROR, stderr,"Usage: save det [detector] file\n");
             return EXIT_FAILURE;
         }
         if(detector_print(argv[1], sim_det(fit_data->sim, i_det))) {
-            fprintf(stderr, "Could not write detector %zu to file \"%s\".\n", i_det, argv[1]);
+            jabs_message(MSG_ERROR, stderr,"Could not write detector %zu to file \"%s\".\n", i_det, argv[1]);
             return -1;
         }
         return 0;
     }
-    fprintf(stderr, "I don't know what to save (%s?)\n", argv[0]);
+    jabs_message(MSG_ERROR, stderr,"I don't know what to save (%s?)\n", argv[0]);
     return -1;
 }
 
@@ -479,7 +478,7 @@ int script_roi(script_session *s, int argc, char * const *argv) {
         r.low = strtoul(argv[0], NULL, 10);
         r.high = strtoul(argv[1], NULL, 10);
     } else {
-        fprintf(stderr, "Usage: roi [det] low high");
+        jabs_message(MSG_ERROR, stderr, "Usage: roi [det] low high");
     }
     fit_data_roi_print(stderr, s->fit, &r);
     return EXIT_SUCCESS;
@@ -496,7 +495,7 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
     s->fit = fit_data_new(jibal, sim); /* Not just fit, but this conveniently holds everything we need. */
     s->cf = jibal_config_file_init(jibal->units);
     if(!s->fit || !s->cf) {
-        fprintf(stderr, "Script session initialization failed.\n");
+        jabs_message(MSG_ERROR, stderr,"Script session initialization failed.\n");
         free(s);
         return NULL;
     }
@@ -537,7 +536,7 @@ int script_process(script_session *s, const char *filename) {
     if(interactive) {
         fputs(prompt, stderr);
     } else if(filename) {
-        fprintf(stderr, "\nRunning script \"%s\"\n\n", filename);
+        jabs_message(MSG_INFO, stderr,"\nRunning script \"%s\"\n\n", filename);
     }
     int exit_session = FALSE;
     int status = 0;
@@ -548,7 +547,7 @@ int script_process(script_session *s, const char *filename) {
             continue;
         char **argv = string_to_argv(line);
         if(!argv) {
-            fprintf(stderr, "Something went wrong in parsing arguments.\n");
+            jabs_message(MSG_ERROR, stderr, "Something went wrong in parsing arguments.\n");
             continue;
         }
         char **a = argv;
@@ -583,9 +582,9 @@ int script_process(script_session *s, const char *filename) {
             }
             if(!found) {
                 if(interactive) {
-                    fprintf(stderr, "Command \"%s\" not recognized. See 'help commands'.\n", line);
+                    jabs_message(MSG_ERROR, stderr,"Command \"%s\" not recognized. See 'help commands'.\n", line);
                 } else {
-                    fprintf(stderr, "Command \"%s\" not recognized on line %zu\n", line, lineno);
+                    jabs_message(MSG_ERROR, stderr, "Command \"%s\" not recognized on line %zu\n", line, lineno);
                     return EXIT_FAILURE; /* TODO: leaks memory */
                 }
             }
@@ -597,19 +596,19 @@ int script_process(script_session *s, const char *filename) {
         if(interactive) {
             fputs(prompt, stderr);
         } else if(status) {
-            fprintf(stderr, "Error (%i) on line %zu. Aborting.\n", status, lineno);
+            jabs_message(MSG_ERROR, stderr, "Error (%i) on line %zu. Aborting.\n", status, lineno);
             break;
         }
     }
     free(line);
     fclose_file_or_stream(f);
     if(interactive) {
-        fprintf(stderr, "Bye.\n");
+        jabs_message(MSG_INFO, stderr,"Bye.\n");
     } else if(filename) {
         if(status) {
-            fprintf(stderr, "Error running script \"%s\"\n", filename);
+            jabs_message(MSG_ERROR, stderr,"Error running script \"%s\"\n", filename);
         } else {
-            fprintf(stderr, "Finished running script \"%s\"\n", filename);
+            jabs_message(MSG_ERROR, stderr, "Finished running script \"%s\"\n", filename);
         }
     }
     fflush(stderr);
@@ -621,15 +620,15 @@ int script_prepare_sim_or_fit(script_session *s) {
     /* TODO: reactions from files? Should "sim_reactions_add" be somewhere else? */
     fit_data *fit = s->fit;
     if(!fit->sm) {
-        fprintf(stderr, "No sample has been defined!\n");
+        jabs_message(MSG_ERROR, stderr,"No sample has been defined!\n");
         return -1;
     }
     if(!fit->sim->beam_isotope) {
-        fprintf(stderr, "No ion has been defined!\n");
+        jabs_message(MSG_ERROR, stderr,"No ion has been defined!\n");
         return -1;
     }
     if(!fit->sim->det) { /* Shouldn't be possible */
-        fprintf(stderr, "No detector has been defined!\n");
+        jabs_message(MSG_ERROR, stderr,"No detector has been defined!\n");
         return -1;
     }
     fit_data_workspaces_free(s->fit);
@@ -640,10 +639,10 @@ int script_prepare_sim_or_fit(script_session *s) {
 #endif
     fit->sim->sample = sample_from_sample_model(fit->sm);
     if(!fit->sim->sample) {
-        fprintf(stderr, "Could not make a sample based on model description. This should never happen.\n");
+        jabs_message(MSG_ERROR, stderr, "Could not make a sample based on model description. This should never happen.\n");
         return -1;
     }
-    fprintf(stderr, "Simplified sample model for simulation:\n");
+    jabs_message(MSG_INFO, stderr, "Simplified sample model for simulation:\n");
     sample_print(NULL, fit->sim->sample, TRUE);
 
     for(size_t i = 0; i < fit->sim->n_reactions; i++) {
@@ -663,17 +662,17 @@ int script_prepare_sim_or_fit(script_session *s) {
         fprintf(stderr, "No reactions, nothing to do.\n");
         return -1;
     }
-    fprintf(stderr, "\nReactions:\n");
+    jabs_message(MSG_INFO, stderr, "\nReactions:\n");
     reactions_print(stderr, fit->sim->reactions, fit->sim->n_reactions);
 
     jibal_gsto_assign_clear_all(fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
     if(assign_stopping(fit->jibal->gsto, fit->sim)) {
-        jabs_message(MSG_ERROR, "Could not assign stopping or straggling. Failure. Provide more data, check that JIBAL Z2_max is sufficiently large (currently %i) or disable unwanted reactions (e.g. ERD).\n", s->jibal->config->Z_max);
+        jabs_message(MSG_ERROR, stderr,"Could not assign stopping or straggling. Failure. Provide more data, check that JIBAL Z2_max is sufficiently large (currently %i) or disable unwanted reactions (e.g. ERD).\n", s->jibal->config->Z_max);
         return -1;
     }
     jibal_gsto_print_assignments(fit->jibal->gsto);
     jibal_gsto_print_files(fit->jibal->gsto, TRUE);
-    jabs_message(MSG_VERBOSE, "Loading stopping data.\n");
+    jabs_message(MSG_VERBOSE, stderr, "Loading stopping data.\n");
     jibal_gsto_load_all(fit->jibal->gsto);
     simulation_print(stderr, fit->sim);
     s->start = clock();
@@ -683,7 +682,7 @@ int script_prepare_sim_or_fit(script_session *s) {
 int script_finish_sim_or_fit(script_session *s) {
     s->end = clock();
     double cputime_total = (((double) (s->end - s->start)) / CLOCKS_PER_SEC);
-    jabs_message(MSG_INFO, "...finished! Total CPU time: %.3lf s.\n", cputime_total);
+    jabs_message(MSG_INFO, stderr, "...finished! Total CPU time: %.3lf s.\n", cputime_total);
 
     struct fit_data *fit = s->fit;
 

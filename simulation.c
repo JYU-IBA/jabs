@@ -17,6 +17,7 @@
 #include "defaults.h"
 #include "rotate.h"
 #include "spectrum.h"
+#include "message.h"
 
 simulation *sim_init(jibal_isotope *isotopes) {
     simulation *sim = malloc(sizeof(simulation));
@@ -109,7 +110,7 @@ int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_t
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         reaction *r_new = reaction_make(sim->beam_isotope, sample->isotopes[i], type, cs);
         if (!r_new) {
-            fprintf(stderr, "Failed to make an %s reaction with isotope %zu (%s)\n", jibal_cross_section_name(cs), i, sample->isotopes[i]->name);
+            jabs_message(MSG_ERROR, stderr, "Failed to make an %s reaction with isotope %zu (%s)\n", jibal_cross_section_name(cs), i, sample->isotopes[i]->name);
             continue;
         }
         sim->reactions[sim->n_reactions] = *r_new;
@@ -121,15 +122,15 @@ int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_t
 
 int sim_sanity_check(const simulation *sim) {
     if(!sim->beam_isotope) {
-        fprintf(stderr, "No valid isotope given for the beam.\n");
+        jabs_message(MSG_ERROR, stderr,  "No valid isotope given for the beam.\n");
         return -1;
     }
     if (sim->beam_E > 1000.0*C_MEV || sim->beam_E < 10*C_KEV) {
-        fprintf(stderr, "Hmm...? Check your numbers. Your energy is %.5lf MeV!\n", sim->beam_E);
+        jabs_message(MSG_ERROR, stderr,  "Hmm...? Check your numbers. Your energy is %.5lf MeV!\n", sim->beam_E);
         return -1;
     }
     if(sim->fluence < 0.0) {
-        fprintf(stderr, "Fluence is negative (%g).\n", sim->fluence);
+        jabs_message(MSG_ERROR, stderr,  "Fluence is negative (%g).\n", sim->fluence);
         return -1;
     }
 #ifdef NO_BLOCKING
@@ -188,11 +189,11 @@ int sim_det_set(simulation *sim, detector *det, size_t i_det) {
 
 sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det) {
     if(!jibal || !sim || !det) {
-        fprintf(stderr, "No JIBAL, sim or det. Guru thinks: %p, %p %p.\n", jibal, sim, det);
+        jabs_message(MSG_ERROR, stderr,  "No JIBAL, sim or det. Guru thinks: %p, %p %p.\n", jibal, sim, det);
         return NULL;
     }
     if(!sim->sample) {
-        fprintf(stderr, "No sample has been set. Will not initialize workspace.\n");
+        jabs_message(MSG_ERROR, stderr,  "No sample has been set. Will not initialize workspace.\n");
         return NULL;
     }
     sim_workspace *ws = malloc(sizeof(sim_workspace));
@@ -207,7 +208,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->isotopes = jibal->isotopes;
 
     if(ws->n_reactions == 0) {
-        fprintf(stderr, "No reactions! Will not initialize workspace if there is nothing to simulate.\n");
+        jabs_message(MSG_ERROR, stderr,  "No reactions! Will not initialize workspace if there is nothing to simulate.\n");
         free(ws);
         return NULL;
     }
@@ -230,7 +231,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
 
     if(ws->n_channels == 0) {
         free(ws);
-        fprintf(stderr, "Number of channels in workspace is zero. Aborting initialization.\n");
+        jabs_message(MSG_ERROR, stderr,  "Number of channels in workspace is zero. Aborting initialization.\n");
         return NULL;
     }
     ws->histo_sum = gsl_histogram_alloc(ws->n_channels);
@@ -267,7 +268,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
                 r->n_bricks = (int) ceil(sim->beam_E / ws->params.stop_step_incident + ws->sample->n_ranges); /* This is conservative */
             }
             if(r->n_bricks > 2000) {
-                fprintf(stderr, "Caution: large number of bricks will be used in the simulation (%zu).\n", r->n_bricks);
+                jabs_message(MSG_WARNING, stderr,  "Caution: large number of bricks will be used in the simulation (%zu).\n", r->n_bricks);
             }
         }
         assert(r->n_bricks > 0 && r->n_bricks < 10000);
@@ -353,26 +354,26 @@ void simulation_print(FILE *f, const simulation *sim) {
     rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */
     alpha = theta;
     if(sim->beam_isotope) {
-        fprintf(f, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass / C_U);
+        jabs_message(MSG_INFO, f,  "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass / C_U);
     } else {
-        fprintf(f, "ion = None\n");
+        jabs_message(MSG_INFO, f, "ion = None\n");
     }
-    fprintf(f, "E = %.3lf keV\n", sim->beam_E/C_KEV);
-    fprintf(f, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
-    fprintf(f, "E_min = %.3lf keV\n", sim->emin/C_KEV);
-    fprintf(f, "alpha = %.3lf deg\n", alpha/C_DEG);
-    fprintf(f, "n_detectors = %zu\n", sim->n_det);
-    fprintf(f, "n_reactions = %zu\n", sim->n_reactions);
-    fprintf(f, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence*C_E*1.0e6);
-    fprintf(f, "step for incident ions = %.3lf keV\n", sim->params.stop_step_incident/C_KEV);
-    fprintf(f, "step for exiting ions = %.3lf keV\n", sim->params.stop_step_exiting/C_KEV);
-    fprintf(f, "stopping RK4 = %s\n", sim->params.rk4?"true":"false");
-    fprintf(f, "depth steps max = %zu\n", sim->params.depthsteps_max);
-    fprintf(f, "cross section weighted by straggling = %s\n", sim->params.mean_conc_and_energy?"false":"true");
-    fprintf(f, "accurate nuclear stopping = %s\n", sim->params.nucl_stop_accurate?"true":"false");
+    jabs_message(MSG_INFO, f, "E = %.3lf keV\n", sim->beam_E/C_KEV);
+    jabs_message(MSG_INFO, f, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
+    jabs_message(MSG_INFO, f, "E_min = %.3lf keV\n", sim->emin/C_KEV);
+    jabs_message(MSG_INFO, f, "alpha = %.3lf deg\n", alpha/C_DEG);
+    jabs_message(MSG_INFO, f,"n_detectors = %zu\n", sim->n_det);
+    jabs_message(MSG_INFO, f, "n_reactions = %zu\n", sim->n_reactions);
+    jabs_message(MSG_INFO, f, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence*C_E*1.0e6);
+    jabs_message(MSG_INFO, f,"step for incident ions = %.3lf keV\n", sim->params.stop_step_incident/C_KEV);
+    jabs_message(MSG_INFO, f, "step for exiting ions = %.3lf keV\n", sim->params.stop_step_exiting/C_KEV);
+    jabs_message(MSG_INFO, f, "stopping RK4 = %s\n", sim->params.rk4?"true":"false");
+    jabs_message(MSG_INFO, f, "depth steps max = %zu\n", sim->params.depthsteps_max);
+    jabs_message(MSG_INFO, f, "cross section weighted by straggling = %s\n", sim->params.mean_conc_and_energy?"false":"true");
+    jabs_message(MSG_INFO, f, "accurate nuclear stopping = %s\n", sim->params.nucl_stop_accurate?"true":"false");
     if(sim->channeling_offset != 1.0 || sim->channeling_slope != 0.0) {
-        fprintf(f, "substrate channeling yield correction offset = %.5lf\n", sim->channeling_offset);
-        fprintf(f, "substrate channeling yield correction slope = %g / keV\n", sim->channeling_slope/(1.0/C_KEV));
+        jabs_message(MSG_INFO, f, "substrate channeling yield correction offset = %.5lf\n", sim->channeling_offset);
+        jabs_message(MSG_INFO, f, "substrate channeling yield correction slope = %g / keV\n", sim->channeling_slope/(1.0/C_KEV));
     }
 }
 

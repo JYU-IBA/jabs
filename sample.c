@@ -17,6 +17,7 @@
 #include "defaults.h"
 #include "generic.h"
 #include "sample.h"
+#include "message.h"
 #include "win_compat.h"
 
 depth depth_seek(const sample *sample, double x) {
@@ -291,34 +292,34 @@ int sample_model_print(const char *filename, const sample_model *sm) {
     size_t n_rl = sample_model_number_of_rough_ranges(sm);
     switch(sm->type) {
         case SAMPLE_MODEL_NONE:
-            fprintf(stderr, "Sample model is none.\n"); /* Not an error as such. No output (to f) is created. */
+            jabs_message(MSG_INFO, f, "Sample model is none.\n"); /* Not an error as such. No output (to f) is created. */
             return 0;
             break;
         case SAMPLE_MODEL_POINT_BY_POINT:
-            fprintf(f, "       depth");
+            jabs_message(MSG_INFO, f, "       depth");
             break;
         case SAMPLE_MODEL_LAYERED:
-            fprintf(f, "       thick");
+            jabs_message(MSG_INFO, f, "       thick");
             break;
     }
     if(n_rl) {
-        fprintf(f, "        rough");
-        fprintf(f, " n_rough");
+        jabs_message(MSG_INFO, f, "        rough");
+        jabs_message(MSG_INFO, f, " n_rough");
     }
     for (size_t i = 0; i < sm->n_materials; i++) {
-        fprintf(f, " %8s", sm->materials[i]->name);
+        jabs_message(MSG_INFO, f, " %8s", sm->materials[i]->name);
     }
-    fprintf(f, "\n");
+    jabs_message(MSG_INFO, f, "\n");
     for (size_t i = 0; i < sm->n_ranges; i++) {
-        fprintf(f, "%12.3lf", sm->ranges[i].x/C_TFU);
+        jabs_message(MSG_INFO, f, "%12.3lf", sm->ranges[i].x/C_TFU);
         if(n_rl) {
-            fprintf(f, " %12.3lf", sm->ranges[i].rough.x / C_TFU);
-            fprintf(f, " %7zu", sm->ranges[i].rough.n);
+            jabs_message(MSG_INFO, f, " %12.3lf", sm->ranges[i].rough.x / C_TFU);
+            jabs_message(MSG_INFO, f, " %7zu", sm->ranges[i].rough.n);
         }
         for (size_t j = 0; j < sm->n_materials; j++) {
-            fprintf(f, " %8.4lf", *sample_model_conc_bin(sm, i, j) * 100.0);
+            jabs_message(MSG_INFO, f, " %8.4lf", *sample_model_conc_bin(sm, i, j) * 100.0);
         }
-        fprintf(f, "\n");
+        jabs_message(MSG_INFO, f, "\n");
     }
     fclose_file_or_stream(f);
     return 0;
@@ -389,7 +390,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                     sm->materials = realloc(sm->materials, sizeof (jibal_material *) * (sm->n_materials + 1)); /* TODO: check allocation */
                     sm->materials[sm->n_materials] = jibal_material_create(jibal->elements, col);
                     if(!sm->materials[sm->n_materials]) {
-                        fprintf(stderr, "Could not create material %s, ignoring it!\n", col);
+                        jabs_message(MSG_WARNING, stderr, "Could not create material %s, ignoring it!\n", col);
                     } else {
                         sm->n_materials++;
                     }
@@ -498,7 +499,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const 
         } else {
             sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, argv[0]);
             if(!sm->materials[sm->n_ranges]) {
-                fprintf(stderr, "%s is not a valid material!\n", argv[0]);
+                jabs_message(MSG_ERROR, stderr, "%s is not a valid material!\n", argv[0]);
                 free(sm->ranges);
                 free(sm->materials);
                 return NULL;
@@ -569,7 +570,7 @@ sample *sample_copy(const sample *s_in) {
 void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes) {
     if(!sample)
         return;
-    fprintf(f, "AREAL D(tfu)             ");
+    jabs_message(MSG_INFO, f, "AREAL D(tfu)             ");
     double sum = 0.0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         for (size_t j = 1; j < sample->n_ranges; j++) {
@@ -577,11 +578,11 @@ void sample_areal_densities_print(FILE *f, const sample *sample, int print_isoto
             sum += 0.5 * ( *(sample_conc_bin(sample, j, i)) + *(sample_conc_bin(sample, j-1, i))) * thickness;
         }
         if (print_isotopes || i == sample->n_isotopes-1 || sample->isotopes[i]->Z != sample->isotopes[i+1]->Z) {
-            fprintf(f, " %8.2lf", sum/C_TFU);
+            jabs_message(MSG_INFO, f, " %8.2lf", sum/C_TFU);
             sum = 0.0;
         }
     }
-    fprintf(f, "\n");
+    jabs_message(MSG_INFO, f, "\n");
 }
 
 
@@ -591,31 +592,31 @@ int sample_print(const char *filename, const sample *sample, int print_isotopes)
     FILE *f = fopen_file_or_stream(filename, "w");
     if(!f)
         return EXIT_FAILURE;
-    fprintf(f, "  DEPTH(tfu)   ROUGH(tfu)");
+    jabs_message(MSG_INFO, f, "  DEPTH(tfu)   ROUGH(tfu)");
     int Z = 0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         if(print_isotopes) {
-            fprintf(f, " %8s", sample->isotopes[i]->name);
+            jabs_message(MSG_INFO, f, " %8s", sample->isotopes[i]->name);
         } else if(Z != sample->isotopes[i]->Z){
             const char *s = sample->isotopes[i]->name;
             while(*s >= '0' && *s <= '9') {s++;} /* Skip numbers, e.g. 28Si -> Si */
-            fprintf(f, " %8s", s);
+            jabs_message(MSG_INFO, f, " %8s", s);
             Z = sample->isotopes[i]->Z; /* New element */
         }
     }
-    fprintf(f, "\n");
+    jabs_message(MSG_INFO, f, "\n");
     for (size_t i = 0; i < sample->n_ranges; i++) {
-        fprintf(f, "%12.3lf", sample->ranges[i].x/C_TFU);
-        fprintf(f, " %12.3lf", sample->ranges[i].rough.x/C_TFU);
+        jabs_message(MSG_INFO, f, "%12.3lf", sample->ranges[i].x/C_TFU);
+        jabs_message(MSG_INFO, f, " %12.3lf", sample->ranges[i].rough.x/C_TFU);
         double sum = 0.0;
         for (size_t j = 0; j < sample->n_isotopes; j++) {
             sum += sample->cbins[i * sample->n_isotopes + j];
             if (print_isotopes || j == sample->n_isotopes-1 || sample->isotopes[j]->Z != sample->isotopes[j+1]->Z) { /* Last isotope or next isotope belongs to another element, print. */
-                fprintf(f, " %8.4lf", sum * 100.0);
+                jabs_message(MSG_INFO, f, " %8.4lf", sum * 100.0);
                 sum = 0.0;
             }
         }
-        fprintf(f, "\n");
+        jabs_message(MSG_INFO, f, "\n");
     }
 #ifdef PRINT_SAMPLE_MODEL
     fprintf(f, "\n");

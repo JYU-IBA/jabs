@@ -10,6 +10,7 @@
 #include "roughness.h"
 #include "jabs.h"
 #include "defaults.h"
+#include "message.h"
 #include "win_compat.h"
 
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
@@ -57,7 +58,7 @@ depth next_crossing(const ion *incident, const sample *sample, const depth *d_fr
         }
         d.x = sample->ranges[d.i].x;
     } else {
-        fprintf(stderr, "WARNING: Inverse cosine is exactly zero. This is an issue!\n");
+        jabs_message(MSG_ERROR, stderr, "WARNING: Inverse cosine is exactly zero. This is an issue!\n");
     }
     return d;
 }

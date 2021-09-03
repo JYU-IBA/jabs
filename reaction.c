@@ -15,6 +15,7 @@
 #include <assert.h>
 #include <string.h>
 #include "reaction.h"
+#include "message.h"
 
 
 void reactions_print(FILE *f, const reaction *reactions, size_t n_reactions) {
@@ -22,7 +23,7 @@ void reactions_print(FILE *f, const reaction *reactions, size_t n_reactions) {
         return;
     for(size_t i = 0; i < n_reactions; i++) {
         const reaction *r = &reactions[i];
-        fprintf(f, "Reaction %3zu: %s with %5s (reaction product %s).\n", i + 1, reaction_name(r), r->target->name, r->product->name);
+        jabs_message(MSG_INFO, f, "Reaction %3zu: %s with %5s (reaction product %s).\n", i + 1, reaction_name(r), r->target->name, r->product->name);
     }
 }
 
@@ -121,13 +122,13 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
 #ifdef R33_IGNORE_REACTION_STRING
             fprintf(stderr, "Could not parse an isotope from Z=%g, mass=%g.", rfile->zeds[i], rfile->masses[i]);
 #else
-            fprintf(stderr, "Could not parse an isotope from \"%s\".\n", rfile->reaction_nuclei[i]);
+            jabs_message(MSG_ERROR, stderr, "Could not parse an isotope from \"%s\".\n", rfile->reaction_nuclei[i]);
 #endif
             return NULL;
         }
     }
     if(rfile->composition) {
-        fprintf(stderr, "This program does not currently support \"Composition\" in R33 files.\n");
+        jabs_message(MSG_ERROR, stderr, "This program does not currently support \"Composition\" in R33 files.\n");
         return NULL;
     }
 
@@ -145,7 +146,7 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     r->product = nuclei[2];
     r->product_nucleus = nuclei[3];
     if(rfile->unit == R33_UNIT_RR && r->incident != r->product) {
-        fprintf(stderr, "R33 file is in units of ratio to Rutherford, but reaction product (%s) is not the same as target (%s). I don't know what to do.\n", r->product->name, r->target->name);
+        jabs_message(MSG_ERROR, stderr, "R33 file is in units of ratio to Rutherford, but reaction product (%s) is not the same as target (%s). I don't know what to do.\n", r->product->name, r->target->name);
         return NULL;
     }
     r->theta = rfile->theta * C_DEG;

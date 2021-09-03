@@ -14,7 +14,15 @@ double thickness_gamma_pdf(double x, double thickness, double sigma) {
 
 
 
-thick_prob_dist *thickness_probability_table_gen(double thickness, double sigma, const size_t n) {
+thick_prob_dist *thickness_probability_table_gen(double thickness, double sigma, size_t n) {
+    if(thickness < 0.0) {
+        thickness = 0.0;
+    }
+    if(sigma < 0.01 * C_TFU) { /* Special case for (near) zero sigma, reduce n to 1 */
+        sigma = 0.0;
+        n = 1;
+    }
+
     double low = thickness - sigma*4.0;
     double high = thickness + sigma*4.0;
     if(low < 0.0)
@@ -28,6 +36,11 @@ thick_prob_dist *thickness_probability_table_gen(double thickness, double sigma,
     
     double sum = 0.0;
     double areal_sum = 0.0;
+    if(n == 1) {
+        tpd->p[0].prob = 1.0;
+        tpd->p[0].x = thickness;
+        return tpd;
+    }
     for(i = 0; i < n; i++) {
         thick_prob *p = &tpd->p[i];
         double x_low = low + i*step;

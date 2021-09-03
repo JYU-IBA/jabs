@@ -25,13 +25,17 @@ int main(int argc, char *argv[])
     return a.exec();
 }
 
-void jabs_message(jabs_msg_level level, const char * format, ...) {
+void jabs_message(jabs_msg_level level, FILE *f, const char * format, ...) {
     va_list argp;
     va_start(argp, format);
-    //vfprintf(stderr, format, argp);
-    char *str_out;
-    vasprintf(&str_out, format, argp);
-    mainWindow->addMessage(str_out);
-    free(str_out);
+    if(f == stderr)     {
+        char *str_out;
+        vasprintf(&str_out, format, argp);
+        mainWindow->addMessage(str_out);
+        fputs(str_out, stderr);
+        free(str_out);
+    } else {
+        vfprintf(f, format, argp);
+    }
     va_end(argp);
 }
