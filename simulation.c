@@ -188,10 +188,12 @@ int sim_det_set(simulation *sim, detector *det, size_t i_det) {
 
 sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det) {
     if(!jibal || !sim || !det) {
+        fprintf(stderr, "No JIBAL, sim or det. Guru thinks: %p, %p %p.\n", jibal, sim, det);
         return NULL;
     }
     if(!sim->sample) {
         fprintf(stderr, "No sample has been set. Will not initialize workspace.\n");
+        return NULL;
     }
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->sim = sim;
@@ -228,6 +230,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
 
     if(ws->n_channels == 0) {
         free(ws);
+        fprintf(stderr, "Number of channels in workspace is zero. Aborting initialization.\n");
         return NULL;
     }
     ws->histo_sum = gsl_histogram_alloc(ws->n_channels);
@@ -320,10 +323,12 @@ void sim_workspace_free(sim_workspace *ws) {
 
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim) { /* TODO: assumes calibration function is increasing */
     size_t i=0;
-    while(detector_calibrated(ws->det, i) < 1.1*sim->beam_E) {i++;}
+    while(detector_calibrated(ws->det, i) < 1.1*sim->beam_E && i <= 1000000) {i++;}
 #ifdef DEBUG
     fprintf(stderr, "Simulating %zu channels\n", i);
 #endif
+    if(i == 1000000)
+        i=0;
     ws->n_channels = i;
 }
 

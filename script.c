@@ -339,6 +339,7 @@ jibal_config_var *script_make_vars(script_session *s) {
             {JIBAL_CONFIG_VAR_STRING,   "det_out",          &s->detector_out_filename,  NULL},
             {JIBAL_CONFIG_VAR_BOOL,     "erd",              &sim->erd,                  NULL},
             {JIBAL_CONFIG_VAR_BOOL,     "rbs",              &sim->rbs,                  NULL},
+            {JIBAL_CONFIG_VAR_SIZE,     "fit_maxiter",      &fit->n_iters_max,          NULL},
             {JIBAL_CONFIG_VAR_NONE, NULL, NULL, NULL}
     };
     int n_vars;
@@ -428,7 +429,7 @@ int script_save(script_session *s, int argc, char * const *argv) {
             return EXIT_FAILURE;
         }
         if(print_spectra(argv[1], fit_data_ws(fit_data, i_det), fit_data_exp(fit_data, i_det))) {
-            fprintf(stderr, "Could not save spectra of detector %zu to file \"%s\"!\n", i_det, argv[1]);
+            fprintf(stderr, "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n", i_det, argv[1], fit_data->sim->n_det);
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
