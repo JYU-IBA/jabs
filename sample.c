@@ -368,7 +368,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
         char *col;
         size_t n = 0; /* Number of columns on this row */
         size_t i_material = 0;
-        while((col = strsep(&line_split, " \t")) != NULL) {
+        while((col = strsep_with_quotes(&line_split, " \t")) != NULL) {
             if(*col == '\0') {/* Multiple separators are treated as one */
                 continue;
             }
@@ -495,7 +495,11 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const 
         if(sm->n_ranges && strcmp(argv[0], "rough") == 0) {
             sample_range *range = &sm->ranges[sm->n_ranges - 1];
             range->rough.x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]);
+            range->rough.n = 0;
             range->rough.model = ROUGHNESS_GAMMA;
+        } else if(sm->n_ranges && strcmp(argv[0], "n_rough") == 0) {
+                sample_range *range = &sm->ranges[sm->n_ranges - 1];
+                range->rough.n = strtoul(argv[1], NULL, 10);
         } else {
             sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, argv[0]);
             if(!sm->materials[sm->n_ranges]) {

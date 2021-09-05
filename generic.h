@@ -15,6 +15,7 @@
 #define JABS_GENERIC_H
 #include <stdio.h>
 
+char *strsep_with_quotes(char **stringp, const char *delim);
 char **string_to_argv(const char *str);
 char *argv_to_string(int argc, char * const *argv);
 

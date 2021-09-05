@@ -8,12 +8,12 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
-
     ui->setupUi(this);
     QIcon icon(":/icons/icon.svg");
     QApplication::setWindowIcon(icon);
     QApplication::setApplicationName("QJaBS");
     setWindowIcon(icon);
+    originalPath = QDir::currentPath();
     ui->groupBox->setVisible(false); //TODO: remove
     ui->splitter->setSizes(QList<int>() << 1 << 3);
     ui->splitter_2->setSizes(QList<int>() << 1 << 2);
@@ -122,6 +122,7 @@ void MainWindow::on_action_Run_triggered()
         }
         if(status) {
             qDebug() << "Error!!!! Status code" << status;
+            exit_session = TRUE;
         }
         if(exit_session)
             break;
@@ -241,6 +242,7 @@ void MainWindow::setFilename(const QString &filename)
     QFileInfo fi(file);
     MainWindow::filebasename = fi.baseName();
     setWindowFilePath(filename);
+    QDir::setCurrent(fi.absolutePath());
 }
 
 
@@ -250,6 +252,7 @@ void MainWindow::on_action_New_File_triggered()
     clearPlotAndOutput();
     filename.clear();
     filebasename.clear();
+    QDir::setCurrent(originalPath);
     needsSaving = false;
     updateWindowTitle();
 }

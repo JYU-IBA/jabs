@@ -66,6 +66,7 @@ private:
     Highlighter *highlighter;
     QString filename;
     QString filebasename;
+    QString originalPath;
     bool needsSaving;
 };
 #endif // MAINWINDOW_H

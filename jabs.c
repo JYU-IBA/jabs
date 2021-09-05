@@ -11,6 +11,7 @@
 #include "jabs.h"
 #include "defaults.h"
 #include "message.h"
+#include "generic.h"
 #include "win_compat.h"
 
 double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
@@ -568,7 +569,7 @@ void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params,
     char *token, *s, *s_orig;
     s_orig = s = strdup(fit_vars);
     assert(s != NULL);
-    while ((token = strsep(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
+    while ((token = strsep_with_quotes(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
 #ifdef DEBUG
         fprintf(stderr, "Thing to fit: \"%s\". Sim pointer is %p, sample model pointer is %p\n", token, (void *)sim, (void *)sm);
 #endif
