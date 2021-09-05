@@ -11,6 +11,8 @@ extern "C" {
 #include "script.h"
 #include "generic.h"
 #include "message.h"
+#include "defaults.h"
+#include <jibal_defaults.h>
 #ifdef WIN32
 #include "win_compat.h"
 #endif
@@ -52,6 +54,8 @@ private slots:
     void on_action_Save_File_triggered();
 
     void clearPlotAndOutput();
+
+    void on_actionAbout_triggered();
 
 private:
     void updateWindowTitle();

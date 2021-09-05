@@ -1,6 +1,7 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource prefix="/">
+        <file>icons/icon.svg</file>
         <file>icons/file-document.svg</file>
         <file>icons/content-save.svg</file>
         <file>icons/folder-open.svg</file> 

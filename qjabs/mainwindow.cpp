@@ -8,7 +8,12 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+
     ui->setupUi(this);
+    QIcon icon(":/icons/icon.svg");
+    QApplication::setWindowIcon(icon);
+    QApplication::setApplicationName("QJaBS");
+    setWindowIcon(icon);
     ui->groupBox->setVisible(false); //TODO: remove
     ui->splitter->setSizes(QList<int>() << 1 << 3);
     ui->splitter_2->setSizes(QList<int>() << 1 << 2);
@@ -235,6 +240,7 @@ void MainWindow::setFilename(const QString &filename)
     QFile file(filename);
     QFileInfo fi(file);
     MainWindow::filebasename = fi.baseName();
+    setWindowFilePath(filename);
 }
 
 
@@ -300,5 +306,15 @@ void MainWindow::clearPlotAndOutput()
     ui->widget->clearAll();
     ui->widget->replot();
     ui->msgPlainTextEdit->clear();
+}
+
+
+void MainWindow::on_actionAbout_triggered()
+{
+    QMessageBox::about(this, tr("QJaBS"), QString("JaBS version ") + jabs_version() + "\n\n"
+                       + "Using JIBAL version "+ jibal_version() + ", compiled using version " + JIBAL_VERSION + "\n\n"
+                       + "Using Qt version " + qVersion() + ", compiled using version " + QT_VERSION_STR + "\n\n"
+                       + "Copyright 2021 Jaakko Julin <jaakko.julin@jyu.fi>\n\n"
+                       + QString(COPYRIGHT_STRING).simplified());
 }
 

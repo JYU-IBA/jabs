@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.19)
 if(WIN32 AND DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
             CACHE STRING "")
@@ -17,6 +17,8 @@ set(CMAKE_AUTORCC ON)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CMAKE_MACOSX_BUNDLE TRUE)
 
 configure_file(version.h.in version.h @ONLY)
 
@@ -68,6 +70,7 @@ set(PROJECT_SOURCES
        ../message.h
         ../win_compat.c
         ../win_compat.h
+        ../defaults.h
        main.cpp
        mainwindow.cpp
        mainwindow.h
@@ -83,10 +86,29 @@ set(PROJECT_SOURCES
        highlighter.h
 )
 
-qt_add_executable(qjabs
-    MANUAL_FINALIZATION
+set(MACOSX_BUNDLE_ICON_FILE icon.icns)
+set(app_icon_macos "${CMAKE_CURRENT_SOURCE_DIR}/icons/icon.icns")
+set_source_files_properties(${app_icon_macos} PROPERTIES
+       MACOSX_PACKAGE_LOCATION "Resources")
+
+if (WIN32)
+#   set(app_icon_resource_windows "${CMAKE_CURRENT_SOURCE_DIR}/icon.rc")
+#    qt_add_executable(qjabs ${PROJECT_SOURCES} ${app_icon_resource_windows})
+    qt_add_executable(qjabs
+        ${PROJECT_SOURCES}
+    )
+elseif(APPLE)
+   qt_add_executable(qjabs
+    MACOSX_BUNDLE
     ${PROJECT_SOURCES}
-)
+    ${app_icon_macos}
+    )
+else()
+    qt_add_executable(qjabs
+     ${PROJECT_SOURCES}
+     )
+endif()
+
 
 target_include_directories(qjabs
         PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/.."
@@ -103,9 +125,8 @@ target_link_libraries(qjabs
     )
 
 set_target_properties(qjabs PROPERTIES
-    MACOSX_BUNDLE_GUI_IDENTIFIER jyu.fi
+    MACOSX_BUNDLE_BUNDLE_NAME QJaBS
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+    MACOSX_BUNDLE_ICON_FILE icon.icns
 )
-
-qt_finalize_executable(qjabs)
