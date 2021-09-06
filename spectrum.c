@@ -39,7 +39,12 @@ gsl_histogram *spectrum_read(const char *filename, const detector *det) {
     while(getline(&line, &line_size, in) > 0) {
         lineno++;
         line[strcspn(line, "\r\n")] = 0; /* Strips all kinds of newlines! */
-        if(strlen(line) >= 1 && *line == '#') /* Comment */
+        size_t line_len = strlen(line);
+        if(line_len == 0)
+            continue;
+        if(line_len >= 1 && *line == '#') /* Comment */
+            continue;
+        if(line_len >= 4 && strncmp(line, "REM", 3) == 0)
             continue;
         char *line_split = line;
         char *col;
