@@ -57,6 +57,10 @@ private slots:
 
     void on_actionAbout_triggered();
 
+    void on_autoRangeCheckBox_stateChanged(int arg1);
+
+    void on_logScaleCheckBox_stateChanged(int arg1);
+
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);

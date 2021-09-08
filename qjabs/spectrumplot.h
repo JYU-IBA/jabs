@@ -10,9 +10,11 @@ class SpectrumPlot : public QCustomPlot
     Q_OBJECT
 public:
     explicit SpectrumPlot(QWidget *parent=nullptr);
-    void drawDataToChart(const QString &name, double *data, int n, const QColor &color, bool rescale);
+    void drawDataToChart(const QString &name, double *data, int n, const QColor &color);
     void setGraphVisibility(QCPGraph *graph, bool visible);
     void clearAll();
+    void setLogScale(bool value);
+    void setAutoRange(bool value);
     ~SpectrumPlot();
 
 private slots:
@@ -21,7 +23,10 @@ private slots:
     void legendClicked(QCPLegend *legend, QCPAbstractLegendItem *item, QMouseEvent *event);
 
 private:
+    void recalculateVerticalRange();
     double xmin, xmax, ymin, ymax;
+    bool logscale;
+    bool autorange;
     QFont legendFont;
 };
 

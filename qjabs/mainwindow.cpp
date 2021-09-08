@@ -14,7 +14,6 @@ MainWindow::MainWindow(QWidget *parent)
     QApplication::setApplicationName("QJaBS");
     setWindowIcon(icon);
     originalPath = QDir::currentPath();
-    ui->groupBox->setVisible(false); //TODO: remove
     ui->splitter->setSizes(QList<int>() << 1 << 3);
     ui->splitter_2->setSizes(QList<int>() << 1 << 2);
 #ifdef WIN32
@@ -153,10 +152,10 @@ void MainWindow::plotSpectrum(size_t i_det)
     gsl_histogram *exp_histo = fit_data_exp(session->fit, i_det);
     sim_workspace *ws = fit_data_ws(session->fit, i_det);
     if(exp_histo) {
-        ui->widget->drawDataToChart("Experimental", exp_histo->bin, exp_histo->n, QColor("Black"), sim_histo?false:true);
+        ui->widget->drawDataToChart("Experimental", exp_histo->bin, exp_histo->n, QColor("Black"));
     }
     if(sim_histo) {
-        ui->widget->drawDataToChart("Simulated", sim_histo->bin, sim_histo->n, QColor("Blue"), true);
+        ui->widget->drawDataToChart("Simulated", sim_histo->bin, sim_histo->n, QColor("Blue"));
     }
     if(ws) {
         gsl_histogram *histo = NULL;
@@ -179,7 +178,7 @@ void MainWindow::plotSpectrum(size_t i_det)
                 }
                 if(!r_next || (r->r->type != r_next->r->type || r->r->target->Z != r_next->r->target->Z)) {
                     if(histo) {
-                      ui->widget->drawDataToChart(QString("") + reaction_name(r->r) + " " + jibal_element_name(jibal->elements, r->r->target->Z), histo->bin, histo->n, QColor("Red"), false);
+                      ui->widget->drawDataToChart(QString("") + reaction_name(r->r) + " " + jibal_element_name(jibal->elements, r->r->target->Z), histo->bin, histo->n, QColor("Red"));
                       ui->widget->setGraphVisibility(ui->widget->graph(), false);
                       gsl_histogram_free(histo);
                       histo = NULL;
@@ -319,5 +318,19 @@ void MainWindow::on_actionAbout_triggered()
                        + "Using Qt version " + qVersion() + ", compiled using version " + QT_VERSION_STR + "\n\n"
                        + "Copyright 2021 Jaakko Julin <jaakko.julin@jyu.fi>\n\n"
                        + QString(COPYRIGHT_STRING).simplified());
+}
+
+
+void MainWindow::on_autoRangeCheckBox_stateChanged(int arg1)
+{
+    ui->widget->setAutoRange(arg1 == Qt::Checked);
+    ui->widget->replot();
+}
+
+
+void MainWindow::on_logScaleCheckBox_stateChanged(int arg1)
+{
+    ui->widget->setLogScale(arg1 == Qt::Checked);
+    ui->widget->replot();
 }
 
