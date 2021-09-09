@@ -339,6 +339,12 @@ jibal_config_var *script_make_vars(script_session *s) {
             {JIBAL_CONFIG_VAR_BOOL,     "erd",              &sim->erd,                  NULL},
             {JIBAL_CONFIG_VAR_BOOL,     "rbs",              &sim->rbs,                  NULL},
             {JIBAL_CONFIG_VAR_SIZE,     "fit_maxiter",      &fit->n_iters_max,          NULL},
+            {JIBAL_CONFIG_VAR_BOOL,     "ds",               &sim->params.ds,            NULL},
+            {JIBAL_CONFIG_VAR_BOOL,     "rk4",              &sim->params.rk4,           NULL},
+            {JIBAL_CONFIG_VAR_UNIT,     "stopstep_incident",    &sim->params.stop_step_incident,    NULL},
+            {JIBAL_CONFIG_VAR_UNIT,     "stopstep_exiting",     &sim->params.stop_step_exiting,     NULL},
+            {JIBAL_CONFIG_VAR_BOOL,     "nucl_stop_accurate",   &sim->params.nucl_stop_accurate,    NULL},
+            {JIBAL_CONFIG_VAR_BOOL,     "mean_conc_and_energy", &sim->params.mean_conc_and_energy,  NULL},
             {JIBAL_CONFIG_VAR_NONE, NULL, NULL, NULL}
     };
     int n_vars;
