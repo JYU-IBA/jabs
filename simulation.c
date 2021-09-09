@@ -267,7 +267,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
             } else {
                 r->n_bricks = (int) ceil(sim->beam_E / ws->params.stop_step_incident + ws->sample->n_ranges); /* This is conservative */
             }
-            if(r->n_bricks > 2000) {
+            if(r->n_bricks > 10000) {
                 jabs_message(MSG_WARNING, stderr,  "Caution: large number of bricks will be used in the simulation (%zu).\n", r->n_bricks);
             }
         }
