@@ -18,9 +18,19 @@ SpectrumPlot::SpectrumPlot(QWidget *parent) : QCustomPlot(parent) {
     connect(xAxis, qOverload<const QCPRange &>(&QCPAxis::rangeChanged), this, &SpectrumPlot::plotxRangeChanged);
     connect(yAxis, qOverload<const QCPRange &>(&QCPAxis::rangeChanged), this, &SpectrumPlot::plotyRangeChanged);
     connect(this, &SpectrumPlot::legendClick, this, &SpectrumPlot::legendClicked);
-    setLogScale(false);
-    setAutoRange(true);
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(this, &QCustomPlot::customContextMenuRequested, this, &SpectrumPlot::contextMenuRequest);
     xAxis->setRange(0.0, 8192);
+    logAction = new QAction("Log", this);
+    logAction->setCheckable(true);
+    connect(logAction, &QAction::triggered, this, &SpectrumPlot::setLogScale);
+    setLogScale(false);
+    autoRangeAction = new QAction("Autorange", this);
+    autoRangeAction->setCheckable(true);
+    connect(autoRangeAction, &QAction::triggered, this, &SpectrumPlot::setAutoRange);
+    setAutoRange(true);
+    setFocusPolicy(Qt::ClickFocus);
+    installEventFilter(this);
 }
 
 void SpectrumPlot::drawDataToChart(const QString &name, double *data, int n, const QColor &color)
@@ -56,6 +66,62 @@ void SpectrumPlot::clearAll()
     setVisible(false);
 }
 
+bool SpectrumPlot::eventFilter(QObject *obj, QEvent *event)
+{
+    if(event->type() == QEvent::KeyPress) {
+        QKeyEvent *ke = static_cast<QKeyEvent *>(event);
+        //qDebug() << "You pushed key " << ke->key();
+        if(ke->key() == Qt::Key_Right) {
+            xAxis->moveRange((xAxis->range().upper-xAxis->range().lower)*0.1);
+            replot();
+            return true;
+        }
+        if(ke->key() == Qt::Key_Left) {
+            xAxis->moveRange((xAxis->range().upper-xAxis->range().lower)*(-0.1));
+            replot();
+            return true;
+        }
+        if(ke->key() == Qt::Key_Up) {
+            yAxis->moveRange((yAxis->range().upper-yAxis->range().lower)*0.1);
+            replot();
+            return true;
+        }
+        if(ke->key() == Qt::Key_Down) {
+            yAxis->moveRange((yAxis->range().upper-yAxis->range().lower)*(-0.1));
+            replot();
+            return true;
+        }
+        if(ke->key() == Qt::Key_Plus) {
+            yAxis->scaleRange(0.5);
+            replot();
+            return true;
+        }
+        if(ke->key() == Qt::Key_Minus) {
+            yAxis->scaleRange(2.0);
+            replot();
+            return true;
+        }
+        if(ke->key() == Qt::Key_0) {
+            xAxis->setRange(xmin, xmax);
+            recalculateVerticalRange();
+            yAxis->setRange(ymin, ymax);
+            replot();
+            return true;
+        }
+        if(ke->key() == Qt::Key_L) {
+            setLogScale(!logscale);
+            return true;
+        }
+        if(ke->key() == Qt::Key_A) {
+            setAutoRange(!autorange);
+            return true;
+        }
+        return false;
+    } else {
+        return QCustomPlot::eventFilter(obj, event);
+    }
+}
+
 void SpectrumPlot::setLogScale(bool value)
 {
 
@@ -73,6 +139,8 @@ void SpectrumPlot::setLogScale(bool value)
         linTicker->setTickCount(15);
     }
     recalculateVerticalRange();
+    logAction->setChecked(logscale);
+    replot();
 }
 
 void SpectrumPlot::setAutoRange(bool value)
@@ -86,6 +154,8 @@ void SpectrumPlot::setAutoRange(bool value)
         axisRect()->setRangeZoom(Qt::Horizontal | Qt::Vertical);
     }
     axisRect()->setRangeZoomAxes(xAxis, autorange?nullptr:yAxis);
+    autoRangeAction->setChecked(autorange);
+    replot();
 }
 
 SpectrumPlot::~SpectrumPlot() {
@@ -163,7 +233,9 @@ void SpectrumPlot::recalculateVerticalRange()
     } else {
         ymax = ceil(ymax/10)*10.0; /* lowest multiple of ten larger than actual maximum */
     }
-    yAxis->setRange(ymin, ymax);
+    if(autorange) {
+        yAxis->setRange(ymin, ymax);
+    }
 }
 
 void SpectrumPlot::setGraphVisibility(QCPGraph *g, bool visible) {
@@ -173,5 +245,31 @@ void SpectrumPlot::setGraphVisibility(QCPGraph *g, bool visible) {
     if(item) {
         legendFont.setStrikeOut(!visible);
         item->setFont(legendFont);
+    }
+}
+
+void SpectrumPlot::contextMenuRequest(const QPoint &pos)
+{
+    QMenu *menu = new QMenu(this);
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    if(legend->selectTest(pos, false) >= 0) { // legend
+
+    } if(yAxis->selectTest(pos, false) >=0) {
+        menu->addAction(logAction);
+        menu->addAction(autoRangeAction);
+    } else {
+      if(selectedGraphs().size() > 0)
+        menu->addAction("Hide selected graph", this, &SpectrumPlot::hideSelectedGraph);
+    }
+    menu->popup(mapToGlobal(pos));
+}
+
+void SpectrumPlot::hideSelectedGraph()
+{
+    if (selectedGraphs().size() > 0) {
+        QCPGraph *graph = selectedGraphs().at(0);
+        setGraphVisibility(graph, false);
+        graph->setSelection(QCPDataSelection());
+        replot();
     }
 }

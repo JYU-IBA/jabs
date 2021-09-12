@@ -13,14 +13,21 @@ public:
     void drawDataToChart(const QString &name, double *data, int n, const QColor &color);
     void setGraphVisibility(QCPGraph *graph, bool visible);
     void clearAll();
+    ~SpectrumPlot();
+
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override;
+
+public slots:
     void setLogScale(bool value);
     void setAutoRange(bool value);
-    ~SpectrumPlot();
 
 private slots:
     void plotxRangeChanged(const QCPRange &range);
     void plotyRangeChanged(const QCPRange &range);
     void legendClicked(QCPLegend *legend, QCPAbstractLegendItem *item, QMouseEvent *event);
+    void contextMenuRequest(const QPoint &pos);
+    void hideSelectedGraph();
 
 private:
     void recalculateVerticalRange();
@@ -28,6 +35,8 @@ private:
     bool logscale;
     bool autorange;
     QFont legendFont;
+    QAction *logAction;
+    QAction *autoRangeAction;
 };
 
 #endif // SPECTRUMPLOT_H

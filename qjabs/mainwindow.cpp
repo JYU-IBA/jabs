@@ -9,6 +9,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    ui->plotSettingsGroupBox->setVisible(false); /* Will be made visible if necessary */
     QIcon icon(":/icons/icon.svg");
     QApplication::setWindowIcon(icon);
     QApplication::setApplicationName("QJaBS");
@@ -128,6 +129,7 @@ void MainWindow::on_action_Run_triggered()
     }
     if(session && session->fit && session->fit->sim) {
         ui->plotSpinBox->setMaximum(session->fit->sim->n_det - 1);
+        ui->plotSettingsGroupBox->setVisible(session->fit->sim->n_det > 1);
         plotSpectrum(ui->plotSpinBox->value());
     }
 }
