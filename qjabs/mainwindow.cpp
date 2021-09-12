@@ -40,6 +40,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->action_Quit->setShortcut(QKeySequence::Quit);
     needsSaving = false;
     updateWindowTitle();
+    firstRun = true;
 }
 
 void MainWindow::addMessage(const char *msg)
@@ -132,6 +133,10 @@ void MainWindow::on_action_Run_triggered()
         ui->plotSettingsGroupBox->setVisible(session->fit->sim->n_det > 1);
         plotSpectrum(ui->plotSpinBox->value());
     }
+    if(firstRun) {
+        ui->widget->resetZoom();
+        firstRun = false;
+    }
 }
 
 
@@ -189,6 +194,7 @@ void MainWindow::plotSpectrum(size_t i_det)
             }
         }
     }
+    ui->widget->updateVerticalRange();
     ui->widget->replot();
 }
 
@@ -310,6 +316,7 @@ void MainWindow::clearPlotAndOutput()
     ui->widget->clearAll();
     ui->widget->replot();
     ui->msgPlainTextEdit->clear();
+    firstRun = true;
 }
 
 

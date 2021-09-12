@@ -39,20 +39,21 @@ void SpectrumPlot::drawDataToChart(const QString &name, double *data, int n, con
     graph()->setLineStyle(QCPGraph::lsStepLeft); /*  GSL histograms store the left edge of bin */
     graph()->setPen(color);
     graph()->setName(name);
-
     double maxy = 0.0;
+    double maxx = 0.0;
     for(int i = 0; i < n; ++i) {
-        if(data[i] > maxy)
+        if(data[i] > maxy) {
             maxy = data[i];
+        }
+        if(data[i] > 0.0) {
+            maxx = i;
+        }
         graph()->addData(i, data[i]);
     }
-    if(maxy > ymax)
-        ymax = maxy;
-    if(n > xmax)
-        xmax = n;
-    if(autorange) {
-        recalculateVerticalRange();
-    }
+    if(maxy > data_ymax)
+        data_ymax = maxy;
+    if(maxx > xmax)
+        xmax = maxx;
     setVisible(true);
 }
 
@@ -61,8 +62,7 @@ void SpectrumPlot::clearAll()
     clearPlottables();
     xmin = 0.0;
     xmax = 0.0;
-    ymin = 0.0;
-    ymax = 0.0;
+    data_ymax = 0.0;
     setVisible(false);
 }
 
@@ -92,20 +92,17 @@ bool SpectrumPlot::eventFilter(QObject *obj, QEvent *event)
             return true;
         }
         if(ke->key() == Qt::Key_Plus) {
-            yAxis->scaleRange(0.5);
+            yAxis->setRange(yAxis->range().lower, (yAxis->range().upper-yAxis->range().lower)*0.5 + yAxis->range().lower);
             replot();
             return true;
         }
         if(ke->key() == Qt::Key_Minus) {
-            yAxis->scaleRange(2.0);
+            yAxis->setRange(yAxis->range().lower, (yAxis->range().upper-yAxis->range().lower)*2.0 + yAxis->range().lower);
             replot();
             return true;
         }
         if(ke->key() == Qt::Key_0) {
-            xAxis->setRange(xmin, xmax);
-            recalculateVerticalRange();
-            yAxis->setRange(ymin, ymax);
-            replot();
+            resetZoom();
             return true;
         }
         if(ke->key() == Qt::Key_L) {
@@ -138,7 +135,7 @@ void SpectrumPlot::setLogScale(bool value)
         linTicker->setScaleStrategy(QCPAxisTickerFixed::ssMultiples);
         linTicker->setTickCount(15);
     }
-    recalculateVerticalRange();
+    updateVerticalRange();
     logAction->setChecked(logscale);
     replot();
 }
@@ -149,12 +146,24 @@ void SpectrumPlot::setAutoRange(bool value)
     axisRect()->setRangeDragAxes(xAxis, autorange?nullptr:yAxis);
     if(autorange) {
         axisRect()->setRangeZoom(Qt::Horizontal);
-        recalculateVerticalRange();
+        updateVerticalRange();
     } else {
         axisRect()->setRangeZoom(Qt::Horizontal | Qt::Vertical);
     }
     axisRect()->setRangeZoomAxes(xAxis, autorange?nullptr:yAxis);
     autoRangeAction->setChecked(autorange);
+    replot();
+}
+
+void SpectrumPlot::updateMaxima()
+{
+
+}
+
+void SpectrumPlot::resetZoom()
+{
+    xAxis->setRange(xmin, xmax);
+    updateVerticalRange(true);
     replot();
 }
 
@@ -179,25 +188,31 @@ void SpectrumPlot::plotxRangeChanged(const QCPRange &range)
     }
     xAxis->setRange(newrange);
     if(autorange) {
-        recalculateVerticalRange();
+        updateVerticalRange();
     }
 }
 
 void SpectrumPlot::plotyRangeChanged(const QCPRange &range)
 {
     if(autorange) {
-        recalculateVerticalRange();
+        updateVerticalRange();
         return;
     }
     QCPRange newrange(range);
     double w = range.upper - range.lower;
-    if(w > 2*(ymax - ymin)) {
-        w = 2*(ymax - ymin);
+
+    double ymin = logscale?0.5:0.0;
+    if(w > 2*(data_ymax - ymin)) {
+        w = 2*(data_ymax - ymin);
     }
     if(range.lower < ymin) {
         newrange.lower = ymin;
         newrange.upper = ymin+w;
     }
+    if(newrange.upper > data_ymax*20.0)
+        newrange.upper = data_ymax*20.0;
+    if(newrange.upper < 10.0)
+        newrange.upper = 10.0;
     yAxis->setRange(newrange);
 }
 
@@ -212,10 +227,28 @@ void SpectrumPlot::legendClicked(QCPLegend *legend, QCPAbstractLegendItem *item,
     }
 }
 
-void SpectrumPlot::recalculateVerticalRange()
+void SpectrumPlot::updateVerticalRange(bool force)
+{
+    if(!force && !autorange)
+        return;
+    double ymin;
+    double ymax = getVerticalMaximum();
+    if(logscale) {
+        ymin = 0.5;
+        ymax = pow(10, ceil(log10(ymax))); /* lowest power of ten larger than actual maximum, .e.g     100000 for 12345 */
+    } else {
+        ymin = 0.0;
+        ymax = ceil(ymax/10)*10.0; /* lowest multiple of ten larger than actual maximum */
+    }
+    if(ymax < 10.0)
+        ymax = 10.0;
+    yAxis->setRange(ymin, ymax);
+}
+
+double SpectrumPlot::getVerticalMaximum()
 {
     QCPRange r=xAxis->range();
-    ymax=0.0;
+    double ymax = 0.0;
     for(int i = 0; i < graphCount(); ++i) {
         QCPGraph *gr = graph(i);
         if(!gr->visible())
@@ -227,20 +260,13 @@ void SpectrumPlot::recalculateVerticalRange()
                 ymax = it->value;
         }
     }
-    ymin=logscale?0.5:0.0;
-    if(logscale) {
-        ymax = pow(10, ceil(log10(ymax))); /* lowest power of ten larger than actual maximum, .e.g     100000 for 12345 */
-    } else {
-        ymax = ceil(ymax/10)*10.0; /* lowest multiple of ten larger than actual maximum */
-    }
-    if(autorange) {
-        yAxis->setRange(ymin, ymax);
-    }
+    return ymax;
 }
 
 void SpectrumPlot::setGraphVisibility(QCPGraph *g, bool visible) {
 
     g->setVisible(visible);
+    updateVerticalRange();
     QCPAbstractLegendItem *item = legend->itemWithPlottable(g);
     if(item) {
         legendFont.setStrikeOut(!visible);

@@ -13,6 +13,7 @@ public:
     void drawDataToChart(const QString &name, double *data, int n, const QColor &color);
     void setGraphVisibility(QCPGraph *graph, bool visible);
     void clearAll();
+    void updateVerticalRange(bool force = false);
     ~SpectrumPlot();
 
 protected:
@@ -21,6 +22,8 @@ protected:
 public slots:
     void setLogScale(bool value);
     void setAutoRange(bool value);
+    void updateMaxima();
+    void resetZoom();
 
 private slots:
     void plotxRangeChanged(const QCPRange &range);
@@ -30,8 +33,9 @@ private slots:
     void hideSelectedGraph();
 
 private:
-    void recalculateVerticalRange();
-    double xmin, xmax, ymin, ymax;
+    double getVerticalMaximum();
+    double xmin, xmax;
+    double data_ymax;
     bool logscale;
     bool autorange;
     QFont legendFont;

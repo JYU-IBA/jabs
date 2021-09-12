@@ -72,5 +72,6 @@ private:
     QString filebasename;
     QString originalPath;
     bool needsSaving;
+    bool firstRun;
 };
 #endif // MAINWINDOW_H
