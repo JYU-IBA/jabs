@@ -287,6 +287,7 @@ void SpectrumPlot::contextMenuRequest(const QPoint &pos)
       if(selectedGraphs().size() > 0)
         menu->addAction("Hide selected graph", this, &SpectrumPlot::hideSelectedGraph);
     }
+    menu->addAction("Reset zoom", this, &SpectrumPlot::resetZoom);
     menu->popup(mapToGlobal(pos));
 }
 
