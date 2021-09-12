@@ -53,13 +53,9 @@ private slots:
 
     void on_action_Save_File_triggered();
 
-    void clearPlotAndOutput();
+    void resetAll();
 
     void on_actionAbout_triggered();
-
-    void on_autoRangeCheckBox_stateChanged(int arg1);
-
-    void on_logScaleCheckBox_stateChanged(int arg1);
 
 private:
     void updateWindowTitle();
@@ -73,5 +69,6 @@ private:
     QString originalPath;
     bool needsSaving;
     bool firstRun;
+    QString aboutString;
 };
 #endif // MAINWINDOW_H

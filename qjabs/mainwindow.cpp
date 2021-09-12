@@ -8,6 +8,12 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+    aboutString = QString("JaBS version ") + jabs_version() + "\n\n"
+                       + "Using JIBAL version "+ jibal_version() + ", compiled using version " + JIBAL_VERSION + "\n\n"
+                       + "Using Qt version " + qVersion() + ", compiled using version " + QT_VERSION_STR + "\n\n"
+                       + "Copyright 2021 Jaakko Julin <jaakko.julin@jyu.fi>\n\n"
+                       + QString(COPYRIGHT_STRING).simplified()
+                       + "\n";
     ui->setupUi(this);
     ui->plotSettingsGroupBox->setVisible(false); /* Will be made visible if necessary */
     QIcon icon(":/icons/icon.svg");
@@ -26,8 +32,9 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plainTextEdit->setFont(fixedFont);
     fixedFont.setPointSize(11);
     ui->msgPlainTextEdit->setFont(fixedFont);
+    ui->msgPlainTextEdit->appendPlainText(aboutString);
     jibal = jibal_init(nullptr);
-    jibal_status_print(stderr, jibal);
+    ui->msgPlainTextEdit->appendPlainText(jibal_status_string(jibal));
     session = script_session_init(jibal, NULL);
     ui->action_Run->setShortcutContext(Qt::ApplicationShortcut);
     highlighter = new Highlighter(ui->plainTextEdit->document());
@@ -65,7 +72,11 @@ void MainWindow::on_action_Run_triggered()
     if(!session) {
         return;
     }
-    script_reset(session, 0, NULL);
+    if(firstRun) {
+        resetAll();
+    } else {
+        script_reset(session, 0, NULL);
+    }
     QString text = ui->plainTextEdit->toPlainText();
     QTextStream stream = QTextStream(&text, QIODevice::ReadOnly);
     size_t lineno = 0;
@@ -73,8 +84,10 @@ void MainWindow::on_action_Run_triggered()
     int exit_session = FALSE;
     while(!stream.atEnd()) {
         QString line = stream.readLine();
-        qDebug() << "Processing line:" << line;
         lineno++;
+#ifdef DEBUG
+        qDebug() << "Processing line " << lineno << line;
+#endif
         if(line.isEmpty())
                 continue;
         if(line.at(0) == '#')
@@ -82,8 +95,8 @@ void MainWindow::on_action_Run_triggered()
 
         char **argv = string_to_argv(qPrintable(line));
         if(!argv) {
-            fprintf(stderr, "Something went wrong in parsing arguments.\n");
-            continue;
+            jabs_message(MSG_ERROR, stderr, "Something went wrong in parsing arguments from %s.\n", qPrintable(line));
+            break;
         }
         char **a = argv;
         int argc = 0;
@@ -106,6 +119,10 @@ void MainWindow::on_action_Run_triggered()
                         break;
                     }
                     status = c->f(session, argc - 1, argv + 1);
+                    if(status) {
+                        jabs_message(MSG_ERROR, stderr, "Command \"%s\" failed with status code %i on line %zu, aborting.\n", c->name, status, lineno);
+                        exit_session = TRUE;
+                    }
                     if(c->f == script_load || c->f == script_reset) {
                         free(session->cf->vars);
                         session->cf->vars = NULL;
@@ -121,10 +138,7 @@ void MainWindow::on_action_Run_triggered()
             free(argv[0]);
             free(argv);
         }
-        if(status) {
-            qDebug() << "Error!!!! Status code" << status;
-            exit_session = TRUE;
-        }
+
         if(exit_session)
             break;
     }
@@ -132,10 +146,10 @@ void MainWindow::on_action_Run_triggered()
         ui->plotSpinBox->setMaximum(session->fit->sim->n_det - 1);
         ui->plotSettingsGroupBox->setVisible(session->fit->sim->n_det > 1);
         plotSpectrum(ui->plotSpinBox->value());
-    }
-    if(firstRun) {
-        ui->widget->resetZoom();
-        firstRun = false;
+        if(firstRun) {
+            ui->widget->resetZoom();
+            firstRun = false;
+        }
     }
 }
 
@@ -209,7 +223,7 @@ void MainWindow::on_action_Open_File_triggered()
     if(file.open(QFile::ReadOnly | QFile::Text)) {
         ui->plainTextEdit->setPlainText(file.readAll());
         file.close();
-        clearPlotAndOutput();
+        resetAll();
         setFilename(filename);
         needsSaving = false;
         updateWindowTitle();
@@ -256,7 +270,7 @@ void MainWindow::setFilename(const QString &filename)
 void MainWindow::on_action_New_File_triggered()
 {
     ui->plainTextEdit->clear();
-    clearPlotAndOutput();
+    resetAll();
     filename.clear();
     filebasename.clear();
     QDir::setCurrent(originalPath);
@@ -311,35 +325,17 @@ void MainWindow::on_action_Save_File_triggered()
     }
 }
 
-void MainWindow::clearPlotAndOutput()
+void MainWindow::resetAll()
 {
     ui->widget->clearAll();
     ui->widget->replot();
     ui->msgPlainTextEdit->clear();
     firstRun = true;
+    script_reset(session, 0, NULL);
 }
 
 
 void MainWindow::on_actionAbout_triggered()
 {
-    QMessageBox::about(this, tr("QJaBS"), QString("JaBS version ") + jabs_version() + "\n\n"
-                       + "Using JIBAL version "+ jibal_version() + ", compiled using version " + JIBAL_VERSION + "\n\n"
-                       + "Using Qt version " + qVersion() + ", compiled using version " + QT_VERSION_STR + "\n\n"
-                       + "Copyright 2021 Jaakko Julin <jaakko.julin@jyu.fi>\n\n"
-                       + QString(COPYRIGHT_STRING).simplified());
+    QMessageBox::about(this, tr("QJaBS"), aboutString);
 }
-
-
-void MainWindow::on_autoRangeCheckBox_stateChanged(int arg1)
-{
-    ui->widget->setAutoRange(arg1 == Qt::Checked);
-    ui->widget->replot();
-}
-
-
-void MainWindow::on_logScaleCheckBox_stateChanged(int arg1)
-{
-    ui->widget->setLogScale(arg1 == Qt::Checked);
-    ui->widget->replot();
-}
-

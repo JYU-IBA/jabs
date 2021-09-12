@@ -86,11 +86,15 @@ int script_load(script_session *s, int argc, char * const *argv) {
             jabs_message(MSG_ERROR, stderr, "Detector number %zu too high (must be below %zu)\n", i_det, fit->sim->n_det);
             return EXIT_FAILURE;
         }
-        fit->exp[i_det] = spectrum_read(argv[1], sim_det(fit->sim, i_det));
-        if(!fit->exp[i_det]) {
+        gsl_histogram *h = spectrum_read(argv[1], sim_det(fit->sim, i_det));
+        if(!h) {
             jabs_message(MSG_ERROR,  stderr,"Reading spectrum from file \"%s\" was not successful.\n", argv[1]);
             return EXIT_FAILURE;
         }
+        if(fit->exp[i_det]) {
+            gsl_histogram_free(fit->exp[i_det]);
+        }
+        fit->exp[i_det] = h;
         return EXIT_SUCCESS;
     } else if(strcmp(argv[0], "reaction") == 0) {
         jabs_message(MSG_ERROR, stderr, "Loading reactions from files not implemented yet, sorry.\n");
@@ -110,11 +114,13 @@ int script_reset(script_session *s, int argc, char * const *argv) {
     fit_data_fit_ranges_free(fit_data);
     fit_params_free(fit_data->fit_params);
     fit_data->fit_params = NULL;
+    fit_data_exp_free(s->fit);
     fit_data_workspaces_free(fit_data);
     sample_model_free(fit_data->sm);
     fit_data->sm = NULL;
     sim_free(fit_data->sim);
     fit_data->sim = sim_init(s->jibal->isotopes);
+    fit_data->exp = calloc(fit_data->sim->n_det, sizeof(gsl_histogram *));
     jibal_gsto_assign_clear_all(fit_data->jibal->gsto);
     free(s->cf->vars);
     s->cf->vars = NULL;
