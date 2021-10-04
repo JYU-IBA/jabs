@@ -68,6 +68,7 @@ Highlighter::Highlighter(QTextDocument *parent)
 
     commandFormat.setForeground(Qt::darkBlue);
     commandFormat.setFontWeight(QFont::Bold);
+#if 0
     const QString commandPatterns[] = {
 
     };
@@ -76,6 +77,7 @@ Highlighter::Highlighter(QTextDocument *parent)
         rule.format = commandFormat;
         highlightingRules.append(rule);
     }
+#endif
      for(const struct script_command *c = script_commands; c->name != NULL; c++) {
          QString pattern = QString("^") + c->name + "\\b";
          rule.pattern = QRegularExpression(pattern);
