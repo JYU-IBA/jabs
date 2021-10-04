@@ -581,28 +581,36 @@ void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params,
                     fit_params_add_parameter(params, &det->slope); /* TODO: prevent adding already added things */
                     fit_params_add_parameter(params, &det->offset);
                     fit_params_add_parameter(params, &det->resolution);
+                    jabs_message(MSG_INFO, stderr, "Added fit parameters (slope, offset, resolution) for detector %zu calibration\n", i_det);
                 }
                 if(strcmp(token, "slope") == 0) {
                     fit_params_add_parameter(params, &det->slope);
+                    jabs_message(MSG_INFO,  stderr, "Added fit parameters for detector %zu calibration slope\n", i_det);
                 }
                 if(strcmp(token, "offset") == 0) {
                     fit_params_add_parameter(params, &det->offset);
+                    jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu calibration offset\n", i_det);
                 }
                 if(strncmp(token, "reso", 4) == 0) {
                     fit_params_add_parameter(params, &det->resolution);
+                    jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu resolution\n", i_det);
                 }
                 if(strncmp(token, "solid", 5) == 0) {
                     fit_params_add_parameter(params, &det->solid);
+                    jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu solid angle\n", i_det);
                 }
             }
             if(strcmp(token, "fluence") == 0) {
                 fit_params_add_parameter(params, &sim->fluence);
+                jabs_message(MSG_INFO, stderr, "Added fit parameter for fluence\n");
             }
             if(strcmp(token, "channeling_slope") == 0) {
                 fit_params_add_parameter(params, &sim->channeling_slope);
+                jabs_message(MSG_INFO, stderr, "Added fit parameter for channeling (energy slope)\n");
             }
             if(strcmp(token, "channeling") == 0) {
                 fit_params_add_parameter(params, &sim->channeling_offset);
+                fprintf(stderr, "Added fit parameter for channeling (constant)\n");
             }
 
         }
@@ -611,24 +619,27 @@ void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params,
                 size_t i_layer = strtoul(token + 5, NULL, 10);
                 if(i_layer >= 1 && i_layer <= sm->n_ranges) {
                     fit_params_add_parameter(params, &sm->ranges[i_layer - 1].rough.x);
+                    jabs_message(MSG_INFO, stderr, "Added fit parameter for roughness of layer %zu\n",  i_layer);
                 } else {
-                    fprintf(stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
+                    jabs_message(MSG_INFO, stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
                 }
             }
             if(strncmp(token, "thickness", 9) == 0 && strlen(token) > 9) {
                 size_t i_layer = strtoul(token + 9, NULL, 10);
                 if(i_layer >= 1 && i_layer <= sm->n_ranges) {
                     fit_params_add_parameter(params, &sm->ranges[i_layer - 1].x);
+                    jabs_message(MSG_INFO,stderr, "Added fit parameter for thickness of layer %zu\n",  i_layer);
                 } else {
-                    fprintf(stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
+                    jabs_message(MSG_INFO,stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
                 }
             }
             size_t i, j;
             if(sscanf(token, "conc%lu_%lu", &i, &j) == 2) {
                 if(i >= 1 && i <= sm->n_ranges && j >= 1 && j <= sm->n_materials) {
                     fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, j - 1));
+                    jabs_message(MSG_INFO,stderr, "Added fit parameter for concentration of %s in layer %zu\n", sm->materials[j - 1]->name, i);
                 } else {
-                    fprintf(stderr, "No element %lu in layer %lu\n", j, i);
+                    jabs_message(MSG_INFO,stderr, "No element %lu in layer %lu\n", j, i);
                 }
             }
         }
