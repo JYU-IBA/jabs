@@ -31,14 +31,20 @@ Simulates RBS spectra rapidly.
         $ cd build
         $ cmake ../
         $ make
-       
+
+## Graphical user interface
+
+Simple Qt-based [GUI](qjabs/) is provided. Scripts can be edited and run, simulated spectra and experimental spectra are plotted (if available). Many GUI-specific features are missing, but the scripts themselves should work as described below. Note that there is no persistence, i.e everything should be reset between the runs. Currently some stopping forces and straggling data is not reloaded between runs and restarting the program may be necessary to reset these.
+
+      
 ## Interactive or scripted usage
 
 This is the preferred way of using JaBS. Some command line options (see below) can be used in conjunction with the interactive or scripted mode.
 
 Launch JaBS in interactive mode simply by running `jabs` or `jabs --interactive`. Scripts (i.e. files with commands identical to interactive mode input) can be given as command line parameters e.g. `jabs script.jbs`, piped in `jabs < script.jbs` or run using the interactive mode. Filename from command line must not be `sample` (reserved keyword for giving the sample on the command line, see below).
 
-The interactive mode should be self-explanatory and an internal help is provided. Please see [the example script](example/script.jbs) to get started.
+The interactive mode should be self-explanatory and an internal help is provided. Please see [the example script](example/example.jbs) to get started.
+
 ## Command line usage
 
 Several parameters can be set from the command line. See `jabs -h` and try something like this:
@@ -48,10 +54,6 @@ $ ./jabs -E 2MeV --alpha=10deg --theta=170deg --out=spectrum.csv sample Au 500tf
 ~~~~
 
 Detector and sample can be read from files. The file formats are simple and human readable. Please see [the example](example).
-
-## Graphical user interface
-
-Extremely crude Qt-based [GUI](qjabs/) is provided. Scripts can be edited and run, simulated spectra and experimental spectra are plotted (if available). Many GUI-specific features are missing, such as loading and saving scripts, but the scripts themselves should work as described above. Note that some things are reset between runs, some are not. This will also be improved in the future.
 
 ## Features
 ### Implemented
@@ -73,19 +75,20 @@ Extremely crude Qt-based [GUI](qjabs/) is provided. Scripts can be edited and ru
  - Simultaneous multi-detector simulation and fitting.
 
 ### Not (yet) implemented, but planned
- - More accurate handling of sharp peaks in cross sections (resonances)
+ - Support for more input and output data formats (CSV, IDF, ...)
+ - More accurate handling of sharp peaks in cross sections (resonances). The current handling is quite accurate in most cases.
  - Multiple scattering (small angle)
  - Kinematic (geometric) broadening
  - Simulation of pile-up and dead time
  - Stopping corrections supplied by user (Bragg correction etc)
  - Non-linear detector response
  - Simulation of time-of-flight spectra
-
+ - Publication quality plotting
 
 ### Distant future
  - Parallel processing of independent simulations
  - Advanced fitting algorithms
-
+ - Fitting of spectra from different measurements (different beam, fluence etc for each simulation)
 
 ### Known issues
  - Detector numbering and usability issues with multidetector mode 
@@ -97,7 +100,6 @@ Extremely crude Qt-based [GUI](qjabs/) is provided. Scripts can be edited and ru
  - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).
  - Dual scattering is benchmarked against SimNRA and is known to produce different results.
  - Adding detector related fit variables will add those for all detectors 
-
 
 ## Fitting
 
