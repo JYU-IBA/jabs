@@ -91,6 +91,8 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Fitting of spectra from different measurements (different beam, fluence etc for each simulation)
 
 ### Known issues
+ - R33 files (reactions) cannot be added in interactive mode
+ - Occasional crashes when fitting, since some corner cases are not handled properly
  - Detector numbering and usability issues with multidetector mode 
  - Point-by-point profiles are not tested (but should work)
  - Ad-hoc channeling correction is the same for all detectors
