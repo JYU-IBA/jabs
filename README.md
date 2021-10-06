@@ -17,9 +17,12 @@ Simulates RBS spectra rapidly.
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-## Installation
+## Binary packages
+Some ready-to-use [binary packages](http://users.jyu.fi/~jaakjuli/jabs/binaries/) for Windows and macOS may be available.
 
-1. Install [JIBAL](https://github.com/JYU-IBA/jibal). You need [GSL](https://www.gnu.org/software/gsl/) for both JIBAL and JaBS.
+## Installation from sources
+
+1. Install [JIBAL](https://github.com/JYU-IBA/jibal), preferably from sources. You'll need [GSL](https://www.gnu.org/software/gsl/) for both JIBAL and JaBS.
 2. Clone this repository, e.g.
 
         $ git clone git@gitlab.jyu.fi:iba/jabs.git
