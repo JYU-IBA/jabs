@@ -131,7 +131,7 @@ int script_reset(script_session *s, int argc, char * const *argv) {
 int script_show(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     if(argc == 0) {
-        jabs_message(MSG_INFO, stderr, "Usage show [sim|fit|sample|detector|vars].\n");
+        jabs_message(MSG_INFO, stderr, "Usage show [sim|fit|sample|det|vars].\n");
         return 0;
     }
     if(strcmp(argv[0], "sim") == 0) {
@@ -143,7 +143,12 @@ int script_show(script_session *s, int argc, char * const *argv) {
         return 0;
     }
     if(strcmp(argv[0], "sample") == 0) {
-        return sample_model_print(NULL, fit->sm);
+        if(!fit->sm) {
+            jabs_message(MSG_WARNING, stderr, "No sample has been set.\n");
+            return 0;
+        } else {
+            return sample_model_print(NULL, fit->sm);
+        }
     }
     if(strcmp(argv[0], "det") == 0) {
 
@@ -214,7 +219,7 @@ int script_set(script_session *s, int argc, char * const *argv) {
         return -1;
     }
     if(jibal_config_file_var_set(s->cf, argv[0], argv[1])) {
-        jabs_message(MSG_ERROR, stderr,"Error in setting \"%s\" to \"%s\"\n", argv[0], argv[1]);
+        jabs_message(MSG_ERROR, stderr,"Error in setting \"%s\" to \"%s\". Does the variable exist? Use show vars.\n", argv[0], argv[1]);
         return -1;
     }
     return 0;
@@ -265,7 +270,8 @@ int script_help(script_session *s, int argc, char * const *argv) {
             {"commands", "I recognize the following commands:\n"},
             {"version", "JaBS version: "},
             {"set", "The following variables can be set (unit optional, SI units assumed otherwise):\n"},
-            {"show", "Show things (print to screen).\n"},
+            {"show", "Show things. Possible things: sim, fit, sample, det, vars.\n"},
+            {"fit", "Make a fit. Provide list of variables to fit.\n"},
             {NULL, NULL}
     };
     if(argc == 0) {
@@ -297,23 +303,23 @@ int script_help(script_session *s, int argc, char * const *argv) {
                     if(var->type != JIBAL_CONFIG_VAR_UNIT)
                         continue;
                     i++;
-                    jabs_message(MSG_INFO, stderr,"%18s", var->name);
-                    if(i % 4 == 0) {
-                        fputc('\n', stderr);
+                    jabs_message(MSG_INFO, stderr," %25s", var->name);
+                    if(i % 3 == 0) {
+                        jabs_message(MSG_INFO, stderr,"\n");
                     }
                 }
                 i = 0;
-                fprintf(stderr, "\nThe following variables are not in SI units:\n");
+                fprintf(stderr, "\n\nThe following variables are not in SI units:\n");
                 for(jibal_config_var *var = s->cf->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
                     if(var->type == JIBAL_CONFIG_VAR_UNIT)
                         continue;
                     i++;
-                    jabs_message(MSG_INFO, stderr, "%18s", var->name);
-                    if(i % 4 == 0) {
+                    jabs_message(MSG_INFO, stderr, " %25s", var->name);
+                    if(i % 3 == 0) {
                         jabs_message(MSG_INFO, stderr,"\n");
                     }
                 }
-                jabs_message(MSG_INFO, stderr,"\nAlso the following things can be set: ion, sample, foil. Special syntax applies for each.\n");
+                jabs_message(MSG_INFO, stderr,"\n\nAlso the following things can be set: ion, sample, det. Special syntax applies for each.\n");
             }
             return 0;
         }
