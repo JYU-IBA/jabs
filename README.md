@@ -25,7 +25,7 @@ Some ready-to-use [binary packages](http://users.jyu.fi/~jaakjuli/jabs/binaries/
 1. Install [JIBAL](https://github.com/JYU-IBA/jibal), preferably from sources. You'll need [GSL](https://www.gnu.org/software/gsl/) for both JIBAL and JaBS.
 2. Clone this repository, e.g.
 
-        $ git clone git@gitlab.jyu.fi:iba/jabs.git
+        $ git clone git@github.com:JYU-IBA/jabs.git
 
 
 3. Build, see [CMake instructions](https://cmake.org/runningcmake/), or try...
