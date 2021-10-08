@@ -382,7 +382,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             b->d = d_after;
             b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
             assert(r->p.E > 0.0);
-            if (d_before.x >= r->max_depth) { /* TODO: check that this is OK when DS is enabled */
+            if(!ws->params.ds && d_before.x >= r->max_depth) { /* Reactions stop when we are too deep in the sample, unless, of course, if DS is enabled. TODO: check optimizations for DS */
 #ifdef DEBUG
                 fprintf(stderr, "Reaction %lu with %s stops, because maximum depth is reached at x = %.3lf tfu.\n",
                         i, r->r->target->name, d_before.x / C_TFU); /* TODO: give reactions a name */
@@ -781,7 +781,7 @@ void simulate_with_ds(sim_workspace *ws) {
         fprintf(stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x/C_TFU, d_after.x/C_TFU, E_front/C_KEV, E_back/C_KEV, fluence);
         double p_sum = 0.0;
         for(int i_polar = 0; i_polar < ws->params.ds_steps_polar; i_polar++) {
-            const double ds_polar_min = 20.0*C_DEG;
+            const double ds_polar_min = 30.0*C_DEG;
             const double ds_polar_max = 180.0*C_DEG;
             double ds_polar_step = (ds_polar_max-ds_polar_min)/(ws->params.ds_steps_polar-1);
             double ds_polar = ds_polar_min + i_polar * ds_polar_step;
@@ -795,7 +795,7 @@ void simulate_with_ds(sim_workspace *ws) {
                 if(incident->mass >= target->mass && ds_polar > asin(target->mass / incident->mass)) { /* Scattering not possible */
                     continue;
                 }
-#if 0
+#if 1
                 double cs = 0.0;
                 for(int polar_substep = 0; polar_substep < 9; polar_substep++) {
                     double ds_polar_sub = ds_polar_step*(1.0*(polar_substep-4)/9.0) + ds_polar;
