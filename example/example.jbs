@@ -6,7 +6,7 @@ set energy 2027keV
 set alpha 0
 set alpha 0deg
 set alpha "0 deg"
-set fluence 1.0e13
+set fluence 2.0e12
 load exp "experimental.dat"
 #sample can be set with one command
 set sample Au 30tfu rough 20tfu n_rough 5 SiO2 6500tfu Si 10000tfu 
@@ -17,6 +17,7 @@ set det offset 10keV
 set det resolution 10keV
 set det theta 160deg
 set det phi 90deg
+set det solid 70msr
 add fit_range 200 700
 add fit_range 1050 1100
 set fit_maxiter 100
