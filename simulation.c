@@ -85,16 +85,46 @@ sim_calc_params sim_calc_params_defaults(int ds, int fast) {
     return p;
 }
 
-int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_type cs, double theta) { /* Note that sim->ion needs to be set! */
-    if(!sim || !sim->beam_isotope) {
+int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, const char *filename) {
+    r33_file *rfile = r33_file_read(filename);
+    if(!rfile) {
         return -1;
     }
-    struct sample *sample = sim->sample;
-    if(!sample) {
+    reaction *reaction_from_file = r33_file_to_reaction(jibal_isotopes, rfile);
+    if(!reaction_from_file) {
+        r33_file_free(rfile);
+        return -1;
+    }
+    fprintf(stderr, "File: %s has a reaction with %s -> %s, product %s, theta %g deg\n", filename,
+            reaction_from_file->incident->name, reaction_from_file->target->name, reaction_from_file->product->name, reaction_from_file->theta/C_DEG);
+    for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
+        reaction *r = &sim->reactions[i_reaction];
+        if(reaction_is_same(r, reaction_from_file)) {
+            jabs_message(MSG_INFO, stderr, "Replacing reaction %zu (%s with %s).\n", i_reaction, reaction_name(r), r->target->name);
+            reaction_from_file->cs = r->cs; /* Adopt fallback cross-section from the reaction we are replacing */
+            reaction_free(r);
+            *r = *reaction_from_file;
+            return EXIT_SUCCESS;
+        }
+    }
+    /* Did not found a reaction to replace, just adding it. */
+    sim->n_reactions++;
+    sim->reactions = realloc(sim->reactions, sim->n_reactions*sizeof(reaction));
+    sim->reactions[sim->n_reactions - 1] = *reaction_from_file;
+    jabs_message(MSG_INFO, stderr, "Added reaction %zu.\n", sim->n_reactions - 1);
+    return EXIT_SUCCESS;
+}
+
+int sim_reactions_add(simulation *sim, const sample_model *sm, reaction_type type, jibal_cross_section_type cs, double theta) { /* Note that sim->ion needs to be set! */
+    if(!sim || !sim->beam_isotope || !sm) {
         return -1;
     }
     if(type == REACTION_NONE || cs ==  JIBAL_CS_NONE) {
         return 0;
+    }
+    struct sample *sample = sample_from_sample_model(sm);
+    if(!sample) {
+        return -1;
     }
 #if 0
     if(type == REACTION_ERD && theta > C_PI/2.0) {
@@ -105,6 +135,7 @@ int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_t
     sim->reactions = realloc(sim->reactions, n_reactions*sizeof(reaction));
     if(!sim->reactions) {
         sim->n_reactions = 0;
+        sample_free(sample);
         return -1;
     }
     for (size_t i = 0; i < sample->n_isotopes; i++) {
@@ -117,7 +148,19 @@ int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_t
         free(r_new);
         sim->n_reactions++;
     };
+    sample_free(sample);
     return 0;
+}
+
+void sim_reactions_free(simulation *sim) {
+    if(!sim)
+        return;
+    for(size_t i = 0; i < sim->n_reactions; i++) {
+        reaction_free(&sim->reactions[i]);
+    }
+    free(sim->reactions);
+    sim->reactions = NULL;
+    sim->n_reactions = 0;
 }
 
 int sim_sanity_check(const simulation *sim) {
@@ -362,10 +405,10 @@ void simulation_print(FILE *f, const simulation *sim) {
     jabs_message(MSG_INFO, f, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
     jabs_message(MSG_INFO, f, "E_min = %.3lf keV\n", sim->emin/C_KEV);
     jabs_message(MSG_INFO, f, "alpha = %.3lf deg\n", alpha/C_DEG);
-    jabs_message(MSG_INFO, f,"n_detectors = %zu\n", sim->n_det);
+    jabs_message(MSG_INFO, f, "n_detectors = %zu\n", sim->n_det);
     jabs_message(MSG_INFO, f, "n_reactions = %zu\n", sim->n_reactions);
     jabs_message(MSG_INFO, f, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence*C_E*1.0e6);
-    jabs_message(MSG_INFO, f,"step for incident ions = %.3lf keV\n", sim->params.stop_step_incident/C_KEV);
+    jabs_message(MSG_INFO, f, "step for incident ions = %.3lf keV\n", sim->params.stop_step_incident/C_KEV);
     jabs_message(MSG_INFO, f, "step for exiting ions = %.3lf keV\n", sim->params.stop_step_exiting/C_KEV);
     jabs_message(MSG_INFO, f, "stopping RK4 = %s\n", sim->params.rk4?"true":"false");
     jabs_message(MSG_INFO, f, "depth steps max = %zu\n", sim->params.depthsteps_max);
@@ -373,7 +416,7 @@ void simulation_print(FILE *f, const simulation *sim) {
     jabs_message(MSG_INFO, f, "accurate nuclear stopping = %s\n", sim->params.nucl_stop_accurate?"true":"false");
     if(sim->channeling_offset != 1.0 || sim->channeling_slope != 0.0) {
         jabs_message(MSG_INFO, f, "substrate channeling yield correction offset = %.5lf\n", sim->channeling_offset);
-        jabs_message(MSG_INFO, f, "substrate channeling yield correction slope = %g / keV\n", sim->channeling_slope/(1.0/C_KEV));
+        jabs_message(MSG_INFO, f, "substrate channeling yield correction slope = %g / keV (%e)\n", sim->channeling_slope/(1.0/C_KEV), sim->channeling_slope);
     }
 }
 

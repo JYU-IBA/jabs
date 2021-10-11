@@ -23,7 +23,11 @@ void reactions_print(FILE *f, const reaction *reactions, size_t n_reactions) {
         return;
     for(size_t i = 0; i < n_reactions; i++) {
         const reaction *r = &reactions[i];
-        jabs_message(MSG_INFO, f, "Reaction %3zu: %s with %5s (reaction product %s).\n", i + 1, reaction_name(r), r->target->name, r->product->name);
+        jabs_message(MSG_INFO, f, "Reaction %3zu: %s with %5s (reaction product %s).", i + 1, reaction_name(r), r->target->name, r->product->name);
+        if(r->type == REACTION_FILE) {
+            jabs_message(MSG_INFO, f, " CS data from file \"%s\".", r->filename);
+        }
+        jabs_message(MSG_INFO, f, "\n");
     }
 }
 

@@ -118,6 +118,15 @@ int main(int argc, char **argv) {
         if(!session->output_filename) {
             session->output_filename = strdup("-"); /* If no output filename given, set it to "-" (interpreted as stdout) */
         }
+        if(fit_data->sim->rbs) {
+            sim_reactions_add(fit_data->sim, fit_data->sm, REACTION_RBS, fit_data->jibal->config->cs_rbs,0.0); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
+        }
+        if(fit_data->sim->erd) {
+            sim_reactions_add(fit_data->sim, fit_data->sm, REACTION_ERD, fit_data->jibal->config->cs_erd, 0.0);
+        }
+        for(size_t i = 0; i < cmd_opt->n_reaction_filenames; i++) {
+            sim_reactions_add_r33(fit_data->sim, jibal->isotopes, cmd_opt->reaction_filenames[i]);
+        }
         if(cmd_opt->fit) {
             fprintf(stderr, "Running a fit in non-interactive mode.\n");
             status = script_fit(session, 1, &cmd_opt->fit_vars);

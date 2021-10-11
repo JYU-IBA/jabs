@@ -97,7 +97,11 @@ int script_load(script_session *s, int argc, char * const *argv) {
         fit->exp[i_det] = h;
         return EXIT_SUCCESS;
     } else if(strcmp(argv[0], "reaction") == 0) {
-        jabs_message(MSG_ERROR, stderr, "Loading reactions from files not implemented yet, sorry.\n");
+        if(argc < 2) {
+            jabs_message(MSG_ERROR, stderr, "Usage: load reaction [file]\n");
+            return EXIT_FAILURE;
+        }
+        sim_reactions_add_r33(fit->sim, fit->jibal->isotopes, argv[1]);
         return EXIT_SUCCESS;
     }
     jabs_message(MSG_ERROR, stderr, "I don't know what to load (%s?)\n", argv[0]);
@@ -110,6 +114,10 @@ int script_reset(script_session *s, int argc, char * const *argv) {
     (void) argv; /* Unused */
     if(!fit_data) {
         return -1;
+    }
+    if(argc > 1 && strcmp(argv[1], "reactions") == 0) {
+        sim_reactions_free(fit_data->sim);
+        return EXIT_SUCCESS;
     }
     fit_data_fit_ranges_free(fit_data);
     fit_params_free(fit_data->fit_params);
@@ -228,10 +236,26 @@ int script_set(script_session *s, int argc, char * const *argv) {
 int script_add(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit_data = s->fit;
     if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Nothing to add. See \"help add\" for more information.\n");
-        return 0;
+        jabs_message(MSG_ERROR, stderr, "Usage: add [reactions|fit_range|det] ...\n");
+        return EXIT_SUCCESS;
     }
-    if(strcmp(argv[0], "fit_range") == 0) {
+    if(strcmp(argv[0], "reaction") == 0) {
+        /* TODO */
+        jabs_message(MSG_ERROR, stderr, "Sorry, adding one reaction at a time is not supported yet...\n");
+        return EXIT_FAILURE;
+    } else if(strcmp(argv[0], "reactions") == 0) {
+        if(!fit_data->sm) {
+            jabs_message(MSG_ERROR, stderr, "Cannot add reactions before sample has been set (I need to know which reactions to add!).\n");
+            return EXIT_FAILURE;
+        }
+        if(fit_data->sim->rbs) {
+            sim_reactions_add(fit_data->sim, fit_data->sm, REACTION_RBS, fit_data->jibal->config->cs_rbs,0.0); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
+        }
+        if(fit_data->sim->erd) {
+            sim_reactions_add(fit_data->sim, fit_data->sm, REACTION_ERD, fit_data->jibal->config->cs_erd, 0.0);
+        }
+        return EXIT_SUCCESS;
+    } else if(strcmp(argv[0], "fit_range") == 0) {
         roi range = {.i_det = 0};
         if(argc == 4) {
             range.i_det = strtoul(argv[1], NULL, 10);
@@ -660,26 +684,22 @@ int script_prepare_sim_or_fit(script_session *s) {
         jabs_message(MSG_ERROR, stderr, "Could not make a sample based on model description. This should never happen.\n");
         return -1;
     }
+    if(fit->sim->n_reactions == 0) {
+        fprintf(stderr, "No reactions, adding some automatically. Please be aware there are commands called \"reset reactions\" and \"add reactions\".\n");
+        if(fit->sim->rbs) {
+            sim_reactions_add(fit->sim, fit->sm, REACTION_RBS, fit->jibal->config->cs_rbs,0.0); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
+        }
+        if(fit->sim->erd) {
+            sim_reactions_add(fit->sim, fit->sm, REACTION_ERD, fit->jibal->config->cs_erd, 0.0);
+        }
+    }
+    if(fit->sim->n_reactions == 0) {
+        fprintf(stderr, "No reactions. Nothing to do.\n");
+        return EXIT_FAILURE;
+    }
     jabs_message(MSG_INFO, stderr, "Simplified sample model for simulation:\n");
     sample_print(NULL, fit->sim->sample, TRUE);
 
-    for(size_t i = 0; i < fit->sim->n_reactions; i++) {
-        reaction_free(&fit->sim->reactions[i]);
-    }
-    free(fit->sim->reactions);
-    fit->sim->reactions = NULL;
-    fit->sim->n_reactions = 0;
-    if(fit->sim->rbs) {
-        sim_reactions_add(fit->sim, REACTION_RBS, fit->jibal->config->cs_rbs,0.0); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
-    }
-    if(fit->sim->erd) {
-        sim_reactions_add(fit->sim, REACTION_ERD, fit->jibal->config->cs_erd, 0.0);
-    }
-
-    if(fit->sim->n_reactions == 0) {
-        fprintf(stderr, "No reactions, nothing to do.\n");
-        return -1;
-    }
     jabs_message(MSG_INFO, stderr, "\nReactions:\n");
     reactions_print(stderr, fit->sim->reactions, fit->sim->n_reactions);
 

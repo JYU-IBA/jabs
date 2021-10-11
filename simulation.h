@@ -105,7 +105,9 @@ typedef struct {
 simulation *sim_init();
 void sim_free(simulation *sim);
 sim_calc_params sim_calc_params_defaults(int ds, int fast);
-int sim_reactions_add(simulation *sim, reaction_type type, jibal_cross_section_type cs, double theta); /* Add RBS or ERD reactions automagically */
+int sim_reactions_add(simulation *sim, const sample_model *sm, reaction_type type, jibal_cross_section_type cs, double theta); /* Add RBS or ERD reactions automagically */
+int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, const char *filename);
+void sim_reactions_free(simulation *sim); /* Free reactions and reset the number of reactions to zero */
 int sim_sanity_check(const simulation *sim);
 detector *sim_det(const simulation *sim, size_t i_det);
 int sim_det_add(simulation *sim, detector *det);
