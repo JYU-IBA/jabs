@@ -26,7 +26,7 @@ void script_print_commands(FILE *f) {
 int script_load(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     if(argc == 0) {
-        jabs_message(MSG_INFO, stderr, "Usage: load [script|sample|detector|exp|reaction] [file]\n");
+        jabs_message(MSG_INFO, stderr, "Usage: load [script|sample|det|exp|reaction] [file]\n");
         return -1;
     }
     if(strcmp(argv[0], "script") == 0) {
