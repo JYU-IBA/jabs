@@ -33,7 +33,15 @@ MainWindow::MainWindow(QWidget *parent)
     fixedFont.setPointSize(11);
     ui->msgPlainTextEdit->setFont(fixedFont);
     ui->msgPlainTextEdit->appendPlainText(aboutString);
-    jibal = jibal_init(nullptr);
+    QString config_filename_str;
+#if defined(Q_OS_OSX)
+    config_filename_str = QApplication::applicationDirPath() + "/../Resources/jibal.conf";
+#endif
+    if(config_filename_str.isEmpty() || !QFile::exists(config_filename_str) ) {
+         jibal = jibal_init(NULL);
+    } else {
+         jibal = jibal_init(qPrintable(config_filename_str));
+    }
     ui->msgPlainTextEdit->appendPlainText(jibal_status_string(jibal));
     session = script_session_init(jibal, NULL);
     ui->action_Run->setShortcutContext(Qt::ApplicationShortcut);
