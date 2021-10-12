@@ -21,6 +21,7 @@ set det solid 5msr
 add fit_range 200 700
 add fit_range 1050 1100
 set fit_maxiter 100
+#load det "detector.txt"
 simulate
 save spectra "simulated_out.csv"
 fit calib,fluence,thickness1,thickness2,rough1

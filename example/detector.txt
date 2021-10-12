@@ -1,4 +1,4 @@
-slope = 1.71 keV
+slope = 1.72 keV
 offset = 15.0 keV
 resolution = 14 keV
 theta = 160 deg
