@@ -17,6 +17,8 @@ Simulates RBS spectra rapidly.
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+Please see additional notes regarding copyrights of included open source code at the end of this document.
+
 ## Binary packages
 Some ready-to-use [binary packages](http://users.jyu.fi/~jaakjuli/jabs/binaries/) for Windows and macOS may be available.
 
@@ -69,7 +71,7 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Multilayer foil in front of detector
  - Reading of experimental data
  - Fitting to experimental spectrum (multidimensional non-linear least squares fitting)
- - Single parameter ad-hoc substrate channeling correction
+ - Linear ad-hoc substrate channeling correction
  - Faster (less accurate) mode
  - User defined "molecules" i.e. elements with fixed concentration ratios (e.g. you can fit C in SiO2 without changing Si/O ratio)
  - Arbitrary cross sections (R33 files). Support is very preliminary and results are not to be trusted!
@@ -94,13 +96,11 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Fitting of spectra from different measurements (different beam, fluence etc for each simulation)
 
 ### Known issues
- - R33 files (reactions) cannot be added in interactive mode
  - Occasional crashes when fitting, since some corner cases are not handled properly
  - Detector numbering and usability issues with multidetector mode 
  - Point-by-point profiles are not tested (but should work)
  - Ad-hoc channeling correction is the same for all detectors
  - Zero reaction Q-value assumed (no NRA, only EBS)
- - Command to load R33 files interactively / from scripts not implemented
  - R33 files can not be used if there are multiple detectors with different scattering angle. E.g. if you load 4He(16O, 16O)4He for theta = 160 deg reaction from an R33 file, you can't load another one with theta = 170 deg.
  - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).
  - Dual scattering is benchmarked against SimNRA and is known to produce different results.
@@ -120,3 +120,12 @@ Beam `fluence` can be fitted. Don't try to combine this with `solid` for all det
 Layer thickness can be also fitted using variable `thicknessN` where `N` is number of a layer, numbering starts from 1 (surface). Roughness can be fitted similarly to thickness, use `roughN`. Concentrations can be fitted using `concN_I`, where `N` is the layer and `I` the element.
 
 Example: `jabs --fit_vars=calib,fluence,thickness1 --fit_low=250 ...`
+
+## Open source licenses
+
+This repository contains following open source software, or parts of them:
+ * Code derived from GSL (GNU Scientific Library) examples, e.g. in [fit.c](fit.c). Used under the terms of GPL v3.
+ * QCustomPlot [qcustomplot.cpp](qjabs/qcustomplot.cpp) and [qcustomplot.h](qjabs/qcustomplot.h), Copyright (C) 2011-2021 Emanuel Eichhammer. Used under the terms of GPL v3.
+ * Coordinate rotate routine from MCERD [rotate.c](rotate.c). Copyright Kai Arstila. User under the terms of GPL v2.
+ * Some routines from NetBSD, Copyright (c) 2011 The NetBSD Foundation, Inc. See [win_compat.c](win_compat.c) for the full copyright notice.
+ * Qt6 GUI is distributed under the provisions of LGPL version 3. Qt Toolkit is Copyright (C) 2018 The Qt Company Ltd. and other contributors.
