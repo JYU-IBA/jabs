@@ -26,7 +26,7 @@ configure_file(version.h.in version.h @ONLY)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 find_package(GSL 2.6 REQUIRED)
-find_package(Jibal 0.3.3 REQUIRED)
+find_package(Jibal 0.3.4 REQUIRED)
 
 if(WIN32)
     find_path(GETOPT_INCLUDE_DIR getopt.h)
