@@ -9,7 +9,7 @@ set alpha "0 deg"
 set fluence 2.0e12
 load exp "experimental.dat"
 #sample can be set with one command
-set sample Au 30tfu rough 20tfu n_rough 5 SiO2 6500tfu Si 10000tfu 
+set sample Au 30tfu rough 20tfu n_rough 5 SiO2 6500tfu Si 10000tfu
 #or loaded from a file (tabular data)
 #load sample "sample.txt"
 set det slope 1.72keV
@@ -21,8 +21,8 @@ set det solid 70msr
 add fit_range 200 700
 add fit_range 1050 1100
 set fit_maxiter 100
-#simulate
-fit calib,fluence,thickness1,thickness2,rough1
+simulate
+#fit calib,fluence,thickness1,thickness2,rough1
 save spectra "out.csv"
 save det "det_out.txt"
 #fitted sample can be saved (and loaded back in later!)
