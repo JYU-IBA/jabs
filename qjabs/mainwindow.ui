@@ -93,7 +93,11 @@
           <height>100</height>
          </size>
         </property>
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
        </widget>
+       <widget class="QLineEdit" name="commandLineEdit"/>
       </widget>
      </widget>
     </item>
@@ -105,7 +109,7 @@
      <x>0</x>
      <y>0</y>
      <width>915</width>
-     <height>24</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu_File">
@@ -154,7 +158,7 @@
     <string>Run script</string>
    </property>
    <property name="toolTip">
-    <string>Run script</string>
+    <string>Reset and run script</string>
    </property>
   </action>
   <action name="action_New_File">

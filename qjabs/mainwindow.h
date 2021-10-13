@@ -57,9 +57,13 @@ private slots:
 
     void on_actionAbout_triggered();
 
+    void on_commandLineEdit_returnPressed();
+
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);
+    int runLine(const QString &line, size_t lineno = 0);
+    void plotSession();
     Ui::MainWindow *ui;
     struct jibal *jibal;
     script_session *session;

@@ -21,7 +21,7 @@ MainWindow::MainWindow(QWidget *parent)
     QApplication::setApplicationName("QJaBS");
     setWindowIcon(icon);
     originalPath = QDir::currentPath();
-    ui->splitter->setSizes(QList<int>() << 1 << 3);
+    ui->splitter->setSizes(QList<int>() << 1 << 3 << 1);
     ui->splitter_2->setSizes(QList<int>() << 1 << 2);
 #ifdef WIN32
     QFont fixedFont = QFont("Courier New");
@@ -75,6 +75,79 @@ MainWindow::~MainWindow()
 }
 
 
+int MainWindow::runLine(const QString &line, size_t lineno) {
+    int status = 0;
+    bool plot = FALSE;
+    jabs_message(MSG_INFO, stderr, "jabs> %s\n", qPrintable(line));
+    char **argv = string_to_argv(qPrintable(line));
+    if(!argv) {
+        jabs_message(MSG_ERROR, stderr, "Something went wrong in parsing arguments from %s.\n", qPrintable(line));
+        return -1;
+    }
+    char **a = argv;
+    int argc = 0;
+    while(*a != NULL) {
+        a++;
+        argc++;
+    }
+#ifdef DEBUG
+    for(int i = 0; i < argc; i++) {
+        fprintf(stderr, "args: %i: \"%s\"\n", i, argv[i]);
+    }
+#endif
+    if(argc) {
+        int found = FALSE;
+        for(const struct script_command *c = script_commands; c->name != NULL; c++) {
+            if(strcmp(c->name, argv[0]) == 0) {
+                found = TRUE;
+                if(c->f == NULL) {
+                    status = EXIT_FAILURE;
+                    break;
+                }
+                status = c->f(session, argc - 1, argv + 1);
+                if(status) {
+                    if(lineno) {
+                       jabs_message(MSG_ERROR, stderr, "Line %zu: ", lineno);
+                    }
+                    jabs_message(MSG_ERROR, stderr, "Command \"%s\" failed with status code %i.\n", c->name, status);
+                }
+                if(c->f == script_load || c->f == script_reset) {
+                    free(session->cf->vars);
+                    session->cf->vars = NULL;
+                    jibal_config_file_set_vars(session->cf, script_make_vars(session)); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
+                }
+                if(!lineno && (c->f == script_simulate || c->f == script_fit)) { /* No lineno means interactive. Plot ASAP. */
+                    plotSession();
+                }
+                break;
+            }
+        }
+        if(!found) {
+            if(lineno) {
+                jabs_message(MSG_ERROR, stderr, "Line %zu: ", lineno);
+            }
+            jabs_message(MSG_ERROR, stderr, "Command \"%s\" not recognized.\n", argv[0]);
+            status = EXIT_FAILURE;
+        }
+        free(argv[0]);
+        free(argv);
+    }
+    return status;
+}
+
+void MainWindow::plotSession()
+{
+    if(session && session->fit && session->fit->sim) {
+        ui->plotSpinBox->setMaximum(session->fit->sim->n_det - 1);
+        ui->plotSettingsGroupBox->setVisible(session->fit->sim->n_det > 1);
+        plotSpectrum(ui->plotSpinBox->value());
+        if(firstRun) {
+            ui->widget->resetZoom();
+            firstRun = false;
+        }
+    }
+}
+
 void MainWindow::on_action_Run_triggered()
 {
     if(!session) {
@@ -83,13 +156,12 @@ void MainWindow::on_action_Run_triggered()
     if(firstRun) {
         resetAll();
     } else {
+        ui->msgPlainTextEdit->clear();
         script_reset(session, 0, NULL);
     }
     QString text = ui->plainTextEdit->toPlainText();
     QTextStream stream = QTextStream(&text, QIODevice::ReadOnly);
     size_t lineno = 0;
-    int status = 0;
-    int exit_session = FALSE;
     while(!stream.atEnd()) {
         QString line = stream.readLine();
         lineno++;
@@ -100,65 +172,10 @@ void MainWindow::on_action_Run_triggered()
                 continue;
         if(line.at(0) == '#')
             continue;
-
-        char **argv = string_to_argv(qPrintable(line));
-        if(!argv) {
-            jabs_message(MSG_ERROR, stderr, "Something went wrong in parsing arguments from %s.\n", qPrintable(line));
-            break;
-        }
-        char **a = argv;
-        int argc = 0;
-        while(*a != NULL) {
-            a++;
-            argc++;
-        }
-#ifdef DEBUG
-        for(int i = 0; i < argc; i++) {
-            fprintf(stderr, "args: %i: \"%s\"\n", i, argv[i]);
-        }
-#endif
-        if(argc) {
-            int found = FALSE;
-            for(const struct script_command *c = script_commands; c->name != NULL; c++) {
-                if(strcmp(c->name, argv[0]) == 0) {
-                    found = TRUE;
-                    if(c->f == NULL) {
-                        exit_session = TRUE;
-                        break;
-                    }
-                    status = c->f(session, argc - 1, argv + 1);
-                    if(status) {
-                        jabs_message(MSG_ERROR, stderr, "Command \"%s\" failed with status code %i on line %zu, aborting.\n", c->name, status, lineno);
-                        exit_session = TRUE;
-                    }
-                    if(c->f == script_load || c->f == script_reset) {
-                        free(session->cf->vars);
-                        session->cf->vars = NULL;
-                        jibal_config_file_set_vars(session->cf, script_make_vars(session)); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
-                    }
-                    break;
-                }
-            }
-            if(!found) {
-                    jabs_message(MSG_ERROR, stderr, "Command \"%s\" not recognized on line %zu\n", argv[0], lineno);
-                    exit_session = TRUE;
-            }
-            free(argv[0]);
-            free(argv);
-        }
-
-        if(exit_session)
-            break;
+        if(runLine(line, lineno))
+            return;
     }
-    if(session && session->fit && session->fit->sim) {
-        ui->plotSpinBox->setMaximum(session->fit->sim->n_det - 1);
-        ui->plotSettingsGroupBox->setVisible(session->fit->sim->n_det > 1);
-        plotSpectrum(ui->plotSpinBox->value());
-        if(firstRun) {
-            ui->widget->resetZoom();
-            firstRun = false;
-        }
-    }
+    plotSession();
 }
 
 
@@ -347,3 +364,11 @@ void MainWindow::on_actionAbout_triggered()
 {
     QMessageBox::about(this, tr("QJaBS"), aboutString);
 }
+
+void MainWindow::on_commandLineEdit_returnPressed()
+{
+    if(runLine(ui->commandLineEdit->text()) == EXIT_SUCCESS) {
+            ui->commandLineEdit->clear();
+    }
+}
+
