@@ -156,6 +156,7 @@ void MainWindow::on_action_Run_triggered()
     if(firstRun) {
         resetAll();
     } else {
+        ui->widget->clearAll();
         ui->msgPlainTextEdit->clear();
         script_reset(session, 0, NULL);
     }

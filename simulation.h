@@ -42,7 +42,7 @@ typedef struct {
 } sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
 
 typedef struct {
-    reaction *reactions;
+    reaction **reactions;
     size_t n_reactions;
     detector **det; /* Array of n_det detector pointers */
     size_t n_det;
@@ -59,6 +59,8 @@ typedef struct {
     sim_calc_params params;
     int erd; /* Add ERD reactions */
     int rbs; /* Add RBS reactions */
+    jibal_cross_section_type cs_rbs;
+    jibal_cross_section_type cs_erd;
 } simulation;
 
 typedef struct sim_reaction {
@@ -90,7 +92,6 @@ typedef struct {
     const sample *sample; /* Note that simulate() can be passed a sample explicitly, but in most cases it should be this. Also this should be exactly the same as sim->sample. */
     size_t n_reactions;
     jibal_gsto *gsto;
-    const jibal_config *jibal_config;
     gsto_stopping_type stopping_type;
     size_t n_channels; /* in histograms */
     gsl_histogram *histo_sum;
@@ -102,10 +103,12 @@ typedef struct {
 
 
 #include "sample.h"
-simulation *sim_init();
+simulation *sim_init(jibal *jibal);
 void sim_free(simulation *sim);
 sim_calc_params sim_calc_params_defaults(int ds, int fast);
-int sim_reactions_add(simulation *sim, const sample_model *sm, reaction_type type, jibal_cross_section_type cs, double theta); /* Add RBS or ERD reactions automagically */
+jibal_cross_section_type sim_cs(const simulation *sim, reaction_type type);
+int sim_reactions_add_reaction(simulation *sim, reaction *r);
+int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jibal_cross_section_type cs); /* Add RBS or ERD reactions automagically */
 int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, const char *filename);
 void sim_reactions_free(simulation *sim); /* Free reactions and reset the number of reactions to zero */
 int sim_sanity_check(const simulation *sim);

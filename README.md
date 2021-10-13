@@ -101,7 +101,6 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Point-by-point profiles are not tested (but should work)
  - Ad-hoc channeling correction is the same for all detectors
  - Zero reaction Q-value assumed (no NRA, only EBS)
- - R33 files can not be used if there are multiple detectors with different scattering angle. E.g. if you load 4He(16O, 16O)4He for theta = 160 deg reaction from an R33 file, you can't load another one with theta = 170 deg.
  - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).
  - Dual scattering is benchmarked against SimNRA and is known to produce different results.
  - Adding detector related fit variables will add those for all detectors 

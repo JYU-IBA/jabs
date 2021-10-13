@@ -18,16 +18,24 @@
 #include "message.h"
 
 
-void reactions_print(FILE *f, const reaction *reactions, size_t n_reactions) {
+void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) {
     if(!reactions)
         return;
+    jabs_message(MSG_INFO, f, "Reactions (%zu):\n", n_reactions);
     for(size_t i = 0; i < n_reactions; i++) {
-        const reaction *r = &reactions[i];
-        jabs_message(MSG_INFO, f, "Reaction %3zu: %s with %5s (reaction product %s).", i + 1, reaction_name(r), r->target->name, r->product->name);
-        if(r->type == REACTION_FILE) {
-            jabs_message(MSG_INFO, f, " CS data from file \"%s\".", r->filename);
+        const reaction *r = reactions[i];
+        if(!r) {
+#ifdef DEBUG
+            fprintf(stderr, "Reaction i=%zu (%zu) is NULL\n", i, i + 1);
+#endif
+            continue;
         }
-        jabs_message(MSG_INFO, f, "\n");
+        jabs_message(MSG_INFO, f, "%3zu: %4s with %5s (reaction product %s).", i + 1, reaction_name(r), r->target->name, r->product->name);
+        if(r->type == REACTION_FILE) {
+            jabs_message(MSG_INFO, f, " Incident = %s, Theta = %g deg, E_low = %g keV, E_high = %g keV. Data from file \"%s\".\n", r->incident->name, r->theta/C_DEG, r->cs_table[0].E/C_KEV, r->cs_table[r->n_cs_table-1].E/C_KEV, r->filename);
+        } else {
+            jabs_message(MSG_INFO, f, " %s cross sections.\n", jibal_cs_types[r->cs]);
+        }
     }
 }
 
@@ -48,6 +56,21 @@ const char *reaction_name(const reaction *r) {
         default:
             return "???";
     }
+}
+
+reaction_type reaction_type_from_string(const char *s) {
+    if(!s)
+        return REACTION_NONE;
+    if(strcmp(s, "RBS") == 0)
+        return REACTION_RBS;
+    if(strcmp(s, "ERD") == 0)
+        return REACTION_ERD;
+    if(strcmp(s, "FILE") == 0)
+        return REACTION_FILE;
+#ifdef DEBUG
+    fprintf(stderr, "Reaction type string %s is not valid.\n", s);
+#endif
+    return REACTION_NONE;
 }
 
 reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs) {
@@ -101,6 +124,8 @@ void reaction_free(reaction *r) {
 }
 
 int reaction_is_same(const reaction *r1, const reaction *r2) {
+    if(!r1 || !r2)
+        return FALSE;
     if(r1->incident != r2->incident)
         return FALSE;
     if(r1->target != r2->target)

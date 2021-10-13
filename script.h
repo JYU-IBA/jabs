@@ -53,6 +53,7 @@ int script_reset(script_session *s, int argc, char * const *argv);
 int script_simulate(script_session *s, int argc, char * const *argv);
 int script_fit(script_session *s, int argc, char * const *argv);
 int script_save(script_session *s, int argc, char * const *argv);
+int script_remove(script_session *s, int argc, char * const *argv);
 int script_roi(script_session *s, int argc, char * const *argv);
 int script_process(script_session *s, const char *filename);
 int script_prepare_sim_or_fit(script_session *s);
@@ -68,6 +69,7 @@ static const struct script_command script_commands[] = {
         {"fit",     &script_fit,            "Do a fit."},
         {"roi",     &script_roi,            "Show information from a region of interest."},
         {"save",    &script_save,           "Save something."},
+        {"remove",  &script_remove,         "Remove something"},
         {"exit", NULL, "Exit."},
         {"quit", NULL, NULL},
         {NULL, NULL, NULL}

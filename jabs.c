@@ -171,7 +171,7 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
         const double E_mean = (E_front + E_back) / 2.0;
         assert(sim_r->cross_section);
         double sigma = sim_r->cross_section(sim_r, E_mean);
-        return sigma*c*sample->ranges[d_halfdepth.i].yield;
+        return sigma * c * sample->ranges[d_halfdepth.i].yield;
     } else {
         depth d;
         d.i = d_after->i;
@@ -284,7 +284,12 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
 #endif
     depth d_before = depth_start;
     for(size_t i = 0; i < ws->n_reactions; i++) {
+#ifdef DEBUG
+        fprintf(stderr, "Initializing reaction %zu\n", i);
+#endif
         sim_reaction *r = &ws->reactions[i];
+        if(!r->r)
+            continue;
         r->last_brick = 0;
         r->stop = FALSE;
         r->theta = scatter_theta;
@@ -459,7 +464,9 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
             fail = TRUE;
         }
         for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-            const reaction *r = &sim->reactions[i_reaction];
+            const reaction *r = sim->reactions[i_reaction];
+            if(!r)
+                continue;
             if (!jibal_gsto_auto_assign(gsto, r->product->Z, Z2)) {
                 fprintf(stderr, "Can not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
                 fail = TRUE;
@@ -504,6 +511,8 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
     for(size_t i = 0; i < ws->n_channels; i++) {
         double sum = 0.0;
         for (size_t j = 0; j < ws->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
+            if(!ws->reactions[j].r)
+                continue;
             if(i < ws->reactions[j].histo->n)
                 sum += ws->reactions[j].histo->bin[i];
         }

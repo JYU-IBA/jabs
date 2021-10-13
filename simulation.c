@@ -19,9 +19,9 @@
 #include "spectrum.h"
 #include "message.h"
 
-simulation *sim_init(jibal_isotope *isotopes) {
+simulation *sim_init(jibal *jibal) {
     simulation *sim = malloc(sizeof(simulation));
-    sim->beam_isotope = jibal_isotope_find(isotopes, NULL, 2, 4);
+    sim->beam_isotope = jibal_isotope_find(jibal->isotopes, NULL, 2, 4);
     sim->sample_theta = ALPHA; /* These defaults are for IBM geometry */
     sim->sample_phi = 0.0;
     sim->fluence = FLUENCE;
@@ -38,6 +38,8 @@ simulation *sim_init(jibal_isotope *isotopes) {
     sim->params = sim_calc_params_defaults(FALSE, FALSE);
     sim->rbs = TRUE;
     sim->erd = TRUE;
+    sim->cs_rbs =  jibal->config->cs_rbs;
+    sim->cs_erd =  jibal->config->cs_erd;
     sim_det_add(sim, detector_default(NULL));
     return sim;
 }
@@ -53,7 +55,7 @@ void sim_free(simulation *sim) {
         free(sim->det);
     }
     for(size_t i = 0; i < sim->n_reactions; i++) {
-        reaction_free(&sim->reactions[i]);
+        reaction_free(sim->reactions[i]);
     }
     free(sim->reactions);
     free(sim);
@@ -85,37 +87,43 @@ sim_calc_params sim_calc_params_defaults(int ds, int fast) {
     return p;
 }
 
-int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, const char *filename) {
-    r33_file *rfile = r33_file_read(filename);
-    if(!rfile) {
-        return -1;
-    }
-    reaction *reaction_from_file = r33_file_to_reaction(jibal_isotopes, rfile);
-    if(!reaction_from_file) {
-        r33_file_free(rfile);
-        return -1;
-    }
-    fprintf(stderr, "File: %s has a reaction with %s -> %s, product %s, theta %g deg\n", filename,
-            reaction_from_file->incident->name, reaction_from_file->target->name, reaction_from_file->product->name, reaction_from_file->theta/C_DEG);
-    for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-        reaction *r = &sim->reactions[i_reaction];
-        if(reaction_is_same(r, reaction_from_file)) {
-            jabs_message(MSG_INFO, stderr, "Replacing reaction %zu (%s with %s).\n", i_reaction, reaction_name(r), r->target->name);
-            reaction_from_file->cs = r->cs; /* Adopt fallback cross-section from the reaction we are replacing */
-            reaction_free(r);
-            *r = *reaction_from_file;
-            return EXIT_SUCCESS;
-        }
-    }
-    /* Did not found a reaction to replace, just adding it. */
+jibal_cross_section_type sim_cs(const simulation *sim, const reaction_type type) {
+    if(type == REACTION_RBS)
+        return sim->cs_rbs;
+    if(type == REACTION_ERD)
+        return sim->cs_erd;
+    return JIBAL_CS_NONE;
+}
+
+int sim_reactions_add_reaction(simulation *sim, reaction *r) {
+    if(!sim || !r)
+        return EXIT_FAILURE;
     sim->n_reactions++;
-    sim->reactions = realloc(sim->reactions, sim->n_reactions*sizeof(reaction));
-    sim->reactions[sim->n_reactions - 1] = *reaction_from_file;
-    jabs_message(MSG_INFO, stderr, "Added reaction %zu.\n", sim->n_reactions - 1);
+    sim->reactions = realloc(sim->reactions, sim->n_reactions*sizeof(reaction *));
+    sim->reactions[sim->n_reactions - 1] = r;
+    jabs_message(MSG_INFO, stderr, "Added reaction %zu.\n", sim->n_reactions);
     return EXIT_SUCCESS;
 }
 
-int sim_reactions_add(simulation *sim, const sample_model *sm, reaction_type type, jibal_cross_section_type cs, double theta) { /* Note that sim->ion needs to be set! */
+int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, const char *filename) {
+    r33_file *rfile = r33_file_read(filename);
+    if(!rfile) {
+        jabs_message(MSG_ERROR, stderr, "Could not load R33 from file \"%s\".\n", filename);
+        return EXIT_FAILURE;
+    }
+    reaction *r = r33_file_to_reaction(jibal_isotopes, rfile);
+    r33_file_free(rfile);
+    if(!r) {
+        jabs_message(MSG_ERROR, stderr, "Could not convert R33 file to a reaction!\n");
+        return EXIT_FAILURE;
+    }
+    jabs_message(MSG_INFO, stderr, "File: %s has a reaction with %s -> %s, product %s, theta %g deg\n",
+            filename, r->incident->name, r->target->name, r->product->name, r->theta/C_DEG);
+    sim_reactions_add_reaction(sim, r);
+    return EXIT_SUCCESS;
+}
+
+int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jibal_cross_section_type cs) { /* Note that sim->ion needs to be set! */
     if(!sim || !sim->beam_isotope || !sm) {
         return -1;
     }
@@ -126,27 +134,13 @@ int sim_reactions_add(simulation *sim, const sample_model *sm, reaction_type typ
     if(!sample) {
         return -1;
     }
-#if 0
-    if(type == REACTION_ERD && theta > C_PI/2.0) {
-        return 0;
-    }
-#endif
-    size_t n_reactions = sim->n_reactions + sample->n_isotopes; /* New maximum */
-    sim->reactions = realloc(sim->reactions, n_reactions*sizeof(reaction));
-    if(!sim->reactions) {
-        sim->n_reactions = 0;
-        sample_free(sample);
-        return -1;
-    }
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         reaction *r_new = reaction_make(sim->beam_isotope, sample->isotopes[i], type, cs);
         if (!r_new) {
             jabs_message(MSG_ERROR, stderr, "Failed to make an %s reaction with isotope %zu (%s)\n", jibal_cross_section_name(cs), i, sample->isotopes[i]->name);
             continue;
         }
-        sim->reactions[sim->n_reactions] = *r_new;
-        free(r_new);
-        sim->n_reactions++;
+        sim_reactions_add_reaction(sim, r_new);
     };
     sample_free(sample);
     return 0;
@@ -156,7 +150,7 @@ void sim_reactions_free(simulation *sim) {
     if(!sim)
         return;
     for(size_t i = 0; i < sim->n_reactions; i++) {
-        reaction_free(&sim->reactions[i]);
+        reaction_free(sim->reactions[i]);
     }
     free(sim->reactions);
     sim->reactions = NULL;
@@ -245,12 +239,11 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->det = det;
     ws->sample = sim->sample;
     ws->params = sim->params;
-    ws->n_reactions = sim->n_reactions;
     ws->gsto = jibal->gsto;
-    ws->jibal_config = jibal->config;
     ws->isotopes = jibal->isotopes;
+    ws->n_reactions = 0; /* Will be incremented later */
 
-    if(ws->n_reactions == 0) {
+    if(sim->n_reactions == 0) {
         jabs_message(MSG_ERROR, stderr,  "No reactions! Will not initialize workspace if there is nothing to simulate.\n");
         free(ws);
         return NULL;
@@ -284,11 +277,13 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     spectrum_set_calibration(ws->histo_sum, ws->det); /* Calibration can be set however already */
     gsl_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
 
-    ws->reactions = calloc(ws->n_reactions, sizeof (sim_reaction));
-    for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
-        sim_reaction *r = &ws->reactions[i_reaction];
-        r->r = &sim->reactions[i_reaction];
-        assert(r->r);
+    ws->reactions = calloc(sim->n_reactions, sizeof (sim_reaction));
+    for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
+        sim_reaction *r = &ws->reactions[ws->n_reactions];
+        r->r = sim->reactions[i_reaction];
+        if(!r->r) { /* No reaction, this will not be valid */
+            continue;
+        }
         assert(r->r->product);
         ion *p = &r->p;
         ion_reset(p);
@@ -339,6 +334,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
             p->nucl_stop_isotopes = 0;
             r->cross_section = NULL;
         }
+        ws->n_reactions++;
     }
     return ws;
 }
@@ -423,6 +419,8 @@ void simulation_print(FILE *f, const simulation *sim) {
 void convolute_bricks(sim_workspace *ws) {
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
+        if(!r)
+            continue;
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
@@ -430,7 +428,10 @@ void convolute_bricks(sim_workspace *ws) {
     }
 }
 
-void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) { /* Calculate variables for Rutherford (and Andersen) cross sections. This is done for all reactions. */
+void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
+    /* Calculate variables for Rutherford (and Andersen) cross sections. This is done for all reactions, even if they are not RBS or ERD reactions! */
+    if(!sim_r || !sim_r->r)
+        return;
     const jibal_isotope *incident = sim_r->r->incident;
     const jibal_isotope *target = sim_r->r->target;
     const jibal_isotope *product = sim_r->r->product;
@@ -509,11 +510,13 @@ double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E)
     const struct reaction_point *t = r->cs_table;
     hi = r->n_cs_table - 1;
     lo = 0;
+#ifdef REACTIONS_FALL_BACK
     if(E < t[lo].E || E > t[hi].E) {
         return sim_reaction_cross_section_rutherford(sim_r, E); /* Fall back quietly to analytical formulae outside tabulated values */
     }
-    if(sim_r->theta != sim_r->r->theta) {
-#ifdef DEBUG_VERBOSE /* This happens with DS */
+#endif
+    if(fabs(sim_r->theta - sim_r->r->theta) > 0.01 * C_DEG) {
+#ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction theta %g deg different from one in the file: %g deg\n", sim_r->theta/C_DEG, sim_r->r->theta/C_DEG);
 #endif
         return sim_reaction_cross_section_rutherford(sim_r, E); /* Fall back quietly if reaction theta has been changed from original scattering angle (in the file) */
