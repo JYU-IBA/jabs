@@ -24,6 +24,8 @@
 typedef struct sample_range {
     double x;
     roughness rough;
+    double yield;
+    double bragg;
 } sample_range;
 
 typedef struct depth {
@@ -67,6 +69,7 @@ void sample_model_free(sample_model *sm);
 sample *sample_from_sample_model(const sample_model *sm);
 int sample_model_print(const char *filename, const sample_model *sm);
 size_t sample_model_number_of_rough_ranges(const sample_model *sm);
+size_t sample_model_number_of_ranges_with_non_unity_yield_or_bragg(const sample_model *sm);
 
 depth depth_seek(const sample *sample, double x);
 inline double depth_diff(const depth a, const depth b) {

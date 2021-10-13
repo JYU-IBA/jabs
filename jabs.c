@@ -42,7 +42,7 @@ double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample,
         }
     }
     //assert(S1 > 0.0);
-    return S1;
+    return S1 * sample->ranges[depth.i].bragg;
 }
 
 depth next_crossing(const ion *incident, const sample *sample, const depth *d_from) {
@@ -171,7 +171,7 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
         const double E_mean = (E_front + E_back) / 2.0;
         assert(sim_r->cross_section);
         double sigma = sim_r->cross_section(sim_r, E_mean);
-        return sigma*c;
+        return sigma*c*sample->ranges[d_halfdepth.i].yield;
     } else {
         depth d;
         d.i = d_after->i;
@@ -195,7 +195,7 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
             }
             sum += sigma * c;
         }
-       return sum/(ws->params.cs_n_steps*1.0);
+       return sample->ranges[d.i].yield * sum/(ws->params.cs_n_steps*1.0);
    }
     return 0.0;
 }

@@ -290,6 +290,7 @@ int sample_model_print(const char *filename, const sample_model *sm) {
         return EXIT_FAILURE;
     }
     size_t n_rl = sample_model_number_of_rough_ranges(sm);
+    size_t n_yield_bragg = sample_model_number_of_ranges_with_non_unity_yield_or_bragg(sm);
     switch(sm->type) {
         case SAMPLE_MODEL_NONE:
             jabs_message(MSG_INFO, f, "Sample model is none.\n"); /* Not an error as such. No output (to f) is created. */
@@ -306,6 +307,10 @@ int sample_model_print(const char *filename, const sample_model *sm) {
         jabs_message(MSG_INFO, f, "        rough");
         jabs_message(MSG_INFO, f, " n_rough");
     }
+    if(n_yield_bragg) {
+        jabs_message(MSG_INFO, f, "  yield");
+        jabs_message(MSG_INFO, f, "  bragg");
+    }
     for (size_t i = 0; i < sm->n_materials; i++) {
         jabs_message(MSG_INFO, f, " %8s", sm->materials[i]->name);
     }
@@ -315,6 +320,10 @@ int sample_model_print(const char *filename, const sample_model *sm) {
         if(n_rl) {
             jabs_message(MSG_INFO, f, " %12.3lf", sm->ranges[i].rough.x / C_TFU);
             jabs_message(MSG_INFO, f, " %7zu", sm->ranges[i].rough.n);
+        }
+        if(n_yield_bragg) {
+            jabs_message(MSG_INFO, f, " %5.4lf", sm->ranges[i].yield);
+            jabs_message(MSG_INFO, f, " %5.4lf", sm->ranges[i].bragg);
         }
         for (size_t j = 0; j < sm->n_materials; j++) {
             jabs_message(MSG_INFO, f, " %8.4lf", *sample_model_conc_bin(sm, i, j) * 100.0);
@@ -331,6 +340,17 @@ size_t sample_model_number_of_rough_ranges(const sample_model *sm) {
     size_t n = 0;
     for(size_t i = 0; i < sm->n_ranges; i++) {
         if(sm->ranges[i].rough.model != ROUGHNESS_NONE)
+            n++;
+    }
+    return n;
+}
+
+size_t sample_model_number_of_ranges_with_non_unity_yield_or_bragg(const sample_model *sm) { /* Used to determine if "yield" and "bragg" fields need to be output by sample_model_print() */
+    if(!sm)
+        return 0;
+    size_t n = 0;
+    for(size_t i = 0; i < sm->n_ranges; i++) {
+        if(sm->ranges[i].yield != 1.0 || sm->ranges[i].bragg != 1.0 )
             n++;
     }
     return n;
@@ -355,7 +375,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
     size_t line_size = 0;
     size_t lineno = 0;
 
-    size_t i_depth = 0, i_rough = 0, i_nrough = 0;
+    size_t i_depth = 0, i_rough = 0, i_nrough = 0, i_bragg = 0, i_yield = 0;
 
     int headers = 1;
 
@@ -373,17 +393,18 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 continue;
             }
             if(headers) { /* Headers */
-                if(strncmp(col, "rough", 5) == 0) {
+                if(strncmp(col, "bragg", 5) == 0) {
+                    i_bragg = n;
+                } else if(strncmp(col, "yield", 5) == 0) {
+                    i_yield = n;
+                } else if(strncmp(col, "rough", 5) == 0) {
                     i_rough = n;
-                }
-                else if(strncmp(col, "n_rough", 7) == 0) {
+                } else if(strncmp(col, "n_rough", 7) == 0) {
                     i_nrough = n;
-                }
-                else if(strncmp(col, "thick", 5) == 0) {
+                } else if(strncmp(col, "thick", 5) == 0) {
                     i_depth = n;
                     sm->type = SAMPLE_MODEL_LAYERED;
-                }
-                else if(strncmp(col, "depth", 5) == 0) {
+                } else if(strncmp(col, "depth", 5) == 0) {
                     i_depth = n;
                     sm->type = SAMPLE_MODEL_POINT_BY_POINT;
                 } else {
@@ -402,10 +423,13 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 sm->ranges = realloc(sm->ranges, sizeof(sample_range) * (sm->n_ranges + 1));
                 sm->cbins = realloc(sm->cbins, sizeof(double) * (sm->n_ranges + 1) * sm->n_materials);
                 assert(sm->cbins && sm->ranges);
-                sm->ranges[sm->n_ranges].x = 0.0;
-                sm->ranges[sm->n_ranges].rough.x = 0.0;
-                sm->ranges[sm->n_ranges].rough.model = ROUGHNESS_NONE;
-                sm->ranges[sm->n_ranges].rough.n = 0;
+                sample_range *r = &sm->ranges[sm->n_ranges];
+                r->x = 0.0;
+                r->yield = 1.0;
+                r->bragg = 1.0;
+                r->rough.x = 0.0;
+                r->rough.model = ROUGHNESS_NONE;
+                r->rough.n = 0;
                 sm->n_ranges++;
 #ifdef DEBUG
                 fprintf(stderr, "Sample from file: NEW POINT, n = %zu, n_ranges = %zu, n_materials=%zu\n", n, sm->n_ranges, sm->n_materials);
@@ -419,6 +443,10 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
             if(n == i_depth) {
                 r->x += x*C_TFU; /* Will be corrected later in case of a layer model*/
                 /* TODO: for p by p profile, check depth monotonicity */
+            } else if (n == i_bragg) {
+                r->bragg = x;
+            } else if (n == i_yield) {
+                r->yield = x;
             } else if (n == i_rough) {
                 r->rough.x = x*C_TFU;
             } else if (n == i_nrough) {
@@ -499,6 +527,12 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const 
         } else if(sm->n_ranges && strcmp(argv[0], "n_rough") == 0) {
                 sample_range *range = &sm->ranges[sm->n_ranges - 1];
                 range->rough.n = strtoul(argv[1], NULL, 10);
+        } else if(sm->n_ranges && strcmp(argv[0], "yield") == 0) {
+                sample_range *range = &sm->ranges[sm->n_ranges - 1];
+                range->yield = strtod(argv[1], NULL);
+        } else if(sm->n_ranges && strcmp(argv[0], "bragg") == 0) {
+                sample_range *range = &sm->ranges[sm->n_ranges - 1];
+                range->bragg = strtod(argv[1], NULL);
         } else {
             sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, argv[0]);
             if(!sm->materials[sm->n_ranges]) {
@@ -512,6 +546,8 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const 
 #endif
             sample_range *range = &sm->ranges[sm->n_ranges];
             range->x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]);
+            range->bragg = 1.0;
+            range->yield = 1.0;
             range->rough.x = 0.0;
             range->rough.model = ROUGHNESS_NONE;
             range->rough.n = 0;
