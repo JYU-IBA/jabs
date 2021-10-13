@@ -78,6 +78,7 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Weighting of cross-sections by straggling
  - Dual scattering model (although it needs improvements before it is usable)
  - Simultaneous multi-detector simulation and fitting.
+ - Stopping corrections can be supplied by user (Bragg correction) for a specific layer
 
 ### Not (yet) implemented, but planned
  - Support for more input and output data formats (CSV, IDF, ...)
@@ -85,7 +86,6 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Multiple scattering (small angle)
  - Kinematic (geometric) broadening
  - Simulation of pile-up and dead time
- - Stopping corrections supplied by user (Bragg correction etc)
  - Non-linear detector response
  - Simulation of time-of-flight spectra
  - Publication quality plotting
