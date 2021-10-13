@@ -3,7 +3,8 @@
 *plots/*
 tests/
 .idea/
-.tmp/
+tmp/
 *.swp
 *.dmg
-TODO.txt
+*.txt
+*.csv
