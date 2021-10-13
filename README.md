@@ -128,3 +128,4 @@ This repository contains following open source software, or parts of them:
  * Coordinate rotate routine from MCERD [rotate.c](rotate.c). Copyright Kai Arstila. User under the terms of GPL v2.
  * Some routines from NetBSD, Copyright (c) 2011 The NetBSD Foundation, Inc. See [win_compat.c](win_compat.c) for the full copyright notice.
  * Qt6 GUI is distributed under the provisions of LGPL version 3. Qt Toolkit is Copyright (C) 2018 The Qt Company Ltd. and other contributors.
+ * Material Design [icons](qjabs/icons) licensed under [Apache 2.0 license](https://www.apache.org/licenses/LICENSE-2.0.html).
