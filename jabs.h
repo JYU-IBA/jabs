@@ -25,7 +25,6 @@ double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample,
 depth next_crossing(const ion *incident, const sample *sample, const depth *d_from);
 depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, struct depth depth, double step);
 void simulate(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample);
-int process_reaction_files(simulation *sim, const jibal_isotope *jibal_isotopes, char * const *reaction_filenames, size_t n_reaction_filenames);
 int assign_stopping(jibal_gsto *gsto, const simulation *sim);
 int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histogram *exp);
 void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, const char *fit_vars); /* fit_vars is a comma separated list of variables to fit */

@@ -433,33 +433,6 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
     convolute_bricks(ws);
 }
 
-int process_reaction_files(simulation *sim, const jibal_isotope *jibal_isotopes, char * const *reaction_filenames, size_t n_reaction_filenames) {
-    for(size_t i = 0; i < n_reaction_filenames; i++) {
-        r33_file *rfile = r33_file_read(reaction_filenames[i]);
-        if(!rfile) {
-            return -1;
-        }
-        reaction *reaction_from_file = r33_file_to_reaction(jibal_isotopes, rfile);
-        if(!reaction_from_file) {
-            r33_file_free(rfile);
-            return -1;
-        }
-        fprintf(stderr, "File: %s has a reaction with %s -> %s, product %s, theta %g deg\n", reaction_filenames[i],
-                reaction_from_file->incident->name, reaction_from_file->target->name, reaction_from_file->product->name, reaction_from_file->theta/C_DEG);
-        for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-            reaction *r = &sim->reactions[i_reaction];
-            if(reaction_is_same(r, reaction_from_file)) {
-                fprintf(stderr, "Replacing reaction %zu (%s with %s).\n", i_reaction, reaction_name(r), r->target->name);
-                reaction_from_file->cs = r->cs; /* Adopt fallback cross-section from the reaction we are replacing */
-                reaction_free(r);
-                *r = *reaction_from_file;
-                break;
-            }
-        }
-    }
-    return 0;
-}
-
 int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
     /* TODO: simplify this by finding all possible Z1, Z2 combinations, considering target elements, beam and reactions before attempting to assign stopping/straggling (GSTO) */
     struct sample *sample = sim->sample;
