@@ -17,9 +17,9 @@ void exit_calculator(double detector_theta, double detector_phi, double sample_t
     ion_rotate(&ion, -sample_theta, -sample_phi); /* Unrotate sample tilt */
     ion_rotate(&ion, detector_theta, detector_phi); /* Rotate to detector */
     theta_scatt = ion.theta; /* There is a more direct way to calculate this (hint detector_theta), but we'll double check it :) */
-    fprintf(stdout, "Alpha = %.3lf deg.\n", alpha/C_DEG);
-    fprintf(stdout, "Beta = %.3lf deg.\n", beta/C_DEG);
-    fprintf(stdout, "Theta = %.3lf deg.\n", theta_scatt/C_DEG);
+    fprintf(stdout, "alpha = %.3lf deg\n", alpha/C_DEG);
+    fprintf(stdout, "beta = %.3lf deg\n", beta/C_DEG);
+    fprintf(stdout, "theta = %.3lf deg\n", theta_scatt/C_DEG);
 }
 
 void ds_test(ion *ion, double detector_theta, double detector_phi, double sample_theta, double sample_phi) {
@@ -85,11 +85,10 @@ int main(int argc, char **argv) {
     if(argc >= 4) {
         detector_phi = jibal_get_val(jibal->units, UNIT_TYPE_ANGLE, argv[3]);
     }
-    fprintf(stderr, "Input values: sample_theta=%.3lf deg, detector_theta=%.3lf deg, detector_phi=%.3lf deg\n", sample_theta/C_DEG, detector_theta/C_DEG, detector_phi/C_DEG);
+    fprintf(stderr, "sample_theta = %.3lf deg\ndetector_theta = %.3lf deg\ndetector_phi = %.3lf\n", sample_theta/C_DEG, detector_theta/C_DEG, detector_phi/C_DEG);
 
-    //exit_calculator(detector_theta, detector_phi, sample_theta, sample_phi);
-    fprintf(stdout, "\n");
-
+    exit_calculator(detector_theta, detector_phi, sample_theta, sample_phi);
+    return 0;
     ion ion;
     ion_reset(&ion);
     ion.E = 2.0*C_MEV;
