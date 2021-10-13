@@ -209,7 +209,7 @@ void MainWindow::plotSpectrum(size_t i_det)
         for(int i = 0; i < session->fit->sim->n_reactions; ++i) {
             sim_reaction *r = &ws->reactions[i];
             sim_reaction *r_next = NULL;
-            if(i+1 < session->fit->sim->n_reactions) {
+            if(i+1 < ws->n_reactions) {
                 r_next = &ws->reactions[i+1];
             }
             if(!r)

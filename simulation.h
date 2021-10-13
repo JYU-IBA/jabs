@@ -82,6 +82,7 @@ typedef struct sim_reaction {
     double cs_constant; /* Non-energy dependent Rutherford cross section terms for RBS or ERD */
     double r_VE_factor; /* Andersen correction factor r_VE = this / E_cm */
     double r_VE_factor2;
+    double E_max;
 } sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
 
 

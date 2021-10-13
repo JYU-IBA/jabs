@@ -14,6 +14,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include "defaults.h"
 #include "reaction.h"
 #include "message.h"
 
@@ -102,6 +103,7 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     r->filename = NULL;
     r->cs_table = NULL;
     r->n_cs_table = 0;
+    r->E_max = E_MAX;
     switch(type) {
         case REACTION_ERD:
             r->product = target;

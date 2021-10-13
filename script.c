@@ -257,6 +257,10 @@ int script_add(script_session *s, int argc, char * const *argv) {
             return EXIT_FAILURE;
         }
         reaction *r = reaction_make(fit_data->sim->beam_isotope, target, type, sim_cs(fit_data->sim, type));
+        if(argc > 3) {
+            double E_max = jibal_get_val(fit_data->jibal->units, 'E', argv[3]);
+            r->E_max = E_max;
+        }
         return sim_reactions_add_reaction(fit_data->sim, r);
     } else if(strcmp(argv[0], "reactions") == 0) {
         if(!fit_data->sm) {

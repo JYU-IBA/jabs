@@ -22,7 +22,9 @@ add fit_range 200 700
 add fit_range 1050 1100
 set fit_maxiter 100
 #load det "detector.txt"
-#add reactions
+add reactions
+remove reaction RBS 16O
+add reaction RBS 16O
 simulate
 save spectra "simulated_out.csv"
 fit calib,fluence,thickness1,thickness2,rough1

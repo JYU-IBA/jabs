@@ -288,6 +288,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         ion *p = &r->p;
         ion_reset(p);
         r->max_depth = 0.0;
+        r->E_max = r->r->E_max;
         r->i_isotope = ws->sample->n_isotopes; /* Intentionally not valid */
         for(size_t i_isotope = 0; i_isotope < ws->sample->n_isotopes; i_isotope++) {
             if(ws->sample->isotopes[i_isotope] == r->r->target) {
@@ -490,6 +491,8 @@ double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E
 #ifdef CROSS_SECTIONS_FROM_JIBAL
     return jibal_cross_section_erd(sim_r->r->incident, sim_r->r->target, sim_r->theta, E, sim_r->r->cs);
 #else
+    if(E > sim_r->E_max)
+        return 0.0;
     const reaction *r = sim_r->r;
     const double E_cm = sim_r->E_cm_ratio * E;
     double sigma_r = sim_r->cs_constant / pow2(E_cm) ;

@@ -47,6 +47,7 @@ typedef struct reaction {
     size_t n_cs_table;
     double theta; /* For REACTION_FILE */
     double Q; /* TODO: We ignore this because only elastic reactions are supported at the moment. */
+    double E_max;
 } reaction;
 
 

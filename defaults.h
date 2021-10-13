@@ -25,6 +25,7 @@
 #define DETECTOR_SOLID (10.0 * C_MSR)
 #define FLUENCE (1.0e14)
 #define E_MIN (50.0*C_KEV)
+#define E_MAX (1000.0*C_MEV)
 #define ENERGY_SLOPE (1.0*C_KEV)
 #define STOP_STEP_INCIDENT (0.0*C_KEV) /* Zero is automatic */
 #define STOP_STEP_EXITING (0.0*C_KEV) /* Zero is automatic */
