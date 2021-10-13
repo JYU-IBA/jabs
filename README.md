@@ -39,7 +39,7 @@ Some ready-to-use [binary packages](http://users.jyu.fi/~jaakjuli/jabs/binaries/
 
 ## Graphical user interface
 
-Simple Qt-based [GUI](qjabs/) is provided. Scripts can be edited and run, simulated spectra and experimental spectra are plotted (if available). Many GUI-specific features are missing, but the scripts themselves should work as described below. Note that there is no persistence, i.e everything should be reset between the runs. Currently some stopping forces and straggling data is not reloaded between runs and restarting the program may be necessary to reset these.
+Simple Qt-based [GUI](qjabs/) is provided. Scripts can be edited and run, simulated spectra and experimental spectra are plotted (if available). Many GUI-specific features are missing, but the scripts themselves should work as described below. Currently some stopping forces and straggling data is not reloaded (from JIBAL) between runs and restarting the program may be necessary to reset these.
 
       
 ## Interactive or scripted usage

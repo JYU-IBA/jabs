@@ -355,7 +355,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         const double E_back = ion1.E;
         const double S_back = ion1.S;
         if(fabs(d_diff) < 0.001*C_TFU && E_front-E_back < 0.001*C_KEV) {
-            fprintf(stderr, "Warning: no or very little progress was made (E step (goal) %g keV, E from %g keV to E = %g keV, depth = %g tfu, d_diff = %g tfu), check stopping or step size.\n", E_step/C_KEV, E_front/C_KEV , E_back/C_KEV, d_before.x/C_TFU, d_diff/C_TFU);
+            jabs_message(MSG_WARNING, stderr, "Warning: no or very little progress was made (E step (goal) %g keV, E from %g keV to E = %g keV, depth = %g tfu, d_diff = %g tfu), check stopping or step size.\n", E_step/C_KEV, E_front/C_KEV , E_back/C_KEV, d_before.x/C_TFU, d_diff/C_TFU);
             //sample_print(stderr, sample, FALSE);
             d_before.x += incident->inverse_cosine_theta*0.0001*C_TFU;
             warnings++;
@@ -442,7 +442,7 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
     /* TODO: simplify this by finding all possible Z1, Z2 combinations, considering target elements, beam and reactions before attempting to assign stopping/straggling (GSTO) */
     struct sample *sample = sim->sample;
     if(!sample) {
-        fprintf(stderr, "Could not assign stopping, because sample is not set!\n");
+        jabs_message(MSG_ERROR, stderr, "Could not assign stopping, because sample is not set!\n");
         return 1;
     }
     int Z2 = -1;
@@ -452,15 +452,15 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
             continue;
         Z2 = sample->isotopes[i]->Z;
         if (!jibal_gsto_auto_assign(gsto, sim->beam_isotope->Z, Z2)) { /* This should handle RBS */
-            fprintf(stderr, "Can not assign stopping or straggling for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
+            jabs_message(MSG_ERROR, stderr, "Can not assign stopping or straggling for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
             fail = TRUE;
         }
         if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, sim->beam_isotope->Z, Z2)) {
-            fprintf(stderr, "Could not assign stopping for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
+            jabs_message(MSG_ERROR, stderr, "Could not assign stopping for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
             fail = TRUE;
         }
         if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, sim->beam_isotope->Z, Z2)) {
-            fprintf(stderr, "Could not assign straggling for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
+            jabs_message(MSG_ERROR, stderr, "Could not assign straggling for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
             fail = TRUE;
         }
         for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
@@ -468,15 +468,15 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
             if(!r)
                 continue;
             if (!jibal_gsto_auto_assign(gsto, r->product->Z, Z2)) {
-                fprintf(stderr, "Can not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
+                jabs_message(MSG_ERROR, stderr, "Can not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
                 fail = TRUE;
             }
             if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, r->product->Z, Z2)) {
-                fprintf(stderr, "Could not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
+                jabs_message(MSG_ERROR, stderr, "Could not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
                 fail = TRUE;
             }
             if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, r->product->Z, Z2)) {
-                fprintf(stderr, "Could not assign straggling for reaction product  (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
+                jabs_message(MSG_ERROR, stderr, "Could not assign straggling for reaction product  (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
                 fail = TRUE;
             }
         }
@@ -731,7 +731,7 @@ void simulate_with_roughness(sim_workspace *ws) {
 
 void simulate_with_ds(sim_workspace *ws) {
     if(!ws) {
-        fprintf(stderr, "No workspace, no simulation.\n");
+        jabs_message(MSG_ERROR, stderr, "No workspace, no simulation.\n");
         return;
     }
     double fluence = ws->fluence;
@@ -748,7 +748,7 @@ void simulate_with_ds(sim_workspace *ws) {
     ws->params.rk4 = FALSE; /* This change is not reversed, nor reflected back to sim->params */
     ws->params.nucl_stop_accurate = FALSE;
     ws->params.mean_conc_and_energy = TRUE;
-    fprintf(stderr, "\n");
+    jabs_message(MSG_ERROR, stderr, "\n");
     const jibal_isotope *incident = ws->sim->beam_isotope;
     while(1) {
         double E_front = ion1.E;
@@ -760,7 +760,7 @@ void simulate_with_ds(sim_workspace *ws) {
         double E_back = ion1.E;
         const double E_mean = (E_front + E_back) / 2.0;
 
-        fprintf(stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x/C_TFU, d_after.x/C_TFU, E_front/C_KEV, E_back/C_KEV, fluence);
+        jabs_message(MSG_ERROR, stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x/C_TFU, d_after.x/C_TFU, E_front/C_KEV, E_back/C_KEV, fluence);
         double p_sum = 0.0;
         for(int i_polar = 0; i_polar < ws->params.ds_steps_polar; i_polar++) {
             const double ds_polar_min = 30.0*C_DEG;

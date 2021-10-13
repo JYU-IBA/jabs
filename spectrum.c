@@ -16,6 +16,7 @@
 
 #include "generic.h"
 #include "spectrum.h"
+#include "message.h"
 #include "win_compat.h"
 
 
@@ -74,23 +75,23 @@ gsl_histogram *spectrum_read(const char *filename, const detector *det) {
         } else {
             ch = strtoul(columns[0], &end, 10);
             if(end == columns[0]) {
-                fprintf(stderr, "Error converting %s to channel number. Issue on line %lu of file %s.\n", columns[0], lineno, filename);
+                jabs_message(MSG_ERROR, stderr, "Error converting %s to channel number. Issue on line %lu of file %s.\n", columns[0], lineno, filename);
                 break;
             }
             column = det->number;
         }
         if(n < column) {
-            fprintf(stderr, "Not enough columns in experimental spectra on line %lu. Expected %lu, got %lu.\n", lineno, column, n);
+            jabs_message(MSG_ERROR, stderr, "Not enough columns in experimental spectra on line %lu. Expected %lu, got %lu.\n", lineno, column, n);
         }
 
         if(ch >= det->channels) {
-            fprintf(stderr, "Channel %lu is too large for detector (%lu channels). Issue on line %lu of file %s.\n", ch, det->channels, lineno, filename);
+            jabs_message(MSG_ERROR, stderr, "Channel %lu is too large for detector (%lu channels). Issue on line %lu of file %s.\n", ch, det->channels, lineno, filename);
             break;
         }
         ch /= det->compress;
         double y = strtod(columns[column], &end);
         if(end == columns[column]) {
-            fprintf(stderr, "Error converting column %lu \"%s\" to histogram value. Issue on line %lu of file %s.\n", column, columns[column], lineno, filename);
+            jabs_message(MSG_ERROR, stderr, "Error converting column %lu \"%s\" to histogram value. Issue on line %lu of file %s.\n", column, columns[column], lineno, filename);
             break;
         }
         h->bin[ch] += y;
@@ -98,7 +99,7 @@ gsl_histogram *spectrum_read(const char *filename, const detector *det) {
             h->n = ch;
     }
     if(h->n == 0) {
-        fprintf(stderr, "Experimental spectrum could be read from file \"%s\". Read %lu lines before stopping.\n", filename, lineno);
+        jabs_message(MSG_ERROR, stderr, "Experimental spectrum could be read from file \"%s\". Read %lu lines before stopping.\n", filename, lineno);
         gsl_histogram_free(h);
         h = NULL;
     } else {

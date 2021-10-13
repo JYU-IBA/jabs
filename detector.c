@@ -7,21 +7,22 @@
 #include "generic.h"
 #include "defaults.h"
 #include "detector.h"
+#include "message.h"
 #include "win_compat.h"
 
 extern inline double detector_calibrated(const detector *det, size_t ch);
 
 int detector_sanity_check(const detector *det) {
     if(!det) {
-        fprintf(stderr, "No detector!\n");
+        jabs_message(MSG_ERROR, stderr, "No detector!\n");
         return -1;
     }
     if (det->resolution <= 0.0) {
-        fprintf(stderr, "Warning: detector resolution (%g) is negative.\n", det->resolution);
+        jabs_message(MSG_ERROR, stderr, "Warning: detector resolution (%g) is negative.\n", det->resolution);
         return -1;
     }
     if (det->slope <= 0.0) {
-        fprintf(stderr, "Warning: detector slope (%g) is negative.\n", det->slope);
+        jabs_message(MSG_ERROR, stderr, "Warning: detector slope (%g) is negative.\n", det->slope);
         return -1;
     }
     return 0;
@@ -30,7 +31,7 @@ int detector_sanity_check(const detector *det) {
 detector *detector_from_file(const jibal *jibal, const char *filename) {
     FILE *f = fopen(filename, "r");
     if(!f) {
-        fprintf(stderr, "Could not read detector from file \"%s\".\n", filename);
+        jabs_message(MSG_ERROR, stderr, "Could not read detector from file \"%s\".\n", filename);
         return NULL;
     }
     detector *det = detector_default(NULL);
@@ -41,7 +42,7 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
     jibal_config_var *vars = detector_make_vars(det); /* Will be freed when config is free'd */
     jibal_config_file_set_vars(cf, vars);
     if(jibal_config_file_read(cf, filename)) {
-        fprintf(stderr, "Could not read detector from \"%s\"\n", filename);
+        jabs_message(MSG_ERROR, stderr, "Could not read detector from \"%s\"\n", filename);
         detector_free(det);
         jibal_config_file_free(cf);
         return NULL;
@@ -147,16 +148,16 @@ int detector_print(const char *filename, const detector *det) {
     FILE *f = fopen_file_or_stream(filename, "w");
     if(!f)
         return EXIT_FAILURE;
-    fprintf(f, "slope = %g keV\n", det->slope/C_KEV);
-    fprintf(f, "offset = %g keV\n", det->offset/C_KEV);
-    fprintf(f, "resolution = %g keV\n", C_FWHM*sqrt(det->resolution)/C_KEV);
-    fprintf(f, "theta = %g deg\n", det->theta/C_DEG);
-    fprintf(f, "phi = %g deg\n", det->phi/C_DEG);
-    fprintf(f, "solid = %g msr\n", det->solid/C_MSR);
-    fprintf(f, "number = %zu\n", det->number);
-    fprintf(f, "channels = %zu\n", det->channels);
+    jabs_message(MSG_INFO, f, "slope = %g keV\n", det->slope/C_KEV);
+    jabs_message(MSG_INFO, f, "offset = %g keV\n", det->offset/C_KEV);
+    jabs_message(MSG_INFO, f, "resolution = %g keV\n", C_FWHM*sqrt(det->resolution)/C_KEV);
+    jabs_message(MSG_INFO, f, "theta = %g deg\n", det->theta/C_DEG);
+    jabs_message(MSG_INFO, f, "phi = %g deg\n", det->phi/C_DEG);
+    jabs_message(MSG_INFO, f, "solid = %g msr\n", det->solid/C_MSR);
+    jabs_message(MSG_INFO, f, "number = %zu\n", det->number);
+    jabs_message(MSG_INFO, f, "channels = %zu\n", det->channels);
     if(det->foil_description) {
-        fprintf(f, "foil = %s\n", det->foil_description);
+        jabs_message(MSG_INFO, f, "foil = %s\n", det->foil_description);
     }
     fclose_file_or_stream(f);
     return EXIT_SUCCESS;
@@ -173,7 +174,7 @@ int detector_update_foil(const jibal *jibal, detector *det) {
     det->foil = sample_from_sample_model(sm);
     sample_model_free(sm);
     if(!det->foil) {
-        fprintf(stderr, "Error: detector foil description %s was not parsed successfully!\n", det->foil_description);
+        jabs_message(MSG_ERROR, stderr, "Error: detector foil description %s was not parsed successfully!\n", det->foil_description);
         free(det->foil_description);
         det->foil_description = NULL;
     }

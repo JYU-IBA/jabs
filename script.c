@@ -160,9 +160,8 @@ int script_show(script_session *s, int argc, char * const *argv) {
     }
     if(strcmp(argv[0], "det") == 0) {
         for(size_t i_det = 0 ; i_det < fit->sim->n_det; i_det++) {  /* TODO: prettier output, maybe a table */
-            fprintf(stderr, "DETECTOR %zu\n", i_det);
+            jabs_message(MSG_INFO, stderr, "Detector %zu:\n", i_det);
             detector_print(NULL, fit->sim->det[i_det]);
-            fprintf(stderr, "\n");
         }
         return EXIT_SUCCESS;
     }
@@ -471,7 +470,7 @@ int script_fit(script_session *s, int argc, char * const *argv) {
 int script_save(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit_data = s->fit;
     if(argc < 1) {
-        fprintf(stderr, "Nothing to save. See \"help save\" for more information.\n");
+        jabs_message(MSG_ERROR, stderr, "Nothing to save. See \"help save\" for more information.\n");
         return -1;
     }
     if(strcmp(argv[0], "spectra") == 0) {
@@ -482,24 +481,24 @@ int script_save(script_session *s, int argc, char * const *argv) {
             argv++;
         }
         if(argc != 2) {
-            fprintf(stderr, "Usage: save spectra [detector] file\n");
+            jabs_message(MSG_ERROR, stderr, "Usage: save spectra [detector] file\n");
             return EXIT_FAILURE;
         }
         if(print_spectra(argv[1], fit_data_ws(fit_data, i_det), fit_data_exp(fit_data, i_det))) {
-            fprintf(stderr, "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n", i_det, argv[1], fit_data->sim->n_det);
+            jabs_message(MSG_ERROR, stderr, "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n", i_det, argv[1], fit_data->sim->n_det);
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
     } else if(strcmp(argv[0], "sample") == 0) {
         if(argc != 2) {
-            fprintf(stderr, "Usage: save sample [file]\n");
+            jabs_message(MSG_ERROR, stderr, "Usage: save sample [file]\n");
         }
         if(!fit_data->sm) {
-            fprintf(stderr, "No sample set.\n");
+            jabs_message(MSG_ERROR, stderr, "No sample set.\n");
             return -1;
         }
         if(sample_model_print(argv[1], fit_data->sm)) {
-            fprintf(stderr, "Could not write sample to file \"%s\".\n", argv[1]);
+            jabs_message(MSG_ERROR, stderr, "Could not write sample to file \"%s\".\n", argv[1]);
             return -1;
         }
         return 0;
@@ -737,7 +736,7 @@ int script_prepare_sim_or_fit(script_session *s) {
         return -1;
     }
     if(fit->sim->n_reactions == 0) {
-        fprintf(stderr, "No reactions, adding some automatically. Please be aware there are commands called \"reset reactions\" and \"add reactions\".\n");
+        jabs_message(MSG_WARNING, stderr, "No reactions, adding some automatically. Please be aware there are commands called \"reset reactions\" and \"add reactions\".\n");
         if(fit->sim->rbs) {
             sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim, REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
         }
@@ -746,7 +745,7 @@ int script_prepare_sim_or_fit(script_session *s) {
         }
     }
     if(fit->sim->n_reactions == 0) {
-        fprintf(stderr, "No reactions. Nothing to do.\n");
+        jabs_message(MSG_ERROR, stderr, "No reactions. Nothing to do.\n");
         return EXIT_FAILURE;
     }
     jabs_message(MSG_INFO, stderr, "Simplified sample model for simulation:\n");
@@ -781,7 +780,7 @@ int script_finish_sim_or_fit(script_session *s) {
         if(ws) {
             if(s->output_filename) {
                 if(print_spectra(s->output_filename, ws, fit_data_exp(fit, i_det))) {
-                    fprintf(stderr, "Could not save spectra of detector %zu to file \"%s\"\n", i_det, s->output_filename);
+                    jabs_message(MSG_ERROR, stderr, "Could not save spectra of detector %zu to file \"%s\"\n", i_det, s->output_filename);
                     return EXIT_FAILURE;
                 }
             }
