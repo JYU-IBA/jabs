@@ -257,4 +257,4 @@ int reaction_compare(const void *a, const void *b) {
     } else {
         return isotope_a->Z - isotope_b->Z;
     }
-};
+}

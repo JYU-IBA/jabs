@@ -321,23 +321,23 @@ void fit_data_print(FILE *f, const struct fit_data *fit_data) {
         return;
     }
     if(fit_data->n_fit_ranges == 0) {
-        jabs_message(MSG_ERROR, stderr, "No fit ranges.\n");
+        jabs_message(MSG_ERROR, f, "No fit ranges.\n");
         return;
     }
-    jabs_message(MSG_INFO, stderr, "%zu fit ranges:\n", fit_data->n_fit_ranges);
-    jabs_message(MSG_INFO, stderr, "  i |    low |   high |    exp cts |    sim cts | sim/exp |\n");
+    jabs_message(MSG_INFO, f, "%zu fit ranges:\n", fit_data->n_fit_ranges);
+    jabs_message(MSG_INFO, f, "  i |    low |   high |    exp cts |    sim cts | sim/exp |\n");
     for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
         roi *range = &fit_data->fit_ranges[i];
         double exp_cts = spectrum_roi(fit_data->exp[range->i_det], range->low, range->high);
         double sim_cts = fit_data->ws?spectrum_roi(fit_data->ws[range->i_det]->histo_sum, range->low, range->high):0.0;
         if(exp_cts == 0.0) {
-            jabs_message(MSG_INFO, stderr, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf |         |\n", i + 1, range->low, range->high, exp_cts, sim_cts);
+            jabs_message(MSG_INFO, f, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf |         |\n", i + 1, range->low, range->high, exp_cts, sim_cts);
         } else {
             double ratio = sim_cts/exp_cts;
-            jabs_message(MSG_INFO, stderr, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf | %7.5lf |\n", i + 1, range->low, range->high, exp_cts, sim_cts, ratio);
+            jabs_message(MSG_INFO, f, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf | %7.5lf |\n", i + 1, range->low, range->high, exp_cts, sim_cts, ratio);
         }
     }
-    jabs_message(MSG_INFO, stderr, "\nFit has %zu channels total.\n", fit_data_ranges_calculate_number_of_channels(fit_data));
+    jabs_message(MSG_INFO, f, "\nFit has %zu channels total.\n", fit_data_ranges_calculate_number_of_channels(fit_data));
 }
 
 int fit(struct fit_data *fit_data) {

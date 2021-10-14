@@ -184,7 +184,7 @@ int script_show(script_session *s, int argc, char * const *argv) {
 int script_set(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     if(argc < 1) {
-        fprintf(stderr, "Nothing to set. See \"help set\" for more information.\n");
+        jabs_message(MSG_ERROR, stderr, "Nothing to set. See \"help set\" for more information.\n");
         return 0;
     }
     if(strcmp(argv[0], "ion") == 0) {
@@ -230,13 +230,13 @@ int script_set(script_session *s, int argc, char * const *argv) {
     }
     if(argc != 2) {
         jabs_message(MSG_ERROR, stderr, "Usage: set variable [value]\n");
-        return -1;
+        return EXIT_FAILURE;
     }
     if(jibal_config_file_var_set(s->cf, argv[0], argv[1])) {
         jabs_message(MSG_ERROR, stderr,"Error in setting \"%s\" to \"%s\". Does the variable exist? Use show vars.\n", argv[0], argv[1]);
-        return -1;
+        return EXIT_FAILURE;
     }
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int script_add(script_session *s, int argc, char * const *argv) {
@@ -545,13 +545,13 @@ int script_remove(script_session *s, int argc, char * const *argv) {
         return EXIT_FAILURE;
     }
     if(strcmp(argv[0], "reaction") == 0) {
-        if(argc == 2) {
-            size_t i = strtoull(argv[1], NULL, 10);
-            return sim_reactions_remove_reaction(fit_data->sim, i - 1);
-        }
         if(argc != 3) {
-            jabs_message(MSG_ERROR, stderr, "Usage: remove reaction [TYPE] [target_isotope]   OR   remove reaction [number]\n");
+            jabs_message(MSG_ERROR, stderr, "Usage: remove reaction [TYPE] [target_isotope]   OR   remove reaction number [number]\n");
             return EXIT_FAILURE;
+        }
+        if(strcmp(argv[1], "number") == 0) {
+            size_t i = strtoull(argv[2], NULL, 10);
+            return sim_reactions_remove_reaction(fit_data->sim, i - 1);
         }
         reaction_type type = reaction_type_from_string(argv[1]);
         const jibal_isotope *target = jibal_isotope_find(fit_data->jibal->isotopes, argv[2], 0, 0);
