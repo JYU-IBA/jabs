@@ -69,7 +69,7 @@ gsl_histogram *spectrum_read(const char *filename, const detector *det) {
         size_t ch;
         size_t column;
         char *end;
-        if(det->number == 0) {
+        if(det->column == 0) {
             ch = lineno-1;
             column = 0;
         } else {
@@ -78,7 +78,7 @@ gsl_histogram *spectrum_read(const char *filename, const detector *det) {
                 jabs_message(MSG_ERROR, stderr, "Error converting %s to channel number. Issue on line %lu of file %s.\n", columns[0], lineno, filename);
                 break;
             }
-            column = det->number;
+            column = det->column;
         }
         if(n < column) {
             jabs_message(MSG_ERROR, stderr, "Not enough columns in experimental spectra on line %lu. Expected %lu, got %lu.\n", lineno, column, n);

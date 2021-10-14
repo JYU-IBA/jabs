@@ -25,7 +25,7 @@ typedef struct detector {
     double theta; /* Polar angle [0, pi] */
     double phi; /* Azimuthal angle [0, 2pi] */
     double solid;
-    size_t number;
+    size_t column;
     size_t channels;
     size_t compress;
     sample *foil;

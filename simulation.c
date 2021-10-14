@@ -207,6 +207,19 @@ detector *sim_det(const simulation *sim, size_t i_det) {
     return sim->det[i_det];
 }
 
+detector *sim_det_from_string(const simulation *sim, const char *s) {
+    size_t i_det;
+    if(*s >= '0' && *s <= '9') {
+        i_det = strtoull(s, NULL, 10);
+        if(i_det == 0)
+            return NULL;
+        i_det--;
+        return sim_det(sim, i_det);
+    }
+    /* TODO: other detector naming besides numbering */
+    return NULL;
+}
+
 int sim_det_add(simulation *sim, detector *det) {
     if(!sim) {
         return EXIT_FAILURE;

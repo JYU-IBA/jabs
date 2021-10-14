@@ -51,30 +51,24 @@ int script_load(script_session *s, int argc, char * const *argv) {
         }
         return 0;
     } else if(strcmp(argv[0], "det") == 0) {
-        int status;
-        size_t i_det = 0;
         if(argc == 3) {
-            i_det = strtoul(argv[1], NULL, 10);
-            argc--;
-            argv++;
+            size_t  i_det = strtoul(argv[1], NULL, 10);
+            if(i_det == 0 || i_det > fit->sim->n_det) {
+                jabs_message(MSG_ERROR, stderr, "Detector number must be between 1 and %zu (you gave %zu)\n", fit->sim->n_det, i_det);
+                return EXIT_FAILURE;
+            }
+            i_det--;
+            return sim_det_set(fit->sim, detector_from_file(fit->jibal, argv[2]), i_det);
         }
         if(argc != 2) {
             jabs_message(MSG_INFO, stderr, "Usage: load det [number] file\n");
             return EXIT_SUCCESS;
         }
-        detector *det = detector_from_file(fit->jibal, argv[1]);
-        if(!det)
-            return EXIT_FAILURE;
-        if(fit->sim->n_det == 0 && i_det == 0) {
-            status = fit_data_add_det(fit, det); /* Adds a new detector (and space for experimental spectrum) */
-        } else {
-            status = sim_det_set(fit->sim, det, i_det);
-        }
-        return status;
+        return fit_data_add_det(fit, detector_from_file(fit->jibal, argv[1])); /* Adds a new detector (and space for experimental spectrum) */
     } else if(strcmp(argv[0], "exp") == 0) {
-        size_t i_det = 0;
+        size_t i_det = 1;
         if(argc == 3) {
-            i_det = strtoul(argv[1], NULL, 10);
+            i_det = strtoull(argv[1], NULL, 10);
             argc--;
             argv++;
         }
@@ -82,10 +76,11 @@ int script_load(script_session *s, int argc, char * const *argv) {
             jabs_message(MSG_INFO, stderr, "Usage: load exp [number] file\n");
             return EXIT_SUCCESS;
         }
-        if(i_det >= fit->sim->n_det) {
-            jabs_message(MSG_ERROR, stderr, "Detector number %zu too high (must be below %zu)\n", i_det, fit->sim->n_det);
+        if(i_det == 0 || i_det > fit->sim->n_det) {
+            jabs_message(MSG_ERROR, stderr, "Detector number must be between 1 and %zu (you gave %zu)\n", fit->sim->n_det, i_det);
             return EXIT_FAILURE;
         }
+        i_det--;
         gsl_histogram *h = spectrum_read(argv[1], sim_det(fit->sim, i_det));
         if(!h) {
             jabs_message(MSG_ERROR,  stderr,"Reading spectrum from file \"%s\" was not successful.\n", argv[1]);
@@ -115,9 +110,18 @@ int script_reset(script_session *s, int argc, char * const *argv) {
     if(!fit_data) {
         return -1;
     }
-    if(argc > 1 && strcmp(argv[1], "reactions") == 0) {
+    if(argc >= 1 && strcmp(argv[0], "reactions") == 0) {
         sim_reactions_free(fit_data->sim);
         return EXIT_SUCCESS;
+    } else if(argc >= 1 && strcmp(argv[0], "detectors") == 0) {
+        for(size_t i_det = 0; i_det < s->fit->sim->n_det; i_det++) {
+            detector_free(sim_det(s->fit->sim, i_det));
+        }
+        s->fit->sim->n_det = 0;
+        return EXIT_SUCCESS;
+    } else if(argc >= 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: reset [reactions|detectors]\n");
+        return EXIT_FAILURE;
     }
     fit_data_fit_ranges_free(fit_data);
     fit_params_free(fit_data->fit_params);
@@ -160,7 +164,7 @@ int script_show(script_session *s, int argc, char * const *argv) {
     }
     if(strcmp(argv[0], "det") == 0) {
         for(size_t i_det = 0 ; i_det < fit->sim->n_det; i_det++) {  /* TODO: prettier output, maybe a table */
-            jabs_message(MSG_INFO, stderr, "Detector %zu:\n", i_det);
+            jabs_message(MSG_INFO, stderr, "Detector %zu:\n", i_det+1);
             detector_print(NULL, fit->sim->det[i_det]);
         }
         return EXIT_SUCCESS;
@@ -213,15 +217,31 @@ int script_set(script_session *s, int argc, char * const *argv) {
         }
         return 0;
     } else if(strcmp(argv[0], "det") == 0) {
-        size_t i_det = 0;
+        size_t i_det = 1;
         if(argc == 4) {
             i_det = strtoul(argv[1], NULL, 10);
+            if(i_det == 0) {
+                jabs_message(MSG_ERROR, stderr, "Usage: set det [number] variable value\n");
+            }
             argc--;
             argv++;
         }
+        if(i_det == 1 && fit->sim->n_det == 0) { /* This happens on first "set det" */
+            jabs_message(MSG_VERBOSE, stderr, "No detectors were defined. Detector was added.\n");
+            fit_data_add_det(fit, detector_default(NULL));
+        }
+        if(i_det == 0 || i_det > fit->sim->n_det) {
+            jabs_message(MSG_ERROR, stderr, "Detector number not valid.\n");
+            return EXIT_FAILURE;
+        }
+        i_det--;
         if(argc != 3) {
             jabs_message(MSG_ERROR, stderr, "Usage: set det [number] variable value\n");
             return EXIT_FAILURE;
+        }
+        if(fit->sim->n_det == 0) {
+            jabs_message(MSG_VERBOSE, stderr, "No detectors defined. Detector added with default values.\n");
+            fit_data_add_det(fit, detector_default(NULL));
         }
         if(detector_set_var(s->jibal, sim_det(fit->sim, i_det), argv[1], argv[2])) {
             jabs_message(MSG_ERROR, stderr, "Can't set \"%s\" to be \"%s\"!\n", argv[1], argv[2]);
@@ -242,7 +262,7 @@ int script_set(script_session *s, int argc, char * const *argv) {
 int script_add(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit_data = s->fit;
     if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: add [reactions|fit_range|det] ...\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: add [reactions|fit_range] ...\n");
         return EXIT_SUCCESS;
     }
     if(strcmp(argv[0], "reaction") == 0) {
@@ -301,16 +321,6 @@ int script_add(script_session *s, int argc, char * const *argv) {
         }
         fit_data_fit_range_add(fit_data, &range);
         return 0;
-    } else if(strcmp(argv[0], "det") == 0) {
-        if(argc != 2) {
-            jabs_message(MSG_ERROR, stderr, "Usage: add det filename\n");
-            return EXIT_FAILURE;
-        }
-        detector *det = detector_from_file(s->jibal, argv[1]);
-        if(!det) {
-            return EXIT_FAILURE;
-        }
-        return fit_data_add_det(fit_data, det);
     }
     jabs_message(MSG_ERROR, stderr, "Don't know what \"%s\" is.\n", argv[0]);
     return -1;
@@ -489,7 +499,7 @@ int script_save(script_session *s, int argc, char * const *argv) {
         return -1;
     }
     if(strcmp(argv[0], "spectra") == 0) {
-        size_t i_det = 0;
+        size_t i_det = 1;
         if(argc == 3) {
             i_det = strtoul(argv[1], NULL, 10);
             argc--;
@@ -499,8 +509,13 @@ int script_save(script_session *s, int argc, char * const *argv) {
             jabs_message(MSG_ERROR, stderr, "Usage: save spectra [detector] file\n");
             return EXIT_FAILURE;
         }
+        if(i_det == 0 || i_det > fit_data->sim->n_det) {
+            jabs_message(MSG_ERROR, stderr, "Detector number not valid.\n");
+            return EXIT_FAILURE;
+        }
+        i_det--;
         if(print_spectra(argv[1], fit_data_ws(fit_data, i_det), fit_data_exp(fit_data, i_det))) {
-            jabs_message(MSG_ERROR, stderr, "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n", i_det, argv[1], fit_data->sim->n_det);
+            jabs_message(MSG_ERROR, stderr, "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n", i_det + 1, argv[1], fit_data->sim->n_det);
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
@@ -578,7 +593,15 @@ int script_remove(script_session *s, int argc, char * const *argv) {
 int script_roi(script_session *s, int argc, char * const *argv) {
     struct roi r;
     if(argc == 3) {
-        r.i_det = strtoul(argv[0], NULL, 10);
+        size_t i = strtoul(argv[0], NULL, 10);
+        if(i == 0) {
+            jabs_message(MSG_ERROR, stderr, "Detector number must be > 0\n");
+            return EXIT_FAILURE;
+        }
+        if(i > s->fit->sim->n_det) {
+            jabs_message(MSG_WARNING, stderr, "Warning: Detector number %zu > %zu.\n", i, s->fit->sim->n_det);
+        }
+        r.i_det = i - 1;
         argv++;
         argc--;
     }
@@ -740,7 +763,7 @@ int script_prepare_sim_or_fit(script_session *s) {
         jabs_message(MSG_ERROR, stderr,"No ion has been defined!\n");
         return -1;
     }
-    if(!fit->sim->det) { /* Shouldn't be possible */
+    if(!fit->sim->det || fit->sim->n_det == 0) {
         jabs_message(MSG_ERROR, stderr,"No detector has been defined!\n");
         return -1;
     }

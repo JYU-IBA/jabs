@@ -127,7 +127,7 @@ detector *detector_default(detector *det) {
     det->resolution = (DETECTOR_RESOLUTION*DETECTOR_RESOLUTION);
     det->slope = ENERGY_SLOPE;
     det->offset = 0.0*C_KEV;
-    det->number = 1; /* This implies default file format has channel numbers. Values are in the second column (number 1). */
+    det->column = 1; /* This implies default file format has channel numbers. Values are in the second column (number 1). */
     det->channels = 16384;
     det->compress = 1;
     det->foil = NULL;
@@ -154,7 +154,7 @@ int detector_print(const char *filename, const detector *det) {
     jabs_message(MSG_INFO, f, "theta = %g deg\n", det->theta/C_DEG);
     jabs_message(MSG_INFO, f, "phi = %g deg\n", det->phi/C_DEG);
     jabs_message(MSG_INFO, f, "solid = %g msr\n", det->solid/C_MSR);
-    jabs_message(MSG_INFO, f, "number = %zu\n", det->number);
+    jabs_message(MSG_INFO, f, "column = %zu\n", det->column);
     jabs_message(MSG_INFO, f, "channels = %zu\n", det->channels);
     if(det->foil_description) {
         jabs_message(MSG_INFO, f, "foil = %s\n", det->foil_description);
@@ -222,7 +222,7 @@ jibal_config_var *detector_make_vars(detector *det) {
             {JIBAL_CONFIG_VAR_UNIT, "theta",      &det->theta,          NULL},
             {JIBAL_CONFIG_VAR_UNIT, "phi",        &det->phi,            NULL},
             {JIBAL_CONFIG_VAR_UNIT, "solid",      &det->solid,          NULL},
-            {JIBAL_CONFIG_VAR_INT,  "number",     &det->number,         NULL},
+            {JIBAL_CONFIG_VAR_INT,  "column",     &det->column,         NULL},
             {JIBAL_CONFIG_VAR_INT,  "channels",   &det->channels,       NULL},
             {JIBAL_CONFIG_VAR_INT,  "compress",   &det->compress,       NULL},
             {JIBAL_CONFIG_VAR_STRING,"foil",       &det->foil_description,NULL},

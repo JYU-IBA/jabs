@@ -114,6 +114,7 @@ int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, 
 void sim_reactions_free(simulation *sim); /* Free reactions and reset the number of reactions to zero */
 int sim_sanity_check(const simulation *sim);
 detector *sim_det(const simulation *sim, size_t i_det);
+detector *sim_det_from_string(const simulation *sim, const char *s);
 int sim_det_add(simulation *sim, detector *det);
 int sim_det_set(simulation *sim, detector *det, size_t i_det); /* Will free existing detector (can be NULL too) */
 sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det);
