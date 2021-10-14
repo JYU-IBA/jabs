@@ -18,13 +18,19 @@ set det resolution 10keV
 set det theta 160deg
 set det phi 90deg
 set det solid 5msr
+#Detector can also be loaded from a file
+#load det "detector.txt"
 add fit_range 200 700
 add fit_range 1050 1100
 set fit_maxiter 100
-#load det "detector.txt"
-add reactions
+#Adding reactions is optional. If no reactions are specified, RBS and ERD reactions are added automatically. Reactions that are not possible are not calculated!
+add reactions RBS
+#We can remove a specific reaction.
 remove reaction RBS 16O
-add reaction RBS 16O
+#We can add reactions with different built-in screening models and min/max energy can be specified. These parameters are optional. 
+add reaction RBS 16O cs Rutherford max "2.4 MeV"
+#Reactions (with non-Rutherford cross sections) from R33 files are supported.
+#load reaction "some_R33_file.r33"
 simulate
 save spectra "simulated_out.csv"
 fit calib,fluence,thickness1,thickness2,rough1

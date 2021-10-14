@@ -101,7 +101,19 @@ int sim_reactions_add_reaction(simulation *sim, reaction *r) {
     sim->n_reactions++;
     sim->reactions = realloc(sim->reactions, sim->n_reactions*sizeof(reaction *));
     sim->reactions[sim->n_reactions - 1] = r;
-    jabs_message(MSG_INFO, stderr, "Added reaction %zu.\n", sim->n_reactions);
+    jabs_message(MSG_INFO, stderr, "Added reaction %zu (%s), %s(%s,%s)%s.\n", sim->n_reactions, reaction_name(r), r->target->name, r->incident->name, r->product->name, r->product_nucleus->name);
+    return EXIT_SUCCESS;
+}
+
+int sim_reactions_remove_reaction(simulation *sim, size_t i) {
+    if(i >= sim->n_reactions) {
+        jabs_message(MSG_ERROR, stderr, "There are %zu reactions, can't remove reaction %zu\n", sim->n_reactions, i + 1);
+        return EXIT_FAILURE;
+    }
+    reaction_free(sim->reactions[i]);
+    sim->reactions[i] = NULL;
+    sim_sort_reactions(sim);
+    sim->n_reactions--;
     return EXIT_SUCCESS;
 }
 
@@ -288,7 +300,6 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         ion *p = &r->p;
         ion_reset(p);
         r->max_depth = 0.0;
-        r->E_max = r->r->E_max;
         r->i_isotope = ws->sample->n_isotopes; /* Intentionally not valid */
         for(size_t i_isotope = 0; i_isotope < ws->sample->n_isotopes; i_isotope++) {
             if(ws->sample->isotopes[i_isotope] == r->r->target) {
@@ -491,9 +502,9 @@ double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E
 #ifdef CROSS_SECTIONS_FROM_JIBAL
     return jibal_cross_section_erd(sim_r->r->incident, sim_r->r->target, sim_r->theta, E, sim_r->r->cs);
 #else
-    if(E > sim_r->E_max)
-        return 0.0;
     const reaction *r = sim_r->r;
+    if(E > r->E_max || E < r->E_min)
+        return 0.0;
     const double E_cm = sim_r->E_cm_ratio * E;
     double sigma_r = sim_r->cs_constant / pow2(E_cm) ;
     switch(r->cs) {
@@ -539,4 +550,8 @@ double sim_calculate_exit_angle(const simulation *sim, const detector *det) {
     double theta, phi;
     rotate(det->theta, det->phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Detector in sample coordinate system, angles are detector in sample system. Note that for Cornell geometry phi = 90.0 deg! */
     return C_PI - theta;
+}
+
+void sim_sort_reactions(const simulation *sim) {
+    qsort(sim->reactions, sim->n_reactions, sizeof(reaction *), &reaction_compare);
 }

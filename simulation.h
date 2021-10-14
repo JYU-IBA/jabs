@@ -82,7 +82,6 @@ typedef struct sim_reaction {
     double cs_constant; /* Non-energy dependent Rutherford cross section terms for RBS or ERD */
     double r_VE_factor; /* Andersen correction factor r_VE = this / E_cm */
     double r_VE_factor2;
-    double E_max;
 } sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
 
 
@@ -109,6 +108,7 @@ void sim_free(simulation *sim);
 sim_calc_params sim_calc_params_defaults(int ds, int fast);
 jibal_cross_section_type sim_cs(const simulation *sim, reaction_type type);
 int sim_reactions_add_reaction(simulation *sim, reaction *r);
+int sim_reactions_remove_reaction(simulation *sim, size_t i);
 int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jibal_cross_section_type cs); /* Add RBS or ERD reactions automagically */
 int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, const char *filename);
 void sim_reactions_free(simulation *sim); /* Free reactions and reset the number of reactions to zero */
@@ -128,4 +128,5 @@ double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E
 double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E);
 double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);
 double sim_calculate_exit_angle(const simulation *sim, const detector *det);
+void sim_sort_reactions(const simulation *sim);
 #endif // JABS_SIMULATION_H

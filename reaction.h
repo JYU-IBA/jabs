@@ -16,6 +16,7 @@
 
 #include <jibal_masses.h>
 #include <gsl/gsl_histogram.h>
+#include <jibal.h>
 #include <jibal_cross_section.h>
 #include <jibal_kin.h>
 #include <jibal_r33.h>
@@ -47,15 +48,18 @@ typedef struct reaction {
     size_t n_cs_table;
     double theta; /* For REACTION_FILE */
     double Q; /* TODO: We ignore this because only elastic reactions are supported at the moment. */
+    double E_min;
     double E_max;
 } reaction;
 
 
 void reactions_print(FILE *f, reaction * const *reactions, size_t n_reactions);
 reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs);
+reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incident, int argc, char * const *argv);
 const char *reaction_name(const reaction *r);
 reaction_type reaction_type_from_string(const char *s);
 void reaction_free(reaction *r);
 int reaction_is_same(const reaction *r1, const reaction *r2); /* TRUE (=1) if r1 and r2 describe the same reaction. Note that "type" can be different. */
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile);
+int reaction_compare(const void *a, const void *b);
 #endif //JABS_REACTION_H

@@ -166,6 +166,10 @@ int script_show(script_session *s, int argc, char * const *argv) {
         return EXIT_SUCCESS;
     }
     if(strcmp(argv[0], "reactions") == 0) {
+        if(fit->sim->n_reactions == 0) {
+            jabs_message(MSG_INFO, stderr, "No reactions.\n");
+            return EXIT_SUCCESS;
+        }
         reactions_print(stderr, fit->sim->reactions, fit->sim->n_reactions);
         return EXIT_SUCCESS;
     }
@@ -246,26 +250,33 @@ int script_add(script_session *s, int argc, char * const *argv) {
             jabs_message(MSG_ERROR, stderr, "Usage: add reaction TYPE isotope\n");
             return EXIT_SUCCESS;
         }
-        reaction_type type = reaction_type_from_string(argv[1]);
-        const jibal_isotope *target = jibal_isotope_find(fit_data->jibal->isotopes, argv[2], 0, 0);
-        if(type == REACTION_NONE) {
-            jabs_message(MSG_ERROR, stderr, "This is not a valid reaction type: \"%s\".\n", argv[1]);
+        reaction *r = reaction_make_from_argv(fit_data->jibal, fit_data->sim->beam_isotope, argc - 1, argv + 1);
+        if(!r) {
+            jabs_message(MSG_ERROR, stderr, "Could not make a reaction based on given description.\n");
             return EXIT_FAILURE;
         }
-        if(!target) {
-            jabs_message(MSG_ERROR, stderr, "This is not a valid isotope: \"%s\".\n", argv[2]);
-            return EXIT_FAILURE;
-        }
-        reaction *r = reaction_make(fit_data->sim->beam_isotope, target, type, sim_cs(fit_data->sim, type));
-        if(argc > 3) {
-            double E_max = jibal_get_val(fit_data->jibal->units, 'E', argv[3]);
-            r->E_max = E_max;
+        if(r->cs == JIBAL_CS_NONE) {
+            jibal_cross_section_type cs = sim_cs(fit_data->sim, r->type);
+            r->cs = cs;
+            jabs_message(MSG_VERBOSE, stderr, "Reaction cross section not given or not valid, assuming default for %s: %s.\n",
+                         reaction_name(r), jibal_cs_types[cs].s);
         }
         return sim_reactions_add_reaction(fit_data->sim, r);
     } else if(strcmp(argv[0], "reactions") == 0) {
         if(!fit_data->sm) {
             jabs_message(MSG_ERROR, stderr, "Cannot add reactions before sample has been set (I need to know which reactions to add!).\n");
             return EXIT_FAILURE;
+        }
+        if(argc > 1) {
+            if(strcmp(argv[1], "RBS") == 0) {
+                sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_RBS, sim_cs(fit_data->sim, REACTION_RBS));
+            } else if(strcmp(argv[1], "ERD") == 0) {
+                sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_ERD, sim_cs(fit_data->sim, REACTION_ERD));
+            } else {
+                jabs_message(MSG_ERROR, stderr, "What is %s anyways? Did you mean \"RBS\" or \"ERD\"?\n", argv[1]);
+                return EXIT_FAILURE;
+            }
+            return EXIT_SUCCESS;
         }
         if(fit_data->sim->rbs) {
             sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_RBS, sim_cs(fit_data->sim, REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
@@ -524,7 +535,7 @@ int script_save(script_session *s, int argc, char * const *argv) {
         return 0;
     }
     jabs_message(MSG_ERROR, stderr,"I don't know what to save (%s?)\n", argv[0]);
-    return -1;
+    return EXIT_FAILURE;
 }
 
 int script_remove(script_session *s, int argc, char * const *argv) {
@@ -534,8 +545,12 @@ int script_remove(script_session *s, int argc, char * const *argv) {
         return EXIT_FAILURE;
     }
     if(strcmp(argv[0], "reaction") == 0) {
+        if(argc == 2) {
+            size_t i = strtoull(argv[1], NULL, 10);
+            return sim_reactions_remove_reaction(fit_data->sim, i - 1);
+        }
         if(argc != 3) {
-            jabs_message(MSG_ERROR, stderr, "Usage: remove reaction TYPE target_isotope...\n");
+            jabs_message(MSG_ERROR, stderr, "Usage: remove reaction [TYPE] [target_isotope]   OR   remove reaction [number]\n");
             return EXIT_FAILURE;
         }
         reaction_type type = reaction_type_from_string(argv[1]);
@@ -550,13 +565,14 @@ int script_remove(script_session *s, int argc, char * const *argv) {
         }
         for(size_t i = 0; i < fit_data->sim->n_reactions; i++) {
             if(fit_data->sim->reactions[i]->type == type && fit_data->sim->reactions[i]->target == target) {
-                reaction_free(fit_data->sim->reactions[i]);
-                fit_data->sim->reactions[i] = NULL;
+                return sim_reactions_remove_reaction(fit_data->sim, i);
             }
         }
-        return EXIT_SUCCESS;
+        jabs_message(MSG_ERROR, stderr, "No matching reaction found!\n");
+        return EXIT_FAILURE;
     }
-    return EXIT_SUCCESS;
+    jabs_message(MSG_ERROR, stderr,"I don't know what to save (%s?)\n", argv[0]);
+    return EXIT_FAILURE;
 }
 
 int script_roi(script_session *s, int argc, char * const *argv) {
@@ -752,6 +768,7 @@ int script_prepare_sim_or_fit(script_session *s) {
         jabs_message(MSG_ERROR, stderr, "No reactions. Nothing to do.\n");
         return EXIT_FAILURE;
     }
+    sim_sort_reactions(fit->sim);
     jabs_message(MSG_INFO, stderr, "Simplified sample model for simulation:\n");
     sample_print(NULL, fit->sim->sample, TRUE);
 

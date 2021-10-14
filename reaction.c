@@ -33,9 +33,13 @@ void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) 
         }
         jabs_message(MSG_INFO, f, "%3zu: %4s with %5s (reaction product %s).", i + 1, reaction_name(r), r->target->name, r->product->name);
         if(r->type == REACTION_FILE) {
-            jabs_message(MSG_INFO, f, " Incident = %s, Theta = %g deg, E_low = %g keV, E_high = %g keV. Data from file \"%s\".\n", r->incident->name, r->theta/C_DEG, r->cs_table[0].E/C_KEV, r->cs_table[r->n_cs_table-1].E/C_KEV, r->filename);
+            jabs_message(MSG_INFO, f, " Incident = %s, Theta = %g deg, E = [%g keV, %g keV]. Data from file \"%s\".\n", r->incident->name, r->theta/C_DEG, r->cs_table[0].E/C_KEV, r->cs_table[r->n_cs_table-1].E/C_KEV, r->filename);
         } else {
-            jabs_message(MSG_INFO, f, " %s cross sections.\n", jibal_cs_types[r->cs]);
+            jabs_message(MSG_INFO, f, " %s cross sections (built-in).", jibal_cs_types[r->cs]);
+            if(r->E_max < E_MAX || r->E_min > 0.0) {
+                jabs_message(MSG_INFO, f, " E = [%g keV, %g keV]", r->E_min/C_KEV, r->E_max/C_KEV);
+            }
+            jabs_message(MSG_INFO, f, "\n");
         }
     }
 }
@@ -103,18 +107,53 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     r->filename = NULL;
     r->cs_table = NULL;
     r->n_cs_table = 0;
+    r->E_min = 0.0;
     r->E_max = E_MAX;
     switch(type) {
         case REACTION_ERD:
             r->product = target;
+            r->product_nucleus = incident;
             break;
         case REACTION_RBS:
             r->product = incident;
+            r->product_nucleus = target;
             break;
         default:
             fprintf(stderr, "Warning, reaction product is null.\n");
             r->product = NULL;
             break;
+    }
+    return r;
+}
+
+reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incident, int argc, char * const *argv) {
+    if(argc < 2) {
+        jabs_message(MSG_ERROR, stderr, "Not enough arguments\n");
+        return NULL;
+    }
+    reaction_type type = reaction_type_from_string(argv[0]);
+    const jibal_isotope *target = jibal_isotope_find(jibal->isotopes, argv[1], 0, 0);
+    if(type == REACTION_NONE) {
+        jabs_message(MSG_ERROR, stderr, "This is not a valid reaction type: \"%s\".\n", argv[0]);
+        return NULL;
+    }
+    if(!target) {
+        jabs_message(MSG_ERROR, stderr, "This is not a valid isotope: \"%s\".\n", argv[1]);
+        return NULL;
+    }
+    reaction *r = reaction_make(incident, target, type, JIBAL_CS_NONE); /* Warning: JIBAL_CS_NONE used here, something sane must be supplied after this somewhere! */
+    argc -= 2;
+    argv += 2;
+    while (argc >= 2) {
+        if(strcmp(argv[0], "max") == 0) {
+            r->E_max = jibal_get_val(jibal->units, 'E', argv[1]);
+        } else if(strcmp(argv[0], "min") == 0) {
+            r->E_min = jibal_get_val(jibal->units, 'E', argv[1]);
+        } else if(strcmp(argv[0], "cs") == 0) {
+            r->cs =  jibal_option_get_value(jibal_cs_types, argv[1]);
+        }
+        argc -= 2;
+        argv += 2;
     }
     return r;
 }
@@ -203,3 +242,19 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     }
     return r;
 }
+
+int reaction_compare(const void *a, const void *b) {
+    const reaction *r_a = *((const reaction **)a);
+    const reaction *r_b = *((const reaction **)b);
+    if(r_a == NULL)
+        return 1; /* TODO: or 1? */
+    if(r_b == NULL)
+        return -1; /* TODO: or -1? */
+    const jibal_isotope *isotope_a = r_a->target;
+    const jibal_isotope *isotope_b = r_b->target;
+    if(isotope_a->Z == isotope_b->Z) { /* Same Z, compare by A */
+        return isotope_a->A - isotope_b->A;
+    } else {
+        return isotope_a->Z - isotope_b->Z;
+    }
+};
