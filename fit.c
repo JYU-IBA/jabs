@@ -165,6 +165,9 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     struct fit_data *f = malloc(sizeof(struct fit_data));
     f->n_iters_max = FIT_ITERS_MAX;
     f->n_fit_ranges = 0;
+    f->xtol = FIT_XTOL;
+    f->gtol = FIT_GTOL;
+    f->ftol = FIT_FTOL;
     f->fit_ranges = NULL;
     f->jibal = jibal;
     f->sim = sim;
@@ -344,7 +347,8 @@ int fit(struct fit_data *fit_data) {
     const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
     gsl_multifit_nlinear_workspace *w;
     gsl_multifit_nlinear_parameters fdf_params = gsl_multifit_nlinear_default_parameters();
-    fdf_params.trs = gsl_multifit_nlinear_trs_lmaccel;
+    fdf_params.trs = gsl_multifit_nlinear_trs_lm;
+    fdf_params.solver = gsl_multifit_nlinear_solver_svd; /* Robust? */
     struct fit_params *fit_params = fit_data->fit_params;
     if(!fit_params || fit_params->n == 0) {
         jabs_message(MSG_ERROR, stderr, "No parameters to fit.\n");
@@ -431,12 +435,7 @@ int fit(struct fit_data *fit_data) {
         gsl_vector_set(x, i, *fit_params->func_params[i]); /* Initial values of fitted parameters from function parameter array */
     }
 
-
     gsl_vector_view wts = gsl_vector_view_array(weights, i_w);
-
-    const double xtol = FIT_XTOL;
-    const double gtol = FIT_GTOL;
-    const double ftol = FIT_FTOL;
 
 /* allocate workspace with default parameters */
     w = gsl_multifit_nlinear_alloc (T, &fdf_params, fdf.n, fdf.p);
@@ -449,7 +448,7 @@ int fit(struct fit_data *fit_data) {
     gsl_blas_ddot(f, f, &chisq0);
 
 /* solve the system with a maximum of n_iters_max iterations */
-    status = gsl_multifit_nlinear_driver(fit_data->n_iters_max, xtol, gtol, ftol, fit_callback, fit_data, &info, w);
+    status = gsl_multifit_nlinear_driver(fit_data->n_iters_max, fit_data->xtol, fit_data->gtol, fit_data->ftol, fit_callback, fit_data, &info, w);
 
 /* compute covariance of best fit parameters */
     J = gsl_multifit_nlinear_jac(w);

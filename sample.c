@@ -86,7 +86,15 @@ void sample_model_renormalize(sample_model *sm) {
         jibal_material_normalize(sm->materials[i_mat]);
     }
 #endif
-    for(size_t i = sm->n_ranges; i--;) {
+    for(size_t i = 0; i < sm->n_ranges; i++) {
+        //fprintf(stderr, "Range %zu: %g tfu\n", i, sm->ranges[i].x/C_TFU);
+        if(sm->type == SAMPLE_MODEL_LAYERED) {
+            if(sm->ranges[i].x < 0.0)
+                sm->ranges[i].x = 0.0;
+        } else if (sm->type == SAMPLE_MODEL_POINT_BY_POINT) {
+            if(i && sm->ranges[i].x < sm->ranges[i-1].x)
+                sm->ranges[i].x = sm->ranges[i-1].x; /* TODO: is this enough? */
+        }
         double sum = 0.0;
         for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
             if(*(sample_model_conc_bin(sm, i, i_mat)) < 0.0)

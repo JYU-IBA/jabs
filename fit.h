@@ -58,7 +58,11 @@ typedef struct fit_data {
     struct roi *fit_ranges; /* Array of fit_range, size n_fit_ranges, freed by fit_data_free() */
     size_t n_fit_ranges;
     size_t n_iters_max;
+    double xtol;
+    double gtol;
+    double ftol;
     double dof;
+    //int lm_accel;
     struct fit_stats stats;
 } fit_data;
 

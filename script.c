@@ -178,7 +178,7 @@ int script_show(script_session *s, int argc, char * const *argv) {
         return EXIT_SUCCESS;
     }
     if(strcmp(argv[0], "vars") == 0) {
-        jibal_config_file_write(s->cf, NULL);
+        jibal_config_file_write(s->cf, NULL); /* TODO: jabs_message() */
         return EXIT_SUCCESS;
     }
     fprintf(stderr, "Don't know what \"%s\" is.\n", argv[0]);
@@ -415,6 +415,9 @@ jibal_config_var *script_make_vars(script_session *s) {
             {JIBAL_CONFIG_VAR_BOOL,     "erd",              &sim->erd,                  NULL},
             {JIBAL_CONFIG_VAR_BOOL,     "rbs",              &sim->rbs,                  NULL},
             {JIBAL_CONFIG_VAR_SIZE,     "fit_maxiter",      &fit->n_iters_max,          NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE,   "fit_xtol",         &fit->xtol,          NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE,   "fit_gtol",         &fit->gtol,          NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE,   "fit_ftol",         &fit->ftol,          NULL},
             {JIBAL_CONFIG_VAR_BOOL,     "ds",               &sim->params.ds,            NULL},
             {JIBAL_CONFIG_VAR_BOOL,     "rk4",              &sim->params.rk4,           NULL},
             {JIBAL_CONFIG_VAR_UNIT,     "stopstep_incident",    &sim->params.stop_step_incident,    NULL},
@@ -459,7 +462,10 @@ int script_fit(script_session *s, int argc, char * const *argv) {
     }
     fit_params_free(fit_data->fit_params);
     fit_data->fit_params = fit_params_new();
-    fit_params_add(fit_data->sim, fit_data->sm, fit_data->fit_params, argv[0]);
+    if(fit_params_add(fit_data->sim, fit_data->sm, fit_data->fit_params, argv[0])) {
+        jabs_message(MSG_ERROR, stderr, "Could not add some fit parameters.\n");
+        return EXIT_FAILURE;
+    }
     if(fit_data->fit_params->n == 0) {
         jabs_message(MSG_ERROR, stderr, "No parameters for fit.\n");
         return -1;

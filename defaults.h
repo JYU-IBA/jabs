@@ -41,7 +41,7 @@
 #define DUAL_SCATTER_POLAR_STEPS 13
 #define DUAL_SCATTER_AZI_STEPS 11
 #define FIT_ITERS_MAX 100
-#define FIT_XTOL (1e-6)
-#define FIT_GTOL (1e-6)
-#define FIT_FTOL (1e-6)
+#define FIT_XTOL (1e-7)
+#define FIT_GTOL (1e-7)
+#define FIT_FTOL (1e-7)
 #endif // JABS_DEFAULTS_H

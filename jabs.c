@@ -542,12 +542,13 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
     return EXIT_SUCCESS;
 }
 
-void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, const char *fit_vars) {
+int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, const char *fit_vars) {
 #ifdef DEBUG
     fprintf(stderr, "fitvars = %s\n", fit_vars);
 #endif
+    int status = EXIT_SUCCESS;
     if(!fit_vars)
-        return;
+        return EXIT_FAILURE;
     char *token, *s, *s_orig;
     s_orig = s = strdup(fit_vars);
     assert(s != NULL);
@@ -603,7 +604,8 @@ void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params,
                     fit_params_add_parameter(params, &sm->ranges[i_layer - 1].rough.x);
                     jabs_message(MSG_INFO, stderr, "Added fit parameter for roughness of layer %zu\n",  i_layer);
                 } else {
-                    jabs_message(MSG_INFO, stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
+                    jabs_message(MSG_ERROR, stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
+                    status = EXIT_FAILURE;
                 }
             }
             if(strncmp(token, "thickness", 9) == 0 && strlen(token) > 9) {
@@ -612,21 +614,46 @@ void fit_params_add(simulation *sim, const sample_model *sm, fit_params *params,
                     fit_params_add_parameter(params, &sm->ranges[i_layer - 1].x);
                     jabs_message(MSG_INFO,stderr, "Added fit parameter for thickness of layer %zu\n",  i_layer);
                 } else {
-                    jabs_message(MSG_INFO,stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
+                    jabs_message(MSG_ERROR,stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
+                    status = EXIT_FAILURE;
                 }
             }
             size_t i, j;
             if(sscanf(token, "conc%lu_%lu", &i, &j) == 2) {
                 if(i >= 1 && i <= sm->n_ranges && j >= 1 && j <= sm->n_materials) {
                     fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, j - 1));
-                    jabs_message(MSG_INFO,stderr, "Added fit parameter for concentration of %s in layer %zu\n", sm->materials[j - 1]->name, i);
+                    jabs_message(MSG_INFO, stderr, "Added fit parameter for concentration of %s in layer %zu\n", sm->materials[j - 1]->name, i);
                 } else {
-                    jabs_message(MSG_INFO,stderr, "No element %lu in layer %lu\n", j, i);
+                    jabs_message(MSG_ERROR, stderr, "No element %lu in layer %lu\n", j, i);
+                    status = EXIT_FAILURE;
+                }
+            } else if(sscanf(token, "conc%lu_", &i) == 1) {
+                if(i >= 1 && i <= sm->n_ranges) {
+                    char *material_name;
+                    for(material_name = token; *material_name != '_'; material_name++);
+                    material_name++;
+                    int found = FALSE;
+                    for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+                        if(strcmp(sm->materials[i_mat]->name, material_name) == 0) {
+                            fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, i_mat));
+                            jabs_message(MSG_INFO,stderr, "Added fit parameter for concentration of %s (material number %zu) in layer %zu\n", sm->materials[i_mat]->name, i_mat + 1, i);
+                            found = TRUE;
+                            break;
+                        }
+                    }
+                    if(!found) {
+                        jabs_message(MSG_ERROR, stderr, "No material %s\n", material_name);
+                        status = EXIT_FAILURE;
+                    }
+                } else {
+                    jabs_message(MSG_ERROR, stderr, "No layer %lu\n", i);
+                    status = EXIT_FAILURE;
                 }
             }
         }
     }
     free(s_orig);
+    return status;
 }
 
 
