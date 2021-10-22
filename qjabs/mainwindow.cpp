@@ -74,6 +74,19 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+void MainWindow::openFile(const QString &filename)
+{
+    QFile file(filename);
+    if(file.open(QFile::ReadOnly | QFile::Text)) {
+        ui->plainTextEdit->setPlainText(file.readAll());
+        file.close();
+        resetAll();
+        setFilename(filename);
+        needsSaving = false;
+        updateWindowTitle();
+    }
+}
+
 
 int MainWindow::runLine(const QString &line, size_t lineno) {
     int status = 0;
@@ -245,15 +258,7 @@ void MainWindow::on_action_Open_File_triggered()
     if(filename.isEmpty()) {
         return;
     }
-    QFile file(filename);
-    if(file.open(QFile::ReadOnly | QFile::Text)) {
-        ui->plainTextEdit->setPlainText(file.readAll());
-        file.close();
-        resetAll();
-        setFilename(filename);
-        needsSaving = false;
-        updateWindowTitle();
-    }
+
 }
 
 

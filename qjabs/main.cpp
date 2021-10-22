@@ -1,5 +1,7 @@
 #include <QApplication>
 #include <QLocale>
+#include <QFileOpenEvent>
+#include <QtDebug>
 #include <cstdarg>
 #include <clocale>
 #include "mainwindow.h"
@@ -11,17 +13,44 @@ extern "C" {
 
 
 
+class QJaBSApplication : public QApplication
+{
+public:
+    QJaBSApplication(int &argc, char **argv)
+        : QApplication(argc, argv)
+    {
+    }
+
+    bool event(QEvent *event) override
+    {
+        if (event->type() == QEvent::FileOpen) {
+            QFileOpenEvent *openEvent = static_cast<QFileOpenEvent *>(event);
+           openEvent->file();
+           mainWindow->openFile(openEvent->file());
+        }
+
+        return QApplication::event(event);
+    }
+    void setMainWindow(MainWindow *mw) {mainWindow = mw;}
+private:
+    MainWindow *mainWindow;
+};
+
 
 MainWindow *mainWindow; /* Dirty trick! jabs_message needs to know the address of MainWindow, but we don't want to mess with the function signature (to pass a pointer directly), since jabs_message() has an alternate implementation in the CLI version. */
 
 int main(int argc, char *argv[])
 {
     setlocale(LC_NUMERIC,"C");
-    QApplication a(argc, argv);
+    QJaBSApplication a(argc, argv);
     setlocale(LC_NUMERIC,"C");  /* This should force C part of JaBS to use "." as a decimal separator even when locale says it is ",". */
     MainWindow w;
     mainWindow = &w;
+    a.setMainWindow(&w);
     w.show();
+    if(argc == 2) {
+        w.openFile(argv[1]);
+    }
     return a.exec();
 }
 

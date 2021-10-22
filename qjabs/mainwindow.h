@@ -32,6 +32,9 @@ public:
     void addMessage(const char *msg);
     ~MainWindow();
 
+public slots:
+    void openFile(const QString &filename);
+
 private slots:
     void on_action_Run_triggered();
 
