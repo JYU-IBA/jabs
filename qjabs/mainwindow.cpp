@@ -258,7 +258,7 @@ void MainWindow::on_action_Open_File_triggered()
     if(filename.isEmpty()) {
         return;
     }
-
+    openFile(filename);
 }
 
 
