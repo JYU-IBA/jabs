@@ -252,6 +252,10 @@ int reaction_compare(const void *a, const void *b) {
         return -1; /* TODO: or -1? */
     const jibal_isotope *isotope_a = r_a->target;
     const jibal_isotope *isotope_b = r_b->target;
+    if(r_a->type < r_b->type)
+        return -1;
+    if(r_a->type > r_b->type)
+        return 1;
     if(isotope_a->Z == isotope_b->Z) { /* Same Z, compare by A */
         return isotope_a->A - isotope_b->A;
     } else {
