@@ -239,6 +239,7 @@ void SpectrumPlot::updateVerticalRange(bool force)
         return;
     double ymin;
     double ymax = getVerticalMaximum();
+    ymax *= 1.1;
     if(logscale) {
         ymin = 0.5;
         ymax = pow(10, ceil(log10(ymax))); /* lowest power of ten larger than actual maximum, .e.g     100000 for 12345 */
