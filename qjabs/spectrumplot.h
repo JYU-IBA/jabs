@@ -41,6 +41,7 @@ private:
     QFont legendFont;
     QAction *logAction;
     QAction *autoRangeAction;
+    QCPLayoutGrid *subLayout;
 };
 
 #endif // SPECTRUMPLOT_H

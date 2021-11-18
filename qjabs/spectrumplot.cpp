@@ -4,12 +4,16 @@ SpectrumPlot::SpectrumPlot(QWidget *parent) : QCustomPlot(parent) {
     setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
     xAxis->setLabel("Channel");
     yAxis->setLabel("Counts");
-    QCPLayoutGrid *subLayout = new QCPLayoutGrid;
+#ifdef SPECTRUM_PLOT_LABEL_OUTSIDE
+    subLayout = new QCPLayoutGrid;
     plotLayout()->addElement(1, 0, subLayout);
-    subLayout->setMargins(QMargins(0, 0, 5, 5));
+    subLayout->setMargins(QMargins(5, 0, 5, 5));
     subLayout->addElement(0, 0, legend);
+#endif
     legend->setFillOrder(QCPLegend::foColumnsFirst);
     legend->setWrap(5);
+    legend->setBorderPen(QPen(Qt::NoPen));
+    legend->setBrush(QBrush(QColor(255,255,255,127)));
     plotLayout()->setRowStretchFactor(1, 0.001);
     legend->setSelectableParts(QCPLegend::spItems);
     legend->setVisible(true);
@@ -37,7 +41,9 @@ void SpectrumPlot::drawDataToChart(const QString &name, double *data, int n, con
 {
     addGraph();
     graph()->setLineStyle(QCPGraph::lsStepLeft); /*  GSL histograms store the left edge of bin */
-    graph()->setPen(color);
+    QPen graphPen;
+    graphPen.setColor(color);
+    graph()->setPen(graphPen);
     graph()->setName(name);
     double maxy = 0.0;
     double maxx = 0.0;
@@ -157,7 +163,7 @@ void SpectrumPlot::setAutoRange(bool value)
 
 void SpectrumPlot::updateMaxima()
 {
-
+    free(subLayout);
 }
 
 void SpectrumPlot::resetZoom()
