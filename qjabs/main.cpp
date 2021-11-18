@@ -24,11 +24,9 @@ public:
     bool event(QEvent *event) override
     {
         if (event->type() == QEvent::FileOpen) {
-            QFileOpenEvent *openEvent = static_cast<QFileOpenEvent *>(event);
-           openEvent->file();
+           QFileOpenEvent *openEvent = static_cast<QFileOpenEvent *>(event);
            mainWindow->openFile(openEvent->file());
         }
-
         return QApplication::event(event);
     }
     void setMainWindow(MainWindow *mw) {mainWindow = mw;}
