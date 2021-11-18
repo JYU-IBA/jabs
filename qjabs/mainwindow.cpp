@@ -56,6 +56,8 @@ MainWindow::MainWindow(QWidget *parent)
     needsSaving = false;
     updateWindowTitle();
     firstRun = true;
+    statusBar()->showMessage(QString("JaBS ") + jabs_version() + ", cwd: " +  QDir::currentPath(), 2000);
+
 }
 
 void MainWindow::addMessage(const char *msg)
@@ -293,8 +295,10 @@ void MainWindow::setFilename(const QString &filename)
     QFile file(filename);
     QFileInfo fi(file);
     MainWindow::filebasename = fi.baseName();
-    setWindowFilePath(filename);
-    QDir::setCurrent(fi.absolutePath());
+    setWindowFilePath(fi.absoluteFilePath());
+    if(!QDir::setCurrent(fi.absolutePath())) {
+        qDebug() << "Can't set the current working directory!";
+    }
 }
 
 
