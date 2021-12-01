@@ -33,7 +33,7 @@ void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) 
         }
         jabs_message(MSG_INFO, f, "%3zu: %4s with %5s (reaction product %s).", i + 1, reaction_name(r), r->target->name, r->product->name);
         if(r->type == REACTION_FILE) {
-            jabs_message(MSG_INFO, f, " Incident = %s, Theta = %g deg, E = [%g keV, %g keV]. Data from file \"%s\".\n", r->incident->name, r->theta/C_DEG, r->cs_table[0].E/C_KEV, r->cs_table[r->n_cs_table-1].E/C_KEV, r->filename);
+            jabs_message(MSG_INFO, f, " Incident = %s, Theta = %g deg, E = [%g keV, %g keV]. Q = %g MeV. Data from file \"%s\".\n", r->incident->name, r->theta/C_DEG, r->cs_table[0].E/C_KEV, r->cs_table[r->n_cs_table-1].E/C_KEV, r->Q/C_MEV, r->filename);
         } else {
             jabs_message(MSG_INFO, f, " %s cross sections (built-in).", jibal_cs_types[r->cs]);
             if(r->E_max < E_MAX || r->E_min > 0.0) {
@@ -221,7 +221,7 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
         return NULL;
     }
     r->theta = rfile->theta * C_DEG;
-    r->Q = rfile->Qvalues[0]; /* TODO: other values? */
+    r->Q = rfile->Qvalues[0] * C_KEV; /* TODO: other values? */
     if(rfile->filename) {
         r->filename = strdup(rfile->filename);
     } else {
@@ -262,4 +262,33 @@ int reaction_compare(const void *a, const void *b) {
     } else {
         return isotope_a->Z - isotope_b->Z;
     }
+}
+
+double reaction_product_energy(const reaction *r, double theta, double E) { /* Hint: call with E == 1.0 to get kinematic factor */
+    const double Q = r->Q;
+    if(Q == 0.0) {
+        if(r->product == r->incident) {
+            return jibal_kin_rbs(r->incident->mass, r->target->mass, theta, '+')*E;
+        }  else if(r->product == r->target) {
+            return jibal_kin_erd(r->incident->mass, r->target->mass, theta)*E;
+        } else {
+            jabs_message(MSG_WARNING, stderr, "Warning: Reaction Q value is zero for reaction \"%s\" but based on incident %s, target %s and product %s I don't know what to do.\n", r->incident->name, r->target->name, r->product->name);
+            return 0.0;
+        }
+    }
+    double m1 = r->incident->mass;
+    double m2 = r->target->mass;
+    double m3 = r->product->mass;
+    double m4 = r->product_nucleus->mass;
+    double E_total = E + Q;
+    double a13 = ((m1 * m3)/((m1 + m2)*(m3 + m4))) * (E / E_total);
+    double a24 = ((m2 * m4)/((m1 + m2)*(m3 + m4))) * (1 + (m1/m2) * Q / E_total);
+    if(a13 > a24) {
+        double theta_max = sqrt(asin(a24/a13));
+        if(theta > theta_max) {
+            return 0.0;
+        }
+    }
+    double E_out = E_total * a13 * pow2(cos(theta) + sqrt(a24/a13 - pow2(sin(theta)))); /* Solution with '-' is ignored. */
+    return E_out;
 }

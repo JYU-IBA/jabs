@@ -299,8 +299,16 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             continue;
         }
         ion *p = &r->p;
-        p->E = ion1.E * r->K;
-        p->S = ion1.S * r->K;
+        if(r->r->Q == 0.0) { /* TODO: replace check with int */
+            p->E = ion1.E * r->K;
+            p->S = ion1.S * r->K;
+        } else {
+            p->E = reaction_product_energy(r->r, r->theta, ion1.E);
+            p->S = ion1.S * p->E/ion1.E; /* TODO: this is probably not correct. Or maybe it is? */
+#ifdef DEBUG
+            fprintf(stderr, "Reaction max energy out %g keV.\n", p->E);
+#endif
+        }
         r->max_depth = sample_isotope_max_depth(sample, r->i_isotope);
         set_ion_exit_angles(ws->sim, ws->det, p); /* Calculating this for every reaction is not necessary (the angles are the same), but what do we know... */
         sim_reaction_reset_bricks(r);
@@ -382,8 +390,18 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
                 continue;
             }
             brick *b = &r->bricks[i_depth];
-            r->p.E = ion1.E * r->K;
-            r->p.S = ion1.S * r->K;
+
+            if(r->r->Q == 0.0) { /* TODO: replace check with int */
+                r->p.E = ion1.E * r->K;
+                r->p.S = ion1.S * r->K;
+            } else {
+                r->p.E = reaction_product_energy(r->r, r->theta, ion1.E);
+                r->p.S = ion1.S * r->p.E/ion1.E; /* TODO: this is probably not correct. Or maybe it is? */
+#ifdef DEBUG
+                fprintf(stderr, "Reaction energy out %g keV.\n", r->p.E/C_KEV);
+#endif
+            }
+
             b->d = d_after;
             b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
             assert(r->p.E > 0.0);
@@ -415,8 +433,8 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
                 b->Q = ion1.inverse_cosine_theta * sigma_conc * d_diff;
                 assert(b->Q >= 0.0);
 #ifdef DEBUG
-                fprintf(stderr, "    %s: type=%i, E_front = %.3lf, E_after = %.3lf, E_out = %.3lf (sigma*conc = %g mb/sr, Q = %g (thickness = %.4lf tfu)\n",
-                                 r->r->target->name, r->r->type, E_front/C_KEV, (ion1.E * r->K)/C_KEV, r->p.E/C_KEV, sigma_conc/C_MB_SR, b->Q, d_diff/C_TFU);
+                fprintf(stderr, "    %s: type=%i, E_front = %.3lf, E_back = %.3lf, E_out = %.3lf (sigma*conc = %g mb/sr, Q = %g (thickness = %.4lf tfu)\n",
+                        r->r->target->name, r->r->type, E_front/C_KEV, E_back/C_KEV, r->p.E/C_KEV, sigma_conc/C_MB_SR, b->Q, d_diff/C_TFU);
 #endif
             } else {
                 b->Q = 0.0;

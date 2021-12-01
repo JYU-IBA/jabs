@@ -288,6 +288,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ion_nuclear_stop_fill_params(&ws->ion, jibal->isotopes, n_isotopes);
 
     ws->stopping_type = GSTO_STO_TOT;
+
     sim_workspace_recalculate_n_channels(ws, sim);
 
     if(ws->n_channels == 0) {
@@ -387,8 +388,19 @@ void sim_workspace_free(sim_workspace *ws) {
 }
 
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim) { /* TODO: assumes calibration function is increasing */
+    double E_max = 0.0;
+    for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
+        double E = reaction_product_energy(sim->reactions[i_reaction], ws->det->theta, sim->beam_E);
+        if(E > E_max) {
+            E_max = E;
+        }
+    }
+    E_max *= 1.1 + ws->det->resolution*3.0;
+#ifdef DEBUG
+    fprintf(stderr, "E_max of this simulation is %g keV\n", E_max/C_KEV);
+#endif
     size_t i=0;
-    while(detector_calibrated(ws->det, i) < 1.1*sim->beam_E && i <= 1000000) {i++;}
+    while(detector_calibrated(ws->det, i) < E_max && i <= 1000000) {i++;}
 #ifdef DEBUG
     fprintf(stderr, "Simulating %zu channels\n", i);
 #endif
@@ -453,38 +465,6 @@ void convolute_bricks(sim_workspace *ws) {
     }
 }
 
-double sim_reaction_product_energy(const sim_reaction *sim_r, double E) { /* Hint: call with E == 1.0 to get kinematic factor */
-    const jibal_isotope *incident = sim_r->r->incident;
-    const jibal_isotope *target = sim_r->r->target;
-    const jibal_isotope *product = sim_r->r->product;
-    const double Q = sim_r->r->Q;
-    if(Q == 0.0) {
-        if(product == incident) {
-            return jibal_kin_rbs(sim_r->r->incident->mass, sim_r->r->target->mass, sim_r->theta, '+')*E;
-        }  else if(product == target) {
-            return jibal_kin_erd(sim_r->r->incident->mass, sim_r->r->target->mass, sim_r->theta)*E;
-        } else {
-            jabs_message(MSG_WARNING, stderr, "Warning: Reaction Q value is zero for reaction \"%s\" but based on incident %s, target %s and product %s I don't know what to do.\n", incident->name, target->name, product->name);
-            return 0.0;
-        }
-    }
-    double m1 = sim_r->r->incident->mass;
-    double m2 = sim_r->r->target->mass;
-    double m3 = sim_r->r->product->mass;
-    double m4 = sim_r->r->product_nucleus->mass;
-    double E_total = E + Q;
-    double a13 = ((m1 * m3)/((m1 + m2)*(m3 + m4))) * (E / E_total);
-    double a24 = ((m2 * m4)/((m1 + m2)*(m3 + m4))) * (1 + (m1/m2) * Q / E_total);
-    if(a13 > a24) {
-        double theta_max = sqrt(asin(a24/a13));
-        if(sim_r->theta > theta_max) {
-            return 0.0;
-        }
-    }
-    double E_out = E_total * a13 * pow2(cos(sim_r->theta) + sqrt(a24/a13 - pow2(sin(sim_r->theta)))); /* Solution with '-' is ignored. */
-    return E_out;
-}
-
 void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
     /* Calculate variables for Rutherford (and Andersen) cross sections. This is done for all reactions, even if they are not RBS or ERD reactions! */
     if(!sim_r || !sim_r->r)
@@ -494,7 +474,7 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
     const jibal_isotope *product = sim_r->r->product;
     sim_r->E_cm_ratio = target->mass / (incident->mass + target->mass);
     sim_r->mass_ratio = incident->mass / target->mass;
-    sim_r->K = sim_reaction_product_energy(sim_r, 1.0);
+    sim_r->K = reaction_product_energy(sim_r->r, sim_r->theta, 1.0);
     sim_r->cs_constant = 0.0;
     sim_r->theta_cm = 0.0;
     if(product == incident) { /* RBS */
@@ -520,7 +500,7 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
     sim_r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0)); /* Factors for Andersen correction */
     sim_r->r_VE_factor2 = pow2(0.5 / sin(sim_r->theta_cm / 2.0));
 #ifdef DEBUG
-    fprintf(stderr, "Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g\n", sim_r->theta/C_DEG, sim_r->theta_cm/C_DEG, sim_r->K);
+    fprintf(stderr, "Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g (valid for RBS and ERD)\n", sim_r->theta/C_DEG, sim_r->theta_cm/C_DEG, sim_r->K);
 #endif
 }
 
