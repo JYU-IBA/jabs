@@ -65,6 +65,17 @@ int script_load(script_session *s, int argc, char * const *argv) {
             return EXIT_SUCCESS;
         }
         return fit_data_add_det(fit, detector_from_file(fit->jibal, argv[1])); /* Adds a new detector (and space for experimental spectrum) */
+    } else if(strcmp(argv[0], "detectors") == 0) {
+        if(argc != 2) {
+            jabs_message(MSG_INFO, stderr, "Usage: load detectors file\n");
+            return EXIT_FAILURE;
+        }
+        size_t n_d = 0;
+        detector **d = detectors_from_file(fit->jibal, argv[1], &n_d);
+        if(d && n_d) {
+            /* TODO: set detectors, number of detectors etc... Clear spectra? */
+            fit->sim->det = d;
+        }
     } else if(strcmp(argv[0], "exp") == 0) {
         size_t i_det = 1;
         if(argc == 3) {
@@ -238,10 +249,6 @@ int script_set(script_session *s, int argc, char * const *argv) {
         if(argc != 3) {
             jabs_message(MSG_ERROR, stderr, "Usage: set det [number] variable value\n");
             return EXIT_FAILURE;
-        }
-        if(fit->sim->n_det == 0) {
-            jabs_message(MSG_VERBOSE, stderr, "No detectors defined. Detector added with default values.\n");
-            fit_data_add_det(fit, detector_default(NULL));
         }
         if(detector_set_var(s->jibal, sim_det(fit->sim, i_det), argv[1], argv[2])) {
             jabs_message(MSG_ERROR, stderr, "Can't set \"%s\" to be \"%s\"!\n", argv[1], argv[2]);
@@ -687,16 +694,11 @@ int script_process(script_session *s, const char *filename) {
         if(!interactive) {
             jabs_message(MSG_INFO, stderr, "%s%s\n", prompt, line);
         }
-        char **argv = string_to_argv(line);
+        int argc = 0;
+        char **argv = string_to_argv(line, &argc);
         if(!argv) {
             jabs_message(MSG_ERROR, stderr, "Something went wrong in parsing arguments.\n");
             continue;
-        }
-        char **a = argv;
-        int argc = 0;
-        while(*a != NULL) {
-            a++;
-            argc++;
         }
 #ifdef DEBUG
         for(int i = 0; i < argc; i++) {
@@ -731,8 +733,7 @@ int script_process(script_session *s, const char *filename) {
                 }
             }
         }
-        free(argv[0]);
-        free(argv);
+        argv_free(argv, argc);
         if(exit_session)
             break;
         if(interactive) {

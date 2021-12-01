@@ -583,23 +583,10 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const 
 }
 
 sample_model *sample_model_from_string(const jibal *jibal, const char *str) {
-    char **argv = string_to_argv(str);
-    if(!argv)
-        return NULL;
-    char **a = argv;
     int argc = 0;
-    while(*a != NULL) {
-#ifdef DEBUG
-        fprintf(stderr, "got \"%s\" from string_to_argv\n", *a);
-#endif
-        a++;
-        argc++;
-    }
-    if(argc < 1)
-        return NULL;
+    char **argv = string_to_argv(str, &argc);
     sample_model *sm = sample_model_from_argv(jibal, argc, argv);
-    free(argv[0]);
-    free(argv);
+    argv_free(argv, argc);
     return sm;
 }
 
@@ -625,7 +612,7 @@ void sample_areal_densities_print(FILE *f, const sample *sample, int print_isoto
             sum += 0.5 * ( *(sample_conc_bin(sample, j, i)) + *(sample_conc_bin(sample, j-1, i))) * thickness;
         }
         if (print_isotopes || i == sample->n_isotopes-1 || sample->isotopes[i]->Z != sample->isotopes[i+1]->Z) {
-            jabs_message(MSG_INFO, f, " %8.2lf", sum/C_TFU);
+            jabs_message(MSG_INFO, f, " %9.3lf", sum/C_TFU);
             sum = 0.0;
         }
     }
@@ -643,11 +630,11 @@ int sample_print(const char *filename, const sample *sample, int print_isotopes)
     int Z = 0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         if(print_isotopes) {
-            jabs_message(MSG_INFO, f, " %8s", sample->isotopes[i]->name);
+            jabs_message(MSG_INFO, f, " %9s", sample->isotopes[i]->name);
         } else if(Z != sample->isotopes[i]->Z){
             const char *s = sample->isotopes[i]->name;
             while(*s >= '0' && *s <= '9') {s++;} /* Skip numbers, e.g. 28Si -> Si */
-            jabs_message(MSG_INFO, f, " %8s", s);
+            jabs_message(MSG_INFO, f, " %9s", s);
             Z = sample->isotopes[i]->Z; /* New element */
         }
     }
@@ -659,7 +646,7 @@ int sample_print(const char *filename, const sample *sample, int print_isotopes)
         for (size_t j = 0; j < sample->n_isotopes; j++) {
             sum += sample->cbins[i * sample->n_isotopes + j];
             if (print_isotopes || j == sample->n_isotopes-1 || sample->isotopes[j]->Z != sample->isotopes[j+1]->Z) { /* Last isotope or next isotope belongs to another element, print. */
-                jabs_message(MSG_INFO, f, " %8.4lf", sum * 100.0);
+                jabs_message(MSG_INFO, f, " %9.4lf", sum * 100.0);
                 sum = 0.0;
             }
         }

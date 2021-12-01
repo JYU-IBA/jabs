@@ -453,6 +453,38 @@ void convolute_bricks(sim_workspace *ws) {
     }
 }
 
+double sim_reaction_product_energy(const sim_reaction *sim_r, double E) { /* Hint: call with E == 1.0 to get kinematic factor */
+    const jibal_isotope *incident = sim_r->r->incident;
+    const jibal_isotope *target = sim_r->r->target;
+    const jibal_isotope *product = sim_r->r->product;
+    const double Q = sim_r->r->Q;
+    if(Q == 0.0) {
+        if(product == incident) {
+            return jibal_kin_rbs(sim_r->r->incident->mass, sim_r->r->target->mass, sim_r->theta, '+')*E;
+        }  else if(product == target) {
+            return jibal_kin_erd(sim_r->r->incident->mass, sim_r->r->target->mass, sim_r->theta)*E;
+        } else {
+            jabs_message(MSG_WARNING, stderr, "Warning: Reaction Q value is zero for reaction \"%s\" but based on incident %s, target %s and product %s I don't know what to do.\n", incident->name, target->name, product->name);
+            return 0.0;
+        }
+    }
+    double m1 = sim_r->r->incident->mass;
+    double m2 = sim_r->r->target->mass;
+    double m3 = sim_r->r->product->mass;
+    double m4 = sim_r->r->product_nucleus->mass;
+    double E_total = E + Q;
+    double a13 = ((m1 * m3)/((m1 + m2)*(m3 + m4))) * (E / E_total);
+    double a24 = ((m2 * m4)/((m1 + m2)*(m3 + m4))) * (1 + (m1/m2) * Q / E_total);
+    if(a13 > a24) {
+        double theta_max = sqrt(asin(a24/a13));
+        if(sim_r->theta > theta_max) {
+            return 0.0;
+        }
+    }
+    double E_out = E_total * a13 * pow2(cos(sim_r->theta) + sqrt(a24/a13 - pow2(sin(sim_r->theta)))); /* Solution with '-' is ignored. */
+    return E_out;
+}
+
 void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
     /* Calculate variables for Rutherford (and Andersen) cross sections. This is done for all reactions, even if they are not RBS or ERD reactions! */
     if(!sim_r || !sim_r->r)
@@ -462,14 +494,14 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
     const jibal_isotope *product = sim_r->r->product;
     sim_r->E_cm_ratio = target->mass / (incident->mass + target->mass);
     sim_r->mass_ratio = incident->mass / target->mass;
+    sim_r->K = sim_reaction_product_energy(sim_r, 1.0);
+    sim_r->cs_constant = 0.0;
+    sim_r->theta_cm = 0.0;
     if(product == incident) { /* RBS */
         if(incident->mass >= target->mass && sim_r->theta > asin(target->mass / incident->mass)) {
-            sim_r->K = 0.0;
-            sim_r->cs_constant = 0.0;
             sim_r->stop = TRUE;
             return;
         }
-        sim_r->K = jibal_kin_rbs(sim_r->r->incident->mass, sim_r->r->target->mass, sim_r->theta, '+');
         sim_r->theta_cm = sim_r->theta + asin(sim_r->mass_ratio * sin(sim_r->theta));
         sim_r->cs_constant = (pow2(sin(sim_r->theta_cm))) / (pow2(sin(sim_r->theta)) * cos(sim_r->theta_cm - sim_r->theta)) *
                              pow2((incident->Z * C_E * target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) *
@@ -479,22 +511,12 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
 #ifdef DEBUG
             fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)\n", target->name, sim_r->theta);
 #endif
-            sim_r->K = 0.0;
-            sim_r->cs_constant = 0.0;
-            sim_r->theta_cm = 0.0;
             sim_r->stop = TRUE;
             return;
         }
-        sim_r->K = jibal_kin_erd(sim_r->r->incident->mass, sim_r->r->target->mass, sim_r->theta);
         sim_r->theta_cm = C_PI - 2.0 * sim_r->theta;
         sim_r->cs_constant = pow2(incident->Z * C_E * target->Z * C_E / (8 * C_PI * C_EPSILON0)) * pow2(1.0 + incident->mass / target->mass) * pow(cos(sim_r->theta), -3.0) * pow2(sim_r->E_cm_ratio);
-    } else {
-        sim_r->K = 0.0;
-        sim_r->cs_constant = 0.0;
-        sim_r->theta_cm = 0.0;
-        sim_r->stop = TRUE;
     }
-
     sim_r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0)); /* Factors for Andersen correction */
     sim_r->r_VE_factor2 = pow2(0.5 / sin(sim_r->theta_cm / 2.0));
 #ifdef DEBUG

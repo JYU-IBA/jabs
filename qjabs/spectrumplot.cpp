@@ -9,12 +9,12 @@ SpectrumPlot::SpectrumPlot(QWidget *parent) : QCustomPlot(parent) {
     plotLayout()->addElement(1, 0, subLayout);
     subLayout->setMargins(QMargins(5, 0, 5, 5));
     subLayout->addElement(0, 0, legend);
+    plotLayout()->setRowStretchFactor(1, 0.001);
 #endif
     legend->setFillOrder(QCPLegend::foColumnsFirst);
     legend->setWrap(5);
     legend->setBorderPen(QPen(Qt::NoPen));
     legend->setBrush(QBrush(QColor(255,255,255,127)));
-    plotLayout()->setRowStretchFactor(1, 0.001);
     legend->setSelectableParts(QCPLegend::spItems);
     legend->setVisible(true);
     legendFont = QFont(font());

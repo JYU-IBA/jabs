@@ -80,7 +80,7 @@ char *strsep_with_quotes(char **stringp, const char *delim) {
 
 /* End of code from NetBSD */
 
-char **string_to_argv(const char *str) {
+char **string_to_argv(const char *str, int *argc) { /* Returns allocated array of allocated strings, needs to be free'd (see argv_free()) */
     char *s = strdup(str);
     char *s_split = s;
     s[strcspn(s, "\r\n")] = 0;
@@ -92,9 +92,6 @@ char **string_to_argv(const char *str) {
             continue;
         }
         n++;
-    }
-    if(!n) {
-        free(s);
     }
     char **out = malloc(sizeof(char *) * (n + 1));
     out[0] = s;
@@ -108,9 +105,39 @@ char **string_to_argv(const char *str) {
             }
         }
     }
+    for(i = 0; i < n; i++) { /* We should have our final strings now, let's make deep copies */
+        out[i] = strdup(out[i]);
+    }
     out[n] = NULL;
+    if(argc) {
+        *argc = n;
+    }
+    free(s);
     return out;
 }
+
+void argv_free(char **argv, int argc) {
+    for(int i = 0; i < argc; i++) {
+        free(argv[i]);
+    }
+    free(argv);
+}
+
+int argc_from_argv(const char * const *argv) {
+    if(!argv)
+        return 0;
+    const char * const *a = argv;
+    int argc = 0;
+    while(*a != NULL) {
+#ifdef DEBUG
+        fprintf(stderr, "got \"%s\" from string_to_argv\n", *a);
+#endif
+        a++;
+        argc++;
+    }
+    return argc;
+}
+
 
 char *argv_to_string(int argc, char * const *argv) {
     if(argc < 1)

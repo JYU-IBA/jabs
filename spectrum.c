@@ -35,7 +35,7 @@ gsl_histogram *spectrum_read(const char *filename, const detector *det) {
     size_t n_columns = 0; /* Number of columns (largest in file) */
     char **columns = NULL; /* Will be (re)allocated later */
 #ifdef DEBUG
-    fprintf(stderr, "Reading experimental spectrum from file %s. Detector number is %lu and it can have up to %lu channels.\n", filename, det->number, det->channels);
+    fprintf(stderr, "Reading experimental spectrum from file %s. Detector column is %lu and it can have up to %lu channels.\n", filename, det->column, det->channels);
 #endif
     while(getline(&line, &line_size, in) > 0) {
         lineno++;

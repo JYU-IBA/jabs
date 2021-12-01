@@ -16,7 +16,8 @@
 #include <stdio.h>
 
 char *strsep_with_quotes(char **stringp, const char *delim);
-char **string_to_argv(const char *str);
+char **string_to_argv(const char *str, int *argc);
+void argv_free(char **argv, int argc);
 char *argv_to_string(int argc, char * const *argv);
 
 FILE *fopen_file_or_stream(const char *filename, const char *mode); /* opens file and returns file pointer, returns NULL if fails, stderr if filename is NULL, stdout if filename is "-" */

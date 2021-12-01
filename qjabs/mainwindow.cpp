@@ -94,16 +94,11 @@ int MainWindow::runLine(const QString &line, size_t lineno) {
     int status = 0;
     bool plot = FALSE;
     jabs_message(MSG_INFO, stderr, "jabs> %s\n", qPrintable(line));
-    char **argv = string_to_argv(qPrintable(line));
+    int argc = 0;
+    char **argv = string_to_argv(qPrintable(line), &argc);
     if(!argv) {
         jabs_message(MSG_ERROR, stderr, "Something went wrong in parsing arguments from %s.\n", qPrintable(line));
         return -1;
-    }
-    char **a = argv;
-    int argc = 0;
-    while(*a != NULL) {
-        a++;
-        argc++;
     }
 #ifdef DEBUG
     for(int i = 0; i < argc; i++) {
@@ -144,9 +139,8 @@ int MainWindow::runLine(const QString &line, size_t lineno) {
             jabs_message(MSG_ERROR, stderr, "Command \"%s\" not recognized.\n", argv[0]);
             status = EXIT_FAILURE;
         }
-        free(argv[0]);
-        free(argv);
     }
+    argv_free(argv, argc);
     return status;
 }
 

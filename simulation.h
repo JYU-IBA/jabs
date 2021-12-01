@@ -123,6 +123,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
 void sim_workspace_calculate_sum_spectra(sim_workspace *ws);
 void simulation_print(FILE *f, const simulation *sim);
 void convolute_bricks(sim_workspace *ws);
+double sim_reaction_product_energy(const sim_reaction *sim_r, double E);
 void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r);
 void sim_reaction_reset_bricks(sim_reaction *sim_r);
 double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);
