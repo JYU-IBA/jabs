@@ -58,28 +58,27 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
     return det;
 }
 
-detector *detectors_from_file(const jibal *jibal, const char *filename, size_t *n_detectors_out) {
-    /* TODO: make more generic table parser.
-     * Needs to have:
-     *  1. name of variable,
-     *  2. type for parsing (int, double, string),
-     *  3. conversion factor (doubles to SI units)
-     *  */
+detector **detectors_from_file(const jibal *jibal, const char *filename, size_t *n_detectors_out) {
     char *line = NULL;
     size_t line_size = 0;
     size_t lineno = 0;
     *n_detectors_out = 0;
 
-    int headers = 1;
     size_t n_detectors = 0;
-    detector *detectors = NULL;
+    detector **detectors = NULL;
     detector *det = NULL;
-    size_t i_slope = 0;
-
 
     FILE *in = fopen_file_or_stream(filename, "r");
     if(!in)
         return NULL;
+
+    char **header_strings = NULL;
+    int n_header_strings = 0;
+    if(getline(&line, &line_size, in) > 0) {
+        header_strings = string_to_argv(line, &n_header_strings);
+    } else {
+        return NULL;
+    }
 
     while(getline(&line, &line_size, in) > 0) {
         lineno++;
@@ -93,27 +92,19 @@ detector *detectors_from_file(const jibal *jibal, const char *filename, size_t *
             if(*col == '\0') {/* Multiple separators are treated as one */
                 continue;
             }
-            if(headers) { /* Headers */
-                if(strncmp(col, "slope", 5) == 0) {
-                    i_slope = n;
-                }
-                n++;
-                continue;
-            }
             if(n == 0) { /* First column, (re)allocate space for a new detector */
                 n_detectors++;
                 detectors = realloc(detectors, sizeof(detector) * (n_detectors));
-                det = detector_default(&detectors[n_detectors-1]);
+                det = detector_default(detectors[n_detectors-1]);
             }
-            double x = strtod(col, NULL);
-            if(n == i_slope) {
-                det->slope = x*C_KEV;
+            if(n < (size_t) n_header_strings) {
+                detector_set_var(jibal, det, header_strings[n], col);
             }
             n++;
         }
-        headers = 0;
     }
     *n_detectors_out = n_detectors;
+    argv_free(header_strings, n_header_strings);
     return detectors;
 }
 
