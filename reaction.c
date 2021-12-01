@@ -109,6 +109,7 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     r->n_cs_table = 0;
     r->E_min = 0.0;
     r->E_max = E_MAX;
+    r->Q = 0.0;
     switch(type) {
         case REACTION_ERD:
             r->product = target;
