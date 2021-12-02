@@ -30,7 +30,7 @@
 #define STOP_STEP_INCIDENT (0.0*C_KEV) /* Zero is automatic */
 #define STOP_STEP_EXITING (0.0*C_KEV) /* Zero is automatic */
 
-#define STOP_STEP_AUTO_FUDGE_FACTOR (1.0) /* Factor to automatic incident step size. TODO: make this runtime configurable */
+#define STOP_STEP_FUDGE_FACTOR (1.0) /* Factor to automatic incident step size. */
 #define SIMULATE_WARNING_LIMIT 10 /* Allowed number of non-critical warnings for each run of simulate() */
 
 /* Other constants */

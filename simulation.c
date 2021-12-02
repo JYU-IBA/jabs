@@ -69,6 +69,7 @@ sim_calc_params sim_calc_params_defaults(int ds, int fast) {
     p.n_ds = p.ds_steps_azi *  p.ds_steps_polar;
     p.stop_step_incident = STOP_STEP_INCIDENT;
     p.stop_step_exiting = STOP_STEP_EXITING;
+    p.stop_step_fudge_factor = STOP_STEP_FUDGE_FACTOR;
     p.cs_n_steps = CS_CONC_STEPS;
     p.cs_stragg_half_n = CS_STRAGG_HALF_N;
     p.depthsteps_max = 0; /* automatic */
@@ -327,7 +328,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
             r->n_bricks = ws->params.depthsteps_max;
         } else {
             if(ws->params.stop_step_incident == 0.0) { /* Automatic incident step size */
-                r->n_bricks = (int) ceil(sim->beam_E / (STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(ws->det->resolution)) + ws->sample->n_ranges); /* This is conservative */
+                r->n_bricks = (int) ceil(sim->beam_E / (ws->params.stop_step_fudge_factor*sqrt(ws->det->resolution)) + ws->sample->n_ranges); /* This is conservative */
             } else {
                 r->n_bricks = (int) ceil(sim->beam_E / ws->params.stop_step_incident + ws->sample->n_ranges); /* This is conservative */
             }

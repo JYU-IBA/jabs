@@ -353,7 +353,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         }
         const double E_front = ion1.E;
         const double S_front = ion1.S;
-        double E_step = ws->params.stop_step_incident == 0.0?STOP_STEP_AUTO_FUDGE_FACTOR*sqrt(ws->det->resolution+ion1.S):ws->params.stop_step_incident;
+        double E_step = ws->params.stop_step_incident == 0.0?ws->params.stop_step_fudge_factor*sqrt(ws->det->resolution+ion1.S):ws->params.stop_step_incident;
         depth d_after = stop_step(ws, &ion1, sample, d_before, E_step);
 #ifdef DEBUG
         fprintf(stderr, "After:  %g tfu in range %zu\n", d_after.x/C_TFU, d_after.i);

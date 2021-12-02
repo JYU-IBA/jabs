@@ -39,6 +39,7 @@ typedef struct {
     int mean_conc_and_energy;
     double stop_step_incident;
     double stop_step_exiting;
+    double stop_step_fudge_factor;
 } sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
 
 typedef struct {
