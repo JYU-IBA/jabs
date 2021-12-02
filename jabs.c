@@ -332,7 +332,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
 #ifdef DEBUG
         fprintf(stderr, "Ion was going sideways in the sample, we nudged it a little.\n");
 #endif
-        ion1.theta = 90.01 * C_DEG;
+        ion1.theta += 0.01 * C_DEG;
         ion1.cosine_theta = cos(ion1.theta);
         return;
     }
