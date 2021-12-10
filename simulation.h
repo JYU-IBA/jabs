@@ -131,4 +131,5 @@ double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E)
 double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);
 double sim_calculate_exit_angle(const simulation *sim, const detector *det);
 void sim_sort_reactions(const simulation *sim);
+void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident);
 #endif // JABS_SIMULATION_H

@@ -298,19 +298,9 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             r->max_depth = 0.0;
             continue;
         }
-        ion *p = &r->p;
-        if(r->r->Q == 0.0) { /* TODO: replace check with int */
-            p->E = ion1.E * r->K;
-            p->S = ion1.S * r->K;
-        } else {
-            p->E = reaction_product_energy(r->r, r->theta, ion1.E);
-            p->S = ion1.S * p->E/ion1.E; /* TODO: this is probably not correct. Or maybe it is? */
-#ifdef DEBUG
-            fprintf(stderr, "Reaction max energy out %g keV.\n", p->E);
-#endif
-        }
+        sim_reaction_product_energy_and_straggling(r, &ion1);
         r->max_depth = sample_isotope_max_depth(sample, r->i_isotope);
-        set_ion_exit_angles(ws->sim, ws->det, p); /* Calculating this for every reaction is not necessary (the angles are the same), but what do we know... */
+        set_ion_exit_angles(ws->sim, ws->det, &r->p); /* Calculating this for every reaction is not necessary (the angles are the same), but what do we know... */
         sim_reaction_reset_bricks(r);
         brick *b = &r->bricks[0];
         b->d = d_before;
@@ -320,8 +310,8 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             r->stop = TRUE;
         }
         post_scatter_exit(&r->p, b->d, ws, sample); /* Calculates the exit energy if calculation doesn't start from the surface */
-        b->E = p->E;
-        b->S = p->S;
+        b->E = r->p.E;
+        b->S = r->p.S;
 #ifdef DEBUG
         fprintf(stderr, "Simulation reaction %zu: %s %s. Max depth %g tfu. i_isotope=%zu, stop = %i.\nCross section at %g keV is %g mb/sr, exit %g keV\n",
                 i, reaction_name(r->r), r->r->target->name, r->max_depth / C_TFU, r->i_isotope, r->stop, ion1.E/C_KEV, r->cross_section(r, ion1.E)/C_MB_SR, p->E/C_KEV);
@@ -390,20 +380,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
                 continue;
             }
             brick *b = &r->bricks[i_depth];
-
-            if(r->r->Q == 0.0) { /* TODO: replace check with int */
-                r->p.E = ion1.E * r->K;
-                r->p.S = ion1.S * r->K;
-            } else {
-                r->p.E = reaction_product_energy(r->r, r->theta, ion1.E);
-                double epsilon = 0.001*C_KEV;
-                double deriv = (reaction_product_energy(r->r, r->theta, ion1.E+epsilon) - reaction_product_energy(r->r, r->theta, ion1.E+epsilon))/(2.0*epsilon); /* TODO: this derivative could be solved analytically */
-                r->p.S = ion1.S * deriv * ion1.E;
-#ifdef DEBUG
-                fprintf(stderr, "Reaction energy out %g keV.\n", r->p.E/C_KEV);
-#endif
-            }
-
+            sim_reaction_product_energy_and_straggling(r, &ion1);
             b->d = d_after;
             b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
             assert(r->p.E > 0.0);

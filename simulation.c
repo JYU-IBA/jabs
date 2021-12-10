@@ -571,3 +571,18 @@ double sim_calculate_exit_angle(const simulation *sim, const detector *det) {
 void sim_sort_reactions(const simulation *sim) {
     qsort(sim->reactions, sim->n_reactions, sizeof(reaction *), &reaction_compare);
 }
+
+void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident) {
+    if(r->r->Q == 0.0) {
+        r->p.E = incident->E * r->K;
+        r->p.S = incident->S * r->K;
+        return;
+    }
+    r->p.E = reaction_product_energy(r->r, r->theta, incident->E);
+    double epsilon = 0.01*C_KEV;
+    double deriv = (reaction_product_energy(r->r, r->theta, incident->E+epsilon) - r->p.E)/(epsilon); /* TODO: this derivative could be solved analytically */
+    r->p.S = incident->S * fabs(deriv) * incident->E;
+#ifdef DEBUG
+    fprintf(stderr, "deriv %g, E_out/E %g, E_out = %g keV, E = %g keV\n", deriv, r->p.E / ion1.E, r->p.E/C_KEV, ion1.E/C_KEV);
+#endif
+}
