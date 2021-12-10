@@ -396,7 +396,9 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
                 r->p.S = ion1.S * r->K;
             } else {
                 r->p.E = reaction_product_energy(r->r, r->theta, ion1.E);
-                r->p.S = ion1.S * r->p.E/ion1.E; /* TODO: this is probably not correct. Or maybe it is? */
+                double epsilon = 0.001*C_KEV;
+                double deriv = (reaction_product_energy(r->r, r->theta, ion1.E+epsilon) - reaction_product_energy(r->r, r->theta, ion1.E+epsilon))/(2.0*epsilon); /* TODO: this derivative could be solved analytically */
+                r->p.S = ion1.S * deriv * ion1.E;
 #ifdef DEBUG
                 fprintf(stderr, "Reaction energy out %g keV.\n", r->p.E/C_KEV);
 #endif
