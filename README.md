@@ -1,6 +1,6 @@
 # JaBS - Jaakko's Backscattering Simulator
 
-Simulates RBS spectra rapidly.
+Simulates RBS, ERD and NRA spectra rapidly.
     
     Copyright (C) 2021 Jaakko Julin
     
@@ -64,6 +64,7 @@ Detector and sample can be read from files. The file formats are simple and huma
 ### Implemented
  - Basic RBS spectrum simulation with atomic data, cross sections, electronic stopping and straggling given by [JIBAL](https://github.com/JYU-IBA/jibal)
  - Automatic recoil spectra when working in forward angles (ERDA)
+ - Arbitrary cross sections and reactions from R33 files. Both EBS (Q-value is zero) as well as p-p NRA are implemented. 
  - Point-by-point and layered sample models
  - Roughness (gamma distribution)
  - Arbitrary geometry, detector and sample tilt can be expressed in arbitrary spherical coordinates
@@ -74,7 +75,6 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Linear ad-hoc substrate channeling correction
  - Faster (less accurate) mode
  - User defined "molecules" i.e. elements with fixed concentration ratios (e.g. you can fit C in SiO2 without changing Si/O ratio)
- - Arbitrary cross sections (R33 files). Support is very preliminary and results are not to be trusted!
  - Weighting of cross-sections by straggling
  - Dual scattering model (although it needs improvements before it is usable)
  - Simultaneous multi-detector simulation and fitting.
@@ -86,7 +86,7 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Multiple scattering (small angle)
  - Kinematic (geometric) broadening
  - Simulation of pile-up and dead time
- - Non-linear detector response
+ - Non-linear detector response and different response for different particles (e.g. alphas, protons)
  - Simulation of time-of-flight spectra
  - Publication quality plotting
 
@@ -100,7 +100,7 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Detector numbering and usability issues with multidetector mode 
  - Point-by-point profiles are not tested (but should work)
  - Ad-hoc channeling correction is the same for all detectors
- - Zero reaction Q-value assumed (no NRA, only EBS)
+ - Detector calibration is the same for all particles (issue with NRA and ERD, but not for RBS and EBS)
  - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).
  - Dual scattering is benchmarked against SimNRA and is known to produce different results.
  - Adding detector related fit variables will add those for all detectors 
