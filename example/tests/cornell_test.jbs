@@ -1,0 +1,7 @@
+#!/usr/bin/env jabs
+set ion 4He
+set det theta 160deg
+set det phi 90deg
+set sample Au 1000tfu Si 20000tfu
+simulate
+save spectra "out.csv"

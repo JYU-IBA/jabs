@@ -1,0 +1,10 @@
+#!/usr/bin/env jabs
+#set ds true
+set ion a
+set energy 2MeV
+set det theta 160deg
+set det phi 0deg
+set alpha 0deg
+set sample Au 1tfu
+simulate
+save spectra "out.csv"
