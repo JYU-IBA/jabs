@@ -64,8 +64,8 @@ void sim_free(simulation *sim) {
 sim_calc_params sim_calc_params_defaults(int ds, int fast) {
     sim_calc_params p;
     p.ds = ds;
-    p.ds_steps_azi = DUAL_SCATTER_POLAR_STEPS;
-    p.ds_steps_polar = DUAL_SCATTER_AZI_STEPS;
+    p.ds_steps_azi = DUAL_SCATTER_AZI_STEPS;
+    p.ds_steps_polar = DUAL_SCATTER_POLAR_STEPS;
     p.n_ds = p.ds_steps_azi *  p.ds_steps_polar;
     p.stop_step_incident = STOP_STEP_INCIDENT;
     p.stop_step_exiting = STOP_STEP_EXITING;
