@@ -490,7 +490,7 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
     } else if(product == target) { /* ERD */
         if(sim_r->theta > C_PI/2.0) {
 #ifdef DEBUG
-            fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)\n", target->name, sim_r->theta);
+            fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)\n", target->name, sim_r->theta/C_DEG);
 #endif
             sim_r->stop = TRUE;
             return;
@@ -583,6 +583,6 @@ void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *inci
     double deriv = (reaction_product_energy(r->r, r->theta, incident->E+epsilon) - r->p.E)/(epsilon); /* TODO: this derivative could be solved analytically */
     r->p.S = incident->S * fabs(deriv) * incident->E;
 #ifdef DEBUG
-    fprintf(stderr, "deriv %g, E_out/E %g, E_out = %g keV, E = %g keV\n", deriv, r->p.E / ion1.E, r->p.E/C_KEV, ion1.E/C_KEV);
+    fprintf(stderr, "deriv %g, E_out/E %g, E_out = %g keV, E = %g keV\n", deriv, r->p.E / incident->E, r->p.E/C_KEV, incident->E/C_KEV);
 #endif
 }
