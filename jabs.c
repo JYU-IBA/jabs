@@ -263,13 +263,12 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
     double thickness = sample->ranges[sample->n_ranges-1].x;
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
-    fprintf(stderr, "Start of simulation, ion angles %g deg and %g deg.\n", incident->theta/C_DEG, incident->phi/C_DEG);
     double scatter_theta = scattering_angle(incident, ws);
     double theta_product, phi_product;
-    double beta;
     rotate(ws->det->theta, ws->det->phi, ws->sim->sample_theta, ws->sim->sample_phi, &theta_product, &phi_product); /* Detector in sample coordinate system */
-    beta = (C_PI-theta_product);
 #ifdef DEBUG
+    double beta;
+    beta = (C_PI-theta_product);
     ion_print(stderr, incident);
     fprintf(stderr, "Simulate from depth %g tfu (index %zu), detector theta = %g deg, calculated theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->det->theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
     fprintf(stderr, "Reaction product angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.\n", theta_product/C_DEG, phi_product/C_DEG, beta/C_DEG);
