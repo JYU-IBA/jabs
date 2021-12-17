@@ -243,32 +243,18 @@ void post_scatter_exit(ion *p, const depth depth_start, sim_workspace *ws, const
 }
 
 double scattering_angle(const ion *incident, sim_workspace *ws) { /* Calculate scattering angle necessary for ion (in sample coordinate system) to hit detector */
-
+    double theta, phi;
     double scatter_theta, scatter_phi;
-
-    rotate(ws->det->theta, ws->det->phi, incident->theta, incident->phi, &scatter_theta, &scatter_phi);/* Detector in ion system */
+    rotate(incident->theta, incident->phi, -1.0*ws->sim->sample_theta*1.0, ws->sim->sample_phi, &theta, &phi);
+    rotate(theta, phi, ws->det->theta, ws->det->phi, &scatter_theta, &scatter_phi);
 #ifdef DEBUG
-    fprintf(stderr, "Detector in ion system angles %g deg and %g deg.\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
-#endif
-    rotate(scatter_theta, scatter_phi, -1.0*ws->sim->sample_theta, ws->sim->sample_phi, &scatter_theta, &scatter_phi); /* Counter sample rotation. Detector in lab (usually). If ion was somehow "deflected" then this is the real scattering angle. Compare to sim->theta.  */
-#ifdef DEBUG
-    fprintf(stderr, "Incident angles %g deg and %g deg (in sample)\n", incident->theta/C_DEG, incident->phi/C_DEG);
-    fprintf(stderr, "Sample lab angles %g deg and %g deg, detector lab angles %g deg and %g deg\n", ws->sim->sample_theta/C_DEG, ws->sim->sample_phi/C_DEG, ws->det->theta/C_DEG, ws->det->phi/C_DEG);
-    fprintf(stderr, "Final lab scattering angles %g deg and %g deg\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
+    fprintf(stderr, "theta = %g deg, phi = %g deg.\n", theta/C_DEG, phi/C_DEG);
+    fprintf(stderr, "scatter_theta = %g deg, scatter_phi = %g deg.\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
     if(!ws->params.ds) {
         assert(fabs(ws->det->theta - scatter_theta) < 0.01 * C_DEG); /* with DS this assert will fail */
     }
 #endif
     return scatter_theta;
-}
-
-void set_ion_exit_angles(const simulation *sim, const detector *det, ion *p) {
-    double theta, phi; /* Generic polar and azimuth angles */
-    rotate(det->theta, det->phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Detector in sample coordinate system */
-    ion_set_angle(p, theta, phi);
-#ifdef DEBUG
-    fprintf(stderr, "Reaction angles (in sample) %g deg and %g deg\n", theta/C_DEG, phi/C_DEG);
-#endif
 }
 
 void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
@@ -277,10 +263,16 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
     double thickness = sample->ranges[sample->n_ranges-1].x;
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
+    fprintf(stderr, "Start of simulation, ion angles %g deg and %g deg.\n", incident->theta/C_DEG, incident->phi/C_DEG);
     double scatter_theta = scattering_angle(incident, ws);
+    double theta_product, phi_product;
+    double beta;
+    rotate(ws->det->theta, ws->det->phi, ws->sim->sample_theta, ws->sim->sample_phi, &theta_product, &phi_product); /* Detector in sample coordinate system */
+    beta = (C_PI-theta_product);
 #ifdef DEBUG
     ion_print(stderr, incident);
     fprintf(stderr, "Simulate from depth %g tfu (index %zu), detector theta = %g deg, calculated theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->det->theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
+    fprintf(stderr, "Reaction product angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.\n", theta_product/C_DEG, phi_product/C_DEG, beta/C_DEG);
 #endif
     depth d_before = depth_start;
     for(size_t i = 0; i < ws->n_reactions; i++) {
@@ -300,7 +292,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         }
         sim_reaction_product_energy_and_straggling(r, &ion1);
         r->max_depth = sample_isotope_max_depth(sample, r->i_isotope);
-        set_ion_exit_angles(ws->sim, ws->det, &r->p); /* Calculating this for every reaction is not necessary (the angles are the same), but what do we know... */
+        ion_set_angle(&r->p, theta_product, phi_product);
         sim_reaction_reset_bricks(r);
         brick *b = &r->bricks[0];
         b->d = d_before;
