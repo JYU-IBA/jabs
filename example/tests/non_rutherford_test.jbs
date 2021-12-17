@@ -1,0 +1,16 @@
+#!/usr/bin/env jabs
+set ion 4He
+set energy "3.1 MeV"
+set emin "200 keV"
+set det theta "160 deg"
+set alpha "0 deg"
+set sample SiO2 5000tfu Si 20000tfu
+#Adding reactions is optional. If no reactions are specified, RBS and ERD reactions are added automatically. Reactions that are not possible are not calculated!
+add reactions RBS
+#We can remove a specific reaction.
+remove reaction RBS 16O
+#We can add reactions with different built-in screening models and min/max energy can be specified. These parameters are optional. 
+add reaction RBS 16O cs Andersen max "1.769 MeV"
+load reaction "sigmacalc_16O_alpha_alpha_16O_160deg.r33"
+simulate
+save spectra "out.csv"

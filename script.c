@@ -107,8 +107,7 @@ int script_load(script_session *s, int argc, char * const *argv) {
             jabs_message(MSG_ERROR, stderr, "Usage: load reaction [file]\n");
             return EXIT_FAILURE;
         }
-        sim_reactions_add_r33(fit->sim, fit->jibal->isotopes, argv[1]);
-        return EXIT_SUCCESS;
+        return sim_reactions_add_r33(fit->sim, fit->jibal->isotopes, argv[1]);
     }
     jabs_message(MSG_ERROR, stderr, "I don't know what to load (%s?)\n", argv[0]);
     return EXIT_FAILURE;

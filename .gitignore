@@ -1,9 +1,9 @@
 *build*/
 *data/*
 *plots/*
-tests/
-.idea/
-tmp/
+/tests/
+/.idea/
+/tmp/
 *.swp
 *.dmg
 *.txt
