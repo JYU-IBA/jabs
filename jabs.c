@@ -799,9 +799,9 @@ void simulate_with_ds(sim_workspace *ws) {
         jabs_message(MSG_ERROR, stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x/C_TFU, d_after.x/C_TFU, E_front/C_KEV, E_back/C_KEV, fluence);
         double p_sum = 0.0;
         for(int i_polar = 0; i_polar < ws->params.ds_steps_polar; i_polar++) {
-            const double ds_polar_min = 30.0*C_DEG;
+            const double ds_polar_min = 20.0*C_DEG;
             const double ds_polar_max = 180.0*C_DEG;
-            double ds_polar_step = (ds_polar_max-ds_polar_min)/(ws->params.ds_steps_polar-1);
+            double ds_polar_step = (ds_polar_max-ds_polar_min)/(ws->params.ds_steps_polar*1.0);
             double ds_polar = ds_polar_min + i_polar * ds_polar_step;
             double cs_sum = 0.0;
             for(size_t i = 0; i < ws->n_reactions; i++) {
@@ -815,9 +815,14 @@ void simulate_with_ds(sim_workspace *ws) {
                 }
 #if 1
                 double cs = 0.0;
-                for(int polar_substep = 0; polar_substep < 19; polar_substep++) {
-                    double ds_polar_sub = ds_polar_step*(1.0*(polar_substep-9)/19.0) + ds_polar;
-                    cs += jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar_sub)/19.0;
+                for(int polar_substep = 0; polar_substep < DUAL_SCATTER_POLAR_SUBSTEPS; polar_substep++) {
+                    double ds_polar_sub = ds_polar_step*(1.0*(polar_substep-(DUAL_SCATTER_POLAR_SUBSTEPS/2))/(DUAL_SCATTER_POLAR_SUBSTEPS*1.0)) + ds_polar;
+                    cs += jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar_sub)/(DUAL_SCATTER_POLAR_SUBSTEPS*1.0);
+#ifdef DEBUG
+                    if(d_before.x == 0.0) {
+                        fprintf(stderr, "  sub %.3lf deg\n", ds_polar_sub/C_DEG);
+                    }
+#endif
                 }
                 cs_sum += c * cs;
 #else
@@ -837,7 +842,7 @@ void simulate_with_ds(sim_workspace *ws) {
                 ws->fluence = fluence_azi * fluence;
 #ifdef DEBUG
                 if(d_before.x == 0.0) {
-                    fprintf(stderr, "DS polar %.3lf, azi %.3lf, scatter %.3lf, exit %.3lf\n", ds_polar/C_DEG, ds_azi/C_DEG, scattering_angle(&ion2, ws)/C_DEG, exit_angle(&ion2, ws)/C_DEG);
+                    fprintf(stderr, "DS polar %.3lf, azi %.3lf, scatter %.3lf, exit %.3lf\n\n", ds_polar/C_DEG, ds_azi/C_DEG, scattering_angle(&ion2, ws)/C_DEG, exit_angle(&ion2, ws)/C_DEG);
                 }
 #endif
                 if(scattering_angle(&ion2, ws) > 19.99999*C_DEG) {
