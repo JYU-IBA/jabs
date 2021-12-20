@@ -39,7 +39,7 @@
 #define CS_CONC_STEPS 3 /* Minimum 1, odd numbers preferred */
 #define CS_STRAGG_HALF_N 3 /* Cross section weighting by straggling, number of steps is this times 2 + 1. Set to zero to disable (aka 1 step). */
 #define DUAL_SCATTER_POLAR_STEPS 15
-#define DUAL_SCATTER_POLAR_SUBSTEPS 15
+#define DUAL_SCATTER_POLAR_SUBSTEPS 9
 #define DUAL_SCATTER_AZI_STEPS 12
 #define FIT_ITERS_MAX 100
 #define FIT_XTOL (1e-7)

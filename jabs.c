@@ -804,33 +804,20 @@ void simulate_with_ds(sim_workspace *ws) {
             double ds_polar_step = (ds_polar_max-ds_polar_min)/(ws->params.ds_steps_polar*1.0);
             double ds_polar = ds_polar_min + i_polar * ds_polar_step;
             double cs_sum = 0.0;
-            for(size_t i = 0; i < ws->n_reactions; i++) {
-                sim_reaction *r = &ws->reactions[i];
-                double c = get_conc(ws->sample, d_halfdepth, r->i_isotope);
+            for(size_t i = 0; i < ws->sample->n_isotopes; i++) {
+                double c = get_conc(ws->sample, d_halfdepth, i);
                 if(c < ABUNDANCE_THRESHOLD)
                     continue;
-                const jibal_isotope *target = r->r->target;
+                const jibal_isotope *target = ws->sample->isotopes[i];
                 if(incident->mass >= target->mass && ds_polar > asin(target->mass / incident->mass)) { /* Scattering not possible */
                     continue;
                 }
-#if 1
                 double cs = 0.0;
                 for(int polar_substep = 0; polar_substep < DUAL_SCATTER_POLAR_SUBSTEPS; polar_substep++) {
                     double ds_polar_sub = ds_polar_step*(1.0*(polar_substep-(DUAL_SCATTER_POLAR_SUBSTEPS/2))/(DUAL_SCATTER_POLAR_SUBSTEPS*1.0)) + ds_polar;
                     cs += jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar_sub)/(DUAL_SCATTER_POLAR_SUBSTEPS*1.0);
-#ifdef DEBUG
-                    if(d_before.x == 0.0) {
-                        fprintf(stderr, "  sub %.3lf deg\n", ds_polar_sub/C_DEG);
-                    }
-#endif
                 }
                 cs_sum += c * cs;
-#else
-                /* TODO: integrals over cross sections? Maybe stepwise from ds_polar=PI. */
-                double cs = jibal_cross_section_rbs(incident, target, ds_polar, E_mean, JIBAL_CS_ANDERSEN);
-                cs *= sin(ds_polar); /* spherical coordinates and surface areas... */
-                cs_sum += c * cs;
-#endif
             }
             double fluence_tot = cs_sum * thick_step * (2.0 * C_PI) * ds_polar_step; /* TODO: check calculation after moving from p_sr to fluence!*/
             p_sum += fluence_tot;
@@ -846,7 +833,7 @@ void simulate_with_ds(sim_workspace *ws) {
                 }
 #endif
                 if(scattering_angle(&ion2, ws) > 19.99999*C_DEG) {
-                    simulate(&ion2, d_after, ws, ws->sample);
+                    simulate(&ion2, d_halfdepth, ws, ws->sample);
                 }
             }
         }
