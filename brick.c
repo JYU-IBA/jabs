@@ -57,13 +57,27 @@ void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const do
     for(size_t i = 1; i <= n_bricks; i++) {
         const brick *b_high = &bricks[i-1];
         const brick *b_low = &bricks[i];
-        double sigma_low = sqrt(b_low->S + S);
-        double sigma_high = sqrt(b_high->S + S);
+        double E_diff_brick = b_high->E - b_low->E;
+        double sigma_low = sqrt(b_low->S + S + b_low->S_geo);
+        double sigma_high = sqrt(b_high->S + S + b_high->S_geo);
         //fprintf(stderr, "delta d = %.3lf, E_high = %.3lf, E_low = %.3lf), sigma_low = %.3lf, sigma_high = %.3lf, Q = %.3lf\n", (b_low->d - b_high->d)/C_TFU, b_high->E/C_KEV, b_low->E/C_KEV, sigma_low/C_KEV, sigma_high/C_KEV, b_low->Q);
         for(size_t j = 0; j < h->n; j++) {
             double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
             double w = h->range[j + 1] - h->range[j];
-            double y = (erf_Q_optim((b_low->E - E) / sigma_low) - erf_Q_optim((b_high->E - E) / sigma_high)) / (b_high->E - b_low->E);
+            double y;
+#if 0
+            double sigma;
+            if(E <= b_low->E) {
+                sigma = sigma_low;
+            } else if(E >= b_high->E)
+                sigma = sigma_high;
+            else {
+                sigma = sigma_low + (sigma_high-sigma_low)*(E - b_low->E)/E_diff_brick;
+            }
+            y = (erf_Q_optim((b_low->E - E) / sigma) - erf_Q_optim((b_high->E - E) / sigma)) / (E_diff_brick);
+#else
+            y = (erf_Q_optim((b_low->E - E) / sigma_low) - erf_Q_optim((b_high->E - E) / sigma_high)) / (b_high->E - b_low->E);
+#endif
             h->bin[j] += scale * y * w * b_low->Q;
             //fprintf(stderr, "i=%i, j=%i, w = %.5lf keV, E = %.3lf keV, y=%g\n", i, j, w/C_KEV, E/C_KEV, y);
             assert(!isnan(y));

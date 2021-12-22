@@ -8,7 +8,8 @@ typedef struct {
     depth d;
     double E_0;
     double E; /* Energy */
-    double S; /* Straggling (variance) */
+    double S; /* Energy loss straggling (variance) */
+    double S_geo; /* Geometric straggling */
     double Q; /* Counts */
 } brick;
 

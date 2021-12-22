@@ -431,6 +431,7 @@ jibal_config_var *script_make_vars(script_session *s) {
             {JIBAL_CONFIG_VAR_DOUBLE,   "stop_step_fudge",      &sim->params.stop_step_fudge_factor,NULL},
             {JIBAL_CONFIG_VAR_BOOL,     "nucl_stop_accurate",   &sim->params.nucl_stop_accurate,    NULL},
             {JIBAL_CONFIG_VAR_BOOL,     "mean_conc_and_energy", &sim->params.mean_conc_and_energy,  NULL},
+            {JIBAL_CONFIG_VAR_BOOL,     "geostragg",        &sim->params.geostragg,  NULL},
             {JIBAL_CONFIG_VAR_NONE, NULL, NULL, NULL}
     };
     int n_vars;
@@ -455,10 +456,13 @@ int script_simulate(script_session *s, int argc, char * const *argv) {
         return EXIT_FAILURE;
     }
     for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
-        simulate_with_ds(fit->ws[i_det]);
+        if(simulate_with_ds(fit->ws[i_det])) {
+            jabs_message(MSG_ERROR, stderr, "Simulation failed.\n");
+            return EXIT_FAILURE;
+        }
     }
     script_finish_sim_or_fit(s);
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int script_fit(script_session *s, int argc, char * const *argv) {

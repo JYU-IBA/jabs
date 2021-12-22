@@ -14,7 +14,7 @@
 #include "generic.h"
 #include "win_compat.h"
 
-double stop_sample(sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
+double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
     double em=E/incident->mass;
     double S1 = 0.0;
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
@@ -69,7 +69,7 @@ depth next_crossing(const ion *incident, const sample *sample, const depth *d_fr
     return d;
 }
 
-depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, depth depth, double step) {
+depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, depth depth, double step) {
     double k1, k2, k3, k4, stop, dE, E;
     struct depth depth_next = next_crossing(incident, sample, &depth);
     double h_max_perp = depth_next.x - depth.x;
@@ -124,7 +124,7 @@ depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, depth de
     assert(stop > 0.0);
     dE =  -1.0* h * stop; /* Energy change in thickness "h". It is always negative! */
 #ifndef STATISTICAL_STRAGGLING
-    double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, depth, E + dE) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
+    double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, fulldepth, E + dE) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
 #ifdef DEBUG
     //if((s_ratio)*(s_ratio) < 0.9 || (s_ratio)*(s_ratio) > 1.1) { /* Non-statistical broadening. */
     //   fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
@@ -132,7 +132,7 @@ depth stop_step(sim_workspace *ws, ion *incident, const sample *sample, depth de
 #endif
     incident->S *= (s_ratio)*(s_ratio);
 #endif
-    incident->S += h* stop_sample(ws, incident, sample, GSTO_STO_STRAGG, halfdepth, (E + dE / 2)); /* Straggling, calculate at mid-energy */
+    incident->S += h * stop_sample(ws, incident, sample, GSTO_STO_STRAGG, halfdepth, (E + dE / 2.0)); /* Straggling, calculate at mid-energy */
     incident->E += dE;
     return fulldepth; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
@@ -207,7 +207,7 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
     return 0.0;
 }
 
-void post_scatter_exit(ion *p, const depth depth_start, sim_workspace *ws, const sample *sample) {
+void post_scatter_exit(ion *p, const depth depth_start, const sim_workspace *ws, const sample *sample) {
     depth d = depth_start;
     while(1) { /* Exit from sample (hopefully) */
 #ifdef DEBUG_REACTION
@@ -228,9 +228,13 @@ void post_scatter_exit(ion *p, const depth depth_start, sim_workspace *ws, const
         assert(d_after.x <= d.x /*|| (d_exit.x == d.x && d_exit.i != d.i)*/); /* Going towards the surface */
         d = d_after;
     }
+}
+
+void detector_foil_traverse(ion *p, sim_workspace *ws) {
     const struct sample *foil = ws->det->foil;
     if(!foil)
         return;
+    depth d;
     d.i = 0;
     d.x = 0.0;
     ion ion_foil = *p;
@@ -259,26 +263,74 @@ double scattering_angle(const ion *incident, sim_workspace *ws) { /* Calculate s
     //fprintf(stderr, "theta = %g deg, phi = %g deg.\n", theta/C_DEG, phi/C_DEG);
     //fprintf(stderr, "scatter_theta = %g deg, scatter_phi = %g deg.\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
     if(!ws->params.ds) {
-       // assert(fabs(ws->det->theta - scatter_theta) < 0.01 * C_DEG); /* with DS this assert will fail */
+       assert(fabs(ws->det->theta - scatter_theta) < 0.01 * C_DEG); /* with DS this assert will fail */
     }
 #endif
     return scatter_theta;
 }
 
-double exit_angle(const ion *incident, sim_workspace *ws) {
+double scattering_angle_exit_deriv(const ion *incident, const sim_workspace *ws) { /* Calculates the dtheta/dbeta derivative for geometrical straggling */
+    double theta, phi;
+    double scatter_theta, scatter_phi;
+    double scatter_theta2, scatter_phi2;
     double theta_product, phi_product;
-   // rotate(incident->theta, incident->phi, ws->sim->sample_theta, ws->sim->sample_phi, &theta_product, &phi_product);
-   rotate(ws->sim->sample_theta, ws->sim->sample_phi, ws->det->theta, ws->det->phi, &theta_product, &phi_product);
-   return C_PI - theta_product;
-
-
-   // rotate(incident->theta, incident->phi, -1.0*ws->sim->sample_theta, ws->sim->sample_phi, &theta_product, &phi_product);
-    rotate(incident->theta, incident->phi, ws->det->theta, ws->det->phi, &theta_product, &phi_product);
-    fprintf(stderr, "theta_product = %g deg, phi_product = %g deg.\n", theta_product/C_DEG, phi_product/C_DEG);
-    return C_PI - theta_product;
+    double theta_product2, phi_product2;
+    double epsilon = 0.001*C_DEG;
+    rotate(incident->theta, incident->phi, -1.0*ws->sim->sample_theta, ws->sim->sample_phi, &theta, &phi);
+    theta *= -1.0;
+    rotate(theta, phi, ws->det->theta, ws->det->phi, &scatter_theta, &scatter_phi);
+    rotate(theta, phi, ws->det->theta+epsilon, ws->det->phi, &scatter_theta2, &scatter_phi2);
+    rotate(ws->sim->sample_theta, ws->sim->sample_phi, ws->det->theta, ws->det->phi, &theta_product, &phi_product);
+    rotate(ws->sim->sample_theta, ws->sim->sample_phi, ws->det->theta+epsilon, ws->det->phi, &theta_product2, &phi_product2);
+    double deriv = (scatter_theta2-scatter_theta)/(theta_product2-theta_product) * -1.0; /* Since exit angle is pi - theta_product, the derivative dtheta/dbeta is -1.0 times this derivative calculated here */
+#ifdef DEBUG
+    fprintf(stderr, "Scat: %g deg, eps: %g deg, product %g deg, eps: %g deg. Deriv %.8lf\n", scatter_theta/C_DEG,scatter_theta2/C_DEG, theta_product/C_DEG, theta_product2/C_DEG, deriv);
+#endif
+    return deriv;
 }
 
-void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
+double exit_angle_delta(const sim_workspace *ws) {
+    static const double shape_circle = 0.5 * C_FWHM/2.0;
+    static const double shape_rect = 0.5 * C_FWHM/1.7320508075688772;
+    if(!ws->params.geostragg)
+        return 0.0;
+    double delta_beam = 0.0; /* TODO: implement */
+    if(ws->det->distance < 0.001 * C_MM)
+        return 0.0;
+    double delta_detector = cos(sim_exit_angle(ws->sim, ws->det))/(ws->det->distance * cos(sim_alpha_angle(ws->sim)));
+    if(ws->det->aperture == JABS_DETECTOR_APERTURE_CIRCLE) {
+        delta_detector *= shape_circle * ws->det->aperture_diameter;
+    } else if(ws->det->aperture == JABS_DETECTOR_APERTURE_RECTANGLE) {
+        delta_detector *= shape_rect * ws->det->aperture_width; /* TODO: IBM only? */
+    }
+    double result = sqrt(pow2(delta_beam) + pow2(delta_detector));
+#ifdef DEBUG
+    fprintf(stderr, "Spread of exit angle due to beam %g deg, due to detector %g deg. Combined %g deg FWHM.\n", delta_beam/C_DEG, delta_detector/C_DEG, result/C_DEG);
+#endif
+    return result;
+}
+double geostragg(const sim_workspace *ws, const sample *sample, const sim_reaction *r, const depth d, const double E_0, const double delta_beta, const double theta_deriv) {
+    if(!ws->params.geostragg) {
+        return 0.0;
+    }
+    ion ion;
+    ion = r->p;
+    ion_set_angle(&ion, r->p.theta + delta_beta, r->p.phi);
+    ion.E = reaction_product_energy(r->r, r->theta + delta_beta * theta_deriv, E_0);
+    ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
+    post_scatter_exit(&ion, d, ws, sample);
+    double Eplus = ion.E;
+    ion = r->p;
+    ion_set_angle(&ion, r->p.theta - delta_beta, r->p.phi);
+    ion.E = reaction_product_energy(r->r, r->theta - delta_beta * theta_deriv, E_0);
+    ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
+    post_scatter_exit(&ion, d, ws, sample);
+    double Eminus = ion.E;
+    return pow2((Eplus - Eminus)/2.0/C_FWHM);
+}
+
+
+int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
     assert(sample->n_ranges);
     int warnings = 0;
     double thickness = sample->ranges[sample->n_ranges-1].x;
@@ -293,6 +345,15 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
     ion_print(stderr, incident);
     fprintf(stderr, "Simulate from depth %g tfu (index %zu), detector theta = %g deg, calculated theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->det->theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
     fprintf(stderr, "Reaction product angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.\n", theta_product/C_DEG, phi_product/C_DEG, beta/C_DEG);
+#endif
+    if(theta_product < 90.0*C_DEG) {
+        jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", theta_product/C_DEG, phi_product/C_DEG);
+        return EXIT_FAILURE;
+    }
+    double delta_beta = exit_angle_delta(ws);
+    double theta_deriv = scattering_angle_exit_deriv(incident, ws);
+#ifdef DEBUG
+    fprintf(stderr, "Delta beta %g deg, theta_deriv %.8lf\n", delta_beta/C_DEG, theta_deriv);
 #endif
     depth d_before = depth_start;
     for(size_t i = 0; i < ws->n_reactions; i++) {
@@ -322,8 +383,10 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             r->stop = TRUE;
         }
         post_scatter_exit(&r->p, b->d, ws, sample); /* Calculates the exit energy if calculation doesn't start from the surface */
+        detector_foil_traverse(&r->p, ws);
         b->E = r->p.E;
         b->S = r->p.S;
+        b->S_geo = geostragg(ws, sample, r, d_before, ion1.E, delta_beta, theta_deriv);
 #ifdef DEBUG
         fprintf(stderr, "Simulation reaction %zu: %s %s. Max depth %g tfu. i_isotope=%zu, stop = %i.\nCross section at %g keV is %g mb/sr, exit %g keV\n",
                 i, reaction_name(r->r), r->r->target->name, r->max_depth / C_TFU, r->i_isotope, r->stop, ion1.E/C_KEV, r->cross_section(r, ion1.E)/C_MB_SR, r->p.E/C_KEV);
@@ -336,7 +399,6 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
 #endif
         ion1.theta += 0.01 * C_DEG;
         ion1.cosine_theta = cos(ion1.theta);
-        return;
     }
     while(1) {
         if(warnings > SIMULATE_WARNING_LIMIT) {
@@ -385,17 +447,12 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
             sim_reaction *r = &ws->reactions[i];
             if(r->stop)
                 continue;
-            all_stop = 0;
             if(i_depth >= r->n_bricks) {
                 fprintf(stderr, "Too many bricks. Data partial.\n");
                 r->stop = TRUE;
                 continue;
             }
             brick *b = &r->bricks[i_depth];
-            sim_reaction_product_energy_and_straggling(r, &ion1);
-            b->d = d_after;
-            b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
-            assert(r->p.E > 0.0);
             if(!ws->params.ds && d_before.x >= r->max_depth) { /* Reactions stop when we are too deep in the sample, unless, of course, if DS is enabled. TODO: check optimizations for DS */
 #ifdef DEBUG
                 fprintf(stderr, "Reaction %lu with %s stops, because maximum depth is reached at x = %.3lf tfu.\n",
@@ -405,12 +462,25 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
                 r->stop = TRUE;
                 continue;
             }
+            all_stop = 0;
+            b->d = d_after;
+            b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
+            assert(r->p.E > 0.0);
+
 #ifdef DEBUG_REACTION
             fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
 #endif
+            if(ws->params.geostragg) {
+                b->S_geo = geostragg(ws, sample, r, d_after, ion1.E, delta_beta, theta_deriv);
+            }
+            sim_reaction_product_energy_and_straggling(r, &ion1);
             post_scatter_exit(&r->p, d_after, ws, sample);
-            b->E = r->p.E; /* Now exited from sample */
+            detector_foil_traverse(&r->p, ws);
+            b->E = r->p.E;
             b->S = r->p.S;
+            #ifdef DEBUG
+            fprintf(stderr, "Reaction %zu depth %g tfu, ptheta = %g deg, E = %g keV, Eloss stragg %g keV, Geo stragg %g keV\n", i, d_before.x/C_TFU, r->p.theta/C_DEG, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo)/C_KEV);
+#endif
             if (r->p.E < ws->sim->emin) {
                 r->stop = TRUE;
                 b->Q = 0.0;
@@ -445,6 +515,7 @@ void simulate(const ion *incident, const depth depth_start, sim_workspace *ws, c
         }
     }
     convolute_bricks(ws);
+    return EXIT_SUCCESS;
 }
 
 int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
@@ -675,8 +746,8 @@ void print_bricks(const char *filename, const sim_workspace *ws) {
         fprintf(f, "#%s %s\n", reaction_name(r->r), r->r->target->name);
         for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
-            fprintf(f, "%2lu %2lu %8.3lf %8.3lf %8.3lf %8.3lf %12.3lf\n",
-                    i, j, b->d.x/C_TFU, b->E_0/C_KEV, b->E/C_KEV, sqrt(b->S)/C_KEV, b->Q * ws->sim->fluence);
+            fprintf(f, "%2lu %2lu %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %12.3lf\n",
+                    i, j, b->d.x/C_TFU, b->E_0/C_KEV, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo)/C_KEV, b->Q * ws->sim->fluence);
         }
         fprintf(f, "\n\n");
     }
@@ -686,7 +757,8 @@ void print_bricks(const char *filename, const sim_workspace *ws) {
 
 
 
-void simulate_with_roughness(sim_workspace *ws) {
+int simulate_with_roughness(sim_workspace *ws) {
+    int status = EXIT_SUCCESS;
     double p_sr = ws->sim->fluence;
     size_t n_rl = 0; /* Number of rough layers */
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
@@ -699,8 +771,7 @@ void simulate_with_roughness(sim_workspace *ws) {
     if(!n_rl) {
         ion_set_angle(&ws->ion, 0.0*C_DEG, 0.0);
         ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
-        simulate(&ws->ion, depth_seek(ws->sample, 0.0*C_TFU), ws, ws->sample);
-        return;
+        return simulate(&ws->ion, depth_seek(ws->sample, 0.0*C_TFU), ws, ws->sample);
     }
     struct sample *sample_rough = sample_copy(ws->sample);
     size_t *index = malloc(sizeof(size_t) * n_rl);
@@ -754,7 +825,9 @@ void simulate_with_roughness(sim_workspace *ws) {
         ws->fluence = p * p_sr;
         ion_set_angle(&ws->ion, 0.0, 0.0);
         ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
-        simulate(&ws->ion, depth_seek(ws->sample, 0.0), ws, sample_rough);
+        status = simulate(&ws->ion, depth_seek(ws->sample, 0.0), ws, sample_rough);
+        if(status != EXIT_SUCCESS)
+            break;
     }
     for(size_t i = 0; i < n_rl; i++) {
         thickness_probability_table_free(tpd[i]);
@@ -763,18 +836,21 @@ void simulate_with_roughness(sim_workspace *ws) {
     free(modulos);
     free(index);
     free(tpd);
+    return status;
 }
 
-void simulate_with_ds(sim_workspace *ws) {
+int simulate_with_ds(sim_workspace *ws) {
     if(!ws) {
         jabs_message(MSG_ERROR, stderr, "No workspace, no simulation.\n");
-        return;
+        return EXIT_FAILURE;
     }
     double fluence = ws->fluence;
-    simulate_with_roughness(ws);
+    if(simulate_with_roughness(ws)) {
+        return EXIT_FAILURE;
+    }
     if(!ws->params.ds) {
         sim_workspace_calculate_sum_spectra(ws);
-        return;
+        return EXIT_SUCCESS;
     }
     ion_set_angle(&ws->ion, 0.0, 0.0);
     ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
@@ -784,6 +860,7 @@ void simulate_with_ds(sim_workspace *ws) {
     ws->params.rk4 = FALSE; /* This change is not reversed, nor reflected back to sim->params */
     ws->params.nucl_stop_accurate = FALSE;
     ws->params.mean_conc_and_energy = TRUE;
+    ws->params.geostragg = FALSE;
     jabs_message(MSG_ERROR, stderr, "\n");
     const jibal_isotope *incident = ws->sim->beam_isotope;
     while(1) {
@@ -819,7 +896,7 @@ void simulate_with_ds(sim_workspace *ws) {
                 }
                 cs_sum += c * cs;
             }
-            double fluence_tot = cs_sum * thick_step * (2.0 * C_PI) * ds_polar_step; /* TODO: check calculation after moving from p_sr to fluence!*/
+            double fluence_tot = cs_sum * thick_step * ion1.inverse_cosine_theta * (2.0 * C_PI) * ds_polar_step; /* TODO: check calculation after moving from p_sr to fluence!*/
             p_sum += fluence_tot;
             double fluence_azi = fluence_tot / (1.0 * (ws->params.ds_steps_azi));
             for(int i_azi = 0; i_azi < ws->params.ds_steps_azi; i_azi++) {
@@ -829,11 +906,13 @@ void simulate_with_ds(sim_workspace *ws) {
                 ws->fluence = fluence_azi * fluence;
 #ifdef DEBUG
                 if(d_before.x == 0.0) {
-                    fprintf(stderr, "DS polar %.3lf, azi %.3lf, scatter %.3lf, exit %.3lf\n\n", ds_polar/C_DEG, ds_azi/C_DEG, scattering_angle(&ion2, ws)/C_DEG, exit_angle(&ion2, ws)/C_DEG);
+                    fprintf(stderr, "DS polar %.3lf, azi %.3lf, scatter %.3lf\n", ds_polar/C_DEG, ds_azi/C_DEG, scattering_angle(&ion2, ws)/C_DEG);
                 }
 #endif
                 if(scattering_angle(&ion2, ws) > 19.99999*C_DEG) {
-                    simulate(&ion2, d_halfdepth, ws, ws->sample);
+                    if(simulate(&ion2, d_halfdepth, ws, ws->sample)) {
+                        return EXIT_FAILURE;
+                    }
                 }
             }
         }
@@ -843,4 +922,5 @@ void simulate_with_ds(sim_workspace *ws) {
         d_before = d_after;
     }
     sim_workspace_calculate_sum_spectra(ws);
+    return EXIT_SUCCESS;
 }

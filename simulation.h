@@ -37,6 +37,7 @@ typedef struct {
     int rk4;
     int nucl_stop_accurate;
     int mean_conc_and_energy;
+    int geostragg;
     double stop_step_incident;
     double stop_step_exiting;
     double stop_step_fudge_factor;
@@ -132,4 +133,6 @@ double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);
 double sim_calculate_exit_angle(const simulation *sim, const detector *det);
 void sim_sort_reactions(const simulation *sim);
 void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident);
+double sim_alpha_angle(const simulation *sim);
+double sim_exit_angle(const simulation *sim, const detector *det);
 #endif // JABS_SIMULATION_H

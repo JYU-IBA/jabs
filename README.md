@@ -99,6 +99,7 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Occasional crashes when fitting, since some corner cases are not handled properly
  - Detector numbering and usability issues with multidetector mode 
  - Point-by-point profiles are not tested (but should work)
+ - Transmission geometry is not supported
  - Ad-hoc channeling correction is the same for all detectors
  - Detector calibration is the same for all particles (issue with NRA and ERD, but not for RBS and EBS)
  - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).

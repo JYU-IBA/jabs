@@ -82,6 +82,7 @@ sim_calc_params sim_calc_params_defaults(int ds, int fast) {
         p.nucl_stop_accurate = TRUE;
         p.mean_conc_and_energy = FALSE;
     }
+    p.geostragg = FALSE;
     p.cs_frac = 1.0/(1.0*(p.cs_n_steps+1));
     assert(p.cs_stragg_half_n >= 0);
     p.cs_n_stragg_steps = p.cs_stragg_half_n * 2 + 1;
@@ -336,7 +337,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
                 jabs_message(MSG_WARNING, stderr,  "Caution: large number of bricks will be used in the simulation (%zu).\n", r->n_bricks);
             }
         }
-        assert(r->n_bricks > 0 && r->n_bricks < 10000);
+        assert(r->n_bricks > 0 && r->n_bricks < 100000);
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Number of bricks for reaction %i: %lu\n", i_reaction, r->n_bricks);
 #endif
@@ -426,10 +427,6 @@ void simulation_print(FILE *f, const simulation *sim) {
     if(!sim) {
         return;
     }
-    double theta, phi; /* Temporary variables */
-    double alpha; /* Incident angle, SimNRA convention (no signs). */
-    rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */
-    alpha = theta;
     if(sim->beam_isotope) {
         jabs_message(MSG_INFO, f,  "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass / C_U);
     } else {
@@ -438,8 +435,16 @@ void simulation_print(FILE *f, const simulation *sim) {
     jabs_message(MSG_INFO, f, "E = %.3lf keV\n", sim->beam_E/C_KEV);
     jabs_message(MSG_INFO, f, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
     jabs_message(MSG_INFO, f, "E_min = %.3lf keV\n", sim->emin/C_KEV);
-    jabs_message(MSG_INFO, f, "alpha = %.3lf deg\n", alpha/C_DEG);
+    jabs_message(MSG_INFO, f, "alpha = %.3lf deg\n", sim_alpha_angle(sim)/C_DEG);
     jabs_message(MSG_INFO, f, "n_detectors = %zu\n", sim->n_det);
+    for(size_t i = 0; i < sim->n_det; i++) {
+        jabs_message(MSG_INFO, f, "DETECTOR %zu:\n", i + 1);
+        jabs_message(MSG_INFO, f, "  beta = %.3lf deg\n", i, sim_exit_angle(sim, sim->det[i]) / C_DEG);
+        jabs_message(MSG_INFO, f, "  theta = %.3lf deg\n", i, sim->det[i]->theta / C_DEG);
+        jabs_message(MSG_INFO, f, "  solid angle = %.3lf msr\n", i, sim->det[0]->solid/C_MSR);
+        jabs_message(MSG_INFO, f, "  particle solid angle product = %e sr\n", i, sim->fluence * sim->det[0]->solid);
+
+    }
     jabs_message(MSG_INFO, f, "n_reactions = %zu\n", sim->n_reactions);
     jabs_message(MSG_INFO, f, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence*C_E*1.0e6);
     jabs_message(MSG_INFO, f, "step for incident ions = %.3lf keV\n", sim->params.stop_step_incident/C_KEV);
@@ -585,4 +590,16 @@ void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *inci
 #ifdef DEBUG
     fprintf(stderr, "deriv %g, E_out/E %g, E_out = %g keV, E = %g keV\n", deriv, r->p.E / incident->E, r->p.E/C_KEV, incident->E/C_KEV);
 #endif
+}
+
+double sim_alpha_angle(const simulation *sim) { /* Returns alpha angle (no sign!) */
+    double theta, phi; /* Temporary variables */
+    rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */
+    return theta;
+}
+
+double sim_exit_angle(const simulation *sim, const detector *det) {
+    double theta, phi;
+    rotate(sim->sample_theta, sim->sample_phi, det->theta, det->phi, &theta, &phi);
+    return C_PI - theta;
 }

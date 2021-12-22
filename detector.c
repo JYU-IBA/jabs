@@ -115,6 +115,9 @@ detector *detector_default(detector *det) {
     det->theta = DETECTOR_THETA;
     det->phi = DETECTOR_PHI;
     det->solid = DETECTOR_SOLID;
+    det->aperture = JABS_DETECTOR_APERTURE_NONE;
+    det->aperture_width = 0.0;
+    det->distance = 0.0;
     det->resolution = (DETECTOR_RESOLUTION*DETECTOR_RESOLUTION);
     det->slope = ENERGY_SLOPE;
     det->offset = 0.0*C_KEV;
@@ -145,6 +148,14 @@ int detector_print(const char *filename, const detector *det) {
     jabs_message(MSG_INFO, f, "theta = %g deg\n", det->theta/C_DEG);
     jabs_message(MSG_INFO, f, "phi = %g deg\n", det->phi/C_DEG);
     jabs_message(MSG_INFO, f, "solid = %g msr\n", det->solid/C_MSR);
+    jabs_message(MSG_INFO, f, "aperture = %s\n", detector_aperture_option[det->aperture]);
+    if(det->aperture == JABS_DETECTOR_APERTURE_CIRCLE) {
+        jabs_message(MSG_INFO, f, "aperture_diameter = %g mm\n", det->aperture_diameter/C_MM);
+    } else if (det->aperture == JABS_DETECTOR_APERTURE_RECTANGLE) {
+        jabs_message(MSG_INFO, f, "aperture_width = %g mm\n", det->aperture_width/C_MM);
+        jabs_message(MSG_INFO, f, "aperture_height = %g mm\n", det->aperture_height/C_MM);
+    }
+    jabs_message(MSG_INFO, f, "distance = %g mm\n", det->distance/C_MM);
     jabs_message(MSG_INFO, f, "column = %zu\n", det->column);
     jabs_message(MSG_INFO, f, "channels = %zu\n", det->channels);
     if(det->foil_description) {
@@ -207,17 +218,22 @@ jibal_config_var *detector_make_vars(detector *det) {
     if(!det)
         return NULL;
     jibal_config_var vars[] = {
-            {JIBAL_CONFIG_VAR_UNIT, "slope",      &det->slope,          NULL},
-            {JIBAL_CONFIG_VAR_UNIT, "offset",     &det->offset,         NULL},
-            {JIBAL_CONFIG_VAR_UNIT, "resolution", &det->resolution,     NULL},
-            {JIBAL_CONFIG_VAR_UNIT, "theta",      &det->theta,          NULL},
-            {JIBAL_CONFIG_VAR_UNIT, "phi",        &det->phi,            NULL},
-            {JIBAL_CONFIG_VAR_UNIT, "solid",      &det->solid,          NULL},
-            {JIBAL_CONFIG_VAR_INT,  "column",     &det->column,         NULL},
-            {JIBAL_CONFIG_VAR_INT,  "channels",   &det->channels,       NULL},
-            {JIBAL_CONFIG_VAR_INT,  "compress",   &det->compress,       NULL},
-            {JIBAL_CONFIG_VAR_STRING,"foil",       &det->foil_description,NULL},
-            {JIBAL_CONFIG_VAR_NONE, NULL, NULL, NULL}
+            {JIBAL_CONFIG_VAR_UNIT,   "slope",             &det->slope,             NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "offset",            &det->offset,            NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "resolution",        &det->resolution,        NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "theta",             &det->theta,             NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "phi",               &det->phi,               NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "solid",             &det->solid,             NULL},
+            {JIBAL_CONFIG_VAR_OPTION, "aperture",          &det->aperture, detector_aperture_option},
+            {JIBAL_CONFIG_VAR_UNIT,   "aperture_width",    &det->aperture_width,    NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "aperture_height",   &det->aperture_height,   NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "aperture_diameter", &det->aperture_diameter, NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "distance",          &det->distance,          NULL},
+            {JIBAL_CONFIG_VAR_INT,    "column",            &det->column,            NULL},
+            {JIBAL_CONFIG_VAR_INT,    "channels",          &det->channels,          NULL},
+            {JIBAL_CONFIG_VAR_INT,    "compress",          &det->compress,          NULL},
+            {JIBAL_CONFIG_VAR_STRING, "foil",              &det->foil_description,  NULL},
+            {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                                     NULL}
     };
     int n_vars;
     for(n_vars = 0; vars[n_vars].type != 0; n_vars++);
