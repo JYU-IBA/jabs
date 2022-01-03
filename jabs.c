@@ -294,14 +294,15 @@ double exit_angle_delta(const sim_workspace *ws) {
     static const double shape_rect = 0.5 * C_FWHM/1.7320508075688772;
     if(!ws->params.geostragg)
         return 0.0;
-    double delta_beam = 0.0; /* TODO: implement */
     if(ws->det->distance < 0.001 * C_MM)
         return 0.0;
-    double delta_detector = cos(sim_exit_angle(ws->sim, ws->det))/(ws->det->distance * cos(sim_alpha_angle(ws->sim)));
+    double delta_beam = cos(sim_exit_angle(ws->sim, ws->det))/(ws->det->distance * cos(sim_alpha_angle(ws->sim))); /* still needs to be multiplied by something... */
+    delta_beam = 0.0;
+    double delta_detector = 1/(ws->det->distance);
     if(ws->det->aperture == JABS_DETECTOR_APERTURE_CIRCLE) {
         delta_detector *= shape_circle * ws->det->aperture_diameter;
     } else if(ws->det->aperture == JABS_DETECTOR_APERTURE_RECTANGLE) {
-        delta_detector *= shape_rect * ws->det->aperture_width; /* TODO: IBM only? */
+        delta_detector *= shape_rect * sqrt(pow2(ws->det->aperture_width * cos(ws->det->phi)) + pow2(ws->det->aperture_height * sin(ws->det->phi))); /* TODO: check if this is correct. Should produce correct results at least in IBM and Cornell geometries... */
     }
     double result = sqrt(pow2(delta_beam) + pow2(delta_detector));
 #ifdef DEBUG
