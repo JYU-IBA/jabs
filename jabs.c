@@ -253,16 +253,15 @@ void detector_foil_traverse(ion *p, sim_workspace *ws) {
     p->S = ion_foil.S;
 }
 
-double scattering_angle(const ion *incident, sim_workspace *ws) { /* Calculate scattering angle necessary for ion (in sample coordinate system) to hit detector */
+double scattering_angle(const ion *incident, const sim_workspace *ws) { /* Calculate scattering angle necessary for ion (in sample coordinate system) to hit detector */
     double theta, phi;
     double scatter_theta, scatter_phi;
-    rotate(incident->theta, incident->phi, -1.0*ws->sim->sample_theta, ws->sim->sample_phi, &theta, &phi);
-    theta *= -1.0;
-    rotate(theta, phi, ws->det->theta, ws->det->phi, &scatter_theta, &scatter_phi);
+    rotate(-1.0*ws->sim->sample_theta, ws->sim->sample_phi, incident->theta, incident->phi, &theta, &phi); /* Move from sample coordinates to lab */
+    rotate(ws->det->theta, ws->det->phi, theta, phi, &scatter_theta, &scatter_phi); /* Move from lab to detector */
 #ifdef DEBUG
-    //fprintf(stderr, "theta = %g deg, phi = %g deg.\n", theta/C_DEG, phi/C_DEG);
-    //fprintf(stderr, "scatter_theta = %g deg, scatter_phi = %g deg.\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
-    if(!ws->params.ds) {
+    fprintf(stderr, "theta = %g deg, phi = %g deg.\n", theta/C_DEG, phi/C_DEG);
+    fprintf(stderr, "scatter_theta = %g deg, scatter_phi = %g deg.\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
+    if(!ws->params.ds && !ws->params.geostragg) {
        assert(fabs(ws->det->theta - scatter_theta) < 0.01 * C_DEG); /* with DS this assert will fail */
     }
 #endif
@@ -276,15 +275,14 @@ double scattering_angle_exit_deriv(const ion *incident, const sim_workspace *ws)
     double theta_product, phi_product;
     double theta_product2, phi_product2;
     double epsilon = 0.001*C_DEG;
-    rotate(incident->theta, incident->phi, -1.0*ws->sim->sample_theta, ws->sim->sample_phi, &theta, &phi);
-    theta *= -1.0;
-    rotate(theta, phi, ws->det->theta, ws->det->phi, &scatter_theta, &scatter_phi);
-    rotate(theta, phi, ws->det->theta+epsilon, ws->det->phi, &scatter_theta2, &scatter_phi2);
-    rotate(ws->sim->sample_theta, ws->sim->sample_phi, ws->det->theta, ws->det->phi, &theta_product, &phi_product);
-    rotate(ws->sim->sample_theta, ws->sim->sample_phi, ws->det->theta+epsilon, ws->det->phi, &theta_product2, &phi_product2);
+    rotate( -1.0*ws->sim->sample_theta, ws->sim->sample_phi, incident->theta, incident->phi, &theta, &phi);
+    rotate( ws->det->theta, ws->det->phi, theta, phi, &scatter_theta, &scatter_phi);
+    rotate(ws->det->theta+epsilon, ws->det->phi, theta, phi, &scatter_theta2, &scatter_phi2);
+    rotate(ws->det->theta, ws->det->phi, ws->sim->sample_theta, ws->sim->sample_phi,  &theta_product, &phi_product);
+    rotate(ws->det->theta+epsilon, ws->det->phi, ws->sim->sample_theta, ws->sim->sample_phi,  &theta_product2, &phi_product2);
     double deriv = (scatter_theta2-scatter_theta)/(theta_product2-theta_product) * -1.0; /* Since exit angle is pi - theta_product, the derivative dtheta/dbeta is -1.0 times this derivative calculated here */
 #ifdef DEBUG
-    fprintf(stderr, "Scat: %g deg, eps: %g deg, product %g deg, eps: %g deg. Deriv %.8lf\n", scatter_theta/C_DEG,scatter_theta2/C_DEG, theta_product/C_DEG, theta_product2/C_DEG, deriv);
+    fprintf(stderr, "Scat: %g deg, eps: %g deg, product %g deg, eps: %g deg. Deriv %.8lf (-1.0 for IBM)\n", scatter_theta/C_DEG,scatter_theta2/C_DEG, theta_product/C_DEG, theta_product2/C_DEG, deriv);
 #endif
     return deriv;
 }
@@ -297,12 +295,12 @@ double exit_angle_delta(const sim_workspace *ws) {
     if(ws->det->distance < 0.001 * C_MM)
         return 0.0;
     double delta_beam = cos(sim_exit_angle(ws->sim, ws->det))/(ws->det->distance * cos(sim_alpha_angle(ws->sim))); /* still needs to be multiplied by something... */
-    delta_beam = 0.0;
+    delta_beam = 0.0; /* TODO: implement */
     double delta_detector = 1/(ws->det->distance);
     if(ws->det->aperture == JABS_DETECTOR_APERTURE_CIRCLE) {
         delta_detector *= shape_circle * ws->det->aperture_diameter;
     } else if(ws->det->aperture == JABS_DETECTOR_APERTURE_RECTANGLE) {
-        delta_detector *= shape_rect * sqrt(pow2(ws->det->aperture_width * cos(ws->det->phi)) + pow2(ws->det->aperture_height * sin(ws->det->phi))); /* TODO: check if this is correct. Should produce correct results at least in IBM and Cornell geometries... */
+        delta_detector *= shape_rect * sqrt(pow2(ws->det->aperture_width * cos(ws->det->phi)) + pow2(ws->det->aperture_height * sin(ws->det->phi))); /* TODO: this is probably not true */
     }
     double result = sqrt(pow2(delta_beam) + pow2(delta_detector));
 #ifdef DEBUG
@@ -316,13 +314,21 @@ double geostragg(const sim_workspace *ws, const sample *sample, const sim_reacti
     }
     ion ion;
     ion = r->p;
-    ion_set_angle(&ion, r->p.theta + delta_beta, r->p.phi);
+    //ion_set_angle(&ion, r->p.theta - delta_beta, ws->det->phi);
+    ion_rotate(&ion, -1.0 * delta_beta, ws->det->phi); /* TODO: why ws->det->phi and not something else? */
     ion.E = reaction_product_energy(r->r, r->theta + delta_beta * theta_deriv, E_0);
+    /* TODO: make (debug) code that checks the sanity of the delta beta and delta theta angles.  */
+    double foo, bar;
+    rotate(ion.theta, ion.phi, 0.0, 0.0, &foo, &bar);
+#ifdef DEBUG
+    fprintf(stderr, "Reaction product (+) (beta %g deg), direction %g deg, %g deg. Manual calculation of theta says %g deg. Other angles: %g deg, %g deg.\n", (C_PI - ion.theta)/C_DEG, ion.theta/C_DEG, ion.phi/C_DEG, (r->theta + delta_beta * theta_deriv)/C_DEG, foo/C_DEG, bar/C_DEG);
+#endif
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
     post_scatter_exit(&ion, d, ws, sample);
     double Eplus = ion.E;
     ion = r->p;
-    ion_set_angle(&ion, r->p.theta - delta_beta, r->p.phi);
+    //ion_set_angle(&ion, r->p.theta + delta_beta, ws->det->phi);
+    ion_rotate(&ion, 1.0 * delta_beta, ws->det->phi);
     ion.E = reaction_product_energy(r->r, r->theta - delta_beta * theta_deriv, E_0);
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
     post_scatter_exit(&ion, d, ws, sample);
@@ -337,7 +343,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     double thickness = sample->ranges[sample->n_ranges-1].x;
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
-    double scatter_theta = scattering_angle(incident, ws);
+    const double scatter_theta = scattering_angle(incident, ws);
     double theta_product, phi_product;
     rotate(ws->det->theta, ws->det->phi, ws->sim->sample_theta, ws->sim->sample_phi, &theta_product, &phi_product); /* Detector in sample coordinate system */
 #ifdef DEBUG
