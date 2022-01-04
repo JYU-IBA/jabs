@@ -22,6 +22,7 @@
 simulation *sim_init(jibal *jibal) {
     simulation *sim = malloc(sizeof(simulation));
     sim->beam_isotope = jibal_isotope_find(jibal->isotopes, NULL, 2, 4);
+    sim->beam_aperture = aperture_default();
     sim->sample_theta = ALPHA; /* These defaults are for IBM geometry */
     sim->sample_phi = 0.0;
     sim->fluence = FLUENCE;
@@ -436,6 +437,13 @@ void simulation_print(FILE *f, const simulation *sim) {
     jabs_message(MSG_INFO, f, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
     jabs_message(MSG_INFO, f, "E_min = %.3lf keV\n", sim->emin/C_KEV);
     jabs_message(MSG_INFO, f, "alpha = %.3lf deg\n", sim_alpha_angle(sim)/C_DEG);
+    jabs_message(MSG_INFO, f, "beam_aperture = %s\n", aperture_name(&sim->beam_aperture));
+    if(sim->beam_aperture.type == APERTURE_CIRCLE) {
+        jabs_message(MSG_INFO, f, "beam_aperture_diameter = %.3lf mm\n", sim->beam_aperture.diameter/C_MM);
+    } else if(sim->beam_aperture.type == APERTURE_RECTANGLE) {
+        jabs_message(MSG_INFO, f, "beam_aperture_width= %.3lf mm\n", sim->beam_aperture.width/C_MM);
+        jabs_message(MSG_INFO, f, "beam_aperture_height = %.3lf mm\n", sim->beam_aperture.height/C_MM);
+    }
     jabs_message(MSG_INFO, f, "n_detectors = %zu\n", sim->n_det);
     for(size_t i = 0; i < sim->n_det; i++) {
         jabs_message(MSG_INFO, f, "DETECTOR %zu:\n", i + 1);

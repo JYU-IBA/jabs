@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 Jaakko Julin
+    Copyright (C) 2021-2022 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,19 +17,7 @@
 #include <ctype.h>
 #include <jibal_units.h>
 #include "sample.h"
-
-typedef enum {
-    JABS_DETECTOR_APERTURE_NONE = 0,
-    JABS_DETECTOR_APERTURE_CIRCLE = 1,
-    JABS_DETECTOR_APERTURE_RECTANGLE = 2
-} detector_aperture;
-
-static const jibal_option detector_aperture_option[] = {
-        {JIBAL_OPTION_STR_NONE, JABS_DETECTOR_APERTURE_NONE},
-        {"circle", JABS_DETECTOR_APERTURE_CIRCLE},
-        {"rectangle", JABS_DETECTOR_APERTURE_RECTANGLE},
-        {NULL, 0}
-};
+#include "aperture.h"
 
 typedef struct detector {
     double slope;
@@ -38,10 +26,7 @@ typedef struct detector {
     double theta; /* Polar angle [0, pi] */
     double phi; /* Azimuthal angle [0, 2pi] */
     double solid;
-    detector_aperture aperture;
-    double aperture_width;
-    double aperture_height;
-    double aperture_diameter;
+    aperture aperture;
     double distance;
     size_t column;
     size_t channels;

@@ -287,24 +287,16 @@ double scattering_angle_exit_deriv(const ion *incident, const sim_workspace *ws)
     return deriv;
 }
 
-double exit_angle_delta(const sim_workspace *ws) {
-    static const double shape_circle = 0.5 * C_FWHM/2.0;
-    static const double shape_rect = 0.5 * C_FWHM/1.7320508075688772;
+double exit_angle_delta(const sim_workspace *ws, const char direction) {
     if(!ws->params.geostragg)
         return 0.0;
     if(ws->det->distance < 0.001 * C_MM)
         return 0.0;
-    double delta_beam = cos(sim_exit_angle(ws->sim, ws->det))/(ws->det->distance * cos(sim_alpha_angle(ws->sim))); /* still needs to be multiplied by something... */
-    delta_beam = 0.0; /* TODO: implement */
-    double delta_detector = 1/(ws->det->distance);
-    if(ws->det->aperture == JABS_DETECTOR_APERTURE_CIRCLE) {
-        delta_detector *= shape_circle * ws->det->aperture_diameter;
-    } else if(ws->det->aperture == JABS_DETECTOR_APERTURE_RECTANGLE) {
-        delta_detector *= shape_rect * sqrt(pow2(ws->det->aperture_width * cos(ws->det->phi)) + pow2(ws->det->aperture_height * sin(ws->det->phi))); /* TODO: this is probably not true */
-    }
+    double delta_beam = aperture_width_shape_product(&ws->sim->beam_aperture, direction) /(ws->det->distance * cos(sim_alpha_angle(ws->sim)));
+    double delta_detector = aperture_width_shape_product(&ws->det->aperture, direction) / ws->det->distance;
     double result = sqrt(pow2(delta_beam) + pow2(delta_detector));
 #ifdef DEBUG
-    fprintf(stderr, "Spread of exit angle due to beam %g deg, due to detector %g deg. Combined %g deg FWHM.\n", delta_beam/C_DEG, delta_detector/C_DEG, result/C_DEG);
+    fprintf(stderr, "Spread of exit angle in direction '%c' due to beam %g deg, due to detector %g deg. Combined %g deg FWHM.\n", direction, delta_beam/C_DEG, delta_detector/C_DEG, result/C_DEG);
 #endif
     return result;
 }
@@ -357,10 +349,11 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", theta_product/C_DEG, phi_product/C_DEG);
         return EXIT_FAILURE;
     }
-    double delta_beta = exit_angle_delta(ws);
+    double delta_beta_width = exit_angle_delta(ws, 'x');
+    double delta_beta_height = exit_angle_delta(ws, 'y');
     double theta_deriv = scattering_angle_exit_deriv(incident, ws);
 #ifdef DEBUG
-    fprintf(stderr, "Delta beta %g deg, theta_deriv %.8lf\n", delta_beta/C_DEG, theta_deriv);
+    fprintf(stderr, "Spread in exit angle width %g deg FWHM, height %g deg FWHM\n", delta_beta_width/C_DEG, delta_beta_height/C_DEG);
 #endif
     depth d_before = depth_start;
     for(size_t i = 0; i < ws->n_reactions; i++) {
@@ -393,7 +386,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         detector_foil_traverse(&r->p, ws);
         b->E = r->p.E;
         b->S = r->p.S;
-        b->S_geo = geostragg(ws, sample, r, d_before, ion1.E, delta_beta, theta_deriv);
+        b->S_geo = geostragg(ws, sample, r, d_before, ion1.E, delta_beta_width, theta_deriv);
 #ifdef DEBUG
         fprintf(stderr, "Simulation reaction %zu: %s %s. Max depth %g tfu. i_isotope=%zu, stop = %i.\nCross section at %g keV is %g mb/sr, exit %g keV\n",
                 i, reaction_name(r->r), r->r->target->name, r->max_depth / C_TFU, r->i_isotope, r->stop, ion1.E/C_KEV, r->cross_section(r, ion1.E)/C_MB_SR, r->p.E/C_KEV);
@@ -478,7 +471,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
 #endif
             if(ws->params.geostragg) {
-                b->S_geo = geostragg(ws, sample, r, d_after, ion1.E, delta_beta, theta_deriv);
+                b->S_geo = geostragg(ws, sample, r, d_after, ion1.E, delta_beta_width, theta_deriv);
             }
             sim_reaction_product_energy_and_straggling(r, &ion1);
             post_scatter_exit(&r->p, d_after, ws, sample);
