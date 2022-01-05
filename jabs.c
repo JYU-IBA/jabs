@@ -298,7 +298,8 @@ double exit_angle_delta(const sim_workspace *ws, const char direction) {
 #ifdef DEBUG
     double theta_product, phi_product;
     rotate(ws->det->theta, ws->det->phi, ws->sim->sample_theta, ws->sim->sample_phi,  &theta_product, &phi_product);
-    fprintf(stderr, "product_direction_proj = %g\n", angle_projection(theta_product, phi_product, direction));
+    fprintf(stderr, "\nproduct_direction_proj = %g\n", angle_projection(theta_product, phi_product, direction));
+    fprintf(stderr, "Cosine of exit angle: %g\n", cos(C_PI - theta_product));
 
     double sample_tilt_x = angle_tilt(ws->sim->sample_theta, ws->sim->sample_phi, 'x');
     double sample_tilt_y = angle_tilt(ws->sim->sample_theta, ws->sim->sample_phi, 'y');
@@ -320,24 +321,14 @@ double exit_angle_delta(const sim_workspace *ws, const char direction) {
     double beam_height = ws->sim->beam_aperture.height / cos(sample_tilt_y);
 
     fprintf(stderr, "Beam spot on sample: %g mm by %g mm\n", beam_width/C_MM, beam_height/C_MM);
-    fprintf(stderr, "alpha_direction_proj = %g\n", angle_projection(ws->sim->sample_theta, ws->sim->sample_phi, direction));
-    fprintf(stderr, "det_direction_proj = %g\n", angle_projection(ws->det->theta, ws->det->phi, direction));
 
-
-    double w_x = aperture_width_shape_product(&ws->sim->beam_aperture, 'x') / ws->det->distance / cos(sample_tilt_x);
-    double w_y = aperture_width_shape_product(&ws->sim->beam_aperture, 'y') / ws->det->distance / cos(sample_tilt_y);
     double w = aperture_width_shape_product(&ws->sim->beam_aperture, direction) / ws->det->distance / cos(angle_tilt(ws->sim->sample_theta, ws->sim->sample_phi, direction));
 
-    fprintf(stderr, "shape * effective_width = %g\n", w_x);
-    fprintf(stderr, "shape * effective_height = %g\n", w_y);
-    fprintf(stderr, "shape * effective length = %g\n", w);
-    double w2_x = w_x * cos(product_tilt_x) * cos(ws->det->phi) + w_x * cos(product_tilt_y) * sin(ws->det->phi);
-    double w2 = w * cos(angle_tilt(theta_product, phi_product, 'x'));
 #endif
-    double delta_beam = w2;
+    double delta_beam = w * cos(C_PI - theta_product);
     double delta_detector = aperture_width_shape_product(&ws->det->aperture, direction) / ws->det->distance;
     double result = sqrt(pow2(delta_beam) + pow2(delta_detector));
-    fprintf(stderr, "Spread of exit angle in direction '%c' due to beam %g deg, due to detector %g deg. Combined %g deg FWHM.\n", direction, delta_beam/C_DEG, delta_detector/C_DEG, result/C_DEG);
+    fprintf(stderr, "Spread of exit angle in direction '%c' due to beam %g deg, due to detector %g deg. Combined %g deg FWHM.\n\n", direction, delta_beam/C_DEG, delta_detector/C_DEG, result/C_DEG);
     return result;
 }
 
