@@ -446,11 +446,19 @@ void simulation_print(FILE *f, const simulation *sim) {
     }
     jabs_message(MSG_INFO, f, "n_detectors = %zu\n", sim->n_det);
     for(size_t i = 0; i < sim->n_det; i++) {
+        detector *det = sim->det[i];
         jabs_message(MSG_INFO, f, "DETECTOR %zu:\n", i + 1);
-        jabs_message(MSG_INFO, f, "  beta = %.3lf deg\n", i, sim_exit_angle(sim, sim->det[i]) / C_DEG);
-        jabs_message(MSG_INFO, f, "  theta = %.3lf deg\n", i, sim->det[i]->theta / C_DEG);
-        jabs_message(MSG_INFO, f, "  solid angle = %.3lf msr\n", i, sim->det[0]->solid/C_MSR);
-        jabs_message(MSG_INFO, f, "  particle solid angle product = %e sr\n", i, sim->fluence * sim->det[0]->solid);
+        jabs_message(MSG_INFO, f, "  theta = %.3lf deg\n", i, det->theta / C_DEG);
+        jabs_message(MSG_INFO, f, "  phi = %.3lf deg\n", i, det->phi / C_DEG);
+        jabs_message(MSG_INFO, f, "  beta = %.3lf deg\n", i, sim_exit_angle(sim, det) / C_DEG);
+        if(det->distance > 1.0 * C_MM) {
+            jabs_message(MSG_INFO, f, "  distance = %.3lf mm\n", i, det->distance / C_MM);
+            rot_vect v = rot_vect_from_angles(det->theta, det->phi);
+            double r = det->distance;
+            jabs_message(MSG_INFO, f, "  coordinates = (%.3lf, %.3lf, %.3lf) mm\n", v.x * r / C_MM, v.y * r / C_MM, v.z * r / C_MM);
+        }
+        jabs_message(MSG_INFO, f, "  solid angle = %.3lf msr\n", i, det->solid/C_MSR);
+        jabs_message(MSG_INFO, f, "  particle solid angle product = %e sr\n", i, sim->fluence * det->solid);
 
     }
     jabs_message(MSG_INFO, f, "n_reactions = %zu\n", sim->n_reactions);

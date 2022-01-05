@@ -94,3 +94,11 @@ void rotate(double theta2, double phi2, double theta1, double phi1,
     *phi = fabs(fmod(*phi, TWO_PI));
 }
 
+rot_vect rot_vect_from_angles(double theta, double phi) {
+    double sintheta = sin(theta);
+    double costheta = cos(theta);
+    double sinphi = sin(phi);
+    double cosphi = cos(phi);
+    rot_vect v = {sintheta * cosphi, sintheta * sinphi, costheta};
+    return v;
+}

@@ -344,6 +344,8 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     ion_print(stderr, incident);
     fprintf(stderr, "Simulate from depth %g tfu (index %zu), detector theta = %g deg, calculated theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->det->theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
     fprintf(stderr, "Reaction product angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.\n", theta_product/C_DEG, phi_product/C_DEG, beta/C_DEG);
+    rot_vect v = rot_vect_from_angles(theta_product, phi_product);
+    fprintf(stderr, "Reaction product vect (%.5lf, %.5lf, %.5lf)\n", v.x, v.y, v.z);
 #endif
     if(theta_product < 90.0*C_DEG) {
         jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", theta_product/C_DEG, phi_product/C_DEG);
