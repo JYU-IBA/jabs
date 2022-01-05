@@ -276,10 +276,10 @@ double reaction_product_energy(const reaction *r, double theta, double E) { /* H
             return 0.0;
         }
     }
-    double m1 = r->incident->mass;
-    double m2 = r->target->mass;
-    double m3 = r->product->mass;
-    double m4 = r->product_nucleus->mass;
+    const double m1 = r->incident->mass;
+    const double m2 = r->target->mass;
+    const double m3 = r->product->mass;
+    const double m4 = r->product_nucleus->mass;
     double E_total = E + Q;
     double a13 = ((m1 * m3)/((m1 + m2)*(m3 + m4))) * (E / E_total);
     double a24 = ((m2 * m4)/((m1 + m2)*(m3 + m4))) * (1 + (m1/m2) * Q / E_total);

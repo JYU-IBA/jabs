@@ -94,11 +94,43 @@ void rotate(double theta2, double phi2, double theta1, double phi1,
     *phi = fabs(fmod(*phi, TWO_PI));
 }
 
-rot_vect rot_vect_from_angles(double theta, double phi) {
+rot_vect rot_vect_from_angles(double theta, double phi) { /* Calculates 3D cartesian unit vector */
     double sintheta = sin(theta);
     double costheta = cos(theta);
     double sinphi = sin(phi);
     double cosphi = cos(phi);
     rot_vect v = {sintheta * cosphi, sintheta * sinphi, costheta};
     return v;
+}
+
+double angle_projection(double theta, double phi, char direction) {
+    if(direction == 'x') {
+        return cos(theta) * cos(phi);
+    }
+    if(direction == 'y') {
+        return cos(theta) * sin(phi);
+    }
+    return 0.0;
+}
+
+double angle_tilt(double theta, double phi, char direction) {
+    double angle = 0.0;
+    rot_vect v = rot_vect_from_angles(theta, phi);
+    if(direction == 'x') {
+        angle = atan2(v.x, v.z);
+    } else if(direction == 'y') {
+        angle = atan2(v.y, v.z);
+    }
+    return angle;
+}
+
+double angle_projection2(double width, double height, double theta, double phi, char direction) {
+    double spread_factor = 1.0/cos(angle_tilt(theta, phi, direction));
+    if(direction == 'x') {
+        return width * spread_factor;
+    }
+    if(direction == 'y') {
+        return height * spread_factor;
+    }
+    return 0.0;
 }
