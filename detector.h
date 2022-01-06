@@ -47,4 +47,5 @@ int detector_update_foil(const jibal *jibal, detector *det);
 int detector_set_var(const jibal *jibal, detector *det, const char *var_str, const char *val_str);
 jibal_config_var *detector_make_vars(detector *det);
 double detector_angle(const detector *det, const char direction);
+double detector_solid_angle_calc(const detector *det);
 #endif //JABS_DETECTOR_H

@@ -103,7 +103,7 @@ rot_vect rot_vect_from_angles(double theta, double phi) { /* Calculates 3D carte
     return v;
 }
 
-double angle_tilt(double theta, double phi, char direction) {
+double angle_tilt(double theta, double phi, char direction) { /* Directions 'x' and 'y' mean "horizontal" and "vertical", respectively. X and Y angles are measured from Z-axis and are orthogonal. */
     double angle = 0.0;
     rot_vect v = rot_vect_from_angles(theta, phi);
     if(direction == 'x') {

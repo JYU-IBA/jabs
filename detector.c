@@ -157,6 +157,9 @@ int detector_print(const char *filename, const detector *det) {
         jabs_message(MSG_INFO, f, "aperture_height = %g mm\n", det->aperture.height/C_MM);
     }
     jabs_message(MSG_INFO, f, "distance = %g mm\n", det->distance/C_MM);
+    if(det->distance > 1.0*C_MM) {
+        jabs_message(MSG_INFO, f, "solid angle (calculated) = %.4lf msr\n", detector_solid_angle_calc(det)/C_MSR);
+    }
     jabs_message(MSG_INFO, f, "column = %zu\n", det->column);
     jabs_message(MSG_INFO, f, "channels = %zu\n", det->channels);
     if(det->foil_description) {
@@ -246,7 +249,7 @@ jibal_config_var *detector_make_vars(detector *det) {
     return vars_out;
 }
 
-double detector_angle(const detector *det, const char direction) {
+double detector_angle(const detector *det, const char direction) { /* Gives detector angle (to an axis, see angle_tilt()) */
     double angle = C_PI - angle_tilt(det->theta, det->phi, direction); /* The pi is here because our detector angles are defined oddly */
     angle = fmod(angle, 2*C_PI);
     if(angle > C_PI)
@@ -254,3 +257,16 @@ double detector_angle(const detector *det, const char direction) {
     return angle;
 }
 
+double detector_solid_angle_calc(const detector *det) {
+    if(det->distance < 1.0*C_MM)
+        return 0.0;
+    if(det->aperture.type == APERTURE_CIRCLE) {
+        return 2.0*C_PI*(1.0 - 1.0/(sqrt(pow2(det->aperture.diameter/2.0/det->distance)+1.0)));
+    }
+    if(det->aperture.type == APERTURE_RECTANGLE) {
+        double alpha = det->aperture.width / det->distance / 2.0;
+        double beta =  det->aperture.height / det->distance / 2.0;
+        return 4.0 * atan(alpha * beta / sqrt(1 + pow2(alpha) + pow2(beta)));
+    }
+    return 0.0;
+}
