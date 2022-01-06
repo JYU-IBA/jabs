@@ -146,6 +146,8 @@ int detector_print(const char *filename, const detector *det) {
     jabs_message(MSG_INFO, f, "resolution = %g keV\n", C_FWHM*sqrt(det->resolution)/C_KEV);
     jabs_message(MSG_INFO, f, "theta = %g deg\n", det->theta/C_DEG);
     jabs_message(MSG_INFO, f, "phi = %g deg\n", det->phi/C_DEG);
+    jabs_message(MSG_INFO, f, "angle from horizontal = %.3lf deg\n", detector_angle(det, 'x')/C_DEG);
+    jabs_message(MSG_INFO, f, "angle from vertical = %.3lf deg\n", detector_angle(det, 'y')/C_DEG);
     jabs_message(MSG_INFO, f, "solid = %g msr\n", det->solid/C_MSR);
     jabs_message(MSG_INFO, f, "aperture = %s\n", aperture_name(&det->aperture));
     if(det->aperture.type == APERTURE_CIRCLE) {
@@ -242,5 +244,13 @@ jibal_config_var *detector_make_vars(detector *det) {
         memcpy(vars_out, vars, var_size); /* Note that this does not make a deep copy */
     }
     return vars_out;
+}
+
+double detector_angle(const detector *det, const char direction) {
+    double angle = C_PI - angle_tilt(det->theta, det->phi, direction); /* The pi is here because our detector angles are defined oddly */
+    angle = fmod(angle, 2*C_PI);
+    if(angle > C_PI)
+        angle -= 2*C_PI;
+    return angle;
 }
 

@@ -292,43 +292,19 @@ double exit_angle_delta(const sim_workspace *ws, const char direction) {
         return 0.0;
     if(ws->det->distance < 0.001 * C_MM)
         return 0.0;
-
-    // double delta_beam = aperture_width_shape_product(&ws->sim->beam_aperture, direction) * cos(sim_exit_angle(ws->sim, ws->det))/ ws->det->distance;
-
-#ifdef DEBUG
-    double theta_product, phi_product;
-    rotate(ws->det->theta, ws->det->phi, ws->sim->sample_theta, ws->sim->sample_phi,  &theta_product, &phi_product);
-    fprintf(stderr, "\nproduct_direction_proj = %g\n", angle_projection(theta_product, phi_product, direction));
-    fprintf(stderr, "Cosine of exit angle: %g\n", cos(C_PI - theta_product));
-
-    double sample_tilt_x = angle_tilt(ws->sim->sample_theta, ws->sim->sample_phi, 'x');
-    double sample_tilt_y = angle_tilt(ws->sim->sample_theta, ws->sim->sample_phi, 'y');
-    fprintf(stderr, "Sample tilt: %g deg (x), %g deg (y)\n", sample_tilt_x/C_DEG, sample_tilt_y/C_DEG);
-    fprintf(stderr, "Cosines of these: %g, %g\n", cos(sample_tilt_x), cos(sample_tilt_y));
-    double product_tilt_x = angle_tilt(theta_product, phi_product, 'x');
-    double product_tilt_y = angle_tilt(theta_product, phi_product, 'y');
-    fprintf(stderr, "Product (or detector in sample) tilt: %g deg (x), %g deg (y)\n", product_tilt_x/C_DEG, product_tilt_y/C_DEG);
-    fprintf(stderr, "Cosines of these: %g, %g\n", cos(product_tilt_x), cos(product_tilt_y));
-
-    double det_tilt_x = angle_tilt(ws->det->theta, ws->det->phi, 'x');
-    double det_tilt_y = angle_tilt(ws->det->theta, ws->det->phi, 'y');
-    fprintf(stderr, "Det tilt in lab: %g deg (x), %g deg (y)\n", det_tilt_x/C_DEG, det_tilt_y/C_DEG);
-    fprintf(stderr, "Cosines of these: %g, %g\n", cos(det_tilt_x), cos(det_tilt_y));
-
-    //double beam_width = angle_projection2(ws->sim->beam_aperture.width, ws->sim->beam_aperture.height, ws->sim->sample_theta, ws->sim->sample_phi, 'x');
-    //double beam_height = angle_projection2(ws->sim->beam_aperture.width, ws->sim->beam_aperture.height, ws->sim->sample_theta, ws->sim->sample_phi, 'y');
-    double beam_width = ws->sim->beam_aperture.width / cos(sample_tilt_x);
-    double beam_height = ws->sim->beam_aperture.height / cos(sample_tilt_y);
-
-    fprintf(stderr, "Beam spot on sample: %g mm by %g mm\n", beam_width/C_MM, beam_height/C_MM);
-
-    double w = aperture_width_shape_product(&ws->sim->beam_aperture, direction) / ws->det->distance / cos(angle_tilt(ws->sim->sample_theta, ws->sim->sample_phi, direction));
-
-#endif
-    double delta_beam = w * cos(C_PI - theta_product);
+    double sample_tilt = angle_tilt(ws->sim->sample_theta, ws->sim->sample_phi, direction);
+    double det_tilt = C_PI - detector_angle(ws->det, direction);
+    double exit = det_tilt - sample_tilt;
+    double geo = fabs(cos(exit)/cos(sample_tilt));
+    double w = aperture_width_shape_product(&ws->sim->beam_aperture, direction);
+    double delta_beam = w *  geo / ws->det->distance;
     double delta_detector = aperture_width_shape_product(&ws->det->aperture, direction) / ws->det->distance;
     double result = sqrt(pow2(delta_beam) + pow2(delta_detector));
+#ifdef DEBUG
+    fprintf(stderr, "Direction %c: detector angles %g deg, sample angle %g deg, exit angle %g deg\n", direction, det_tilt/C_DEG, sample_tilt/C_DEG, exit/C_DEG);
+    fprintf(stderr, "cos(alpha) = %g, cos(beta) = %g, cos(beta)/cos(alpha) = %g\n", cos(sample_tilt), cos(exit), geo);
     fprintf(stderr, "Spread of exit angle in direction '%c' due to beam %g deg, due to detector %g deg. Combined %g deg FWHM.\n\n", direction, delta_beam/C_DEG, delta_detector/C_DEG, result/C_DEG);
+#endif
     return result;
 }
 
@@ -376,11 +352,6 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     ion_print(stderr, incident);
     fprintf(stderr, "Simulate from depth %g tfu (index %zu), detector theta = %g deg, calculated theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->det->theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
     fprintf(stderr, "Reaction product angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.\n", theta_product/C_DEG, phi_product/C_DEG, beta/C_DEG);
-    rot_vect v_product = rot_vect_from_angles(theta_product, phi_product);
-    fprintf(stderr, "Reaction product vect (%.5lf, %.5lf, %.5lf)\n", v_product.x, v_product.y, v_product.z);
-    rot_vect v_sample = rot_vect_from_angles(ws->sim->sample_theta, ws->sim->sample_phi);
-    fprintf(stderr, "Sample vect (%.5lf, %.5lf, %.5lf)\n", v_sample.x, v_sample.y, v_sample.z);
-
 #endif
     if(theta_product < 90.0*C_DEG) {
         jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", theta_product/C_DEG, phi_product/C_DEG);

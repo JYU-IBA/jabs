@@ -437,6 +437,10 @@ void simulation_print(FILE *f, const simulation *sim) {
     jabs_message(MSG_INFO, f, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
     jabs_message(MSG_INFO, f, "E_min = %.3lf keV\n", sim->emin/C_KEV);
     jabs_message(MSG_INFO, f, "alpha = %.3lf deg\n", sim_alpha_angle(sim)/C_DEG);
+    jabs_message(MSG_INFO, f, "sample tilt (horizontal) = %.3lf deg\n", angle_tilt(sim->sample_theta, sim->sample_phi, 'x')/C_DEG);
+    jabs_message(MSG_INFO, f, "sample tilt (vertical) = %.3lf deg\n", angle_tilt(sim->sample_theta, sim->sample_phi, 'y')/C_DEG);
+    rot_vect v = rot_vect_from_angles(C_PI - sim->sample_theta, sim->sample_phi); /* By default our sample faces the beam and tilt angles are based on that choice. Pi is there for a reason. */
+    jabs_message(MSG_INFO, f, "surf normal unit vector (beam in z direction) = (%.3lf, %.3lf, %.3lf)\n", v.x, v.y, v.z);
     jabs_message(MSG_INFO, f, "beam_aperture = %s\n", aperture_name(&sim->beam_aperture));
     if(sim->beam_aperture.type == APERTURE_CIRCLE) {
         jabs_message(MSG_INFO, f, "beam_aperture_diameter = %.3lf mm\n", sim->beam_aperture.diameter/C_MM);
@@ -451,6 +455,8 @@ void simulation_print(FILE *f, const simulation *sim) {
         jabs_message(MSG_INFO, f, "  theta = %.3lf deg\n", i, det->theta / C_DEG);
         jabs_message(MSG_INFO, f, "  phi = %.3lf deg\n", i, det->phi / C_DEG);
         jabs_message(MSG_INFO, f, "  beta = %.3lf deg\n", i, sim_exit_angle(sim, det) / C_DEG);
+        jabs_message(MSG_INFO, f, "  angle from horizontal = %.3lf deg\n", detector_angle(det, 'x')/C_DEG);
+        jabs_message(MSG_INFO, f, "  angle from vertical = %.3lf deg\n", detector_angle(det, 'y')/C_DEG);
         if(det->distance > 1.0 * C_MM) {
             jabs_message(MSG_INFO, f, "  distance = %.3lf mm\n", i, det->distance / C_MM);
             rot_vect v = rot_vect_from_angles(det->theta, det->phi);
