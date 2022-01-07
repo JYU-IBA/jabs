@@ -21,9 +21,11 @@
 #include "sample.h"
 #include "reaction.h"
 
-double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E);
+double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, depth depth, double E);
 depth next_crossing(const ion *incident, const sample *sample, const depth *d_from);
 depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, struct depth depth, double step);
+void post_scatter_exit(ion *p, depth depth_start, const sim_workspace *ws, const sample *sample);
+void foil_traverse(ion *p, const sample *foil, sim_workspace *ws);
 int simulate(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample);
 int assign_stopping(jibal_gsto *gsto, const simulation *sim);
 int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histogram *exp);
