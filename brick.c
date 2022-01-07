@@ -57,7 +57,7 @@ void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const do
     for(size_t i = 1; i <= n_bricks; i++) {
         const brick *b_high = &bricks[i-1];
         const brick *b_low = &bricks[i];
-        double E_diff_brick = b_high->E - b_low->E;
+        //double E_diff_brick = b_high->E - b_low->E;
         double sigma_low = sqrt(b_low->S + S + b_low->S_geo);
         double sigma_high = sqrt(b_high->S + S + b_high->S_geo);
         //fprintf(stderr, "delta d = %.3lf, E_high = %.3lf, E_low = %.3lf), sigma_low = %.3lf, sigma_high = %.3lf, Q = %.3lf\n", (b_low->d - b_high->d)/C_TFU, b_high->E/C_KEV, b_low->E/C_KEV, sigma_low/C_KEV, sigma_high/C_KEV, b_low->Q);

@@ -12,6 +12,7 @@
 
  */
 
+#include <assert.h>
 #include "geostragg.h"
 #include "jabs.h"
 
@@ -50,7 +51,7 @@ double exit_angle_delta(const sim_workspace *ws, const char direction) {
 #ifdef DEBUG
     fprintf(stderr, "Direction %c: detector angles %g deg, sample angle %g deg, exit angle %g deg\n", direction, det_tilt/C_DEG, sample_tilt/C_DEG, exit/C_DEG);
     fprintf(stderr, "cos(alpha) = %g, cos(beta) = %g, cos(beta)/cos(alpha) = %g\n", cos(sample_tilt), cos(exit), geo);
-    fprintf(stderr, "Spread of exit angle in direction '%c' due to beam %g deg, due to detector %g deg. Combined %g deg FWHM.\n\n", direction, delta_beam/C_DEG, delta_detector/C_DEG, result/C_DEG);
+    fprintf(stderr, "Spread of exit angle in direction '%c' due to beam %g deg, due to detector %g deg. Combined %g deg FWHM.\n", direction, delta_beam/C_DEG, delta_detector/C_DEG, result/C_DEG);
 #endif
     return result;
 }
@@ -81,4 +82,48 @@ double geostragg(const sim_workspace *ws, const sample *sample, const sim_reacti
     post_scatter_exit(&ion, d, ws, sample);
     double Eminus = ion.E;
     return pow2((Eplus - Eminus)/2.0/C_FWHM);
+}
+
+double theta_deriv_beta(const detector *det, const char direction) { /* TODO: possibly wrong sign */
+    double x = detector_angle(det, 'x');
+    double y = detector_angle(det, 'y');
+    static const double delta = 0.001*C_DEG;
+    double theta_from_rot = C_PI - theta_tilt(x, y); /* We shouldn't need to calculate this, but we do. Numerical issues? */
+    if(direction == 'x') {
+        x += delta;
+    } else if(direction == 'y') {
+        y += delta;
+    } else {
+        return 0.0;
+    }
+    double theta_eps = C_PI - theta_tilt(x, y);
+    double deriv = (theta_eps - theta_from_rot) / delta;
+#ifdef DEBUG
+    fprintf(stderr, "Theta %.5lf deg, from rotations %.5lf deg. Delta = %g deg, Theta_eps = %.5lf deg\n", det->theta/C_DEG, theta_from_rot/C_DEG, delta/C_DEG, theta_eps/C_DEG);
+    //assert(fabs(theta_from_rot - det->theta) < 1e-3); /* TODO: there is some numerical issue here */ */
+    fprintf(stderr, "Derivative %.5lf (dir '%c').\n", deriv, direction);
+#endif
+    return deriv;
+}
+
+double beta_deriv(const detector *det, const simulation *sim, const char direction) { /* TODO: replace by analytical formula */
+    double theta, phi;
+    double theta_product, phi_product;
+    static const double delta = 0.001*C_DEG;
+    rotate(det->theta, det->phi, sim->sample_theta, sim->sample_phi, &theta_product, &phi_product); /* Detector in sample coordinate system */
+    theta = delta;
+    if(direction == 'x') {
+        phi = 0.0;
+    } else if(direction == 'y') {
+        phi = C_PI_2;
+    } else {
+        return 0.0;
+    }
+    rotate(theta, phi, det->theta, det->phi, &theta, &phi);
+    rotate(theta, phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* "new" Detector in sample coordinate system */
+    double result = (theta_product - theta)/delta;
+#ifdef DEBUG
+    fprintf(stderr, "Beta deriv got theta = %g deg, diff %g deg, result %g\n", theta/C_DEG, (theta_product - theta)/C_DEG, result);
+#endif
+    return result; /* TODO: check sign */
 }

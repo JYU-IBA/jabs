@@ -251,10 +251,30 @@ jibal_config_var *detector_make_vars(detector *det) {
 
 double detector_angle(const detector *det, const char direction) { /* Gives detector angle (to an axis, see angle_tilt()) */
     double angle = C_PI - angle_tilt(det->theta, det->phi, direction); /* The pi is here because our detector angles are defined oddly */
-    angle = fmod(angle, C_2_PI);
+    angle = fmod(angle, C_2PI);
     if(angle > C_PI)
-        angle -= C_2_PI;
+        angle -= C_2PI;
     return angle;
+}
+
+double detector_theta_deriv(const detector *det, const char direction) { /* We don't need to use this. Probably doesn't work when det->theta = 180 deg TODO: remove. */
+    static const double delta = 0.001*C_DEG;
+    double theta, phi;
+
+    theta = delta;
+    if(direction == 'x') {
+        phi = 0.0;
+    } else if(direction == 'y') {
+        phi = C_PI_2;
+    } else {
+        return 0.0;
+    }
+    rotate(theta, phi, det->theta, det->phi, &theta, &phi);
+    double result = (theta - det->theta)/delta;
+#ifdef DEBUG
+    fprintf(stderr, "(%.7lf deg - %.7lf deg)/(%g deg) = %g\n", theta/C_DEG, det->theta/C_DEG, delta/C_DEG, result);
+#endif
+    return result; /* TODO: sign of result? */
 }
 
 double detector_solid_angle_calc(const detector *det) {

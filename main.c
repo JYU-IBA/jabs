@@ -38,6 +38,9 @@
 #include "defaults.h"
 
 int main(int argc, char **argv) {
+#ifdef DEBUG
+    fprintf(stderr, "Note: this is a debug build!\n");
+#endif
     int script_files = FALSE;
     jibal *jibal = jibal_init(NULL);
     if(jibal->error) {

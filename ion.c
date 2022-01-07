@@ -47,12 +47,12 @@ void ion_set_angle(ion *ion, double theta, double phi) {
     if(theta == ion->theta && phi == ion->phi) {
         return;
     }
-    ion->theta = fmod(theta, C_2_PI);
+    ion->theta = fmod(theta, C_2PI);
     if(ion->theta > C_PI) { /* Limit theta to [0, pi] */
-        ion->theta = C_2_PI - ion->theta;
+        ion->theta = C_2PI - ion->theta;
         phi += C_PI;
     }
-    ion->phi = fmod(phi, C_2_PI);
+    ion->phi = fmod(phi, C_2PI);
     ion->cosine_theta = cos(ion->theta);
     ion->cosine_phi = cos(ion->phi);
     ion->inverse_cosine_theta = 1.0/ion->cosine_theta;

@@ -290,8 +290,20 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     double delta_beta_width = exit_angle_delta(ws, 'x');
     double delta_beta_height = exit_angle_delta(ws, 'y');
     double theta_deriv = scattering_angle_exit_deriv(incident, ws);
+#ifdef UNNECESSARY_NUMERICAL_THINGS
+    double theta_deriv_x = theta_deriv_beta(ws->det, 'x');
+    double theta_deriv_y = theta_deriv_beta(ws->det, 'y');
+#else
+    double theta_deriv_x = -cos(ws->det->phi); /* TODO: check IBM with phi 180 deg and */
+    double theta_deriv_y = -sin(ws->det->phi); /* TODO: check Cornell with phi 270 deg */
+#endif
+
 #ifdef DEBUG
     fprintf(stderr, "Spread in exit angle width %g deg FWHM, height %g deg FWHM\n", delta_beta_width/C_DEG, delta_beta_height/C_DEG);
+    fprintf(stderr, "dBeta/dBeta_Width: %g\n", beta_deriv(ws->det, ws->sim, 'x')); /* TODO: verify, check sign */
+    fprintf(stderr, "dTheta/dBeta_Width = %g\n", theta_deriv_x); /* TODO: this should also be valid when sample_phi is not zero? */
+    fprintf(stderr, "dBeta/dBeta_Height: %g\n", beta_deriv(ws->det, ws->sim, 'y')); /* TODO: verify, check sign */
+    fprintf(stderr, "dTheta/dBeta_Height = %g\n", theta_deriv_y);
 #endif
     depth d_before = depth_start;
     for(size_t i = 0; i < ws->n_reactions; i++) {
@@ -409,7 +421,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
 #endif
             if(ws->params.geostragg) {
-                b->S_geo = geostragg(ws, sample, r, d_after, ion1.E, delta_beta_width, theta_deriv);
+                b->S_geo = geostragg(ws, sample, r, d_after, ion1.E, delta_beta_width, theta_deriv); /* TODO: replace this with something that uses values calculated earlier */
             }
             sim_reaction_product_energy_and_straggling(r, &ion1);
             post_scatter_exit(&r->p, d_after, ws, sample);
@@ -839,7 +851,7 @@ int simulate_with_ds(sim_workspace *ws) {
             double fluence_azi = fluence_tot / (1.0 * (ws->params.ds_steps_azi));
             for(int i_azi = 0; i_azi < ws->params.ds_steps_azi; i_azi++) {
                 ion2 = ion1;
-                double ds_azi = C_2_PI * (1.0 * i_azi) / (ws->params.ds_steps_azi * 1.0);
+                double ds_azi = C_2PI * (1.0 * i_azi) / (ws->params.ds_steps_azi * 1.0);
                 ion_rotate(&ion2, ds_polar, ds_azi); /* Dual scattering: first scattering to some angle (scattering angle: ds_polar). Note that this does not follow SimNRA conventions. */
                 ws->fluence = fluence_azi * fluence;
 #ifdef DEBUG

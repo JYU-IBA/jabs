@@ -86,7 +86,7 @@ void rotate(double theta2, double phi2, double theta1, double phi1,
     } else {
         *phi = 0.0;
     }
-    *phi = fabs(fmod(*phi, C_2_PI));
+    *phi = fabs(fmod(*phi, C_2PI));
 }
 
 rot_vect rot_vect_from_angles(double theta, double phi) { /* Calculates 3D cartesian unit vector */
@@ -107,4 +107,16 @@ double angle_tilt(double theta, double phi, char direction) { /* Directions 'x' 
         angle = atan2(v.y, v.z);
     }
     return angle;
+}
+
+double theta_tilt(double tilt_x, double tilt_y) {
+    double theta = 0.0, phi = 0.0;
+    rotate(tilt_x, 0.0, theta, phi, &theta, &phi);
+    rotate(tilt_y, C_PI_2, theta, phi, &theta, &phi);
+#ifdef DEBUG
+    fprintf(stderr, "By rotating first by %.7lf deg (phi 0) and then %.7lf deg (phi 90 deg) we get angles %.7lf deg and %.7lf deg.\n",
+            tilt_x/C_DEG, tilt_y/C_DEG,
+            theta/C_DEG, phi/C_DEG);
+#endif
+    return theta;
 }
