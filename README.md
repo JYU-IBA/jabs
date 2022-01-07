@@ -75,7 +75,8 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Linear ad-hoc substrate channeling correction
  - Faster (less accurate) mode
  - User defined "molecules" i.e. elements with fixed concentration ratios (e.g. you can fit C in SiO2 without changing Si/O ratio)
- - Weighting of cross-sections by straggling
+ - Weighting of cross-sections by straggling 
+ - Kinematic (geometric) broadening due to finite detector size and beam spot
  - Dual scattering model (although it needs improvements before it is usable)
  - Simultaneous multi-detector simulation and fitting.
  - Stopping corrections can be supplied by user (Bragg correction) for a specific layer
@@ -84,7 +85,6 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Support for more input and output data formats (CSV, IDF, ...)
  - More accurate handling of sharp peaks in cross sections (resonances). The current handling is quite accurate in most cases.
  - Multiple scattering (small angle)
- - Kinematic (geometric) broadening
  - Simulation of pile-up and dead time
  - Non-linear detector response and different response for different particles (e.g. alphas, protons)
  - Simulation of time-of-flight spectra
