@@ -3,6 +3,7 @@
 #include "message.h"
 
 void jabs_message(jabs_msg_level level, FILE *f, const char * restrict format, ...) {
+    (void) level;
     va_list argp;
     va_start(argp, format);
     vfprintf(f, format, argp);

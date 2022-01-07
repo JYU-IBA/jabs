@@ -37,7 +37,7 @@ void ds_test(ion *ion, double detector_theta, double detector_phi, double sample
         double cosine = (ds_steps_polar - 2 * i_polar) / (1.0 * ds_steps_polar);
         double ds_polar = acos(cosine);
         int i_azi = i_ds % ds_steps_azi;
-        double ds_azi = 2 * M_PI * (1.0 * i_azi) / (ds_steps_azi * 1.0);
+        double ds_azi = C_2_PI * (1.0 * i_azi) / (ds_steps_azi * 1.0);
         fprintf(stdout, "%3i %3i %3i %12g %12g %12g", i_ds, i_polar, i_azi, cosine, ds_polar/C_DEG, ds_azi/C_DEG);
         ion_set_angle(ion, 0.0, 0.0);
         ion_rotate(ion, sample_theta, sample_phi); /* Go to sample coordinates, sample tilted */

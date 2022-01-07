@@ -839,7 +839,7 @@ int simulate_with_ds(sim_workspace *ws) {
             double fluence_azi = fluence_tot / (1.0 * (ws->params.ds_steps_azi));
             for(int i_azi = 0; i_azi < ws->params.ds_steps_azi; i_azi++) {
                 ion2 = ion1;
-                double ds_azi = 2.0 * M_PI * (1.0 * i_azi) / (ws->params.ds_steps_azi * 1.0);
+                double ds_azi = C_2_PI * (1.0 * i_azi) / (ws->params.ds_steps_azi * 1.0);
                 ion_rotate(&ion2, ds_polar, ds_azi); /* Dual scattering: first scattering to some angle (scattering angle: ds_polar). Note that this does not follow SimNRA conventions. */
                 ws->fluence = fluence_azi * fluence;
 #ifdef DEBUG

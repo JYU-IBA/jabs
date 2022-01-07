@@ -251,9 +251,9 @@ jibal_config_var *detector_make_vars(detector *det) {
 
 double detector_angle(const detector *det, const char direction) { /* Gives detector angle (to an axis, see angle_tilt()) */
     double angle = C_PI - angle_tilt(det->theta, det->phi, direction); /* The pi is here because our detector angles are defined oddly */
-    angle = fmod(angle, 2*C_PI);
+    angle = fmod(angle, C_2_PI);
     if(angle > C_PI)
-        angle -= 2*C_PI;
+        angle -= C_2_PI;
     return angle;
 }
 

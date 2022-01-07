@@ -1,24 +1,27 @@
-/* rotate.c from MCERD, https://github.com/JYU-IBA/mcerd,
+/*
+ * rotate() from rotate.c from MCERD, https://github.com/JYU-IBA/mcerd,
  * Some modifications made by Jaakko Julin.
  *
  * MCERD is Copyright (C) 1996-2020  Kai Arstila, 2015-2021 Jaakko Julin
  * and used here under terms of the GNU General Public License v2.
  *
+ * For the rest
+ *
+    Jaakko's Backscattering Simulator (JaBS)
+    Copyright (C) 2021-2022 Jaakko Julin
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    See LICENSE.txt for the full license.
+ *
+ *
  */
 
 #include <math.h>
-
-#ifndef M_PI
-#define M_PI (3.14159265358979323846264338327950288)
-#endif
-
-#ifndef M_PI_2
-#define M_PI_2 (3.14159265358979323846264338327950288/2.0)
-#endif
-
-#ifndef TWO_PI
-#define TWO_PI (2.0*M_PI)
-#endif
+#include "jibal_units.h"
 
 #define max(A, B)  ((A) > (B)) ? (A) : (B)
 #define min(A, B)  ((A) < (B)) ? (A) : (B)
@@ -57,8 +60,8 @@ void rotate(double theta2, double phi2, double theta1, double phi1,
     cosa1 = cos(theta2);
     sina1 = sin(theta2);
 
-    sina2 = sin(phi2 + M_PI_2);
-    cosa2 = cos(phi2 + M_PI_2);
+    sina2 = sin(phi2 + C_PI_2);
+    cosa2 = cos(phi2 + C_PI_2);
 
     cosa3 = cosa2;
     sina3 = -sina2;
@@ -83,15 +86,7 @@ void rotate(double theta2, double phi2, double theta1, double phi1,
     } else {
         *phi = 0.0;
     }
-#if 0
-    if (fabs(*phi) > TWO_PI) {
-        *phi = fmod(*phi, 2.0 * PI);
-    }
-    if (*phi < 0.0) {
-        *phi += 2.0 * PI;
-    }
-#endif
-    *phi = fabs(fmod(*phi, TWO_PI));
+    *phi = fabs(fmod(*phi, C_2_PI));
 }
 
 rot_vect rot_vect_from_angles(double theta, double phi) { /* Calculates 3D cartesian unit vector */

@@ -17,14 +17,6 @@
 #include "ion.h"
 #include "rotate.h"
 
-#ifndef M_PI
-#define M_PI (3.14159265358979323846264338327950288)
-#endif
-
-#ifndef TWO_PI
-#define TWO_PI (2.0*M_PI)
-#endif
-
 void ion_reset(ion *ion) {
     ion->isotope = NULL;
     ion->E = 0.0;
@@ -55,12 +47,12 @@ void ion_set_angle(ion *ion, double theta, double phi) {
     if(theta == ion->theta && phi == ion->phi) {
         return;
     }
-    ion->theta = fmod(theta, TWO_PI);
-    if(ion->theta > M_PI) { /* Limit theta to [0, pi] */
-        ion->theta = TWO_PI - ion->theta;
-        phi += M_PI;
+    ion->theta = fmod(theta, C_2_PI);
+    if(ion->theta > C_PI) { /* Limit theta to [0, pi] */
+        ion->theta = C_2_PI - ion->theta;
+        phi += C_PI;
     }
-    ion->phi = fmod(phi, TWO_PI);
+    ion->phi = fmod(phi, C_2_PI);
     ion->cosine_theta = cos(ion->theta);
     ion->cosine_phi = cos(ion->phi);
     ion->inverse_cosine_theta = 1.0/ion->cosine_theta;
