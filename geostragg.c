@@ -42,8 +42,8 @@ double exit_angle_delta(const sim_workspace *ws, const char direction) {
         return 0.0;
     double sample_tilt = angle_tilt(ws->sim->sample_theta, ws->sim->sample_phi, direction);
     double det_tilt = C_PI - detector_angle(ws->det, direction);
-    double exit = det_tilt - sample_tilt;
-    double geo = fabs(cos(exit)/cos(sample_tilt));
+    double exit = C_PI - det_tilt - sample_tilt;
+    double geo = cos(exit)/cos(sample_tilt);
     double w = aperture_width_shape_product(&ws->sim->beam_aperture, direction);
     double delta_beam = w *  geo / ws->det->distance;
     double delta_detector = aperture_width_shape_product(&ws->det->aperture, direction) / ws->det->distance;
@@ -71,12 +71,12 @@ double geostragg(const sim_workspace *ws, const sample *sample, const sim_reacti
     } else {
         return 0.0;
     }
-    ion_rotate(&ion, 1.0 * delta_beta * beta_deriv, phi); /* TODO: check phi vs theta */
+    ion_rotate(&ion, 1.0 * delta_beta * beta_deriv/2.0, phi); /* TODO: check phi vs theta */
     ion.E = reaction_product_energy(r->r, r->theta + delta_beta * theta_deriv, E_0);
     /* TODO: make (debug) code that checks the sanity of the delta beta and delta theta angles.  */
+#ifdef DEBUG
     double foo, bar;
     rotate(ion.theta, ion.phi, 0.0, 0.0, &foo, &bar);
-#ifdef DEBUG
     fprintf(stderr, "Reaction product (+) (beta %g deg), direction %g deg, %g deg. Manual calculation of theta says %g deg. Other angles: %g deg, %g deg.\n", (C_PI - ion.theta)/C_DEG, ion.theta/C_DEG, ion.phi/C_DEG, (r->theta + delta_beta * theta_deriv)/C_DEG, foo/C_DEG, bar/C_DEG);
 #endif
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
@@ -84,7 +84,7 @@ double geostragg(const sim_workspace *ws, const sample *sample, const sim_reacti
     double Eplus = ion.E;
     ion = r->p;
     //ion_set_angle(&ion, r->p.theta + delta_beta, ws->det->phi);
-    ion_rotate(&ion, -1.0 * delta_beta * beta_deriv, phi);
+    ion_rotate(&ion, -1.0 * delta_beta * beta_deriv/2.0, phi);
     ion.E = reaction_product_energy(r->r, r->theta - delta_beta * theta_deriv, E_0);
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
     post_scatter_exit(&ion, d, ws, sample);
