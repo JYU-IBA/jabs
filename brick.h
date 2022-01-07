@@ -9,7 +9,8 @@ typedef struct {
     double E_0;
     double E; /* Energy */
     double S; /* Energy loss straggling (variance) */
-    double S_geo; /* Geometric straggling */
+    double S_geo_x; /* Geometric straggling */
+    double S_geo_y; /* Geometric straggling */
     double Q; /* Counts */
 } brick;
 

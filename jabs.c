@@ -287,9 +287,9 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", theta_product/C_DEG, phi_product/C_DEG);
         return EXIT_FAILURE;
     }
-    double delta_beta_width = exit_angle_delta(ws, 'x');
-    double delta_beta_height = exit_angle_delta(ws, 'y');
-    double theta_deriv = scattering_angle_exit_deriv(incident, ws);
+    double delta_beta_x= exit_angle_delta(ws, 'x');
+    double delta_beta_y = exit_angle_delta(ws, 'y');
+    //double theta_deriv = scattering_angle_exit_deriv(incident, ws);
 #ifdef UNNECESSARY_NUMERICAL_THINGS
     double theta_deriv_x = theta_deriv_beta(ws->det, 'x');
     double theta_deriv_y = theta_deriv_beta(ws->det, 'y');
@@ -298,12 +298,16 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     double theta_deriv_y = -sin(ws->det->phi); /* TODO: check Cornell with phi 270 deg */
 #endif
 
+    double beta_deriv_x = fabs(beta_deriv(ws->det, ws->sim, 'x'));
+    double beta_deriv_y = fabs(beta_deriv(ws->det, ws->sim, 'y'));
+
 #ifdef DEBUG
-    fprintf(stderr, "Spread in exit angle width %g deg FWHM, height %g deg FWHM\n", delta_beta_width/C_DEG, delta_beta_height/C_DEG);
-    fprintf(stderr, "dBeta/dBeta_Width: %g\n", beta_deriv(ws->det, ws->sim, 'x')); /* TODO: verify, check sign */
+    fprintf(stderr, "Spread in exit angle width %g deg FWHM, height %g deg FWHM\n", delta_beta_x/C_DEG, delta_beta_y/C_DEG);
+    fprintf(stderr, "dBeta/dBeta_Width: %g\n", beta_deriv_x); /* TODO: verify, check sign */
     fprintf(stderr, "dTheta/dBeta_Width = %g\n", theta_deriv_x); /* TODO: this should also be valid when sample_phi is not zero? */
-    fprintf(stderr, "dBeta/dBeta_Height: %g\n", beta_deriv(ws->det, ws->sim, 'y')); /* TODO: verify, check sign */
+    fprintf(stderr, "dBeta/dBeta_Height: %g\n", beta_deriv_y); /* TODO: verify, check sign */
     fprintf(stderr, "dTheta/dBeta_Height = %g\n", theta_deriv_y);
+
 #endif
     depth d_before = depth_start;
     for(size_t i = 0; i < ws->n_reactions; i++) {
@@ -336,7 +340,10 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         foil_traverse(&r->p, ws->det->foil, ws);
         b->E = r->p.E;
         b->S = r->p.S;
-        b->S_geo = geostragg(ws, sample, r, d_before, ion1.E, delta_beta_width, theta_deriv);
+        if(ws->params.geostragg) {
+            b->S_geo_x = geostragg(ws, sample, r, d_before, ion1.E, 'x', delta_beta_x, beta_deriv_x, theta_deriv_x);
+            b->S_geo_y = geostragg(ws, sample, r, d_before, ion1.E, 'y', delta_beta_y, beta_deriv_y, theta_deriv_y);
+        }
 #ifdef DEBUG
         fprintf(stderr, "Simulation reaction %zu: %s %s. Max depth %g tfu. i_isotope=%zu, stop = %i.\nCross section at %g keV is %g mb/sr, exit %g keV\n",
                 i, reaction_name(r->r), r->r->target->name, r->max_depth / C_TFU, r->i_isotope, r->stop, ion1.E/C_KEV, r->cross_section(r, ion1.E)/C_MB_SR, r->p.E/C_KEV);
@@ -421,7 +428,8 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
 #endif
             if(ws->params.geostragg) {
-                b->S_geo = geostragg(ws, sample, r, d_after, ion1.E, delta_beta_width, theta_deriv); /* TODO: replace this with something that uses values calculated earlier */
+                b->S_geo_x = geostragg(ws, sample, r, d_after, ion1.E, 'x', delta_beta_x, beta_deriv_x, theta_deriv_x);
+                b->S_geo_y = geostragg(ws, sample, r, d_after, ion1.E, 'y', delta_beta_y, beta_deriv_y, theta_deriv_y);
             }
             sim_reaction_product_energy_and_straggling(r, &ion1);
             post_scatter_exit(&r->p, d_after, ws, sample);
@@ -429,7 +437,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             b->E = r->p.E;
             b->S = r->p.S;
             #ifdef DEBUG
-            fprintf(stderr, "Reaction %zu depth %g tfu, ptheta = %g deg, E = %g keV, Eloss stragg %g keV, Geo stragg %g keV\n", i, d_before.x/C_TFU, r->p.theta/C_DEG, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo)/C_KEV);
+            fprintf(stderr, "Reaction %zu depth %g tfu, ptheta = %g deg, E = %g keV, Eloss stragg %g keV, Geo stragg %g keV\n", i, d_before.x/C_TFU, r->p.theta/C_DEG, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo_x+b->S_geo_y)/C_KEV);
 #endif
             if (r->p.E < ws->sim->emin) {
                 r->stop = TRUE;
@@ -697,7 +705,7 @@ void print_bricks(const char *filename, const sim_workspace *ws) {
         for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
             fprintf(f, "%2lu %2lu %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %12.3lf\n",
-                    i, j, b->d.x/C_TFU, b->E_0/C_KEV, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo)/C_KEV, b->Q * ws->sim->fluence);
+                    i, j, b->d.x/C_TFU, b->E_0/C_KEV, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo_x+b->S_geo_y)/C_KEV, b->Q * ws->sim->fluence);
         }
         fprintf(f, "\n\n");
     }

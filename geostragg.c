@@ -56,14 +56,22 @@ double exit_angle_delta(const sim_workspace *ws, const char direction) {
     return result;
 }
 
-double geostragg(const sim_workspace *ws, const sample *sample, const sim_reaction *r, const depth d, const double E_0, const double delta_beta, const double theta_deriv) {
+double geostragg(const sim_workspace *ws, const sample *sample, const sim_reaction *r, const depth d, const double E_0, const char direction, const double delta_beta, const double beta_deriv, const double theta_deriv) {
     if(!ws->params.geostragg) {
         return 0.0;
     }
     ion ion;
     ion = r->p;
     //ion_set_angle(&ion, r->p.theta - delta_beta, ws->det->phi);
-    ion_rotate(&ion, -1.0 * delta_beta, ws->det->phi); /* TODO: why ws->det->phi and not something else? */
+    double phi;
+    if(direction == 'x') {
+        phi = 0.0;
+    } else if(direction == 'y') {
+        phi = C_PI_2;
+    } else {
+        return 0.0;
+    }
+    ion_rotate(&ion, 1.0 * delta_beta * beta_deriv, phi); /* TODO: check phi vs theta */
     ion.E = reaction_product_energy(r->r, r->theta + delta_beta * theta_deriv, E_0);
     /* TODO: make (debug) code that checks the sanity of the delta beta and delta theta angles.  */
     double foo, bar;
@@ -76,7 +84,7 @@ double geostragg(const sim_workspace *ws, const sample *sample, const sim_reacti
     double Eplus = ion.E;
     ion = r->p;
     //ion_set_angle(&ion, r->p.theta + delta_beta, ws->det->phi);
-    ion_rotate(&ion, 1.0 * delta_beta, ws->det->phi);
+    ion_rotate(&ion, -1.0 * delta_beta * beta_deriv, phi);
     ion.E = reaction_product_energy(r->r, r->theta - delta_beta * theta_deriv, E_0);
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
     post_scatter_exit(&ion, d, ws, sample);
@@ -125,5 +133,5 @@ double beta_deriv(const detector *det, const simulation *sim, const char directi
 #ifdef DEBUG
     fprintf(stderr, "Beta deriv got theta = %g deg, diff %g deg, result %g\n", theta/C_DEG, (theta_product - theta)/C_DEG, result);
 #endif
-    return result; /* TODO: check sign */
+    return -1.0*result; /* TODO: check sign */
 }
