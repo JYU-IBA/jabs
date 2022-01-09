@@ -53,7 +53,7 @@ double exit_angle_delta(const sim_workspace *ws, const char direction) {
     fprintf(stderr, "cos(alpha) = %g, cos(beta) = %g, cos(beta)/cos(alpha) = %g\n", cos(sample_tilt), cos(exit), geo);
     fprintf(stderr, "Spread of exit angle in direction '%c' due to beam %g deg, due to detector %g deg. Combined %g deg FWHM.\n", direction, delta_beam/C_DEG, delta_detector/C_DEG, result/C_DEG);
 #endif
-    return result;
+    return result / C_FWHM;
 }
 
 double geostragg(const sim_workspace *ws, const sample *sample, const sim_reaction *r, const depth d, const double E_0, const char direction, const double delta_beta, const double beta_deriv, const double theta_deriv) {
@@ -71,25 +71,28 @@ double geostragg(const sim_workspace *ws, const sample *sample, const sim_reacti
     } else {
         return 0.0;
     }
-    ion_rotate(&ion, 1.0 * delta_beta * beta_deriv/2.0, phi); /* TODO: check phi vs theta */
+    ion_rotate(&ion, delta_beta * beta_deriv, phi);
     ion.E = reaction_product_energy(r->r, r->theta + delta_beta * theta_deriv, E_0);
     /* TODO: make (debug) code that checks the sanity of the delta beta and delta theta angles.  */
 #ifdef DEBUG
-    double foo, bar;
-    rotate(ion.theta, ion.phi, 0.0, 0.0, &foo, &bar);
-    fprintf(stderr, "Reaction product (+) (beta %g deg), direction %g deg, %g deg. Manual calculation of theta says %g deg. Other angles: %g deg, %g deg.\n", (C_PI - ion.theta)/C_DEG, ion.theta/C_DEG, ion.phi/C_DEG, (r->theta + delta_beta * theta_deriv)/C_DEG, foo/C_DEG, bar/C_DEG);
+    fprintf(stderr, "Reaction product (+, direction '%c') angles %g deg, %g deg (delta beta %g deg, delta theta %g deg), E = %g keV, original %g keV\n",
+            direction, ion.theta/C_DEG, ion.phi/C_DEG, delta_beta * beta_deriv / C_DEG, delta_beta * theta_deriv / C_DEG, ion.E/C_KEV,
+            reaction_product_energy(r->r, r->theta, E_0)/C_KEV);
 #endif
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
     post_scatter_exit(&ion, d, ws, sample);
     double Eplus = ion.E;
     ion = r->p;
     //ion_set_angle(&ion, r->p.theta + delta_beta, ws->det->phi);
-    ion_rotate(&ion, -1.0 * delta_beta * beta_deriv/2.0, phi);
+    ion_rotate(&ion, -1.0 * delta_beta * beta_deriv, phi);
     ion.E = reaction_product_energy(r->r, r->theta - delta_beta * theta_deriv, E_0);
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
     post_scatter_exit(&ion, d, ws, sample);
     double Eminus = ion.E;
-    return pow2((Eplus - Eminus)/2.0/C_FWHM);
+#ifdef DEBUG
+    fprintf(stderr, "Direction (%c), Eplus %g keV, Eminus %g keV\n", direction, Eplus/C_KEV, Eminus/C_KEV);
+#endif
+    return pow2((Eplus - Eminus)/2.0);
 }
 
 double theta_deriv_beta(const detector *det, const char direction) { /* TODO: possibly wrong sign */
@@ -129,9 +132,9 @@ double beta_deriv(const detector *det, const simulation *sim, const char directi
     }
     rotate(theta, phi, det->theta, det->phi, &theta, &phi);
     rotate(theta, phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* "new" Detector in sample coordinate system */
-    double result = (theta_product - theta)/delta;
+    double result = -1.0*(theta - theta_product)/delta; /* -1.0, since beta = pi - theta */
 #ifdef DEBUG
-    fprintf(stderr, "Beta deriv got theta = %g deg, diff %g deg, result %g\n", theta/C_DEG, (theta_product - theta)/C_DEG, result);
+    fprintf(stderr, "Beta deriv ('%c') got theta = %g deg (orig %g deg), diff in beta %g deg, result %g\n", direction, theta/C_DEG, theta_product/C_DEG,  (theta_product - theta)/C_DEG, result);
 #endif
-    return -1.0*result; /* TODO: check sign */
+    return result;
 }

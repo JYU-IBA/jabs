@@ -287,7 +287,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", theta_product/C_DEG, phi_product/C_DEG);
         return EXIT_FAILURE;
     }
-    double delta_beta_x= exit_angle_delta(ws, 'x');
+    double delta_beta_x = exit_angle_delta(ws, 'x');
     double delta_beta_y = exit_angle_delta(ws, 'y');
     //double theta_deriv = scattering_angle_exit_deriv(incident, ws);
 #ifdef UNNECESSARY_NUMERICAL_THINGS
@@ -307,6 +307,9 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     fprintf(stderr, "dTheta/dBeta_Width = %g\n", theta_deriv_x); /* TODO: this should also be valid when sample_phi is not zero? */
     fprintf(stderr, "dBeta/dBeta_Height: %g\n", beta_deriv_y); /* TODO: verify, check sign */
     fprintf(stderr, "dTheta/dBeta_Height = %g\n", theta_deriv_y);
+    /*delta_beta_x /= 2.0;
+    delta_beta_y /= 2.0;*/
+
 
 #endif
     depth d_before = depth_start;
