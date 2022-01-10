@@ -287,31 +287,8 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", theta_product/C_DEG, phi_product/C_DEG);
         return EXIT_FAILURE;
     }
-    double delta_beta_x = exit_angle_delta(ws, 'x');
-    double delta_beta_y = exit_angle_delta(ws, 'y');
-    //double theta_deriv = scattering_angle_exit_deriv(incident, ws);
-#ifdef UNNECESSARY_NUMERICAL_THINGS
-    double theta_deriv_x = theta_deriv_beta(ws->det, 'x');
-    double theta_deriv_y = theta_deriv_beta(ws->det, 'y');
-#else
-    double theta_deriv_x = -cos(ws->det->phi); /* TODO: check IBM with phi 180 deg and */
-    double theta_deriv_y = -sin(ws->det->phi); /* TODO: check Cornell with phi 270 deg */
-#endif
+    geostragg_vars g = geostragg_vars_calculate(ws);
 
-    double beta_deriv_x = fabs(beta_deriv(ws->det, ws->sim, 'x'));
-    double beta_deriv_y = fabs(beta_deriv(ws->det, ws->sim, 'y'));
-
-#ifdef DEBUG
-    fprintf(stderr, "Spread in exit angle width %g deg FWHM, height %g deg FWHM\n", delta_beta_x/C_DEG, delta_beta_y/C_DEG);
-    fprintf(stderr, "dBeta/dBeta_Width: %g\n", beta_deriv_x); /* TODO: verify, check sign */
-    fprintf(stderr, "dTheta/dBeta_Width = %g\n", theta_deriv_x); /* TODO: this should also be valid when sample_phi is not zero? */
-    fprintf(stderr, "dBeta/dBeta_Height: %g\n", beta_deriv_y); /* TODO: verify, check sign */
-    fprintf(stderr, "dTheta/dBeta_Height = %g\n", theta_deriv_y);
-    /*delta_beta_x /= 2.0;
-    delta_beta_y /= 2.0;*/
-
-
-#endif
     depth d_before = depth_start;
     for(size_t i = 0; i < ws->n_reactions; i++) {
 #ifdef DEBUG
@@ -344,8 +321,8 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         b->E = r->p.E;
         b->S = r->p.S;
         if(ws->params.geostragg) {
-            b->S_geo_x = geostragg(ws, sample, r, d_before, ion1.E, 'x', delta_beta_x, beta_deriv_x, theta_deriv_x);
-            b->S_geo_y = geostragg(ws, sample, r, d_before, ion1.E, 'y', delta_beta_y, beta_deriv_y, theta_deriv_y);
+            b->S_geo_x = geostragg(ws, sample, r, &g.x, d_before, ion1.E);
+            b->S_geo_y = geostragg(ws, sample, r, &g.y, d_before, ion1.E);
         }
 #ifdef DEBUG
         fprintf(stderr, "Simulation reaction %zu: %s %s. Max depth %g tfu. i_isotope=%zu, stop = %i.\nCross section at %g keV is %g mb/sr, exit %g keV\n",
@@ -431,8 +408,8 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
 #endif
             if(ws->params.geostragg) {
-                b->S_geo_x = geostragg(ws, sample, r, d_after, ion1.E, 'x', delta_beta_x, beta_deriv_x, theta_deriv_x);
-                b->S_geo_y = geostragg(ws, sample, r, d_after, ion1.E, 'y', delta_beta_y, beta_deriv_y, theta_deriv_y);
+                b->S_geo_x = geostragg(ws, sample, r, &g.x, d_after, ion1.E);
+                b->S_geo_y = geostragg(ws, sample, r, &g.y, d_after, ion1.E);
             }
             sim_reaction_product_energy_and_straggling(r, &ion1);
             post_scatter_exit(&r->p, d_after, ws, sample);

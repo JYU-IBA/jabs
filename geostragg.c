@@ -56,27 +56,47 @@ double exit_angle_delta(const sim_workspace *ws, const char direction) {
     return result / C_FWHM;
 }
 
-double geostragg(const sim_workspace *ws, const sample *sample, const sim_reaction *r, const depth d, const double E_0, const char direction, const double delta_beta, const double beta_deriv, const double theta_deriv) {
+geostragg_vars geostragg_vars_calculate(const sim_workspace *ws) {
+    geostragg_vars g;
+    g.x.direction = 'x';
+    g.y.direction = 'y';
+    geostragg_vars_dir *gds[] = {&g.x, &g.y, NULL};
+    for(geostragg_vars_dir **gdp = gds; *gdp; gdp++) {
+        geostragg_vars_dir *gd = *gdp;
+        gd->delta_beta = exit_angle_delta(ws, gd->direction);
+#ifdef UNNECESSARY_NUMERICAL_THINGS
+        double theta_deriv_y = theta_deriv_beta(ws->det, gd->direction);
+#else
+        if(gd->direction == 'x') {
+            gd->theta_deriv = -cos(ws->det->phi); /* TODO: check IBM with phi 180 deg and */
+        } else if (gd->direction == 'y') {
+            gd->theta_deriv = -sin(ws->det->phi); /* TODO: check Cornell with phi 270 deg */
+        }
+#endif
+        gd->delta_beta = exit_angle_delta(ws, gd->direction);
+        gd->beta_deriv = fabs(beta_deriv(ws->det, ws->sim, 'x'));
+#ifdef DEBUG
+        fprintf(stderr, "Spread in exit angle ('%c') %g deg FWHM\n", gd->direction, gd->delta_beta / C_DEG);
+        fprintf(stderr, "dBeta/dBeta_%c: %g\n", gd->direction, gd->beta_deriv); /* TODO: verify, check sign */
+        fprintf(stderr, "dTheta/dBeta_%c = %g\n", gd->direction, gd->theta_deriv); /* TODO: this should also be valid when sample_phi is not zero? */
+#endif
+    }
+    return g;
+}
+
+double geostragg(const sim_workspace *ws, const sample *sample, const sim_reaction *r, const geostragg_vars_dir *gd, const depth d, const double E_0) {
     if(!ws->params.geostragg) {
         return 0.0;
     }
     ion ion;
     ion = r->p;
     //ion_set_angle(&ion, r->p.theta - delta_beta, ws->det->phi);
-    double phi;
-    if(direction == 'x') {
-        phi = 0.0;
-    } else if(direction == 'y') {
-        phi = C_PI_2;
-    } else {
-        return 0.0;
-    }
-    ion_rotate(&ion, -1.0 * delta_beta * beta_deriv, phi); /* -1.0 again because of difference between theta and pi - theta */
-    ion.E = reaction_product_energy(r->r, r->theta + delta_beta * theta_deriv, E_0);
+    ion_rotate(&ion, -1.0 * gd->delta_beta * gd->beta_deriv, gd->phi); /* -1.0 again because of difference between theta and pi - theta */
+    ion.E = reaction_product_energy(r->r, r->theta + gd->delta_beta * gd->theta_deriv, E_0);
     /* TODO: make (debug) code that checks the sanity of the delta beta and delta theta angles.  */
 #ifdef DEBUG
     fprintf(stderr, "Reaction product (+, direction '%c') angles %g deg, %g deg (delta beta %g deg, delta theta %g deg), E = %g keV, original %g keV\n",
-            direction, ion.theta/C_DEG, ion.phi/C_DEG, -1.0 * delta_beta * beta_deriv / C_DEG, delta_beta * theta_deriv / C_DEG, ion.E/C_KEV,
+            gd->direction, ion.theta/C_DEG, ion.phi/C_DEG, -1.0 * gd->delta_beta * gd->beta_deriv / C_DEG, gd->delta_beta * gd->theta_deriv / C_DEG, ion.E/C_KEV,
             reaction_product_energy(r->r, r->theta, E_0)/C_KEV);
 #endif
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
@@ -84,13 +104,13 @@ double geostragg(const sim_workspace *ws, const sample *sample, const sim_reacti
     double Eplus = ion.E;
     ion = r->p;
     //ion_set_angle(&ion, r->p.theta + delta_beta, ws->det->phi);
-    ion_rotate(&ion, 1.0 * delta_beta * beta_deriv, phi);
-    ion.E = reaction_product_energy(r->r, r->theta - delta_beta * theta_deriv, E_0);
+    ion_rotate(&ion, 1.0 * gd->delta_beta * gd->beta_deriv, gd->phi);
+    ion.E = reaction_product_energy(r->r, r->theta - gd->delta_beta * gd->theta_deriv, E_0);
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
     post_scatter_exit(&ion, d, ws, sample);
     double Eminus = ion.E;
 #ifdef DEBUG
-    fprintf(stderr, "Direction (%c), Eplus %g keV, Eminus %g keV\n", direction, Eplus/C_KEV, Eminus/C_KEV);
+    fprintf(stderr, "Direction (%c), Eplus %g keV, Eminus %g keV\n", gd->direction, Eplus/C_KEV, Eminus/C_KEV);
 #endif
     return pow2((Eplus - Eminus)/2.0);
 }
