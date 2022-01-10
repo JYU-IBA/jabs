@@ -24,8 +24,6 @@ typedef struct {
     double delta_beta;
     double theta_deriv;
     double beta_deriv;
-    double theta_product;
-    double phi_product;
     double theta_product_plus;
     double phi_product_plus;
     double theta_product_minus;
