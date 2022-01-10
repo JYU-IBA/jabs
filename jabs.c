@@ -252,43 +252,19 @@ void foil_traverse(ion *p, const sample *foil, sim_workspace *ws) {
     p->S = ion_foil.S;
 }
 
-double scattering_angle(const ion *incident, const sim_workspace *ws) { /* Calculate scattering angle necessary for ion (in sample coordinate system) to hit detector */
-    double theta, phi;
-    double scatter_theta, scatter_phi;
-    rotate(-1.0*ws->sim->sample_theta, ws->sim->sample_phi, incident->theta, incident->phi, &theta, &phi); /* Move from sample coordinates to lab */
-    rotate(ws->det->theta, ws->det->phi, theta, phi, &scatter_theta, &scatter_phi); /* Move from lab to detector */
-#ifdef DEBUG
-    fprintf(stderr, "theta = %g deg, phi = %g deg.\n", theta/C_DEG, phi/C_DEG);
-    fprintf(stderr, "scatter_theta = %g deg, scatter_phi = %g deg.\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
-    if(!ws->params.ds && !ws->params.geostragg) {
-       assert(fabs(ws->det->theta - scatter_theta) < 0.01 * C_DEG); /* with DS this assert will fail */
-    }
-#endif
-    return scatter_theta;
-}
-
 int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
     assert(sample->n_ranges);
     int warnings = 0;
     double thickness = sample->ranges[sample->n_ranges-1].x;
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
-    const double scatter_theta = scattering_angle(incident, ws);
-    double theta_product, phi_product;
-    rotate(ws->det->theta, ws->det->phi, ws->sim->sample_theta, ws->sim->sample_phi, &theta_product, &phi_product); /* Detector in sample coordinate system */
-#ifdef DEBUG
-    double beta;
-    beta = (C_PI-theta_product);
-    ion_print(stderr, incident);
-    fprintf(stderr, "Simulate from depth %g tfu (index %zu), detector theta = %g deg, calculated theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->det->theta/C_DEG, scatter_theta/C_DEG, ws->n_reactions);
-    fprintf(stderr, "Reaction product angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.\n", theta_product/C_DEG, phi_product/C_DEG, beta/C_DEG);
-#endif
-    if(theta_product < 90.0*C_DEG) {
-        jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", theta_product/C_DEG, phi_product/C_DEG);
+    geostragg_vars g = geostragg_vars_calculate(ws, incident);
+    if(g.theta_product < 90.0*C_DEG) {
+        jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", g.theta_product/C_DEG, g.phi_product/C_DEG);
         return EXIT_FAILURE;
     }
-    geostragg_vars g = geostragg_vars_calculate(ws);
-
+    fprintf(stderr, "Simulate from depth %g tfu (index %zu), detector theta = %g deg, calculated theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->det->theta/C_DEG, g.scatter_theta/C_DEG, ws->n_reactions);
+    fprintf(stderr, "Ion energy at start %g keV, straggling %g keV FWHM.\n", incident->E/C_KEV, C_FWHM * sqrt(incident->S) / C_KEV);
     depth d_before = depth_start;
     for(size_t i = 0; i < ws->n_reactions; i++) {
 #ifdef DEBUG
@@ -299,8 +275,8 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             continue;
         r->last_brick = 0;
         r->stop = FALSE;
-        r->theta = scatter_theta;
-        ion_set_angle(&r->p, theta_product, phi_product);
+        r->theta = g.scatter_theta;
+        ion_set_angle(&r->p, g.theta_product, g.phi_product);
         sim_reaction_recalculate_internal_variables(r);
         if(r->stop) {
             r->max_depth = 0.0;
@@ -417,8 +393,8 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             b->E = r->p.E;
             b->S = r->p.S;
             #ifdef DEBUG
-            fprintf(stderr, "Reaction %zu depth %g tfu, ptheta = %g deg, E = %g keV, Eloss stragg %g keV, Geo stragg %g keV\n", i, d_before.x/C_TFU, r->p.theta/C_DEG, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo_x+b->S_geo_y)/C_KEV);
-#endif
+            fprintf(stderr, "Reaction %2zu depth from %8.3lf tfu to %8.3lf tfu, E = %8.3lf keV, Straggling: eloss %7.3lf keV, geo %7.3lf keV\n", i, d_before.x/C_TFU, d_after.x/C_TFU, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo_x+b->S_geo_y)/C_KEV);
+            #endif
             if (r->p.E < ws->sim->emin) {
                 r->stop = TRUE;
                 b->Q = 0.0;

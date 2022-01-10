@@ -13,6 +13,7 @@
 #include "script.h"
 #include "jabs.h"
 #include "message.h"
+#include "geostragg.h"
 
 
 void script_print_commands(FILE *f) {
