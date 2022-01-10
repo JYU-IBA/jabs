@@ -71,12 +71,12 @@ double geostragg(const sim_workspace *ws, const sample *sample, const sim_reacti
     } else {
         return 0.0;
     }
-    ion_rotate(&ion, delta_beta * beta_deriv, phi);
+    ion_rotate(&ion, -1.0 * delta_beta * beta_deriv, phi); /* -1.0 again because of difference between theta and pi - theta */
     ion.E = reaction_product_energy(r->r, r->theta + delta_beta * theta_deriv, E_0);
     /* TODO: make (debug) code that checks the sanity of the delta beta and delta theta angles.  */
 #ifdef DEBUG
     fprintf(stderr, "Reaction product (+, direction '%c') angles %g deg, %g deg (delta beta %g deg, delta theta %g deg), E = %g keV, original %g keV\n",
-            direction, ion.theta/C_DEG, ion.phi/C_DEG, delta_beta * beta_deriv / C_DEG, delta_beta * theta_deriv / C_DEG, ion.E/C_KEV,
+            direction, ion.theta/C_DEG, ion.phi/C_DEG, -1.0 * delta_beta * beta_deriv / C_DEG, delta_beta * theta_deriv / C_DEG, ion.E/C_KEV,
             reaction_product_energy(r->r, r->theta, E_0)/C_KEV);
 #endif
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
@@ -84,7 +84,7 @@ double geostragg(const sim_workspace *ws, const sample *sample, const sim_reacti
     double Eplus = ion.E;
     ion = r->p;
     //ion_set_angle(&ion, r->p.theta + delta_beta, ws->det->phi);
-    ion_rotate(&ion, -1.0 * delta_beta * beta_deriv, phi);
+    ion_rotate(&ion, 1.0 * delta_beta * beta_deriv, phi);
     ion.E = reaction_product_energy(r->r, r->theta - delta_beta * theta_deriv, E_0);
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
     post_scatter_exit(&ion, d, ws, sample);
