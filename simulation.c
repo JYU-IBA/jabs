@@ -529,7 +529,7 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
     sim_r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0)); /* Factors for Andersen correction */
     sim_r->r_VE_factor2 = pow2(0.5 / sin(sim_r->theta_cm / 2.0));
 #ifdef DEBUG
-    fprintf(stderr, "Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g (valid for RBS and ERD)\n", sim_r->theta/C_DEG, sim_r->theta_cm/C_DEG, sim_r->K);
+    fprintf(stderr, "Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g (valid for RBS and ERD). Q = %g MeV.\n", sim_r->theta/C_DEG, sim_r->theta_cm/C_DEG, sim_r->K, sim_r->r->Q / C_MEV);
 #endif
 }
 
@@ -603,13 +603,16 @@ void sim_sort_reactions(const simulation *sim) {
 void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident) {
     if(r->r->Q == 0.0) {
         r->p.E = incident->E * r->K;
-        r->p.S = incident->S * r->K;
+        r->p.S = incident->S * pow2(r->K);
+#ifdef DEBUG
+        fprintf(stderr, "Product energy %g keV, eloss straggling %g keV FWHM. Calculated using K = %g\n", r->p.E/C_KEV, C_FWHM * sqrt(r->p.S) / C_KEV, r->K);
+#endif
         return;
     }
     r->p.E = reaction_product_energy(r->r, r->theta, incident->E);
     double epsilon = 0.01*C_KEV;
     double deriv = (reaction_product_energy(r->r, r->theta, incident->E+epsilon) - r->p.E)/(epsilon); /* TODO: this derivative could be solved analytically */
-    r->p.S = incident->S * fabs(deriv) * incident->E;
+    r->p.S = incident->S * pow2(deriv) * incident->E;
 #ifdef DEBUG
     fprintf(stderr, "deriv %g, E_out/E %g, E_out = %g keV, E = %g keV\n", deriv, r->p.E / incident->E, r->p.E/C_KEV, incident->E/C_KEV);
 #endif

@@ -36,9 +36,7 @@ double stop_sample(const sim_workspace *ws, const ion *incident, const sample *s
                     #endif
                     );
         } else {
-            S1 += c * (
-                    jibal_gsto_get_em(ws->gsto, type, incident->Z, sample->isotopes[i_isotope]->Z, em)
-            );
+            S1 += c * (jibal_gsto_get_em(ws->gsto, type, incident->Z, sample->isotopes[i_isotope]->Z, em));
         }
     }
     //assert(S1 > 0.0);
@@ -117,7 +115,7 @@ depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, de
         k2 = stop_sample(ws, incident, sample, ws->stopping_type, halfdepth, E - (h / 2.0) * k1);
         k3 = stop_sample(ws, incident, sample, ws->stopping_type, halfdepth, E - (h / 2.0) * k2);
         k4 = stop_sample(ws, incident, sample, ws->stopping_type, fulldepth, E - h * k3);
-        stop = (k1 + 2 * k2 + 2 * k3 + k4) / 6;
+        stop = (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0;
     } else {
         stop = k1;
     }
@@ -130,9 +128,9 @@ depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, de
     //   fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
     //}
 #endif
-    incident->S *= (s_ratio)*(s_ratio);
 #endif
-    incident->S += h * stop_sample(ws, incident, sample, GSTO_STO_STRAGG, halfdepth, (E + dE / 2.0)); /* Straggling, calculate at mid-energy */
+    incident->S *= pow2(s_ratio);
+    incident->S += h * stop_sample(ws, incident, sample, GSTO_STO_STRAGG, halfdepth, E + (0.5 * dE)); /* Straggling, calculate at mid-energy */
     incident->E += dE;
     return fulldepth; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
@@ -145,7 +143,7 @@ double normal_pdf(double x, double mean, double sigma) {
 }
 
 double cross_section_straggling(const sim_reaction *sim_r, int n_steps, double E, double S) {
-    const double sigmas = 2.0; /* TODO: what is enough or too much? */
+    static const double sigmas = 2.0; /* TODO: what is enough or too much? */
     const double std_dev = sqrt(S);
     const int half_n = n_steps/2;
     const double w = sigmas/(half_n);
@@ -155,7 +153,7 @@ double cross_section_straggling(const sim_reaction *sim_r, int n_steps, double E
     for(int i = 0; i < n_steps; i++) {
         double x = w*(i-half_n);
         double E_stragg = E + x * std_dev;
-        double prob = normal_pdf(x, 0.0, 1.0)*w; /* TODO: if this is always a normal distribution and n_steps doesn't change, this function call could be replaced by a lookup table */
+        double prob = normal_pdf(x, 0.0, 1.0) * w; /* TODO: if this is always a normal distribution and n_steps doesn't change, this function call could be replaced by a lookup table */
         prob_sum += prob;
         cs_sum += prob * sim_r->cross_section(sim_r, E_stragg);
     }
@@ -303,6 +301,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
 #ifdef DEBUG
         fprintf(stderr, "Simulation reaction %zu: %s %s. Max depth %g tfu. i_isotope=%zu, stop = %i.\nCross section at %g keV is %g mb/sr, exit %g keV\n",
                 i, reaction_name(r->r), r->r->target->name, r->max_depth / C_TFU, r->i_isotope, r->stop, ion1.E/C_KEV, r->cross_section(r, ion1.E)/C_MB_SR, r->p.E/C_KEV);
+        ion_print(stderr, &r->p);
 #endif
     }
     i_depth=1;
@@ -378,6 +377,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             all_stop = 0;
             b->d = d_after;
             b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
+            b->S_0 = ion1.S;
             assert(r->p.E > 0.0);
 
 #ifdef DEBUG_REACTION
@@ -401,11 +401,13 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
                 continue;
             }
             double sigma_conc = cross_section_concentration_product(ws, sample, r, E_front, E_back, &d_before, &d_after, S_front, S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
+            b->thick = d_diff;
             if(sigma_conc > 0.0) {
                 if(d_after.i == sample->n_ranges - 2) {
                     sigma_conc *= ws->sim->channeling_offset + ws->sim->channeling_slope * (E_front + E_back)/2.0;
                 }
                 b->Q = ion1.inverse_cosine_theta * sigma_conc * d_diff;
+                b->sc = sigma_conc;
                 assert(b->Q >= 0.0);
 #ifdef DEBUG_VERBOSE
                 fprintf(stderr, "    %s: type=%i, E_front = %.3lf, E_back = %.3lf, E_out = %.3lf (sigma*conc = %g mb/sr, Q = %g (thickness = %.4lf tfu)\n",
@@ -413,6 +415,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
 #endif
             } else {
                 b->Q = 0.0;
+                b->sc = 0.0;
             }
             r->last_brick = i_depth;
         }
@@ -658,10 +661,10 @@ void print_bricks(const char *filename, const sim_workspace *ws) {
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const sim_reaction *r = &ws->reactions[i];
         fprintf(f, "#%s %s\n", reaction_name(r->r), r->r->target->name);
+        fprintf(f, "#i  brick  depth    thick       E_0 S_0(eloss) E(det)  S(eloss)    S(geo) sigma*conc        Q\n");
         for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
-            fprintf(f, "%2lu %2lu %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %12.3lf\n",
-                    i, j, b->d.x/C_TFU, b->E_0/C_KEV, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo_x+b->S_geo_y)/C_KEV, b->Q * ws->sim->fluence);
+            fprintf(f, "%2lu %4lu %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %8e\n", i, j, b->d.x/C_TFU, b->thick/C_TFU, b->E_0/C_KEV, C_FWHM * sqrt(b->S_0)/C_KEV, b->E/C_KEV, C_FWHM * sqrt(b->S)/C_KEV, C_FWHM * sqrt(b->S_geo_x+b->S_geo_y)/C_KEV, b->sc/C_MB_SR, b->Q * ws->fluence * ws->det->solid);
         }
         fprintf(f, "\n\n");
     }
