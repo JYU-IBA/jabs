@@ -90,7 +90,8 @@ geostragg_vars geostragg_vars_calculate(const sim_workspace *ws, const ion *inci
         geostragg_vars_dir *gd = *gdp;
         gd->delta_beta = exit_angle_delta(ws, gd->direction);
 #ifdef UNNECESSARY_NUMERICAL_THINGS
-        double theta_deriv_y = theta_deriv_beta(ws->det, gd->direction);
+        gd->theta_deriv = theta_deriv_beta(ws->det, gd->direction);
+        gd->phi = ws->det->phi;
 #else
         if(gd->direction == 'x') {
             gd->theta_deriv = -cos(ws->det->phi); /* TODO: check IBM with phi 180 deg and */
@@ -101,13 +102,13 @@ geostragg_vars geostragg_vars_calculate(const sim_workspace *ws, const ion *inci
         }
 #endif
         gd->delta_beta = exit_angle_delta(ws, gd->direction) / 2.0;
-        gd->beta_deriv = fabs(beta_deriv(ws->det, ws->sim, 'x'));
+        gd->beta_deriv = fabs(beta_deriv(ws->det, ws->sim, gd->direction));
 
         gd->theta_plus = g.scatter_theta + gd->delta_beta * gd->theta_deriv;
         gd->theta_minus = g.scatter_theta - gd->delta_beta * gd->theta_deriv;
 
-        rotate(-1.0 * gd->delta_beta * gd->beta_deriv, gd->phi, g.theta_product, g.phi_product, &gd->theta_product_plus, &gd->phi_product_plus); /* -1.0 again because of difference between theta and pi - theta */
-        rotate(1.0 * gd->delta_beta * gd->beta_deriv, gd->phi, g.theta_product, g.phi_product, &gd->theta_product_minus, &gd->phi_product_minus);
+        rotate(-1.0 * gd->delta_beta * gd->beta_deriv, g.phi_product, g.theta_product, g.phi_product, &gd->theta_product_plus, &gd->phi_product_plus); /* -1.0 again because of difference between theta and pi - theta */
+        rotate(1.0 * gd->delta_beta * gd->beta_deriv, g.phi_product, g.theta_product, g.phi_product, &gd->theta_product_minus, &gd->phi_product_minus);
 
 #ifdef DEBUG
         fprintf(stderr, "Spread in exit angle ('%c') %g deg\n", gd->direction, gd->delta_beta / C_DEG);
@@ -141,7 +142,7 @@ double geostragg(const sim_workspace *ws, const sample *sample, const sim_reacti
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
     post_scatter_exit(&ion, d, ws, sample);
     double Eminus = ion.E;
-    double result = pow2((Eplus - Eminus));
+    double result = pow2(Eplus - Eminus);
 #ifdef DEBUG_VERBOSE
     fprintf(stderr, "Direction (%c), Eplus %g keV, Eminus %g keV, Straggling %g keV FWHM\n", gd->direction, Eplus/C_KEV, Eminus/C_KEV, C_FWHM*sqrt(result)/C_KEV);
 #endif

@@ -100,7 +100,7 @@ depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, de
         h = h_max;
         halfdepth.x = depth.x + h_max_perp/2.0;
         fulldepth = depth_next;
-        if(h == 0.0) {
+        if(h < 0.001*C_TFU) {
             return fulldepth;
         }
     } else {
@@ -261,8 +261,10 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", g.theta_product/C_DEG, g.phi_product/C_DEG);
         return EXIT_FAILURE;
     }
+#ifdef DEBUG
     fprintf(stderr, "Simulate from depth %g tfu (index %zu), detector theta = %g deg, calculated theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->det->theta/C_DEG, g.scatter_theta/C_DEG, ws->n_reactions);
     fprintf(stderr, "Ion energy at start %g keV, straggling %g keV FWHM.\n", incident->E/C_KEV, C_FWHM * sqrt(incident->S) / C_KEV);
+#endif
     depth d_before = depth_start;
     for(size_t i = 0; i < ws->n_reactions; i++) {
 #ifdef DEBUG
@@ -341,7 +343,9 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         if(fabs(d_diff) < 0.001*C_TFU && E_front-E_back < 0.001*C_KEV) {
             jabs_message(MSG_WARNING, stderr, "Warning: no or very little progress was made (E step (goal) %g keV, E from %g keV to E = %g keV, depth = %g tfu, d_diff = %g tfu), check stopping or step size.\n", E_step/C_KEV, E_front/C_KEV , E_back/C_KEV, d_before.x/C_TFU, d_diff/C_TFU);
             //sample_print(stderr, sample, FALSE);
-            d_before.x += incident->inverse_cosine_theta*0.0001*C_TFU;
+            //d_before.x += incident->inverse_cosine_theta*0.0001*C_TFU;
+            d_before = d_after;
+            d_before.x += 0.002*C_TFU;
             warnings++;
             continue;
         }
