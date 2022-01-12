@@ -1,0 +1,24 @@
+#!/usr/bin/env jabs
+#set stop_step_fudge 0.5
+#set stop_step_incident 5keV
+#set stop_step_exiting 20keV
+set ion 197Au
+set geostragg true
+set energy 13.6MeV
+set alpha 70deg
+set sample_azi 0deg
+set beam_aperture rectangle
+set beam_aperture_width 3mm
+set beam_aperture_height 3mm
+set det theta 40deg
+set det phi 0deg
+set det slope 2keV
+set det resolution 10keV
+set det aperture circle
+set det aperture_diameter 20mm
+set det distance 1000mm
+set sample Co 1000tfu
+#add reactions RBS
+add reactions ERD
+simulate
+save spectra "out.csv"
