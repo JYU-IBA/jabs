@@ -71,6 +71,10 @@ set(PROJECT_SOURCES
         ../win_compat.c
         ../win_compat.h
         ../defaults.h
+        ../aperture.c
+        ../aperture.h
+        ../geostragg.c
+        ../geostragg.h
        main.cpp
        mainwindow.cpp
        mainwindow.h
