@@ -1,14 +1,18 @@
 #ifndef JABS_BRICK_H
 #define JABS_BRICK_H
 
+#include <jibal_masses.h>
 #include <gsl/gsl_histogram.h>
 #include "sample.h"
+#include "detector.h"
 
 typedef struct {
     depth d; /* Depth from sample surface */
     double thick; /* Thickness of brick (difference of depth compared to previous brick) */
     double E_0; /* Incident ion energy at depth */
     double S_0;  /* Incident ion energy loss straggling at depth */
+    double E_r; /* Energy after reaction */
+    double S_r; /* Energy loss straggling after reaction */
     double E; /* Energy of reaction product (as detected, after detector foil) */
     double S; /* Energy loss straggling (variance) of reaction product */
     double S_geo_x; /* Geometric straggling in "width" direction */
@@ -18,6 +22,5 @@ typedef struct {
 } brick;
 
 void brick_int(double sigma_low, double  sigma_high, double E_low, double E_high, gsl_histogram *h, double Q);
-void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, double S, double scale);
-
+void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const detector *det,const jibal_isotope *isotope, double scale);
 #endif // JABS_BRICK_H

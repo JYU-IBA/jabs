@@ -12,17 +12,25 @@
 
 extern inline double detector_calibrated(const detector *det, size_t ch);
 
+const char *detector_type_name(const detector *det) {
+    return detector_option[det->type].s;
+}
+
 int detector_sanity_check(const detector *det) {
     if(!det) {
         jabs_message(MSG_ERROR, stderr, "No detector!\n");
         return -1;
     }
-    if (det->resolution <= 0.0) {
+    if(det->resolution <= 0.0) {
         jabs_message(MSG_ERROR, stderr, "Warning: detector resolution (%g) is negative.\n", det->resolution);
         return -1;
     }
-    if (det->slope <= 0.0) {
+    if(det->slope <= 0.0) {
         jabs_message(MSG_ERROR, stderr, "Warning: detector slope (%g) is negative.\n", det->slope);
+        return -1;
+    }
+    if(det->type == DETECTOR_TOF && det->length < 1 * C_MM) {
+        jabs_message(MSG_ERROR, stderr, "Warning: length (%g) is small (%g mm)\n", det->length/C_MM);
         return -1;
     }
     return 0;
@@ -112,11 +120,13 @@ detector *detector_default(detector *det) {
     if(!det) {
         det = malloc(sizeof(detector));
     }
+    det->type = DETECTOR_ENERGY;
     det->theta = DETECTOR_THETA;
     det->phi = DETECTOR_PHI;
     det->solid = DETECTOR_SOLID;
     det->aperture = aperture_default();
-    det->distance = 0.0;
+    det->distance = DETECTOR_DISTANCE;
+    det->length = DETECTOR_LENGTH;
     det->resolution = (DETECTOR_RESOLUTION*DETECTOR_RESOLUTION);
     det->slope = ENERGY_SLOPE;
     det->offset = 0.0*C_KEV;
@@ -141,13 +151,23 @@ int detector_print(const char *filename, const detector *det) {
     FILE *f = fopen_file_or_stream(filename, "w");
     if(!f)
         return EXIT_FAILURE;
+    jabs_message(MSG_INFO, f, "type = %s\n", detector_type_name(det));
     jabs_message(MSG_INFO, f, "slope = %g keV\n", det->slope/C_KEV);
     jabs_message(MSG_INFO, f, "offset = %g keV\n", det->offset/C_KEV);
-    jabs_message(MSG_INFO, f, "resolution = %g keV\n", C_FWHM*sqrt(det->resolution)/C_KEV);
+    if(det->type == DETECTOR_ENERGY) {
+        jabs_message(MSG_INFO, f, "resolution = %g keV\n", C_FWHM * sqrt(det->resolution)/C_KEV);
+    } else if(det->type == DETECTOR_TOF) {
+        jabs_message(MSG_INFO, f, "length = %g mm\n", det->length/C_MM);
+        jabs_message(MSG_INFO, f, "resolution = %g ps\n", C_FWHM * sqrt(det->resolution)/C_PS);
+    } else if(det->type == DETECTOR_ELECTROSTATIC) {
+        jabs_message(MSG_INFO, f, "resolution = %g\n", C_FWHM * sqrt(det->resolution));
+    }
     jabs_message(MSG_INFO, f, "theta = %g deg\n", det->theta/C_DEG);
     jabs_message(MSG_INFO, f, "phi = %g deg\n", det->phi/C_DEG);
+#if 0
     jabs_message(MSG_INFO, f, "angle from horizontal = %.3lf deg\n", detector_angle(det, 'x')/C_DEG);
     jabs_message(MSG_INFO, f, "angle from vertical = %.3lf deg\n", detector_angle(det, 'y')/C_DEG);
+#endif
     jabs_message(MSG_INFO, f, "solid = %g msr\n", det->solid/C_MSR);
     jabs_message(MSG_INFO, f, "aperture = %s\n", aperture_name(&det->aperture));
     if(det->aperture.type == APERTURE_CIRCLE) {
@@ -157,9 +177,11 @@ int detector_print(const char *filename, const detector *det) {
         jabs_message(MSG_INFO, f, "aperture_height = %g mm\n", det->aperture.height/C_MM);
     }
     jabs_message(MSG_INFO, f, "distance = %g mm\n", det->distance/C_MM);
+#if 0
     if(det->distance > 1.0*C_MM) {
         jabs_message(MSG_INFO, f, "solid angle (calculated) = %.4lf msr\n", detector_solid_angle_calc(det)/C_MSR);
     }
+#endif
     jabs_message(MSG_INFO, f, "column = %zu\n", det->column);
     jabs_message(MSG_INFO, f, "channels = %zu\n", det->channels);
     if(det->foil_description) {
@@ -222,13 +244,15 @@ jibal_config_var *detector_make_vars(detector *det) {
     if(!det)
         return NULL;
     jibal_config_var vars[] = {
+            {JIBAL_CONFIG_VAR_OPTION, "type",              &det->type,              detector_option},
             {JIBAL_CONFIG_VAR_UNIT,   "slope",             &det->slope,             NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "offset",            &det->offset,            NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "length",            &det->length,            NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "resolution",        &det->resolution,        NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "theta",             &det->theta,             NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "phi",               &det->phi,               NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "solid",             &det->solid,             NULL},
-            {JIBAL_CONFIG_VAR_OPTION, "aperture",          &det->aperture.type,          aperture_option},
+            {JIBAL_CONFIG_VAR_OPTION, "aperture",          &det->aperture.type,     aperture_option},
             {JIBAL_CONFIG_VAR_UNIT,   "aperture_width",    &det->aperture.width,    NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "aperture_height",   &det->aperture.height,   NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "aperture_diameter", &det->aperture.diameter, NULL},
@@ -289,4 +313,18 @@ double detector_solid_angle_calc(const detector *det) {
         return 4.0 * atan(alpha * beta / sqrt(1 + pow2(alpha) + pow2(beta)));
     }
     return 0.0;
+}
+
+double detector_resolution(const detector *det, const jibal_isotope *isotope, double E) { /* Returns variance! */
+    switch(det->type) {
+        case DETECTOR_NONE:
+            return 0.0;
+        case DETECTOR_ENERGY:
+            return det->resolution;
+        case DETECTOR_TOF:
+            return det->resolution * pow3(2*E)/(pow2(det->length)*isotope->mass);
+        case DETECTOR_ELECTROSTATIC:
+            return det->resolution * pow2(E);
+    }
+    return 0.0; /* Never reached */
 }

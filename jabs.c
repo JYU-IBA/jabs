@@ -231,17 +231,17 @@ void post_scatter_exit(ion *p, const depth depth_start, const sim_workspace *ws,
 void foil_traverse(ion *p, const sample *foil, sim_workspace *ws) {
     if(!foil)
         return;
-    depth d;
-    d.i = 0;
-    d.x = 0.0;
+    depth d = {.i = 0, .x = 0.0};
     ion ion_foil = *p;
     ion_set_angle(&ion_foil, 0.0, 0.0); /* Foils are not tilted. We use a temporary copy of "p" to do this step. */
+    size_t i = 0;
     while(1) {
-        if(d.x >= foil->ranges[foil->n_ranges-1].x) {
+        i++;
+        if(foil->ranges[foil->n_ranges-1].x - d.x < DEPTH_TOLERANCE) {
             break;
         }
         depth d_after  = stop_step(ws, &ion_foil, foil, d, ws->params.stop_step_exiting == 0.0?p->E*0.1+sqrt(p->S):ws->params.stop_step_exiting);
-        if(p->E < ws->sim->emin) {
+        if(ion_foil.E < ws->sim->emin) {
             break;
         }
         d = d_after;
@@ -286,6 +286,10 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         r->max_depth = sample_isotope_max_depth(sample, r->i_isotope);
         sim_reaction_reset_bricks(r);
         brick *b = &r->bricks[0];
+        b->E_0 = ion1.E;
+        b->S_0 = ion1.S;
+        b->E_r = r->p.E;
+        b->S_r = r->p.S;
         b->d = d_before;
         b->E_0 = ion1.E;
         b->Q = 0.0;
@@ -331,7 +335,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         }
         const double E_front = ion1.E;
         const double S_front = ion1.S;
-        double E_step = ws->params.stop_step_incident == 0.0?ws->params.stop_step_fudge_factor*sqrt(ws->det->resolution+ion1.S):ws->params.stop_step_incident;
+        double E_step = ws->params.stop_step_incident == 0.0?ws->params.stop_step_fudge_factor*sqrt(detector_resolution(ws->det, ion1.isotope, ion1.E)+ion1.S):ws->params.stop_step_incident;
         depth d_after = stop_step(ws, &ion1, sample, d_before, E_step);
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "After:  %g tfu in range %zu\n", d_after.x/C_TFU, d_after.i);
@@ -364,7 +368,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             if(r->stop)
                 continue;
             if(i_depth >= r->n_bricks) {
-                fprintf(stderr, "Too many bricks. Data partial.\n");
+                fprintf(stderr, "Too many bricks (%zu max). Data partial.\n", r->n_bricks);
                 r->stop = TRUE;
                 continue;
             }
@@ -392,6 +396,8 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
                 b->S_geo_y = geostragg(ws, sample, r, &g.y, d_after, ion1.E);
             }
             sim_reaction_product_energy_and_straggling(r, &ion1);
+            b->E_r = r->p.E;
+            b->S_r = r->p.S;
             post_scatter_exit(&r->p, d_after, ws, sample);
             foil_traverse(&r->p, ws->det->foil, ws);
             b->E = r->p.E;
@@ -424,8 +430,6 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             r->last_brick = i_depth;
         }
         d_before = d_after;
-        ion1.S = S_back;
-        ion1.E = E_back;
         i_depth++;
 
         if(all_stop) {
@@ -439,6 +443,40 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     return EXIT_SUCCESS;
 }
 
+int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) {
+    int fail = FALSE;
+    if (!jibal_gsto_auto_assign(gsto, sim->beam_isotope->Z, Z2)) { /* This should handle RBS */
+        jabs_message(MSG_ERROR, stderr, "Can not assign stopping or straggling for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
+        fail = TRUE;
+    }
+    if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, sim->beam_isotope->Z, Z2)) {
+        jabs_message(MSG_ERROR, stderr, "Could not assign stopping for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
+        fail = TRUE;
+    }
+    if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, sim->beam_isotope->Z, Z2)) {
+        jabs_message(MSG_ERROR, stderr, "Could not assign straggling for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
+        fail = TRUE;
+    }
+    for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
+        const reaction *r = sim->reactions[i_reaction];
+        if(!r)
+            continue;
+        if (!jibal_gsto_auto_assign(gsto, r->product->Z, Z2)) {
+            jabs_message(MSG_ERROR, stderr, "Can not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
+            fail = TRUE;
+        }
+        if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, r->product->Z, Z2)) {
+            jabs_message(MSG_ERROR, stderr, "Could not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
+            fail = TRUE;
+        }
+        if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, r->product->Z, Z2)) {
+            jabs_message(MSG_ERROR, stderr, "Could not assign straggling for reaction product  (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
+            fail = TRUE;
+        }
+    }
+    return fail;
+}
+
 int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
     /* TODO: simplify this by finding all possible Z1, Z2 combinations, considering target elements, beam and reactions before attempting to assign stopping/straggling (GSTO) */
     struct sample *sample = sim->sample;
@@ -449,35 +487,24 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
     int Z2 = -1;
     int fail = FALSE; /* We don't return immediately on failure since the user might want to know ALL failures at one go. */
     for(size_t i = 0; i < sample->n_isotopes; i++) {
-        if(Z2 == sample->isotopes[i]->Z) /* Z2 repeats, skip */
+        if(Z2 == sample->isotopes[i]->Z) {/* Z2 repeats, skip */
             continue;
+        }
         Z2 = sample->isotopes[i]->Z;
-        if (!jibal_gsto_auto_assign(gsto, sim->beam_isotope->Z, Z2)) { /* This should handle RBS */
-            jabs_message(MSG_ERROR, stderr, "Can not assign stopping or straggling for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
+        if(assign_stopping_Z2(gsto, sim, Z2)) {
             fail = TRUE;
         }
-        if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, sim->beam_isotope->Z, Z2)) {
-            jabs_message(MSG_ERROR, stderr, "Could not assign stopping for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
-            fail = TRUE;
-        }
-        if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, sim->beam_isotope->Z, Z2)) {
-            jabs_message(MSG_ERROR, stderr, "Could not assign straggling for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
-            fail = TRUE;
-        }
-        for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-            const reaction *r = sim->reactions[i_reaction];
-            if(!r)
+    }
+    for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
+        const detector *det = sim->det[i_det];
+        if(!det || !det->foil)
+            continue;
+        for(size_t i = 0; i < det->foil->n_isotopes; i++) {
+            if(Z2 == det->foil->isotopes[i]->Z) {/* Z2 repeats, skip */
                 continue;
-            if (!jibal_gsto_auto_assign(gsto, r->product->Z, Z2)) {
-                jabs_message(MSG_ERROR, stderr, "Can not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
-                fail = TRUE;
             }
-            if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, r->product->Z, Z2)) {
-                jabs_message(MSG_ERROR, stderr, "Could not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
-                fail = TRUE;
-            }
-            if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, r->product->Z, Z2)) {
-                jabs_message(MSG_ERROR, stderr, "Could not assign straggling for reaction product  (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
+            Z2 = det->foil->isotopes[i]->Z;
+            if(assign_stopping_Z2(gsto, sim, Z2)) {
                 fail = TRUE;
             }
         }
@@ -665,10 +692,15 @@ void print_bricks(const char *filename, const sim_workspace *ws) {
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const sim_reaction *r = &ws->reactions[i];
         fprintf(f, "#%s %s\n", reaction_name(r->r), r->r->target->name);
-        fprintf(f, "#i  brick  depth    thick       E_0 S_0(eloss) E(det)  S(eloss)    S(geo) sigma*conc        Q\n");
+        fprintf(f, "#i  brick  depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo) sigma*conc        Q\n");
         for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
-            fprintf(f, "%2lu %4lu %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %8e\n", i, j, b->d.x/C_TFU, b->thick/C_TFU, b->E_0/C_KEV, C_FWHM * sqrt(b->S_0)/C_KEV, b->E/C_KEV, C_FWHM * sqrt(b->S)/C_KEV, C_FWHM * sqrt(b->S_geo_x+b->S_geo_y)/C_KEV, b->sc/C_MB_SR, b->Q * ws->fluence * ws->det->solid);
+            fprintf(f, "%2lu %4lu %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %8e\n",
+                    i, j, b->d.x/C_TFU, b->thick/C_TFU,
+                    b->E_0/C_KEV, C_FWHM * sqrt(b->S_0)/C_KEV,
+                    b->E_r/C_KEV, C_FWHM * sqrt(b->S_r)/C_KEV,
+                    b->E/C_KEV, C_FWHM * sqrt(b->S)/C_KEV,
+                    C_FWHM * sqrt(b->S_geo_x+b->S_geo_y)/C_KEV, b->sc/C_MB_SR, b->Q * ws->fluence * ws->det->solid);
         }
         fprintf(f, "\n\n");
     }
@@ -788,7 +820,7 @@ int simulate_with_ds(sim_workspace *ws) {
         double E_front = ion1.E;
         if(E_front < ws->sim->emin)
             break;
-        depth d_after = stop_step(ws, &ion1, ws->sample, d_before, ws->params.stop_step_fudge_factor*sqrt(ws->det->resolution+ion1.S)); /* TODO: step? */
+        depth d_after = stop_step(ws, &ion1, ws->sample, d_before, ws->params.stop_step_fudge_factor*sqrt(detector_resolution(ws->det, ion1.isotope, ion1.E)+ion1.S)); /* TODO: step? */
         double thick_step = depth_diff(d_before, d_after);
         const depth d_halfdepth = {.x = (d_before.x + d_after.x)/2.0, .i = d_after.i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         double E_back = ion1.E;

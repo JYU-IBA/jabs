@@ -306,6 +306,32 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     spectrum_set_calibration(ws->histo_sum, ws->det); /* Calibration can be set however already */
     gsl_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
 
+    size_t n_bricks = 0;
+
+    if(ws->params.depthsteps_max) {
+        n_bricks = ws->params.depthsteps_max;
+    } else {
+        if(det->type == DETECTOR_ENERGY) {
+            if(ws->params.stop_step_incident == 0.0) { /* Automatic incident step size */
+                n_bricks = (int) ceil(sim->beam_E / (ws->params.stop_step_fudge_factor*sqrt(detector_resolution(ws->det, sim->beam_isotope, sim->beam_E))) + ws->sample->n_ranges);
+            } else {
+                n_bricks = (int) ceil(sim->beam_E / ws->params.stop_step_incident + ws->sample->n_ranges); /* This is conservative */
+            }
+        } /* TODO: other detectors? */
+        if(n_bricks > 10000) {
+            jabs_message(MSG_WARNING, stderr,  "Caution: large number of bricks will be used in the simulation (%zu).\n", n_bricks);
+        }
+        if(n_bricks > 100000) {
+            jabs_message(MSG_WARNING, stderr,  "Number of bricks limited to 100000.\n", n_bricks);
+            n_bricks = 100000;
+        }
+        if(n_bricks < 1000) {
+            n_bricks = 1000;
+        }
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Number of bricks: %zu\n", n_bricks);
+#endif
     ws->reactions = calloc(sim->n_reactions, sizeof (sim_reaction));
     for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
         sim_reaction *r = &ws->reactions[ws->n_reactions];
@@ -326,25 +352,10 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
                 r->i_isotope = i_isotope;
             }
         }
-        if(ws->params.depthsteps_max) {
-            r->n_bricks = ws->params.depthsteps_max;
-        } else {
-            if(ws->params.stop_step_incident == 0.0) { /* Automatic incident step size */
-                r->n_bricks = (int) ceil(sim->beam_E / (ws->params.stop_step_fudge_factor*sqrt(ws->det->resolution)) + ws->sample->n_ranges); /* This is conservative */
-            } else {
-                r->n_bricks = (int) ceil(sim->beam_E / ws->params.stop_step_incident + ws->sample->n_ranges); /* This is conservative */
-            }
-            if(r->n_bricks > 10000) {
-                jabs_message(MSG_WARNING, stderr,  "Caution: large number of bricks will be used in the simulation (%zu).\n", r->n_bricks);
-            }
-        }
-        assert(r->n_bricks > 0 && r->n_bricks < 100000);
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Number of bricks for reaction %i: %lu\n", i_reaction, r->n_bricks);
-#endif
         r->histo = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
         spectrum_set_calibration(r->histo, ws->det);
         gsl_histogram_reset(r->histo);
+        r->n_bricks = n_bricks;
         r->bricks = calloc(r->n_bricks, sizeof(brick));
         ion_set_isotope(p, r->r->product);
         if(r->r->type == REACTION_RBS) {
@@ -452,6 +463,7 @@ void simulation_print(FILE *f, const simulation *sim) {
     for(size_t i = 0; i < sim->n_det; i++) {
         detector *det = sim->det[i];
         jabs_message(MSG_INFO, f, "DETECTOR %zu:\n", i + 1);
+        jabs_message(MSG_INFO, f, "  type = %s\n", detector_type_name(det));
         jabs_message(MSG_INFO, f, "  theta = %.3lf deg\n", i, det->theta / C_DEG);
         jabs_message(MSG_INFO, f, "  phi = %.3lf deg\n", i, det->phi / C_DEG);
         jabs_message(MSG_INFO, f, "  beta = %.3lf deg\n", i, sim_exit_angle(sim, det) / C_DEG);
@@ -490,7 +502,7 @@ void convolute_bricks(sim_workspace *ws) {
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
-        brick_int2(r->histo, r->bricks, r->last_brick, ws->det->resolution, ws->fluence * ws->det->solid);
+        brick_int2(r->histo, r->bricks, r->last_brick, ws->det, r->p.isotope, ws->fluence * ws->det->solid);
     }
 }
 

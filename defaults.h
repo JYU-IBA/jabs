@@ -23,6 +23,8 @@
 #define DETECTOR_PHI (0.0 * C_DEG) /* IBM geometry */
 #define DETECTOR_RESOLUTION (15.0*C_KEV/C_FWHM)
 #define DETECTOR_SOLID (10.0 * C_MSR)
+#define DETECTOR_DISTANCE (100.0 * C_MM)
+#define DETECTOR_LENGTH (1000.0 * C_MM)
 #define FLUENCE (1.0e14)
 #define E_MIN (50.0*C_KEV)
 #define E_MAX (1000.0*C_MEV)
