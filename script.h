@@ -56,7 +56,11 @@ void script_print_commands(FILE *f, const struct script_command *commands);
 jibal_config_var *script_make_vars(script_session *s);
 script_command_status script_load(script_session *s, int argc, char * const *argv);
 script_command_status script_help(script_session *s, int argc, char * const *argv);
-script_command_status script_show(script_session *s, int argc, char * const *argv);
+script_command_status script_show_sample(script_session *s, int argc, char * const *argv);
+script_command_status script_show_simulation(script_session *s, int argc, char * const *argv);
+script_command_status script_show_fit(script_session *s, int argc, char * const *argv);
+script_command_status script_show_detector(script_session *s, int argc, char * const *argv);
+script_command_status script_show_variables(script_session *s, int argc, char * const *argv);
 script_command_status script_set(script_session *s, int argc, char * const *argv);
 script_command_status script_add_reaction(script_session *s, int argc, char * const *argv);
 script_command_status script_add_reactions(script_session *s, int argc, char * const *argv);
@@ -67,9 +71,10 @@ script_command_status script_fit(script_session *s, int argc, char * const *argv
 script_command_status script_save_spectra(script_session *s, int argc, char * const *argv);
 script_command_status script_save_detector(script_session *s, int argc, char * const *argv);
 script_command_status script_save_sample(script_session *s, int argc, char * const *argv);
-script_command_status script_save(script_session *s, int argc, char * const *argv);
+
 script_command_status script_remove(script_session *s, int argc, char * const *argv);
 script_command_status script_roi(script_session *s, int argc, char * const *argv);
+script_command_status script_exit(script_session *s, int argc, char * const *argv);
 const script_command *script_command_find(const script_command *commands, const char *cmd_string); /* Returns pointer to command (if it is unambiguous) */
 void script_command_not_found(const char *cmd, const script_command *parent);
 int script_process(script_session *s, const char *filename);
@@ -77,33 +82,42 @@ int script_prepare_sim_or_fit(script_session *s);
 int script_finish_sim_or_fit(script_session *s);
 int script_get_detector_number(const simulation *sim, int *argc, char *const **argv, size_t *i_det);
 static const struct script_command script_save_commands[] = {
-        {"spectra",  &script_save_spectra,  "Save spectra.",  NULL},
         {"detector", &script_save_detector, "Save detector.", NULL},
         {"sample",   &script_save_sample,   "Save sample.",   NULL},
+        {"spectra",  &script_save_spectra,  "Save spectra.",  NULL},
         {NULL, NULL, NULL, NULL}
 };
 
 static const struct script_command script_add_commands[] = {
+        {"fit_range", &script_add_fit_range, "Add a fit range",               NULL},
         {"reaction",  &script_add_reaction,  "Add a reaction.",               NULL},
         {"reactions", &script_add_reactions, "Add reactions (of some type).", NULL},
-        {"fit_range", &script_add_fit_range, "Add a fit range",               NULL},
         {NULL, NULL, NULL, NULL}
 };
 
+static const struct script_command script_show_commands[] = {
+        {"detector",   &script_show_detector,   "Show detector.",   NULL},
+        {"fit",        &script_show_fit,        "Show fit.",        NULL},
+        {"sample",     &script_show_sample,     "Show sample",      NULL},
+        {"simulation", &script_show_simulation, "Show simulation.", NULL},
+        {"variables",  &script_show_variables,  "Show variables.",  NULL},
+        {NULL, NULL, NULL,NULL}
+};
+
+
 static const struct script_command script_commands[] = {
-        {"help",     &script_help,     "Print help.",                                 NULL},
-        {"show",     &script_show,     "Show information on things.",                 NULL},
-        {"set",      &script_set,      "Set variables.",                              NULL},
         {"add",  NULL,                 "Add things.",     script_add_commands},
-        {"simulate", &script_simulate, "Run a simulation.",                           NULL},
-        {"load",     &script_load,     "Load something.",                             NULL},
-        {"reset",    &script_reset,    "Reset something.",                            NULL},
+        {"exit",     &script_exit,     "Exit.",                                       NULL},
         {"fit",      &script_fit,      "Do a fit.",                                   NULL},
-        {"roi",      &script_roi,      "Show information from a region of interest.", NULL},
         {"save", NULL,                 "Save something.", script_save_commands},
+        {"set",      &script_set,      "Set variables.",                              NULL},
+        {"show", NULL,                 "Show information on things.",                 script_show_commands},
+        {"help",     &script_help,     "Print help.",                                 NULL},
+        {"load",     &script_load,     "Load something.",                             NULL},
         {"remove",   &script_remove,   "Remove something",                            NULL},
-        {"exit", NULL,                 "Exit.",                                       NULL},
-        {"quit", NULL, NULL,                                                          NULL},
+        {"reset",    &script_reset,    "Reset something.",                            NULL},
+        {"roi",      &script_roi,      "Show information from a region of interest.", NULL},
+        {"simulate", &script_simulate, "Run a simulation.",                           NULL},
         {NULL,   NULL, NULL,                                                          NULL},
 };
 #endif // JABS_SCRIPT_H

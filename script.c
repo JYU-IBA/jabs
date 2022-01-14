@@ -150,48 +150,80 @@ script_command_status script_reset(script_session *s, int argc, char * const *ar
     return SCRIPT_COMMAND_SUCCESS;
 }
 
-script_command_status script_show(script_session *s, int argc, char * const *argv) {
+script_command_status script_show_sample(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
-    if(argc == 0) {
-        jabs_message(MSG_INFO, stderr, "Usage show [sim|fit|sample|det|vars].\n");
-        return SCRIPT_COMMAND_NOT_FOUND;
+    if(!fit->sm) {
+        jabs_message(MSG_WARNING, stderr, "No sample has been set.\n");
+        return SCRIPT_COMMAND_SUCCESS;
+    } else {
+        return sample_model_print(NULL, fit->sm);
     }
-    if(strcmp(argv[0], "sim") == 0) {
-         simulation_print(stderr, fit->sim);
-         return SCRIPT_COMMAND_SUCCESS;
-     }
-    if(strcmp(argv[0], "fit") == 0) {
-        fit_data_print(stderr, fit);
+}
+
+script_command_status script_show_simulation(script_session *s, int argc, char * const *argv) {
+    simulation_print(stderr, s->fit->sim);
+    return SCRIPT_COMMAND_SUCCESS;
+}
+script_command_status script_show_fit(script_session *s, int argc, char * const *argv) {
+    fit_data_print(stderr, s->fit);
+    return SCRIPT_COMMAND_SUCCESS;
+}
+script_command_status script_show_detector(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    size_t i_det = 0;
+    if(script_get_detector_number(fit->sim, &argc, &argv, &i_det)) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    detector_print(NULL, fit->sim->det[i_det]);
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+script_command_status script_show_reactions(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+
+    if(fit->sim->n_reactions == 0) {
+        jabs_message(MSG_INFO, stderr, "No reactions.\n");
         return SCRIPT_COMMAND_SUCCESS;
     }
-    if(strcmp(argv[0], "sample") == 0) {
-        if(!fit->sm) {
-            jabs_message(MSG_WARNING, stderr, "No sample has been set.\n");
-            return SCRIPT_COMMAND_SUCCESS;
-        } else {
-            return sample_model_print(NULL, fit->sm);
+    reactions_print(stderr, fit->sim->reactions, fit->sim->n_reactions);
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+script_command_status script_show_variables(script_session *s, int argc, char * const *argv) {
+    const jibal_config_var *var;
+    for(var = s->cf->vars; var->type != 0; var++) {
+        if(var->variable == NULL)
+            continue;
+        switch(var->type) {
+            case JIBAL_CONFIG_VAR_NONE:
+                break;
+            case JIBAL_CONFIG_VAR_PATH:
+            case JIBAL_CONFIG_VAR_STRING:
+                if(*((void **) var->variable) == NULL)
+                    continue;
+                jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name, *((char **) var->variable));
+                break;
+            case JIBAL_CONFIG_VAR_BOOL:
+                jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name, *((int *) var->variable) ? "true" : "false");
+                break;
+            case JIBAL_CONFIG_VAR_INT:
+                jabs_message(MSG_INFO, stderr, "%s = %i\n", var->name, *((int *) var->variable));
+                break;
+            case JIBAL_CONFIG_VAR_DOUBLE:
+                jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
+                break;
+            case JIBAL_CONFIG_VAR_UNIT:
+                jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
+                break;
+            case JIBAL_CONFIG_VAR_OPTION:
+                jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name, jibal_option_get_string(var->option_list, *((int *) var->variable)));
+                break;
+            case JIBAL_CONFIG_VAR_SIZE:
+                jabs_message(MSG_INFO, stderr, "%s = %zu\n", var->name, *((size_t *) var->variable));
+                break;
         }
     }
-    if(strcmp(argv[0], "det") == 0) {
-        for(size_t i_det = 0 ; i_det < fit->sim->n_det; i_det++) {  /* TODO: prettier output, maybe a table */
-            jabs_message(MSG_INFO, stderr, "Detector %zu:\n", i_det+1);
-            detector_print(NULL, fit->sim->det[i_det]);
-        }
-        return SCRIPT_COMMAND_SUCCESS;
-    }
-    if(strcmp(argv[0], "reactions") == 0) {
-        if(fit->sim->n_reactions == 0) {
-            jabs_message(MSG_INFO, stderr, "No reactions.\n");
-            return SCRIPT_COMMAND_SUCCESS;
-        }
-        reactions_print(stderr, fit->sim->reactions, fit->sim->n_reactions);
-        return SCRIPT_COMMAND_SUCCESS;
-    }
-    if(strcmp(argv[0], "vars") == 0) {
-        jibal_config_file_write(s->cf, NULL); /* TODO: jabs_message() */
-        return SCRIPT_COMMAND_SUCCESS;
-    }
-    return SCRIPT_COMMAND_NOT_FOUND;
+    return SCRIPT_COMMAND_SUCCESS;
 }
 
 script_command_status script_set(script_session *s, int argc, char * const *argv) {
@@ -629,6 +661,10 @@ script_command_status script_roi(script_session *s, int argc, char * const *argv
     return SCRIPT_COMMAND_SUCCESS;
 }
 
+script_command_status script_exit(script_session *s, int argc, char * const *argv) {
+    return SCRIPT_COMMAND_EXIT;
+}
+
 script_session *script_session_init(jibal *jibal, simulation *sim) {
     if(!jibal)
         return NULL;
@@ -759,7 +795,9 @@ void script_command_not_found(const char *cmd, const script_command *parent) {
         jabs_message(MSG_ERROR, stderr, "Following subcommands are recognized:\n");
         script_print_commands(stderr, parent->subcommands);
     } else {
-        jabs_message(MSG_ERROR, stderr, "\"%s\" not understood\n", cmd);
+        if(cmd) {
+            jabs_message(MSG_ERROR, stderr, "\"%s\" not understood\n", cmd);
+        }
     }
 }
 
@@ -921,11 +959,14 @@ int script_finish_sim_or_fit(script_session *s) {
 
 int script_get_detector_number(const simulation *sim, int * const argc, char * const ** const argv, size_t *i_det) {
     char *end;
-    if(!argc || !argv || !i_det || *argc < 1) {
+    if(!argc || !argv || !i_det) {
 #ifdef DEBUG
-        fprintf(stderr, "Null pointer or no arguments passed to script_get_detector_number()\n");
+        fprintf(stderr, "Null pointer passed to script_get_detector_number()\n");
 #endif
         return EXIT_FAILURE;
+    }
+    if(*argc < 1) {
+        return EXIT_SUCCESS;
     }
     char *s = (*argv)[0];
     if(*s == '\0') {
