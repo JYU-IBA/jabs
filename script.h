@@ -58,6 +58,7 @@ int script_roi(script_session *s, int argc, char * const *argv);
 int script_process(script_session *s, const char *filename);
 int script_prepare_sim_or_fit(script_session *s);
 int script_finish_sim_or_fit(script_session *s);
+int script_get_detector_number(const simulation *sim, int *argc, char *const **argv, size_t *i_det);
 static const struct script_command script_commands[] = {
         {"help",    &script_help,           "Print help."},
         {"show",    &script_show,           "Show information on things."},

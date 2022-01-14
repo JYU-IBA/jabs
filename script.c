@@ -514,62 +514,67 @@ int script_fit(script_session *s, int argc, char * const *argv) {
     return 0;
 }
 
-int script_save(script_session *s, int argc, char * const *argv) {
+int script_save_spectra(script_session *s, int argc, char * const *argv) {
+    size_t i_det = 0;
     struct fit_data *fit_data = s->fit;
+    if(script_get_detector_number(fit_data->sim, &argc, &argv, &i_det) || argc != 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: save spectra [detector] file\n");
+        return EXIT_FAILURE;
+    }
+    if(print_spectra(argv[0], fit_data_ws(fit_data, i_det), fit_data_exp(fit_data, i_det))) {
+        jabs_message(MSG_ERROR, stderr, "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n", i_det + 1, argv[0], fit_data->sim->n_det);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
+int script_save_sample(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit_data = s->fit;
+    if(argc != 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: save sample [file]\n");
+    }
+    if(!fit_data->sm) {
+        jabs_message(MSG_ERROR, stderr, "No sample set.\n");
+        return EXIT_FAILURE;
+    }
+    if(sample_model_print(argv[0], fit_data->sm)) {
+        jabs_message(MSG_ERROR, stderr, "Could not write sample to file \"%s\".\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
+int script_save_detector(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit_data = s->fit;
+    size_t i_det = 0;
+    if(script_get_detector_number(fit_data->sim, &argc, &argv, &i_det) || argc != 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: save detector [detector] file\n");
+        return EXIT_FAILURE;
+    }
+    if(detector_print(argv[0], sim_det(fit_data->sim, i_det))) {
+        jabs_message(MSG_ERROR, stderr,"Could not write detector %zu to file \"%s\".\n", i_det, argv[0]);
+        return -1;
+    }
+    return 0;
+}
+
+int script_save(script_session *s, int argc, char * const *argv) {
     if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Nothing to save. See \"help save\" for more information.\n");
         return -1;
     }
     if(strcmp(argv[0], "spectra") == 0) {
-        size_t i_det = 1;
-        if(argc == 3) {
-            i_det = strtoul(argv[1], NULL, 10);
-            argc--;
-            argv++;
-        }
-        if(argc != 2) {
-            jabs_message(MSG_ERROR, stderr, "Usage: save spectra [detector] file\n");
-            return EXIT_FAILURE;
-        }
-        if(i_det == 0 || i_det > fit_data->sim->n_det) {
-            jabs_message(MSG_ERROR, stderr, "Detector number not valid.\n");
-            return EXIT_FAILURE;
-        }
-        i_det--;
-        if(print_spectra(argv[1], fit_data_ws(fit_data, i_det), fit_data_exp(fit_data, i_det))) {
-            jabs_message(MSG_ERROR, stderr, "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n", i_det + 1, argv[1], fit_data->sim->n_det);
-            return EXIT_FAILURE;
-        }
-        return EXIT_SUCCESS;
+        argv++;
+        argc--;
+        script_save_spectra(s, argc - 1, argv + 1);
     } else if(strcmp(argv[0], "sample") == 0) {
-        if(argc != 2) {
-            jabs_message(MSG_ERROR, stderr, "Usage: save sample [file]\n");
-        }
-        if(!fit_data->sm) {
-            jabs_message(MSG_ERROR, stderr, "No sample set.\n");
-            return -1;
-        }
-        if(sample_model_print(argv[1], fit_data->sm)) {
-            jabs_message(MSG_ERROR, stderr, "Could not write sample to file \"%s\".\n", argv[1]);
-            return -1;
-        }
-        return 0;
+        argv++;
+        argc--;
+        script_save_sample(s, argc - 1, argv + 1);
     } else if(strcmp(argv[0], "det") == 0) {
-        size_t i_det = 0;
-        if(argc == 3) {
-            i_det = strtoul(argv[1], NULL, 10);
-            argc--;
-            argv++;
-        }
-        if(argc != 2) {
-            jabs_message(MSG_ERROR, stderr,"Usage: save det [detector] file\n");
-            return EXIT_FAILURE;
-        }
-        if(detector_print(argv[1], sim_det(fit_data->sim, i_det))) {
-            jabs_message(MSG_ERROR, stderr,"Could not write detector %zu to file \"%s\".\n", i_det, argv[1]);
-            return -1;
-        }
-        return 0;
+        argv++;
+        argc--;
+        script_save_detector(s, argc - 1, argv + 1);
     }
     jabs_message(MSG_ERROR, stderr,"I don't know what to save (%s?)\n", argv[0]);
     return EXIT_FAILURE;
@@ -856,4 +861,34 @@ int script_finish_sim_or_fit(script_session *s) {
         sample_model_print(s->sample_out_filename, fit->sm);
     }
     return 0;
+}
+
+int script_get_detector_number(const simulation *sim, int * const argc, char * const ** const argv, size_t *i_det) {
+    char *end;
+    if(!argc || !argv || !i_det || *argc < 1) {
+        fprintf(stderr, "Null pointer or no arguments passed to script_get_detector_number()\n");
+        return EXIT_FAILURE;
+    }
+    char *s = (*argv)[0];
+    if(*s == '\0') {
+        return EXIT_FAILURE;
+    }
+    size_t number = strtoul(s, &end, 10);
+    if(end == s) { /* No digits at all! */
+        return EXIT_SUCCESS; /* First argument was not a number, don't change i_det! */
+    }
+    if(*end == '\0') { /* Entire string was valid */
+        *i_det = number - 1;
+        if(*i_det > sim->n_det) {
+            jabs_message(MSG_ERROR, stderr, "Detector number %zu is not valid (n_det = %zu).\n", number, sim->n_det);
+            return EXIT_FAILURE;
+        }
+        *argc -= 1;
+        (*argv)++;
+        return EXIT_SUCCESS;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Unknown failure! End points to %p, (== '%c')\n", (void *)end, *end);
+#endif
+    return EXIT_FAILURE;
 }
