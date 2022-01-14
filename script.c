@@ -26,6 +26,74 @@ void script_print_commands(FILE *f, const struct script_command *commands) {
     }
 }
 
+script_command_status script_load_script(script_session *s, int argc, char * const *argv) {
+    if(argc < 1) {
+        jabs_message(MSG_INFO, stderr, "Usage: load script [file]\n");
+    }
+     return script_process(s, argv[1]);
+}
+
+script_command_status script_load_sample(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: load sample [file]\n");
+        return EXIT_FAILURE;
+    }
+    sample_model *sm = sample_model_from_file(fit->jibal, argv[1]);
+    if(!sm) {
+        jabs_message(MSG_INFO, stderr, "Sample load from \"%s\" failed.\n", argv[1]);
+        return -1;
+    }
+    sample_model_free(fit->sm);
+    fit->sm = sm;
+    return 0;
+}
+
+script_command_status script_load_detector(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    size_t i_det = 0;
+    if(script_get_detector_number(fit->sim, &argc, &argv, &i_det)) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(argc < 1) {
+        jabs_message(MSG_ERROR,  stderr,"Usage: load detector [detector] filename\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return sim_det_set(fit->sim, detector_from_file(fit->jibal, argv[0]), i_det);
+}
+
+script_command_status script_load_experimental(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    size_t i_det = 0;
+    if(script_get_detector_number(fit->sim, &argc, &argv, &i_det)) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(argc < 1) {
+        jabs_message(MSG_ERROR,  stderr,"Usage: load experimental [detector] filename\n", argv[0]);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    gsl_histogram *h = spectrum_read(argv[0], sim_det(fit->sim, i_det));
+    if(!h) {
+        jabs_message(MSG_ERROR,  stderr,"Reading spectrum from file \"%s\" was not successful.\n", argv[0]);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(fit->exp[i_det]) {
+        gsl_histogram_free(fit->exp[i_det]);
+    }
+    fit->exp[i_det] = h;
+    return EXIT_SUCCESS;
+}
+
+script_command_status script_load_reaction(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: load reaction [file]\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return sim_reactions_add_r33(fit->sim, fit->jibal->isotopes, argv[0]);
+}
+
+
 script_command_status script_load(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     if(argc == 0) {
@@ -33,41 +101,12 @@ script_command_status script_load(script_session *s, int argc, char * const *arg
         return SCRIPT_COMMAND_NOT_FOUND;
     }
     if(strcmp(argv[0], "script") == 0) {
-        if(argc == 2) {
-            return script_process(s, argv[1]);
-        } else {
-            jabs_message(MSG_INFO, stderr, "Usage: load script [file]\n");
-        }
-        return 0;
+
     } else if(strcmp(argv[0], "sample") == 0) {
-        if(argc == 2) {
-            sample_model *sm = sample_model_from_file(fit->jibal, argv[1]);
-            if(!sm) {
-                jabs_message(MSG_INFO, stderr,"Sample load from \"%s\" failed.\n", argv[1]);
-                return -1;
-            }
-            sample_model_free(fit->sm);
-            fit->sm = sm;
-            return 0;
-        } else {
-            jabs_message(MSG_INFO, stderr, "Usage: load sample [file]\n");
-        }
+
         return 0;
     } else if(strcmp(argv[0], "det") == 0) {
-        if(argc == 3) {
-            size_t  i_det = strtoul(argv[1], NULL, 10);
-            if(i_det == 0 || i_det > fit->sim->n_det) {
-                jabs_message(MSG_ERROR, stderr, "Detector number must be between 1 and %zu (you gave %zu)\n", fit->sim->n_det, i_det);
-                return SCRIPT_COMMAND_FAILURE;
-            }
-            i_det--;
-            return sim_det_set(fit->sim, detector_from_file(fit->jibal, argv[2]), i_det);
-        }
-        if(argc != 2) {
-            jabs_message(MSG_INFO, stderr, "Usage: load det [number] file\n");
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        return fit_data_add_det(fit, detector_from_file(fit->jibal, argv[1])); /* Adds a new detector (and space for experimental spectrum) */
+
     } else if(strcmp(argv[0], "detectors") == 0) {
         if(argc != 2) {
             jabs_message(MSG_INFO, stderr, "Usage: load detectors file\n");
@@ -80,37 +119,9 @@ script_command_status script_load(script_session *s, int argc, char * const *arg
             fit->sim->det = d;
         }
     } else if(strcmp(argv[0], "exp") == 0) {
-        size_t i_det = 1;
-        if(argc == 3) {
-            i_det = strtoull(argv[1], NULL, 10);
-            argc--;
-            argv++;
-        }
-        if(argc != 2) {
-            jabs_message(MSG_INFO, stderr, "Usage: load exp [number] file\n");
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        if(i_det == 0 || i_det > fit->sim->n_det) {
-            jabs_message(MSG_ERROR, stderr, "Detector number must be between 1 and %zu (you gave %zu)\n", fit->sim->n_det, i_det);
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        i_det--;
-        gsl_histogram *h = spectrum_read(argv[1], sim_det(fit->sim, i_det));
-        if(!h) {
-            jabs_message(MSG_ERROR,  stderr,"Reading spectrum from file \"%s\" was not successful.\n", argv[1]);
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        if(fit->exp[i_det]) {
-            gsl_histogram_free(fit->exp[i_det]);
-        }
-        fit->exp[i_det] = h;
-        return EXIT_SUCCESS;
+
     } else if(strcmp(argv[0], "reaction") == 0) {
-        if(argc < 2) {
-            jabs_message(MSG_ERROR, stderr, "Usage: load reaction [file]\n");
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        return sim_reactions_add_r33(fit->sim, fit->jibal->isotopes, argv[1]);
+
     }
     return SCRIPT_COMMAND_NOT_FOUND;
 }
@@ -340,6 +351,16 @@ script_command_status script_add_reactions(script_session *s, int argc, char * c
     }
     return SCRIPT_COMMAND_SUCCESS;
 }
+
+script_command_status script_add_detector(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    if(argc < 1) {
+        jabs_message(MSG_ERROR,  stderr,"Usage: add detector filename\n", argv[0]);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return fit_data_add_det(fit, detector_from_file(fit->jibal, argv[0])); /* Adds a new detector (and space for experimental spectrum) */
+}
+
 script_command_status script_add_fit_range(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     roi range = {.i_det = 0};
@@ -816,7 +837,7 @@ int script_process(script_session *s, const char *filename) {
     } else if(filename) {
         jabs_message(MSG_INFO, stderr,"\nRunning script \"%s\"\n\n", filename);
     }
-    int status = SCRIPT_COMMAND_SUCCESS;
+    script_command_status status = SCRIPT_COMMAND_SUCCESS;
     while(getline(&line, &line_size, f) > 0) {
         lineno++;
         line[strcspn(line, "\r\n")] = 0; /* Strip newlines */
