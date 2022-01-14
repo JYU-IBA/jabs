@@ -58,7 +58,9 @@ script_command_status script_load(script_session *s, int argc, char * const *arg
 script_command_status script_help(script_session *s, int argc, char * const *argv);
 script_command_status script_show(script_session *s, int argc, char * const *argv);
 script_command_status script_set(script_session *s, int argc, char * const *argv);
-script_command_status script_add(script_session *s, int argc, char * const *argv);
+script_command_status script_add_reaction(script_session *s, int argc, char * const *argv);
+script_command_status script_add_reactions(script_session *s, int argc, char * const *argv);
+script_command_status script_add_fit_range(script_session *s, int argc, char * const *argv);
 script_command_status script_reset(script_session *s, int argc, char * const *argv);
 script_command_status script_simulate(script_session *s, int argc, char * const *argv);
 script_command_status script_fit(script_session *s, int argc, char * const *argv);
@@ -68,6 +70,7 @@ script_command_status script_save_sample(script_session *s, int argc, char * con
 script_command_status script_save(script_session *s, int argc, char * const *argv);
 script_command_status script_remove(script_session *s, int argc, char * const *argv);
 script_command_status script_roi(script_session *s, int argc, char * const *argv);
+const script_command *script_command_find(const script_command *commands, const char *cmd_string); /* Returns pointer to command (if it is unambiguous) */
 void script_command_not_found(const char *cmd, const script_command *parent);
 int script_process(script_session *s, const char *filename);
 int script_prepare_sim_or_fit(script_session *s);
@@ -77,23 +80,30 @@ static const struct script_command script_save_commands[] = {
         {"spectra",  &script_save_spectra,  "Save spectra.",  NULL},
         {"detector", &script_save_detector, "Save detector.", NULL},
         {"sample",   &script_save_sample,   "Save sample.",   NULL},
-        {NULL, NULL, NULL,                                    NULL}
+        {NULL, NULL, NULL, NULL}
+};
+
+static const struct script_command script_add_commands[] = {
+        {"reaction",  &script_add_reaction,  "Add a reaction.",               NULL},
+        {"reactions", &script_add_reactions, "Add reactions (of some type).", NULL},
+        {"fit_range", &script_add_fit_range, "Add a fit range",               NULL},
+        {NULL, NULL, NULL, NULL}
 };
 
 static const struct script_command script_commands[] = {
         {"help",     &script_help,     "Print help.",                                 NULL},
         {"show",     &script_show,     "Show information on things.",                 NULL},
         {"set",      &script_set,      "Set variables.",                              NULL},
-        {"add",      &script_add,      "Add things.",                                 NULL},
+        {"add",  NULL,                 "Add things.",     script_add_commands},
         {"simulate", &script_simulate, "Run a simulation.",                           NULL},
         {"load",     &script_load,     "Load something.",                             NULL},
         {"reset",    &script_reset,    "Reset something.",                            NULL},
         {"fit",      &script_fit,      "Do a fit.",                                   NULL},
         {"roi",      &script_roi,      "Show information from a region of interest.", NULL},
-        {"save",     NULL,     "Save something.",                             script_save_commands},
+        {"save", NULL,                 "Save something.", script_save_commands},
         {"remove",   &script_remove,   "Remove something",                            NULL},
         {"exit", NULL,                 "Exit.",                                       NULL},
         {"quit", NULL, NULL,                                                          NULL},
-        {NULL,   NULL, NULL,                                                          NULL}
-}; /* TODO: more commands... */
+        {NULL,   NULL, NULL,                                                          NULL},
+};
 #endif // JABS_SCRIPT_H
