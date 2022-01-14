@@ -432,7 +432,16 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
                 for(jibal_config_var *var = s->cf->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
                     if(var->type == JIBAL_CONFIG_VAR_UNIT)
                         continue;
-                    jabs_message(MSG_INFO, stderr, " %25s: %s\n", var->name, jibal_config_var_type_name(var->type));
+                    jabs_message(MSG_INFO, stderr, " %25s: %s", var->name, jibal_config_var_type_name(var->type));
+                    if(var->type == JIBAL_CONFIG_VAR_OPTION && var->option_list) {
+                        jabs_message(MSG_INFO, stderr, " (");
+                        for(const jibal_option *o = var->option_list; o->s; o++) {
+                            jabs_message(MSG_INFO, stderr, "%s%s", o == var->option_list ? "":", ", o->s);
+                        }
+                        jabs_message(MSG_INFO, stderr, ")\n");
+                    } else {
+                        jabs_message(MSG_INFO, stderr, "\n");
+                    }
                 }
                 jabs_message(MSG_INFO, stderr,"\n\nAlso the following things can be set: ion, sample, det. Special syntax applies for each.\n");
             }
