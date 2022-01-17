@@ -301,6 +301,9 @@ script_command_status script_roi(script_session *s, int argc, char * const *argv
 }
 
 script_command_status script_exit(script_session *s, int argc, char * const *argv) {
+    (void) s;
+    (void) argc;
+    (void) argv;
     return SCRIPT_COMMAND_EXIT;
 }
 
@@ -510,11 +513,15 @@ script_command_status script_load(script_session *s, int argc, char * const *arg
 }
 
 script_command_status script_reset_reactions(script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
     sim_reactions_free(s->fit->sim);
     return SCRIPT_COMMAND_SUCCESS;
 }
 
 script_command_status script_reset_detectors(script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
     for(size_t i_det = 0; i_det < s->fit->sim->n_det; i_det++) {
         detector_free(sim_det(s->fit->sim, i_det));
     }
@@ -523,11 +530,15 @@ script_command_status script_reset_detectors(script_session *s, int argc, char *
 }
 
 script_command_status script_reset_fit_ranges(script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
     fit_data_fit_ranges_free(s->fit);
     return SCRIPT_COMMAND_SUCCESS;
 }
 
 script_command_status script_reset_sample(script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
     struct fit_data *fit = s->fit;
     sample_model_free(fit->sm);
     fit->sm = NULL;
@@ -535,6 +546,8 @@ script_command_status script_reset_sample(script_session *s, int argc, char * co
 }
 
 script_command_status script_reset_experimental(script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
     struct fit_data *fit = s->fit;
     fit_data_exp_free(s->fit);
     fit->exp = calloc(fit->sim->n_det, sizeof(gsl_histogram *));
@@ -571,6 +584,8 @@ script_command_status script_reset(script_session *s, int argc, char * const *ar
 }
 
 script_command_status script_show_sample(script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
     struct fit_data *fit = s->fit;
     if(!fit->sm) {
         jabs_message(MSG_WARNING, stderr, "No sample has been set.\n");
@@ -581,10 +596,14 @@ script_command_status script_show_sample(script_session *s, int argc, char * con
 }
 
 script_command_status script_show_simulation(script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
     simulation_print(stderr, s->fit->sim);
     return SCRIPT_COMMAND_SUCCESS;
 }
 script_command_status script_show_fit(script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
     fit_data_print(stderr, s->fit);
     return SCRIPT_COMMAND_SUCCESS;
 }
@@ -599,6 +618,8 @@ script_command_status script_show_detector(script_session *s, int argc, char * c
 }
 
 script_command_status script_show_reactions(script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
     struct fit_data *fit = s->fit;
     if(fit->sim->n_reactions == 0) {
         jabs_message(MSG_INFO, stderr, "No reactions.\n");
@@ -607,7 +628,9 @@ script_command_status script_show_reactions(script_session *s, int argc, char * 
     return SCRIPT_COMMAND_SUCCESS;
 }
 
-script_command_status script_show_variables(script_session *s, int argc, char * const *argv) {
+script_command_status script_show_variables(script_session *s, int argc, char *const *argv) {
+    (void) argc;
+    (void) argv;
     const jibal_config_var *var;
     for(var = s->cf->vars; var->type != 0; var++) {
         if(var->variable == NULL)
@@ -616,29 +639,30 @@ script_command_status script_show_variables(script_session *s, int argc, char * 
             case JIBAL_CONFIG_VAR_NONE:
                 break;
             case JIBAL_CONFIG_VAR_PATH:
-                case JIBAL_CONFIG_VAR_STRING:
-                    if(*((void **) var->variable) == NULL)
-                        continue;
-                    jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name, *((char **) var->variable));
-                    break;
-                    case JIBAL_CONFIG_VAR_BOOL:
-                        jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name, *((int *) var->variable) ? "true" : "false");
-                        break;
-                        case JIBAL_CONFIG_VAR_INT:
-                            jabs_message(MSG_INFO, stderr, "%s = %i\n", var->name, *((int *) var->variable));
-                            break;
-                            case JIBAL_CONFIG_VAR_DOUBLE:
-                                jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
-                                break;
-                                case JIBAL_CONFIG_VAR_UNIT:
-                                    jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
-                                    break;
-                                    case JIBAL_CONFIG_VAR_OPTION:
-                                        jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name, jibal_option_get_string(var->option_list, *((int *) var->variable)));
-                                        break;
-                                        case JIBAL_CONFIG_VAR_SIZE:
-                                            jabs_message(MSG_INFO, stderr, "%s = %zu\n", var->name, *((size_t *) var->variable));
-                                            break;
+            case JIBAL_CONFIG_VAR_STRING:
+                if(*((void **) var->variable) == NULL)
+                    continue;
+                jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name, *((char **) var->variable));
+                break;
+            case JIBAL_CONFIG_VAR_BOOL:
+                jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name, *((int *) var->variable) ? "true" : "false");
+                break;
+            case JIBAL_CONFIG_VAR_INT:
+                jabs_message(MSG_INFO, stderr, "%s = %i\n", var->name, *((int *) var->variable));
+                break;
+            case JIBAL_CONFIG_VAR_DOUBLE:
+                jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
+                break;
+            case JIBAL_CONFIG_VAR_UNIT:
+                jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
+                break;
+            case JIBAL_CONFIG_VAR_OPTION:
+                jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name,
+                             jibal_option_get_string(var->option_list, *((int *) var->variable)));
+                break;
+            case JIBAL_CONFIG_VAR_SIZE:
+                jabs_message(MSG_INFO, stderr, "%s = %zu\n", var->name, *((size_t *) var->variable));
+                break;
         }
     }
     return SCRIPT_COMMAND_SUCCESS;
@@ -771,14 +795,14 @@ script_command_status script_add_detector(script_session *s, int argc, char * co
 script_command_status script_add_fit_range(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     roi range = {.i_det = 0};
-    if(argc == 4) {
-        range.i_det = strtoul(argv[1], NULL, 10);
+    if(argc == 3) {
+        range.i_det = strtoul(argv[0], NULL, 10);
         argc--;
         argv++;
     }
-    if(argc == 3) {
-        range.low = strtoul(argv[1], NULL, 10);
-        range.high = strtoul(argv[2], NULL, 10);
+    if(argc == 2) {
+        range.low = strtoul(argv[0], NULL, 10);
+        range.high = strtoul(argv[1], NULL, 10);
     } else {
         jabs_message(MSG_ERROR, stderr, "Usage: add fit_range [detector] low high\n");
         return -1;
