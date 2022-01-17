@@ -479,39 +479,6 @@ script_command_status script_load_reaction(script_session *s, int argc, char * c
     return sim_reactions_add_r33(fit->sim, fit->jibal->isotopes, argv[0]);
 }
 
-
-script_command_status script_load(script_session *s, int argc, char * const *argv) {
-    struct fit_data *fit = s->fit;
-    if(argc == 0) {
-        jabs_message(MSG_INFO, stderr, "Usage: load [script|sample|det|exp|reaction] [file]\n");
-        return SCRIPT_COMMAND_NOT_FOUND;
-    }
-    if(strcmp(argv[0], "script") == 0) {
-
-    } else if(strcmp(argv[0], "sample") == 0) {
-
-        return 0;
-    } else if(strcmp(argv[0], "det") == 0) {
-
-    } else if(strcmp(argv[0], "detectors") == 0) {
-        if(argc != 2) {
-            jabs_message(MSG_INFO, stderr, "Usage: load detectors file\n");
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        size_t n_d = 0;
-        detector **d = detectors_from_file(fit->jibal, argv[1], &n_d);
-        if(d && n_d) {
-            /* TODO: set detectors, number of detectors etc... Clear spectra? */
-            fit->sim->det = d;
-        }
-    } else if(strcmp(argv[0], "exp") == 0) {
-
-    } else if(strcmp(argv[0], "reaction") == 0) {
-
-    }
-    return SCRIPT_COMMAND_NOT_FOUND;
-}
-
 script_command_status script_reset_reactions(script_session *s, int argc, char * const *argv) {
     (void) argc;
     (void) argv;
