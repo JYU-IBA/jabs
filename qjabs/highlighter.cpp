@@ -61,6 +61,8 @@ extern "C" {
 #include "../script.h"
 }
 
+#define COMMAND_DEPTH 8
+
 Highlighter::Highlighter(QTextDocument *parent)
     : QSyntaxHighlighter(parent)
 {
@@ -78,12 +80,38 @@ Highlighter::Highlighter(QTextDocument *parent)
         highlightingRules.append(rule);
     }
 #endif
-     for(const struct script_command *c = script_commands; c->name != NULL; c++) {
-         QString pattern = QString("^") + c->name + "\\b";
-         rule.pattern = QRegularExpression(pattern);
-         rule.format = commandFormat;
-         highlightingRules.append(rule);
-    }
+     const struct script_command *stack[COMMAND_DEPTH];
+     const struct script_command *c;
+     stack[0] = script_commands;
+     size_t i = 0;
+     c = stack[0];
+     while(c->name != NULL) {
+         while(c->name != NULL) {
+             QString pattern = QString("^");
+             for(size_t j = 1; j <= i; j++) {
+                 pattern += stack[j]->name;
+                 pattern += " ";
+             }
+             pattern += c->name;
+             pattern + "\\b";
+             if(c->subcommands && i < (COMMAND_DEPTH - 1)) {
+                 i++;
+                 stack[i] = c;
+                 c = c->subcommands;
+             } else {
+                 c++;
+             }
+             rule.pattern = QRegularExpression(pattern);
+             //qDebug() << pattern;
+             rule.format = commandFormat;
+             highlightingRules.append(rule);
+         }
+         if(i == 0)
+             break;
+         c = stack[i];
+         i--;
+         c++;
+     }
 
     singleLineCommentFormat.setForeground(Qt::gray);
     rule.pattern = QRegularExpression(QStringLiteral("#[^\n]*"));
