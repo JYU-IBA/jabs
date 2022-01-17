@@ -708,7 +708,7 @@ script_command_status script_set(script_session *s, int argc, char * const *argv
         return SCRIPT_COMMAND_FAILURE;
     }
     if(jibal_config_file_var_set(s->cf, argv[0], argv[1])) {
-        jabs_message(MSG_ERROR, stderr,"Error in setting \"%s\" to \"%s\". Does the variable exist? Use show vars.\n", argv[0], argv[1]);
+        jabs_message(MSG_ERROR, stderr,"Error in setting \"%s\" to \"%s\". Does the variable exist? Use 'show variables'.\n", argv[0], argv[1]);
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
