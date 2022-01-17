@@ -134,7 +134,7 @@ void script_session_free(script_session *s) {
     free(s);
 }
 
-int script_get_detector_number(const simulation *sim, int * const argc, char * const ** const argv, size_t *i_det) {
+int script_get_detector_number(const simulation *sim, int allow_empty, int * const argc, char * const ** const argv, size_t *i_det) {
     char *end;
     if(!argc || !argv || !i_det) {
 #ifdef DEBUG
@@ -151,7 +151,11 @@ int script_get_detector_number(const simulation *sim, int * const argc, char * c
     }
     size_t number = strtoul(s, &end, 10);
     if(end == s) { /* No digits at all! */
-        return EXIT_SUCCESS; /* First argument was not a number, don't change i_det! */
+        if(allow_empty) {
+            return EXIT_SUCCESS; /* First argument was not a number, don't change i_det! */
+        } else {
+            return EXIT_FAILURE;
+        }
     }
     if(*end == '\0') { /* Entire string was valid */
         *i_det = number - 1;

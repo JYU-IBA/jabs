@@ -115,18 +115,20 @@ int script_finish_sim_or_fit(script_session *s) {
 }
 
 
-void script_command_not_found(const char *cmd, const script_command *parent) {
-    if(parent && parent->subcommands) {
+void script_command_not_found(const char *cmd, const script_command *c) {
+    if(c) {
         if(cmd) {
-            jabs_message(MSG_ERROR, stderr, "Sub-command \"%s\" not found!\n\n", cmd);
+            jabs_message(MSG_ERROR, stderr, "Sub-command \"%s\" is invalid!\n\n", cmd);
         } else {
             jabs_message(MSG_ERROR, stderr, "Not enough arguments!\n\n");
         }
         jabs_message(MSG_ERROR, stderr, "Following subcommands are recognized:\n");
-        script_print_commands(stderr, parent->subcommands);
+        script_print_commands(stderr, c);
     } else {
         if(cmd) {
-            jabs_message(MSG_ERROR, stderr, "\"%s\" not understood\n", cmd);
+            jabs_message(MSG_ERROR, stderr, "Invalid command: \"%s\".\n", cmd);
+        } else {
+            jabs_message(MSG_ERROR, stderr, "What?\n", cmd);
         }
     }
 }
@@ -199,7 +201,7 @@ script_command_status script_fit(script_session *s, int argc, char * const *argv
 script_command_status script_save_spectra(script_session *s, int argc, char * const *argv) {
     size_t i_det = 0;
     struct fit_data *fit_data = s->fit;
-    if(script_get_detector_number(fit_data->sim, &argc, &argv, &i_det) || argc != 1) {
+    if(script_get_detector_number(fit_data->sim, TRUE, &argc, &argv, &i_det) || argc != 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: save spectra [detector] file\n");
         return SCRIPT_COMMAND_FAILURE;
     }
@@ -229,7 +231,7 @@ script_command_status script_save_sample(script_session *s, int argc, char * con
 script_command_status script_save_detector(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit_data = s->fit;
     size_t i_det = 0;
-    if(script_get_detector_number(fit_data->sim, &argc, &argv, &i_det) || argc != 1) {
+    if(script_get_detector_number(fit_data->sim, TRUE, &argc, &argv, &i_det) || argc != 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: save detector [detector] file\n");
         return SCRIPT_COMMAND_FAILURE;
     }
@@ -314,6 +316,9 @@ const script_command *script_command_find(const script_command *commands, const 
         if(strncmp(c->name, cmd_string, strlen(cmd_string)) == 0) {
             found++;
             c_found = c;
+#ifdef DEBUG
+            fprintf(stderr, "Candidate for \"%s\": \"%s\".\n", cmd_string, c->name);
+#endif
             if(strlen(cmd_string) == strlen(c->name)) { /* Exact match, can not be ambiguous */
                 found = 1;
                 break;
@@ -367,35 +372,36 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
             const script_command *c = script_command_find(cmds, argv[0]);
             if(c) { /* Subcommand found */
 #ifdef DEBUG
-                fprintf(stderr, "Debug: Found command %s. Going deeper.\n", c->name);
+                fprintf(stderr, "Debug: Found command %s.\n", c->name);
 #endif
-                cmds = c->subcommands;
-                argc--;
-                argv++;
-                c_parent = c;
-                continue;
+                if(c->f) {
+#ifdef DEBUG
+                    fprintf(stderr, "There is a function %p in command %s. Calling it with %i arguments.\n", (void *) c->f, c->name, argc);
+#endif
+                    script_command_status status = c->f(s, argc - 1, argv + 1);
+                    if(status != SCRIPT_COMMAND_NOT_FOUND) {
+                        return status;
+                    }
+                }
+                if(!c->subcommands) {
+                    script_command_not_found(argv[0], c);
+                    return SCRIPT_COMMAND_NOT_FOUND;
+                } else {
+                    cmds = c->subcommands;
+                    argc--;
+                    argv++;
+                    c_parent = c;
+                    continue;
+                }
             } else {
 #ifdef DEBUG
-                fprintf(stderr, "Debug: Didn't find subcommand %s.\n", argv[0]);
+                fprintf(stderr, "Debug: Didn't find command %s.\n", argv[0]);
 #endif
+                script_command_not_found(argv[0], c_parent?c_parent->subcommands:NULL);
             }
 
-        }
-        if(c_parent) { /* This is a subcommand */
-            if(c_parent->f) { /* Fallback function exists and should handle this case */
-#ifdef DEBUG
-                fprintf(stderr, "There is a function %p in command %s. Calling it with %i arguments.\n", (void *) c_parent->f, c_parent->name, argc);
-#endif
-                return c_parent->f(s, argc, argv);
-            } else {
-#ifdef DEBUG
-                fprintf(stderr, "There is no function to call. Parent was %s.\n", c_parent->name);
-#endif
-                script_command_not_found(argv[0], c_parent);
-            }
         } else {
-            jabs_message(MSG_ERROR, stderr, "Command \"%s\" not recognized! Try 'help commands'.\n", argv[0]);
-            return SCRIPT_COMMAND_NOT_FOUND;
+            script_command_not_found(NULL, c_parent?c_parent->subcommands:NULL);
         }
         return SCRIPT_COMMAND_NOT_FOUND;
     }
@@ -438,7 +444,7 @@ script_command_status script_load_sample(script_session *s, int argc, char * con
 script_command_status script_load_detector(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     size_t i_det = 0;
-    if(script_get_detector_number(fit->sim, &argc, &argv, &i_det)) {
+    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
     if(argc < 1) {
@@ -451,7 +457,7 @@ script_command_status script_load_detector(script_session *s, int argc, char * c
 script_command_status script_load_experimental(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     size_t i_det = 0;
-    if(script_get_detector_number(fit->sim, &argc, &argv, &i_det)) {
+    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
     if(argc < 1) {
@@ -525,11 +531,10 @@ script_command_status script_reset(script_session *s, int argc, char * const *ar
     struct fit_data *fit = s->fit;
     (void) argc; /* Unused */
     (void) argv; /* Unused */
-    if(!fit) {
-        return -1;
-    }
     if(argc > 0) {
-        fprintf(stderr, "Reset what? See 'help reset' or call without arguments to reset everything.\n");
+        return SCRIPT_COMMAND_NOT_FOUND;
+    }
+    if(!fit) {
         return SCRIPT_COMMAND_FAILURE;
     }
 #ifdef DEBUG
@@ -577,7 +582,7 @@ script_command_status script_show_fit(script_session *s, int argc, char * const 
 script_command_status script_show_detector(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     size_t i_det = 0;
-    if(script_get_detector_number(fit->sim, &argc, &argv, &i_det)) {
+    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
     detector_print(NULL, fit->sim->det[i_det]);
@@ -634,76 +639,83 @@ script_command_status script_show_variables(script_session *s, int argc, char *c
     }
     return SCRIPT_COMMAND_SUCCESS;
 }
-
 script_command_status script_set(script_session *s, int argc, char * const *argv) {
+    if(argc == 0) {
+        script_command_not_found(NULL, script_set_commands);
+        jabs_message(MSG_INFO, stderr, "\nAlso see 'help set' and 'show variables' for additional variables you can set.\nExample: 'set alpha \"10 deg\"'\n");
+    }
+    return script_set_variable(s, argc, argv);
+}
+
+script_command_status script_set_ion(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
-    if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Nothing to set. See 'help set' for more information.\n");
-        return 0;
-    }
-    if(strcmp(argv[0], "ion") == 0) {
-        if(argc != 2) {
-            jabs_message(MSG_ERROR, stderr, "Usage: set ion [ion]\nExample: set ion 4He\n");
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        fit->sim->beam_isotope = jibal_isotope_find(fit->jibal->isotopes, argv[1], 0, 0);
-        if(!fit->sim->beam_isotope) {
-            jabs_message(MSG_ERROR, stderr,"No such isotope: %s\n", argv[1]);
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        return 0;
-    } else if(strcmp(argv[0], "sample") == 0) {
-        if(argc < 2) {
-            jabs_message(MSG_ERROR, stderr, "Usage: set sample [sample]\nExample: set sample TiO2 1000tfu Si 10000tfu\n");
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        sample_model *sm_new = sample_model_from_argv(fit->jibal, argc-1, argv+1);
-        if(sm_new) {
-            sample_model_free(fit->sm);
-            fit->sm = sm_new;
-        } else {
-            jabs_message(MSG_ERROR, stderr, "Sample is not valid.\n");
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        return SCRIPT_COMMAND_SUCCESS;
-    } else if(strcmp(argv[0], "det") == 0) {
-        size_t i_det = 1;
-        if(argc == 4) {
-            i_det = strtoul(argv[1], NULL, 10);
-            if(i_det == 0) {
-                jabs_message(MSG_ERROR, stderr, "Usage: set det [number] variable value\n");
-            }
-            argc--;
-            argv++;
-        }
-        if(i_det == 1 && fit->sim->n_det == 0) { /* This happens on first "set det" */
-            jabs_message(MSG_VERBOSE, stderr, "No detectors were defined. Detector was added.\n");
-            fit_data_add_det(fit, detector_default(NULL));
-        }
-        if(i_det == 0 || i_det > fit->sim->n_det) {
-            jabs_message(MSG_ERROR, stderr, "Detector number not valid.\n");
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        i_det--;
-        if(argc != 3) {
-            jabs_message(MSG_ERROR, stderr, "Usage: set det [number] variable value\n");
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        if(detector_set_var(s->jibal, sim_det(fit->sim, i_det), argv[1], argv[2])) {
-            jabs_message(MSG_ERROR, stderr, "Can't set \"%s\" to be \"%s\"!\n", argv[1], argv[2]);
-        }
-        return EXIT_SUCCESS;
-    }
-    if(argc != 2) {
-        jabs_message(MSG_ERROR, stderr, "Usage: set variable [value]\n");
+    if(argc != 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: set ion [ion]\nExample: set ion 4He\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(jibal_config_file_var_set(s->cf, argv[0], argv[1])) {
-        jabs_message(MSG_ERROR, stderr,"Error in setting \"%s\" to \"%s\". Does the variable exist? Use 'show variables'.\n", argv[0], argv[1]);
-        return EXIT_FAILURE;
+    const jibal_isotope *isotope = jibal_isotope_find(fit->jibal->isotopes, argv[0], 0, 0);
+    if(!isotope) {
+        jabs_message(MSG_ERROR, stderr,"No such isotope: %s\n", argv[0]);
+        return SCRIPT_COMMAND_FAILURE;
     }
-    return EXIT_SUCCESS;
+    s->fit->sim->beam_isotope = isotope;
+    return SCRIPT_COMMAND_SUCCESS;
 }
+
+
+
+script_command_status script_set_detector(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    size_t i_det = 0;
+    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(argc != 2) {
+        jabs_message(MSG_ERROR, stderr, "Usage: set detector [number] variable value\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(detector_set_var(s->jibal, sim_det(fit->sim, i_det), argv[0], argv[1])) {
+        jabs_message(MSG_ERROR, stderr, "Can't set \"%s\" to be \"%s\"!\n", argv[0], argv[1]);
+    }
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+
+script_command_status script_set_sample(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    if(argc < 2) {
+        jabs_message(MSG_ERROR, stderr, "Usage: set sample [sample]\nExample: set sample TiO2 1000tfu Si 10000tfu\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    sample_model *sm_new = sample_model_from_argv(fit->jibal, argc, argv);
+    if(sm_new) {
+        sample_model_free(fit->sm);
+        fit->sm = sm_new;
+    } else {
+        jabs_message(MSG_ERROR, stderr, "Sample is not valid.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+script_command_status script_set_variable(script_session *s, int argc, char * const *argv) {
+    if(argc < 1)
+        return SCRIPT_COMMAND_FAILURE;
+    for(jibal_config_var *var = s->cf->vars; var->type != 0; var++) {
+        if(strcmp(var->name, argv[0]) == 0) {
+#ifdef DEBUG
+            fprintf(stderr, "Setting variable %s to \"%s\"\n", var->name, argv[1]);
+#endif
+            if(argc != 2) { /* Yes, this check is quite late, but it allows us to check if the variable exists */
+                jabs_message(MSG_ERROR, stderr, "Usage: set variable %s [value]\n", var->name);
+                return SCRIPT_COMMAND_FAILURE;
+            }
+            return jibal_config_var_set(s->cf->units, var, argv[1], s->cf->filename);
+        }
+    }
+    return SCRIPT_COMMAND_NOT_FOUND;
+}
+
 
 script_command_status script_add_reaction(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
@@ -762,8 +774,13 @@ script_command_status script_add_detector(script_session *s, int argc, char * co
 script_command_status script_add_fit_range(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     roi range = {.i_det = 0};
-    if(argc == 3) {
+    if(argc == 3) { /* Three arguments, first is the detector number */
         range.i_det = strtoul(argv[0], NULL, 10);
+        if(range.i_det == 0 || range.i_det > fit->sim->n_det) {
+            jabs_message(MSG_ERROR, stderr, "Detector number %zu is not valid (n_det = %zu).\n", range.i_det, fit->sim->n_det);
+            return SCRIPT_COMMAND_FAILURE;
+        }
+        range.i_det--;
         argc--;
         argv++;
     }
@@ -785,7 +802,7 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
             {"commands", "I recognize the following commands (try 'help' followed by command name):\n"},
             {"version", "JaBS version: "},
             {"set", "The following variables can be set (unit optional, SI units assumed otherwise):\n"},
-            {"show", "Show things. Possible things: sim, fit, sample, det, vars.\n"},
+            {"show", "Show things. Possible things: sim, fit, sample, detector, variables.\n"},
             {"fit", "Make a fit. Provide list of variables to fit.\n"},
             {NULL, NULL}
     };
@@ -841,7 +858,7 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
                         jabs_message(MSG_INFO, stderr, "\n");
                     }
                 }
-                jabs_message(MSG_INFO, stderr,"\n\nAlso the following things can be set: ion, sample, det. Special syntax applies for each.\n");
+                jabs_message(MSG_INFO, stderr,"\n\nAlso the following things can be set: ion, sample, detector. Special syntax applies for each.\n");
             }
             return 0;
         }

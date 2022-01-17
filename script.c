@@ -54,6 +54,9 @@ int script_process(script_session *s, const char *filename) {
                 status = SCRIPT_COMMAND_EXIT;
         }
     }
+    if(s->files[0]->interactive) {
+        jabs_message(MSG_INFO, stderr, "\nBye!\n");
+    }
     fflush(stderr);
     return status;
 }
