@@ -100,16 +100,7 @@ int script_finish_sim_or_fit(script_session *s) {
                     return EXIT_FAILURE;
                 }
             }
-            if(s->bricks_out_filename) {
-                print_bricks(s->bricks_out_filename, ws);
-            }
-            if(s->detector_out_filename) {
-                detector_print(s->detector_out_filename, ws->det);
-            }
         }
-    }
-    if(s->sample_out_filename) {
-        sample_model_print(s->sample_out_filename, fit->sm);
     }
     return 0;
 }
@@ -198,19 +189,35 @@ script_command_status script_fit(script_session *s, int argc, char * const *argv
     return 0;
 }
 
-script_command_status script_save_spectra(script_session *s, int argc, char * const *argv) {
+script_command_status script_save_bricks(script_session *s, int argc, char * const *argv) {
     size_t i_det = 0;
-    struct fit_data *fit_data = s->fit;
-    if(script_get_detector_number(fit_data->sim, TRUE, &argc, &argv, &i_det) || argc != 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: save spectra [detector] file\n");
+    struct fit_data *fit = s->fit;
+    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det) || argc != 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: save bricks [detector] file\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(print_spectra(argv[0], fit_data_ws(fit_data, i_det), fit_data_exp(fit_data, i_det))) {
-        jabs_message(MSG_ERROR, stderr, "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n", i_det + 1, argv[0], fit_data->sim->n_det);
+    if(print_bricks(argv[0], fit_data_ws(fit, i_det))) {
+        jabs_message(MSG_ERROR, stderr, "Could not save bricks of detector %zu to file \"%s\"! There should be %zu detector(s).\n", i_det + 1, argv[0], fit->sim->n_det);
         return SCRIPT_COMMAND_FAILURE;
     }
     return SCRIPT_COMMAND_SUCCESS;
 }
+
+script_command_status script_save_spectra(script_session *s, int argc, char * const *argv) {
+    size_t i_det = 0;
+    struct fit_data *fit = s->fit;
+    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det) || argc != 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: save spectra [detector] file\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(print_spectra(argv[0], fit_data_ws(fit, i_det), fit_data_exp(fit, i_det))) {
+        jabs_message(MSG_ERROR, stderr, "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n", i_det + 1, argv[0], fit->sim->n_det);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+
 
 script_command_status script_save_sample(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit_data = s->fit;

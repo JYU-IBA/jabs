@@ -685,10 +685,10 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
 }
 
 
-void print_bricks(const char *filename, const sim_workspace *ws) {
+int print_bricks(const char *filename, const sim_workspace *ws) {
     FILE *f = fopen_file_or_stream(filename, "w");
     if(!f)
-        return;
+        return EXIT_FAILURE;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const sim_reaction *r = &ws->reactions[i];
         fprintf(f, "#%s %s\n", reaction_name(r->r), r->r->target->name);
@@ -704,8 +704,8 @@ void print_bricks(const char *filename, const sim_workspace *ws) {
         }
         fprintf(f, "\n\n");
     }
-    if(!(f == stdout || f == stderr))
-        fclose(f);
+    fclose_file_or_stream(f);
+    return EXIT_SUCCESS;
 }
 
 

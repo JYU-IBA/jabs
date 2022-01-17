@@ -66,9 +66,6 @@ int main(int argc, char **argv) {
     sim->rbs = cmd_opt->rbs;
     sim->erd = cmd_opt->erd;
     session->output_filename = strdup_non_null(cmd_opt->output_filename);
-    session->bricks_out_filename = strdup_non_null(cmd_opt->bricks_filename);
-    session->sample_out_filename = strdup_non_null(cmd_opt->sample_filename);
-    session->detector_out_filename = strdup_non_null(cmd_opt->detector_out_filename);
     roi range = {.low = cmd_opt->fit_low, .high = cmd_opt->fit_high};
     fit_data_fit_range_add(fit_data, &range); /* We add just this one range (or none) */
     sim_sanity_check(sim);

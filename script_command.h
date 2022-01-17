@@ -60,6 +60,7 @@ script_command_status script_reset_fit_ranges(script_session *s, int argc, char 
 script_command_status script_reset_reactions(script_session *s, int argc, char * const *argv);
 script_command_status script_reset_sample(script_session *s, int argc, char * const *argv);
 script_command_status script_roi(script_session *s, int argc, char * const *argv);
+script_command_status script_save_bricks(script_session *s, int argc, char * const *argv);
 script_command_status script_save_detector(script_session *s, int argc, char * const *argv);
 script_command_status script_save_sample(script_session *s, int argc, char * const *argv);
 script_command_status script_save_spectra(script_session *s, int argc, char * const *argv);
@@ -95,6 +96,7 @@ static const struct script_command script_load_commands[] = {
 
 
 static const struct script_command script_save_commands[] = {
+        {"bricks",   &script_save_bricks,   "Save bricks.",   NULL},
         {"detector", &script_save_detector, "Save detector.", NULL},
         {"sample",   &script_save_sample,   "Save sample.",   NULL},
         {"spectra",  &script_save_spectra,  "Save spectra.",  NULL},

@@ -22,9 +22,6 @@ typedef struct script_session {
     struct fit_data *fit;
     jibal_config_file *cf; /* a pseudo-configuration "file" for our session */
     char *output_filename; /* File name for automatic spectra saving */ /* TODO: multidetector! */
-    char *bricks_out_filename; /* File name for automatic bricks saving */
-    char *sample_out_filename; /* File name for automatic sample saving */
-    char *detector_out_filename; /* File name for automatic detector saving */
     clock_t start, end;
     script_file *files[SCRIPT_NESTED_MAX];
     size_t file_depth;

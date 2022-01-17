@@ -124,7 +124,7 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
         int option_index = 0;
-        char c = getopt_long(*argc, *argv, "ihvVE:o:a:t:prob:I:r:R:S:s:fe:Fd:D:B:c:C:", long_options, &option_index);
+        char c = getopt_long(*argc, *argv, "ihvVE:o:a:t:prob:I:r:R:s:fe:Fd:B:c:C:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -172,9 +172,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
             case '6':
                 cmd_opt->fit_vars = strdup(optarg);
                 break;
-            case '7':
-                cmd_opt->bricks_filename = strdup(optarg);
-                break;
             case '8':
                 cmd_opt->depthsteps_max = atoi(optarg);
                 break;
@@ -192,9 +189,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
                 break;
             case 's':
                 cmd_opt->sample_filename = strdup(optarg);
-                break;
-            case 'S':
-                cmd_opt->sample_out_filename = strdup(optarg);
                 break;
             case 'a':
                 sim->sample_theta = jibal_get_val(jibal->units, UNIT_TYPE_ANGLE, optarg);
@@ -272,9 +266,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
                     exit(EXIT_FAILURE);
                 }
                 break;
-            case 'D':
-                cmd_opt->detector_out_filename = strdup(optarg);
-                break;
             default:
                 usage();
                 exit(EXIT_FAILURE);
@@ -296,11 +287,8 @@ cmdline_options *cmdline_options_init() {
 void cmdline_options_free(cmdline_options *cmd_opt) {
     free(cmd_opt->output_filename);
     free(cmd_opt->exp_filename);
-    free(cmd_opt->bricks_filename);
     free(cmd_opt->fit_vars);
-    free(cmd_opt->detector_out_filename);
     free(cmd_opt->sample_filename);
-    free(cmd_opt->sample_out_filename);
     if(cmd_opt->reaction_filenames) {
         for(size_t i = 0; i < cmd_opt->n_reaction_filenames; i++) {
             free(cmd_opt->reaction_filenames[i]);

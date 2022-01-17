@@ -31,7 +31,7 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim);
 int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histogram *exp);
 int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, const char *fit_vars); /* fit_vars is a comma separated list of variables to fit */
 void fit_params_clear(fit_params *params);
-void print_bricks(const char *filename, const sim_workspace *ws);
+int print_bricks(const char *filename, const sim_workspace *ws);
 int simulate_with_ds(sim_workspace *ws);
 void ds(sim_workspace *ws); /* TODO: the DS routine is more pseudocode at this stage... */
 double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back);

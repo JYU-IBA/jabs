@@ -32,11 +32,8 @@ typedef struct {
     double stop_step_exiting;
     char *output_filename;
     char *exp_filename;
-    char *bricks_filename;
     char *fit_vars;
-    char *detector_out_filename;
     char *sample_filename;
-    char *sample_out_filename;
     char **reaction_filenames;
     size_t n_reaction_filenames;
 } cmdline_options;

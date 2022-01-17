@@ -35,9 +35,6 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
     }
     script_session_reset_vars(s);
     s->output_filename = NULL;
-    s->bricks_out_filename = NULL;
-    s->sample_out_filename = NULL;
-    s->detector_out_filename = NULL;
     s->file_depth = 0;
     s->files[0] = NULL;
     return s;
@@ -66,9 +63,6 @@ jibal_config_var *script_make_vars(script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT,   "channeling",             &sim->channeling_offset,             NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",       &sim->channeling_slope,              NULL},
             {JIBAL_CONFIG_VAR_STRING, "output",                 &s->output_filename,                 NULL},
-            {JIBAL_CONFIG_VAR_STRING, "bricks_out",             &s->bricks_out_filename,             NULL},
-            {JIBAL_CONFIG_VAR_STRING, "sample_out",             &s->sample_out_filename,             NULL},
-            {JIBAL_CONFIG_VAR_STRING, "det_out",                &s->detector_out_filename,           NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "erd",                    &sim->erd,                           NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "rbs",                    &sim->rbs,                           NULL},
             {JIBAL_CONFIG_VAR_SIZE,   "fit_maxiter",            &fit->n_iters_max,                   NULL},
@@ -122,9 +116,6 @@ void script_session_free(script_session *s) {
     if(!s)
         return;
     free(s->output_filename);
-    free(s->bricks_out_filename);
-    free(s->sample_out_filename);
-    free(s->detector_out_filename);
     jibal_config_file_free(s->cf);
     fit_data_workspaces_free(s->fit);
     fit_data_exp_free(s->fit);
