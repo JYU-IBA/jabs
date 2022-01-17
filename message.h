@@ -14,6 +14,8 @@
 #ifndef _JABS_MESSAGE_H_
 #define _JABS_MESSAGE_H_
 
+#include <stdio.h>
+
 typedef enum jabs_msg_level {
     MSG_DEBUG = 0,
     MSG_VERBOSE = 1,

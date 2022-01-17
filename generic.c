@@ -107,6 +107,9 @@ char **string_to_argv(const char *str, int *argc) { /* Returns allocated array o
     }
     for(i = 0; i < n; i++) { /* We should have our final strings now, let's make deep copies */
         out[i] = strdup(out[i]);
+#ifdef DEBUG
+        fprintf(stderr, "argv[%zu] = %s\n", i, out[i]);
+#endif
     }
     out[n] = NULL;
     if(argc) {
@@ -162,7 +165,7 @@ char *argv_to_string(int argc, char * const *argv) {
 }
 
 FILE *fopen_file_or_stream(const char *filename, const char *mode) {
-    FILE *f;
+    FILE *f = NULL;
     if(!filename) {
         if(*mode == 'r')
             f = stdin;

@@ -16,6 +16,9 @@
 #define COPYRIGHT_STRING "\n    This program is free software; you can redistribute it and/or modify \n    it under the terms of the GNU General Public License as published by\n    the Free Software Foundation; either version 2 of the License, or\n    (at your option) any later version.\n\n   See LICENSE.txt for the full license.\n\n"
 #include <jibal_units.h>
 
+#define SCRIPT_NESTED_MAX 8 /* How deep (number of levels) scripts can be nested, i.e. script file loads a script file loads a script file... */
+#define PROMPT "jabs> "
+
 /* Defaults for new simulations */
 #define ENERGY (2.0*C_MEV)
 #define ALPHA (0.0*C_DEG)

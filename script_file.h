@@ -12,11 +12,18 @@
 
  */
 
-#ifndef JABS_SCRIPT_H
-#define JABS_SCRIPT_H
 #include <stdio.h>
-#include "jabs.h"
 
-#include "script_command.h"
-int script_process(script_session *s, const char *filename);
-#endif // JABS_SCRIPT_H
+typedef struct script_file {
+    FILE *f;
+    char *filename;
+    char *line;
+    size_t line_size;
+    size_t lineno;
+    int interactive;
+} script_file;
+
+script_file *script_file_open(const char *filename);
+void script_file_close(script_file *sfile);
+
+ssize_t script_file_getline(script_file *sfile);
