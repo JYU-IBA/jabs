@@ -41,27 +41,10 @@ int script_process(script_session *s, const char *filename) {
             fputs(prompt, stderr);
         }
         if(script_file_getline(sfile) > 0) {
-            sfile->lineno++;
-            sfile->line[strcspn(sfile->line, "\r\n")] = 0; /* Strip newlines */
-#ifdef DEBUG
-            fprintf(stderr, "File %s: line %zu: %s\n", sfile->filename, sfile->lineno, sfile->line);
-#endif
-            if(*sfile->line == '#') {/* Comment */
-                continue;
-            }
             if(!interactive) {
                 jabs_message(MSG_INFO, stderr, "%s%s\n", prompt, sfile->line);
             }
-            int argc = 0;
-            char **argv = string_to_argv(sfile->line, &argc);
-            if(!argv) {
-                jabs_message(MSG_ERROR, stderr, "Something went wrong in parsing arguments.\n");
-                continue;
-            }
-            if(argc) {
-                status = script_process_command(s, script_commands, argc, argv); /* Note that s->file_depth may be altered (e.g. by script_load_script() */
-            }
-            argv_free(argv, argc);
+            status = script_execute_command(s, sfile->line);
             if(!interactive && status != SCRIPT_COMMAND_SUCCESS) {
                 jabs_message(MSG_ERROR, stderr, "Error (%i) on line %zu in file \"%s\". Aborting.\n", status, sfile->lineno, sfile->filename);
             }

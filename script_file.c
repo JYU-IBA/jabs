@@ -52,5 +52,19 @@ void script_file_close(script_file *sfile) {
 }
 
 ssize_t script_file_getline(script_file *sfile) {
-    return getline(&sfile->line, &sfile->line_size, sfile->f);
+    while(1) {
+        ssize_t n = getline(&sfile->line, &sfile->line_size, sfile->f);
+        if(n <= 0) {
+            return n;
+        }
+        sfile->lineno++;
+        sfile->line[strcspn(sfile->line, "\r\n")] = 0; /* Strip newlines */
+#ifdef DEBUG
+        fprintf(stderr, "File %s: line %zu: %s\n", sfile->filename, sfile->lineno, sfile->line);
+#endif
+        if(*sfile->line == '#') {/* Comment */
+            continue;
+        }
+        return n;
+    }
 }

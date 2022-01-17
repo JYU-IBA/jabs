@@ -20,6 +20,7 @@
 #include "fit.h"
 #include "options.h"
 #include "jabs.h"
+#include "generic.h"
 #include "script_command.h"
 
 int script_prepare_sim_or_fit(script_session *s) {
@@ -332,7 +333,24 @@ const script_command *script_command_find(const script_command *commands, const 
     return NULL;
 }
 
-script_command_status script_process_command(script_session *s, const script_command *commands, int argc, char **argv) {
+script_command_status script_execute_command(script_session *s, const char *cmd) {
+    int argc = 0;
+    script_command_status status;
+    char **argv = string_to_argv(cmd, &argc);
+    if(!argv) {
+        jabs_message(MSG_ERROR, stderr, "Something went wrong in parsing arguments.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(argc) {
+        status = script_execute_command_argv(s, script_commands, argc, argv); /* Note that s->file_depth may be altered (e.g. by script_load_script() */
+    } else {
+        status = SCRIPT_COMMAND_SUCCESS; /* Doing nothing successfully */
+    }
+    argv_free(argv, argc);
+    return status;
+}
+
+script_command_status script_execute_command_argv(script_session *s, const script_command *commands, int argc, char **argv) {
     if(!s || !commands || !argv)
         return SCRIPT_COMMAND_FAILURE;
     if(argc < 1) {

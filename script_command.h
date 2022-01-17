@@ -36,8 +36,8 @@ struct help_topic {
 };
 
 void script_print_commands(FILE *f, const struct script_command *commands);
-script_command_status script_process_command(script_session *s, const script_command *commands, int argc, char **argv);
-
+script_command_status script_execute_command(script_session *s, const char *cmd);
+script_command_status script_execute_command_argv(script_session *s, const script_command *commands, int argc, char **argv);
 void script_command_not_found(const char *cmd, const script_command *parent);
 
 script_command_status script_add_detector(script_session *s, int argc, char * const *argv);
