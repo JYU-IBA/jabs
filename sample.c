@@ -503,8 +503,6 @@ void sample_model_free(sample_model *sm) {
 }
 
 sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const *argv) {
-    if(argc < 2)
-        return NULL;
     sample_model *sm = malloc(sizeof(sample_model));
     sm->type = SAMPLE_MODEL_LAYERED;
     size_t n = 0;

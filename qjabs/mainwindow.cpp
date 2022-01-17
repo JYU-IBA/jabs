@@ -91,56 +91,8 @@ void MainWindow::openFile(const QString &filename)
 
 
 int MainWindow::runLine(const QString &line, size_t lineno) {
-    int status = 0;
-    bool plot = FALSE;
-    jabs_message(MSG_INFO, stderr, "jabs> %s\n", qPrintable(line));
-    int argc = 0;
-    char **argv = string_to_argv(qPrintable(line), &argc);
-    if(!argv) {
-        jabs_message(MSG_ERROR, stderr, "Something went wrong in parsing arguments from %s.\n", qPrintable(line));
-        return -1;
-    }
-#ifdef DEBUG
-    for(int i = 0; i < argc; i++) {
-        fprintf(stderr, "args: %i: \"%s\"\n", i, argv[i]);
-    }
-#endif
-    if(argc) {
-        int found = FALSE;
-        for(const struct script_command *c = script_commands; c->name != NULL; c++) {
-            if(strcmp(c->name, argv[0]) == 0) {
-                found = TRUE;
-                if(c->f == NULL) {
-                    status = EXIT_FAILURE;
-                    break;
-                }
-                status = c->f(session, argc - 1, argv + 1);
-                if(status) {
-                    if(lineno) {
-                       jabs_message(MSG_ERROR, stderr, "Line %zu: ", lineno);
-                    }
-                    jabs_message(MSG_ERROR, stderr, "Command \"%s\" failed with status code %i.\n", c->name, status);
-                }
-                if(c->f == script_load || c->f == script_reset) {
-                    free(session->cf->vars);
-                    session->cf->vars = NULL;
-                    jibal_config_file_set_vars(session->cf, script_make_vars(session)); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
-                }
-                if(!lineno && (c->f == script_simulate || c->f == script_fit)) { /* No lineno means interactive. Plot ASAP. */
-                    plotSession();
-                }
-                break;
-            }
-        }
-        if(!found) {
-            if(lineno) {
-                jabs_message(MSG_ERROR, stderr, "Line %zu: ", lineno);
-            }
-            jabs_message(MSG_ERROR, stderr, "Command \"%s\" not recognized.\n", argv[0]);
-            status = EXIT_FAILURE;
-        }
-    }
-    argv_free(argv, argc);
+    //jabs_message(MSG_INFO, stderr, "jabs> %s\n", qPrintable(line));
+    int status = script_execute_command(session, qPrintable(line));
     return status;
 }
 
@@ -374,5 +326,6 @@ void MainWindow::on_commandLineEdit_returnPressed()
     if(runLine(ui->commandLineEdit->text()) == EXIT_SUCCESS) {
             ui->commandLineEdit->clear();
     }
+    plotSession();
 }
 

@@ -462,7 +462,7 @@ void simulation_print(FILE *f, const simulation *sim) {
     jabs_message(MSG_INFO, f, "n_detectors = %zu\n", sim->n_det);
     for(size_t i = 0; i < sim->n_det; i++) {
         detector *det = sim->det[i];
-        jabs_message(MSG_INFO, f, "DETECTOR %zu:\n", i + 1);
+        jabs_message(MSG_INFO, f, "DETECTOR %zu (run 'show detector %zu' for other parameters):\n", i + 1, i + 1);
         jabs_message(MSG_INFO, f, "  type = %s\n", detector_type_name(det));
         jabs_message(MSG_INFO, f, "  theta = %.3lf deg\n", i, det->theta / C_DEG);
         jabs_message(MSG_INFO, f, "  phi = %.3lf deg\n", i, det->phi / C_DEG);

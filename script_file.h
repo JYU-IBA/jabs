@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 Jaakko Julin
+    Copyright (C) 2021-2022 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -11,18 +11,19 @@
     See LICENSE.txt for the full license.
 
  */
-#ifndef _JABS_MESSAGE_H_
-#define _JABS_MESSAGE_H_
 
 #include <stdio.h>
 
-typedef enum jabs_msg_level {
-    MSG_DEBUG = 0,
-    MSG_VERBOSE = 1,
-    MSG_INFO = 2,
-    MSG_WARNING = 3,
-    MSG_ERROR = 4
-} jabs_msg_level;
+typedef struct script_file {
+    FILE *f;
+    char *filename;
+    char *line;
+    size_t line_size;
+    size_t lineno;
+    int interactive;
+} script_file;
 
-void jabs_message(jabs_msg_level level, FILE *f, const char *format, ...);
-#endif // _JABS_MESSAGE_H_
+script_file *script_file_open(const char *filename);
+void script_file_close(script_file *sfile);
+
+ssize_t script_file_getline(script_file *sfile);

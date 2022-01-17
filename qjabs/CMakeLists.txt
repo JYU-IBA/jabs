@@ -75,6 +75,12 @@ set(PROJECT_SOURCES
         ../aperture.h
         ../geostragg.c
         ../geostragg.h
+        ../script_command.c
+        ../script_command.h
+        ../script_session.c
+        ../script_session.h
+        ../script_file.c
+        ../script_file.h
        main.cpp
        mainwindow.cpp
        mainwindow.h
