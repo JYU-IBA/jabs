@@ -60,6 +60,7 @@ script_command_status script_show_sample(script_session *s, int argc, char * con
 script_command_status script_show_simulation(script_session *s, int argc, char * const *argv);
 script_command_status script_show_fit(script_session *s, int argc, char * const *argv);
 script_command_status script_show_detector(script_session *s, int argc, char * const *argv);
+script_command_status script_show_reactions(script_session *s, int argc, char * const *argv);
 script_command_status script_show_variables(script_session *s, int argc, char * const *argv);
 script_command_status script_set(script_session *s, int argc, char * const *argv);
 script_command_status script_add_reaction(script_session *s, int argc, char * const *argv);
@@ -87,7 +88,7 @@ script_command_status script_load_sample(script_session *s, int argc, char *cons
 script_command_status script_load_detector(script_session *s, int argc, char *const *argv);
 script_command_status script_load_experimental(script_session *s, int argc, char *const *argv);
 script_command_status script_load_reaction(script_session *s, int argc, char *const *argv);
-
+script_command_status script_remove_reaction(script_session *s, int argc, char * const *argv);
 
 static const struct script_command script_load_commands[] = {
         {"detector",     &script_load_detector,     "Load (replace) a detector.",     NULL},
@@ -117,26 +118,32 @@ static const struct script_command script_add_commands[] = {
 static const struct script_command script_show_commands[] = {
         {"detector",   &script_show_detector,   "Show detector.",   NULL},
         {"fit",        &script_show_fit,        "Show fit.",        NULL},
+        {"reactions",  &script_show_reactions,  "Show reactions,",  NULL},
         {"sample",     &script_show_sample,     "Show sample",      NULL},
         {"simulation", &script_show_simulation, "Show simulation.", NULL},
         {"variables",  &script_show_variables,  "Show variables.",  NULL},
         {NULL, NULL, NULL,NULL}
 };
 
+static const struct script_command script_remove_commands[] = {
+        {"reaction",   &script_remove_reaction,   "Remove reaction.",   NULL},
+        {NULL, NULL, NULL,NULL}
+};
+
 
 static const struct script_command script_commands[] = {
-        {"add",  NULL,                 "Add things.",                 script_add_commands},
+        {"add",    NULL,               "Add things.",                 script_add_commands},
         {"exit",     &script_exit,     "Exit.",                                       NULL},
         {"fit",      &script_fit,      "Do a fit.",                                   NULL},
-        {"save", NULL,                 "Save something.",             script_save_commands},
+        {"save",   NULL,               "Save something.",             script_save_commands},
         {"set",      &script_set,      "Set variables.",                              NULL},
-        {"show", NULL,                 "Show information on things.", script_show_commands},
+        {"show",   NULL,               "Show information on things.", script_show_commands},
         {"help",     &script_help,     "Print help.",                                 NULL},
-        {"load", NULL,                 "Load something.",             script_load_commands},
-        {"remove",   &script_remove,   "Remove something",                            NULL},
+        {"load",   NULL,               "Load something.",             script_load_commands},
+        {"remove", NULL,               "Remove something",            script_remove_commands},
         {"reset",    &script_reset,    "Reset something.",                            NULL},
         {"roi",      &script_roi,      "Show information from a region of interest.", NULL},
         {"simulate", &script_simulate, "Run a simulation.",                           NULL},
-        {NULL,   NULL, NULL,                                                          NULL},
+        {NULL,     NULL, NULL,                                                        NULL},
 };
 #endif // JABS_SCRIPT_H

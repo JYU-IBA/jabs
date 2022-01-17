@@ -629,40 +629,38 @@ script_command_status script_save_detector(script_session *s, int argc, char * c
     return SCRIPT_COMMAND_SUCCESS;
 }
 
-script_command_status script_remove(script_session *s, int argc, char * const *argv) {
+script_command_status script_remove_reaction(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit_data = s->fit;
     if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: remove [reaction] ...\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: remove reaction [TYPE] [target_isotope]   OR   remove reaction [number]\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(strcmp(argv[0], "reaction") == 0) {
-        if(argc != 3) {
-            jabs_message(MSG_ERROR, stderr, "Usage: remove reaction [TYPE] [target_isotope]   OR   remove reaction number [number]\n");
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        if(strcmp(argv[1], "number") == 0) {
-            size_t i = strtoull(argv[2], NULL, 10);
-            return sim_reactions_remove_reaction(fit_data->sim, i - 1);
-        }
-        reaction_type type = reaction_type_from_string(argv[1]);
-        const jibal_isotope *target = jibal_isotope_find(fit_data->jibal->isotopes, argv[2], 0, 0);
-        if(type == REACTION_NONE) {
-            jabs_message(MSG_ERROR, stderr, "This is not a valid reaction type: \"%s\".\n", argv[1]);
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        if(!target) {
-            jabs_message(MSG_ERROR, stderr, "This is not a valid isotope: \"%s\".\n", argv[2]);
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        for(size_t i = 0; i < fit_data->sim->n_reactions; i++) {
-            if(fit_data->sim->reactions[i]->type == type && fit_data->sim->reactions[i]->target == target) {
-                return sim_reactions_remove_reaction(fit_data->sim, i);
-            }
-        }
-        jabs_message(MSG_ERROR, stderr, "No matching reaction found!\n");
+    char *end;
+    size_t i = strtoull(argv[0], &end, 10);
+    if(*end == '\0') {
+        return sim_reactions_remove_reaction(fit_data->sim, i - 1);
+    }
+    if(argc != 2) {
+        jabs_message(MSG_ERROR, stderr, "Usage: remove reaction [TYPE] [target_isotope]   OR   remove reaction [number]\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    return SCRIPT_COMMAND_NOT_FOUND;
+    reaction_type type = reaction_type_from_string(argv[0]);
+    const jibal_isotope *target = jibal_isotope_find(fit_data->jibal->isotopes, argv[1], 0, 0);
+    if(type == REACTION_NONE) {
+        jabs_message(MSG_ERROR, stderr, "This is not a valid reaction type: \"%s\".\n", argv[0]);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(!target) {
+        jabs_message(MSG_ERROR, stderr, "This is not a valid isotope: \"%s\".\n", argv[1]);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    for(size_t i = 0; i < fit_data->sim->n_reactions; i++) {
+        if(fit_data->sim->reactions[i]->type == type && fit_data->sim->reactions[i]->target == target) {
+            return sim_reactions_remove_reaction(fit_data->sim, i);
+        }
+    }
+    jabs_message(MSG_ERROR, stderr, "No matching reaction found!\n");
+    return SCRIPT_COMMAND_FAILURE;
 }
 
 script_command_status script_roi(script_session *s, int argc, char * const *argv) {
