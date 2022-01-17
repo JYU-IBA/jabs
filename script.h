@@ -89,6 +89,11 @@ script_command_status script_load_detector(script_session *s, int argc, char *co
 script_command_status script_load_experimental(script_session *s, int argc, char *const *argv);
 script_command_status script_load_reaction(script_session *s, int argc, char *const *argv);
 script_command_status script_remove_reaction(script_session *s, int argc, char * const *argv);
+script_command_status script_reset_reactions(script_session *s, int argc, char * const *argv);
+script_command_status script_reset_detectors(script_session *s, int argc, char * const *argv);
+script_command_status script_reset_fit_ranges(script_session *s, int argc, char * const *argv);
+script_command_status script_reset_sample(script_session *s, int argc, char * const *argv);
+script_command_status script_reset_experimental(script_session *s, int argc, char * const *argv);
 
 static const struct script_command script_load_commands[] = {
         {"detector",     &script_load_detector,     "Load (replace) a detector.",     NULL},
@@ -130,6 +135,14 @@ static const struct script_command script_remove_commands[] = {
         {NULL, NULL, NULL,NULL}
 };
 
+static const struct script_command script_reset_commands[] = {
+        {"detectors", &script_reset_detectors,    "Reset detectors.",            NULL},
+        {"experimental", &script_reset_experimental, "Reset experimental spectra.", NULL},
+        {"fit_ranges", &script_reset_fit_ranges,   "Reset fit ranges.",           NULL},
+        {"reactions", &script_reset_reactions,    "Reset reactions.",            NULL},
+        {"sample", &script_reset_sample,       "Reset sample.",               NULL},
+        {NULL, NULL, NULL,                                                       NULL}
+};
 
 static const struct script_command script_commands[] = {
         {"add",    NULL,               "Add things.",                 script_add_commands},
@@ -141,7 +154,7 @@ static const struct script_command script_commands[] = {
         {"help",     &script_help,     "Print help.",                                 NULL},
         {"load",   NULL,               "Load something.",             script_load_commands},
         {"remove", NULL,               "Remove something",            script_remove_commands},
-        {"reset",    &script_reset,    "Reset something.",                            NULL},
+        {"reset",    &script_reset,    "Reset something.",            script_reset_commands},
         {"roi",      &script_roi,      "Show information from a region of interest.", NULL},
         {"simulate", &script_simulate, "Run a simulation.",                           NULL},
         {NULL,     NULL, NULL,                                                        NULL},

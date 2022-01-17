@@ -126,37 +126,63 @@ script_command_status script_load(script_session *s, int argc, char * const *arg
     return SCRIPT_COMMAND_NOT_FOUND;
 }
 
+script_command_status script_reset_reactions(script_session *s, int argc, char * const *argv) {
+    sim_reactions_free(s->fit->sim);
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+script_command_status script_reset_detectors(script_session *s, int argc, char * const *argv) {
+    for(size_t i_det = 0; i_det < s->fit->sim->n_det; i_det++) {
+        detector_free(sim_det(s->fit->sim, i_det));
+    }
+    s->fit->sim->n_det = 0;
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+script_command_status script_reset_fit_ranges(script_session *s, int argc, char * const *argv) {
+    fit_data_fit_ranges_free(s->fit);
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+script_command_status script_reset_sample(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    sample_model_free(fit->sm);
+    fit->sm = NULL;
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+script_command_status script_reset_experimental(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    fit_data_exp_free(s->fit);
+    fit->exp = calloc(fit->sim->n_det, sizeof(gsl_histogram *));
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
 script_command_status script_reset(script_session *s, int argc, char * const *argv) {
-    struct fit_data *fit_data = s->fit;
+    struct fit_data *fit = s->fit;
     (void) argc; /* Unused */
     (void) argv; /* Unused */
-    if(!fit_data) {
+    if(!fit) {
         return -1;
     }
-    if(argc >= 1 && strcmp(argv[0], "reactions") == 0) {
-        sim_reactions_free(fit_data->sim);
-        return SCRIPT_COMMAND_SUCCESS;
-    } else if(argc >= 1 && strcmp(argv[0], "detectors") == 0) {
-        for(size_t i_det = 0; i_det < s->fit->sim->n_det; i_det++) {
-            detector_free(sim_det(s->fit->sim, i_det));
-        }
-        s->fit->sim->n_det = 0;
-        return SCRIPT_COMMAND_SUCCESS;
-    } else if(argc >= 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: reset [reactions|detectors]\n");
+    if(argc > 0) {
+        fprintf(stderr, "Reset what? See 'help reset' or call without arguments to reset everything.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    fit_data_fit_ranges_free(fit_data);
-    fit_params_free(fit_data->fit_params);
-    fit_data->fit_params = NULL;
-    fit_data_exp_free(s->fit);
-    fit_data_workspaces_free(fit_data);
-    sample_model_free(fit_data->sm);
-    fit_data->sm = NULL;
-    sim_free(fit_data->sim);
-    fit_data->sim = sim_init(s->jibal);
-    fit_data->exp = calloc(fit_data->sim->n_det, sizeof(gsl_histogram *));
-    jibal_gsto_assign_clear_all(fit_data->jibal->gsto);
+#ifdef DEBUG
+    fprintf(stderr, "Resetting everything!\n");
+#endif
+    fit_data_fit_ranges_free(fit);
+    fit_params_free(fit->fit_params);
+    fit->fit_params = NULL;
+    fit_data_exp_free(fit);
+    fit_data_workspaces_free(fit);
+    sample_model_free(fit->sm);
+    fit->sm = NULL;
+    sim_free(fit->sim);
+    fit->sim = sim_init(s->jibal);
+    fit->exp = calloc(fit->sim->n_det, sizeof(gsl_histogram *));
+    jibal_gsto_assign_clear_all(fit->jibal->gsto);
     script_session_reset_vars(s);
     return SCRIPT_COMMAND_SUCCESS;
 }
