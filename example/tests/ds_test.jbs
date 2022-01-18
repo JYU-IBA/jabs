@@ -3,7 +3,6 @@ set ds true
 set ion a
 set energy 2MeV
 set det theta 160deg
-set det phi 0deg
 set alpha 7deg
 set sample Au 1000tfu Si 20000tfu
 add reactions RBS

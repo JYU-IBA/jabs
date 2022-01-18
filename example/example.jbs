@@ -6,23 +6,25 @@ set energy 2027keV
 set alpha 0
 set alpha 0deg
 set alpha "0 deg"
+
 set fluence 2.0e13
 load exp "experimental.dat"
+
 #sample can be set with one command
 set sample Au 30tfu rough 20tfu n_rough 5 SiO2 6500tfu Si 10000tfu
 #or loaded from a file (tabular data)
 #load sample "sample.txt"
-set det slope 1.72keV
-set det offset 10keV
-set det resolution 10keV
-set det theta 160deg
-set det phi 90deg
-set det solid 5msr
+
+set detector slope 1.72keV offset 10keV resolution 10keV
+#commands can be abbreviated in some cases, like 'set detector' -> 'set det'
+set det theta 160deg phi 90deg solid 5msr
 #Detector can also be loaded from a file
 #load det "detector.txt"
+
 add fit_range 200 700
 add fit_range 1050 1100
 set fit_maxiter 100
+
 simulate
 save spectra "simulated_out.csv"
 fit calib,fluence,thickness1,thickness2,rough1

@@ -6,9 +6,7 @@ set geostragg true
 set det resolution 15keV
 set det theta 130deg
 set det phi 90deg
-set det aperture circle
-set det aperture_diameter 20mm
-set det distance 100mm
+set det aperture circle diameter 20mm distance 100mm
 set sample Au 1000tfu Si 20000tfu
 simulate
 save spectra "out.csv"

@@ -10,16 +10,10 @@ set sample_azi 0deg
 set beam_aperture rectangle
 set beam_aperture_width 3mm
 set beam_aperture_height 3mm
-set det theta 40deg
-set det phi 0deg
+set det theta 40deg phi 0deg
 set det slope 2keV
-set det resolution 10keV
-set det type tof
-set det resolution 200ps
-set det length 623mm
-set det aperture circle
-set det aperture_diameter 20mm
-set det distance 1000mm
+set det type tof resolution 200ps length 623mm
+set det aperture circle diameter 20mm distance 1000mm
 set sample Co 1000tfu
 #add reactions RBS
 add reactions ERD

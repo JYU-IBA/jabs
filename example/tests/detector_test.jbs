@@ -1,9 +1,0 @@
-reset detectors
-load det "detector_1.txt"
-load det "detector_2.txt"
-load det 2 "detector_2.txt"
-show det
-set sample Au 30tfu Si 10000tfu
-simulate
-save spectra 1 "out_1.csv"
-save spectra 2 "out_2.csv"
