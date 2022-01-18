@@ -434,9 +434,9 @@ void script_print_command_tree(FILE *f, const struct script_command *commands) {
         while(c->name != NULL) {
             if(c->f) {
                 for(size_t j = 1; j <= i; j++) {
-                    jabs_message(MSG_INFO, stderr, "%s ", stack[j]->name);
+                    jabs_message(MSG_INFO, f, "%s ", stack[j]->name);
                 }
-                jabs_message(MSG_INFO, stderr, "%s\n", c->name);
+                jabs_message(MSG_INFO, f, "%s\n", c->name);
             }
             if(c->subcommands && i < (COMMAND_DEPTH - 1)) {
                 i++;
@@ -699,7 +699,43 @@ script_command_status script_set_ion(script_session *s, int argc, char * const *
     return SCRIPT_COMMAND_SUCCESS;
 }
 
-
+script_command_status script_set_aperture(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    aperture *a = &fit->sim->beam_aperture;
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: set aperture (type) [width|height|diameter (value)] ...\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    while(argc >= 1) {
+        for(const jibal_option *o = aperture_option; o->s; o++) { /* look for a matching aperture_option keyword (circle, rectangle) */
+            if(strcmp(o->s, argv[0]) == 0) {
+                a->type = o->val;
+                argv++;
+                argc--;
+                break;
+            }
+        }
+        if(argc < 2) /* Following things need two arguments */
+            break;
+        if(strcmp(argv[0], "width") == 0) {
+            a->width = jibal_get_val(fit->jibal->units, UNIT_TYPE_DISTANCE, argv[1]);
+        } else if(strcmp(argv[0], "height") == 0) {
+            a->height = jibal_get_val(fit->jibal->units, UNIT_TYPE_DISTANCE, argv[1]);
+        } else if(strcmp(argv[0], "diameter") == 0) {
+            a->diameter = jibal_get_val(fit->jibal->units, UNIT_TYPE_DISTANCE, argv[1]);
+        } else {
+            jabs_message(MSG_ERROR, stderr, "Unrecognized argument (%s)\n", argv[0]);
+            return SCRIPT_COMMAND_FAILURE;
+        }
+        argc -= 2;
+        argv += 2;
+    }
+    if(argc) {
+        jabs_message(MSG_ERROR, stderr, "Unexpected extra arguments (%i), starting with %s\n", argc, argv[0]);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return SCRIPT_COMMAND_SUCCESS;
+}
 
 script_command_status script_set_detector(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
@@ -903,7 +939,8 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
                         jabs_message(MSG_INFO, stderr, "\n");
                     }
                 }
-                jabs_message(MSG_INFO, stderr,"\n\nAlso the following things can be set: ion, sample, detector. Special syntax applies for each.\n");
+                jabs_message(MSG_INFO, stderr,"\n\nAlso the following things can be set (special syntax applies for each):\n");
+                script_print_commands(stderr, script_set_commands);
             }
             return 0;
         }

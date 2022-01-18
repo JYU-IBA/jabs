@@ -75,17 +75,19 @@ script_command_status script_show_simulation(script_session *s, int argc, char *
 script_command_status script_show_variables(script_session *s, int argc, char * const *argv);
 script_command_status script_simulate(script_session *s, int argc, char * const *argv);
 script_command_status script_set(script_session *s, int argc, char * const *argv);
+script_command_status script_set_aperture(script_session *s, int argc, char * const *argv);
 script_command_status script_set_ion(script_session *s, int argc, char * const *argv);
 script_command_status script_set_detector(script_session *s, int argc, char * const *argv);
 script_command_status script_set_sample(script_session *s, int argc, char * const *argv);
 script_command_status script_set_variable(script_session *s, int argc, char * const *argv);
 
 static const struct script_command script_set_commands[] = {
-        {"detector", &script_set_detector, "Set detector properties.", NULL},
-        {"ion",      &script_set_ion,      "Set ion.",                 NULL},
-        {"sample",   &script_set_sample,   "Set sample.",              NULL},
-        {"variable", &script_set_variable, "Set a variable",           NULL},
-        {NULL, NULL, NULL,                                             NULL}
+        {"aperture", &script_set_aperture, "Set beam aperture.",          NULL},
+        {"detector", &script_set_detector, "Set detector properties.",    NULL},
+        {"ion",      &script_set_ion,      "Set incident ion (isotope).", NULL},
+        {"sample",   &script_set_sample,   "Set sample.",                 NULL},
+        {"variable", &script_set_variable, "Set a variable",              NULL},
+        {NULL, NULL, NULL,                                                NULL}
 };
 
 static const struct script_command script_load_commands[] = {
