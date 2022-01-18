@@ -14,6 +14,8 @@
 
 #include "script_session.h"
 
+#define COMMAND_DEPTH 8
+
 typedef enum script_command_status {
     SCRIPT_COMMAND_SUCCESS = EXIT_SUCCESS,
     SCRIPT_COMMAND_FAILURE = EXIT_FAILURE,
@@ -35,6 +37,7 @@ struct help_topic {
 };
 
 void script_print_commands(FILE *f, const struct script_command *commands);
+void script_print_command_tree(FILE *f, const struct script_command *commands);
 script_command_status script_execute_command(script_session *s, const char *cmd);
 script_command_status script_execute_command_argv(script_session *s, const script_command *commands, int argc, char **argv);
 void script_command_not_found(const char *cmd, const script_command *c);

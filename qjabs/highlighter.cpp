@@ -61,8 +61,6 @@ extern "C" {
 #include "../script.h"
 }
 
-#define COMMAND_DEPTH 8
-
 Highlighter::Highlighter(QTextDocument *parent)
     : QSyntaxHighlighter(parent)
 {

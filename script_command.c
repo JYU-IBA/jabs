@@ -424,6 +424,36 @@ void script_print_commands(FILE *f, const struct script_command *commands) {
     }
 }
 
+void script_print_command_tree(FILE *f, const struct script_command *commands) {
+    const struct script_command *stack[COMMAND_DEPTH];
+    const struct script_command *c;
+    stack[0] = commands;
+    size_t i = 0;
+    c = stack[0];
+    while(c->name != NULL) {
+        while(c->name != NULL) {
+            if(c->f) {
+                for(size_t j = 1; j <= i; j++) {
+                    jabs_message(MSG_INFO, stderr, "%s ", stack[j]->name);
+                }
+                jabs_message(MSG_INFO, stderr, "%s\n", c->name);
+            }
+            if(c->subcommands && i < (COMMAND_DEPTH - 1)) {
+                i++;
+                stack[i] = c;
+                c = c->subcommands;
+            } else {
+                c++;
+            }
+        }
+        if(i == 0)
+            break;
+        c = stack[i];
+        i--;
+        c++;
+    }
+}
+
 script_command_status script_load_script(script_session *s, int argc, char * const *argv) {
     if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: load script [file]\n");
@@ -812,6 +842,7 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
     static const struct help_topic topics[] = {
             {"help", "This is help on help. How meta.\nHelp is available on following topics:\n"},
             {"commands", "I recognize the following commands (try 'help' followed by command name):\n"},
+            {"command_tree", "Almost full list of recognized commands:\n"},
             {"version", "JaBS version: "},
             {"set", "The following variables can be set (unit optional, SI units assumed otherwise):\n"},
             {"show", "Show things. Possible things: sim, fit, sample, detector, variables.\n"},
@@ -840,6 +871,8 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
                 jabs_message(MSG_INFO, stderr, "\n");
             } else if(strcmp(t->name, "commands") == 0) {
                 script_print_commands(stderr, script_commands);
+            } else if(strcmp(t->name, "command_tree") == 0) {
+                script_print_command_tree(stderr, script_commands);
             } else if(strcmp(t->name, "version") == 0) {
                 jabs_message(MSG_INFO, stderr, "%s\n", jabs_version());
             } else if(strcmp(t->name, "set") == 0) {
