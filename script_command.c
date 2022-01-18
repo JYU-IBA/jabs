@@ -735,7 +735,7 @@ script_command_status script_add_reaction(script_session *s, int argc, char * co
         jabs_message(MSG_ERROR, stderr, "Usage: add reaction TYPE isotope\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    reaction *r = reaction_make_from_argv(fit->jibal, fit->sim->beam_isotope, argc - 1, argv + 1);
+    reaction *r = reaction_make_from_argv(fit->jibal, fit->sim->beam_isotope, argc, argv);
     if(!r) {
         jabs_message(MSG_ERROR, stderr, "Could not make a reaction based on given description.\n");
         return SCRIPT_COMMAND_FAILURE;
