@@ -677,12 +677,17 @@ script_command_status script_set_detector(script_session *s, int argc, char * co
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(argc != 2) {
-        jabs_message(MSG_ERROR, stderr, "Usage: set detector [number] variable value\n");
+    if(argc < 2) {
+        jabs_message(MSG_ERROR, stderr, "Usage: set detector [number] variable value variable2 value2 ...\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(detector_set_var(s->jibal, sim_det(fit->sim, i_det), argv[0], argv[1])) {
-        jabs_message(MSG_ERROR, stderr, "Can't set \"%s\" to be \"%s\"!\n", argv[0], argv[1]);
+    while(argc >= 2) {
+        if(detector_set_var(s->jibal, sim_det(fit->sim, i_det), argv[0], argv[1])) {
+            jabs_message(MSG_ERROR, stderr, "Can't set \"%s\" to be \"%s\"!\n", argv[0], argv[1]);
+            return SCRIPT_COMMAND_FAILURE;
+        }
+        argv += 2;
+        argc -= 2;
     }
     return SCRIPT_COMMAND_SUCCESS;
 }
