@@ -42,11 +42,14 @@ script_command_status script_execute_command(script_session *s, const char *cmd)
 script_command_status script_execute_command_argv(script_session *s, const script_command *commands, int argc, char **argv);
 void script_command_not_found(const char *cmd, const script_command *c);
 const script_command *script_command_find(const script_command *commands, const char *cmd_string);
+script_command_status script_set_boolean(script_session *s, const char *variable, int value);
 
 script_command_status script_add_detector(script_session *s, int argc, char * const *argv);
 script_command_status script_add_fit_range(script_session *s, int argc, char * const *argv);
 script_command_status script_add_reaction(script_session *s, int argc, char * const *argv);
 script_command_status script_add_reactions(script_session *s, int argc, char * const *argv);
+script_command_status script_disable(script_session *s, int argc, char * const *argv);
+script_command_status script_enable(script_session *s, int argc, char * const *argv);
 script_command_status script_exit(script_session *s, int argc, char * const *argv);
 script_command_status script_fit(script_session *s, int argc, char * const *argv);
 script_command_status script_help(script_session *s, int argc, char * const *argv);
@@ -76,13 +79,15 @@ script_command_status script_show_variables(script_session *s, int argc, char * 
 script_command_status script_simulate(script_session *s, int argc, char * const *argv);
 script_command_status script_set(script_session *s, int argc, char * const *argv);
 script_command_status script_set_aperture(script_session *s, int argc, char * const *argv);
+script_command_status script_set_beam(script_session *s, int argc, char * const *argv);
 script_command_status script_set_ion(script_session *s, int argc, char * const *argv);
 script_command_status script_set_detector(script_session *s, int argc, char * const *argv);
 script_command_status script_set_sample(script_session *s, int argc, char * const *argv);
 script_command_status script_set_variable(script_session *s, int argc, char * const *argv);
 
 static const struct script_command script_set_commands[] = {
-        {"aperture", &script_set_aperture, "Set beam aperture.",          NULL},
+        {"aperture", &script_set_aperture, "Set aperture.",               NULL},
+        {"beam",     &script_set_beam,     "Set beam properties.",        NULL},
         {"detector", &script_set_detector, "Set detector properties.",    NULL},
         {"ion",      &script_set_ion,      "Set incident ion (isotope).", NULL},
         {"sample",   &script_set_sample,   "Set sample.",                 NULL},
@@ -142,6 +147,8 @@ static const struct script_command script_reset_commands[] = {
 
 static const struct script_command script_commands[] = {
         {"add",    NULL,               "Add things.",                 script_add_commands},
+        {"disable",  &script_disable,  "Set boolean variable to false.",              NULL},
+        {"enable",   &script_enable,   "Set boolean variable to true.",               NULL},
         {"exit",     &script_exit,     "Exit.",                                       NULL},
         {"fit",      &script_fit,      "Do a fit.",                                   NULL},
         {"save",   NULL,               "Save something.",             script_save_commands},

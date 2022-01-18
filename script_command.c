@@ -117,7 +117,7 @@ void script_command_not_found(const char *cmd, const script_command *c) {
         script_print_commands(stderr, c);
     } else {
         if(cmd) {
-            jabs_message(MSG_ERROR, stderr, "Invalid command: \"%s\".\n", cmd);
+            jabs_message(MSG_ERROR, stderr, "Invalid command or argument: \"%s\".\n", cmd);
         } else {
             jabs_message(MSG_ERROR, stderr, "What?\n", cmd);
         }
@@ -309,6 +309,22 @@ script_command_status script_roi(script_session *s, int argc, char * const *argv
     return SCRIPT_COMMAND_SUCCESS;
 }
 
+script_command_status script_disable(script_session *s, int argc, char *const *argv) {
+    if(argc != 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: disable (variable)\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return script_set_boolean(s, argv[0], FALSE);
+}
+
+script_command_status script_enable(script_session *s, int argc, char * const *argv) {
+    if(argc != 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: enable (variable)\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return script_set_boolean(s, argv[0], TRUE);
+}
+
 script_command_status script_exit(script_session *s, int argc, char * const *argv) {
     (void) s;
     (void) argc;
@@ -346,6 +362,20 @@ const script_command *script_command_find(const script_command *commands, const 
         return NULL;
     }
     return NULL;
+}
+
+script_command_status script_set_boolean(script_session *s, const char *variable, int value) {
+    for(jibal_config_var *var = s->cf->vars; var->type != 0; var++) {
+        if(strcmp(var->name, variable) == 0) {
+            if(var->type != JIBAL_CONFIG_VAR_BOOL) {
+                jabs_message(MSG_ERROR, stderr, "Variable exists, but is not boolean.\n");
+                return SCRIPT_COMMAND_FAILURE;
+            }
+            *((int *)var->variable) = value;
+            return SCRIPT_COMMAND_SUCCESS;
+        }
+    }
+    return SCRIPT_COMMAND_NOT_FOUND;
 }
 
 script_command_status script_execute_command(script_session *s, const char *cmd) {
@@ -391,7 +421,10 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                     }
                 }
                 if(!c->subcommands) {
-                    script_command_not_found(argv[0], c);
+#ifdef DEBUG
+                    fprintf(stderr, "Debug: there are no subcommands.\n");
+#endif
+                    script_command_not_found(argv[1], NULL);
                     return SCRIPT_COMMAND_NOT_FOUND;
                 } else {
                     cmds = c->subcommands;
@@ -408,6 +441,9 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
             }
 
         } else {
+#ifdef DEBUG
+            fprintf(stderr, "Debug: Didn't find command %s (and no more arguments remain).\n", argv[0]);
+#endif
             script_command_not_found(NULL, c_parent?c_parent->subcommands:NULL);
         }
         return SCRIPT_COMMAND_NOT_FOUND;
@@ -726,6 +762,37 @@ script_command_status script_set_aperture(script_session *s, int argc, char * co
         } else {
             jabs_message(MSG_ERROR, stderr, "Unrecognized argument (%s)\n", argv[0]);
             return SCRIPT_COMMAND_FAILURE;
+        }
+        argc -= 2;
+        argv += 2;
+    }
+    if(argc) {
+        jabs_message(MSG_ERROR, stderr, "Unexpected extra arguments (%i), starting with %s\n", argc, argv[0]);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+script_command_status script_set_beam(script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: set beam energy|fluence|ion (value)...\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    while(argc >= 2) {
+        if(strcmp(argv[0], "energy") == 0) {
+            fit->sim->beam_E = jibal_get_val(fit->jibal->units, UNIT_TYPE_ENERGY, argv[1]);
+        } else if(strcmp(argv[0], "energy_broad") == 0) {
+            fit->sim->beam_E_broad = jibal_get_val(fit->jibal->units, UNIT_TYPE_ENERGY, argv[1]);
+        } else if(strcmp(argv[0], "fluence") == 0) {
+            fit->sim->fluence = jibal_get_val(fit->jibal->units, UNIT_TYPE_ANY, argv[1]);
+        } else if(strcmp(argv[0], "ion") == 0) { /* Alternative to 'set ion' is 'set beam ion' here. */
+            const jibal_isotope *isotope = jibal_isotope_find(fit->jibal->isotopes, argv[1], 0, 0);
+            if(!isotope) {
+                jabs_message(MSG_ERROR, stderr, "\"%s\" is not a valid isotope!\n");
+                return SCRIPT_COMMAND_FAILURE;
+            }
+            fit->sim->beam_isotope = isotope;
         }
         argc -= 2;
         argv += 2;
