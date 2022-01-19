@@ -832,14 +832,14 @@ script_command_status script_set_sample(script_session *s, int argc, char * cons
         jabs_message(MSG_ERROR, stderr, "Usage: set sample [sample]\nExample: set sample TiO2 1000tfu Si 10000tfu\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    sample_model *sm_new = sample_model_from_argv(fit->jibal, argc, argv);
-    if(sm_new) {
-        sample_model_free(fit->sm);
-        fit->sm = sm_new;
-    } else {
-        jabs_message(MSG_ERROR, stderr, "Sample is not valid.\n");
+    sample_model *sm_new = sample_model_from_argv(fit->jibal, &argc, &argv);
+    if(argc != 0) {
+        jabs_message(MSG_ERROR, stderr, "Not all arguments were parsed correctly (starting from \"%s\")! Sample not set.\n", argv[0]);
+        sample_model_free(sm_new);
         return SCRIPT_COMMAND_FAILURE;
     }
+    sample_model_free(fit->sm);
+    fit->sm = sm_new;
     return SCRIPT_COMMAND_SUCCESS;
 }
 

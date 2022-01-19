@@ -37,7 +37,7 @@
 #include "generic.h"
 #include "defaults.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char * const *argv) {
 #ifdef DEBUG
     fprintf(stderr, "Note: this is a debug build!\n");
 #endif
@@ -85,9 +85,9 @@ int main(int argc, char **argv) {
     } else if(argc > 0 && strcmp(argv[0], "sample") == 0) {
         argc--;
         argv++;
-        fit_data->sm  = sample_model_from_argv(jibal, argc, argv);
-        if(!fit_data->sm) {
-            fprintf(stderr, "Error in reading sample model from command line (%i args were given)\n", argc);
+        fit_data->sm  = sample_model_from_argv(jibal, &argc, &argv);
+        if(argc != 0) {
+            fprintf(stderr, "Error in reading sample model from command line (%i args remain)\n", argc);
             return EXIT_FAILURE;
         }
         argc = 0;

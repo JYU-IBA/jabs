@@ -502,7 +502,7 @@ void sample_model_free(sample_model *sm) {
     free(sm);
 }
 
-sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const *argv) {
+sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char * const ** const argv) {
     sample_model *sm = malloc(sizeof(sample_model));
     sm->type = SAMPLE_MODEL_LAYERED;
     size_t n = 0;
@@ -510,8 +510,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const 
     sm->n_materials = 0;
     sm->materials = NULL;
     sm->ranges = NULL;
-
-    while (argc >= 2) {
+    while (*argc >= 2) {
         if(sm->n_ranges == n) {
             if(n == 0) {
                 n = 8;
@@ -526,32 +525,32 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const 
             if(!sm->ranges)
                 return NULL;
         }
-        if(sm->n_ranges && strcmp(argv[0], "rough") == 0) {
+        if(sm->n_ranges && strcmp((*argv)[0], "rough") == 0) {
             sample_range *range = &sm->ranges[sm->n_ranges - 1];
-            range->rough.x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]);
+            range->rough.x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, *argv[1]);
             range->rough.model = ROUGHNESS_GAMMA;
-        } else if(sm->n_ranges && strcmp(argv[0], "n_rough") == 0) {
+        } else if(sm->n_ranges && strcmp((*argv)[0], "n_rough") == 0) {
                 sample_range *range = &sm->ranges[sm->n_ranges - 1];
-                range->rough.n = strtoul(argv[1], NULL, 10);
-        } else if(sm->n_ranges && strcmp(argv[0], "yield") == 0) {
+                range->rough.n = strtoul((*argv)[1], NULL, 10);
+        } else if(sm->n_ranges && strcmp((*argv)[0], "yield") == 0) {
                 sample_range *range = &sm->ranges[sm->n_ranges - 1];
-                range->yield = strtod(argv[1], NULL);
-        } else if(sm->n_ranges && strcmp(argv[0], "bragg") == 0) {
+                range->yield = strtod((*argv)[1], NULL);
+        } else if(sm->n_ranges && strcmp((*argv)[0], "bragg") == 0) {
                 sample_range *range = &sm->ranges[sm->n_ranges - 1];
-                range->bragg = strtod(argv[1], NULL);
+                range->bragg = strtod((*argv)[1], NULL);
         } else {
-            sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, argv[0]);
+            sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, (*argv)[0]);
             if(!sm->materials[sm->n_ranges]) {
-                jabs_message(MSG_ERROR, stderr, "%s is not a valid material!\n", argv[0]);
-                free(sm->ranges);
-                free(sm->materials);
-                return NULL;
+#ifdef DEBUG
+                fprintf(stderr, "Material from formula \"%s\" was NOT created.\n", (*argv)[0]);
+#endif
+                break;
             }
 #ifdef DEBUG
-            fprintf(stderr, "Material from formula \"%s\" was created\n", argv[0]);
+            fprintf(stderr, "Material from formula \"%s\" was created\n", (*argv)[0]);
 #endif
             sample_range *range = &sm->ranges[sm->n_ranges];
-            range->x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, argv[1]);
+            range->x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1]);
             range->bragg = 1.0;
             range->yield = 1.0;
             range->rough.x = 0.0;
@@ -560,8 +559,8 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const 
             sm->n_ranges++;
             sm->n_materials++;
         }
-        argc -= 2;
-        argv += 2;
+        (*argc) -= 2;
+        (*argv) += 2;
     }
     sm->cbins = calloc(sm->n_ranges * sm->n_ranges, sizeof(double));
     for(size_t i = 0; i < sm->n_ranges; i++) {
@@ -581,10 +580,15 @@ sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const 
 }
 
 sample_model *sample_model_from_string(const jibal *jibal, const char *str) {
-    int argc = 0;
-    char **argv = string_to_argv(str, &argc);
-    sample_model *sm = sample_model_from_argv(jibal, argc, argv);
-    argv_free(argv, argc);
+    int argc_orig = 0;
+    char **argv_orig = string_to_argv(str, &argc_orig);
+    char **argv = argv_orig;
+    int argc = argc_orig;
+    sample_model *sm = sample_model_from_argv(jibal, &argc, (char *const **) &argv);
+#ifdef DEBUG
+    fprintf(stderr, "%i arguments remain after sample conversion\n", argc);
+#endif
+    argv_free(argv_orig, argc_orig);
     return sm;
 }
 

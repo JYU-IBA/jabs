@@ -41,7 +41,7 @@ void greeting(int interactive) {
     }
 }
 
-void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,  int *argc, char ***argv) {
+void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,  int *argc, char * const **argv) {
     static struct option long_options[] = {
             {"help",          no_argument,       NULL, 'h'},
             {"version",       no_argument,       NULL, 'V'},

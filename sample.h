@@ -61,7 +61,7 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges);
 void sample_model_renormalize(sample_model *sm);
 sample_model *sample_model_split_elements(const struct sample_model *sm);
 sample_model *sample_model_from_file(const jibal *jibal, const char *filename);
-sample_model *sample_model_from_argv(const jibal *jibal, int argc, char * const *argv);
+sample_model *sample_model_from_argv(const jibal *jibal, int *argc, char * const **argv);
 sample_model *sample_model_from_string(const jibal *jibal, const char *str);
 sample_model *sample_model_to_point_by_point(const sample_model *sm);
 size_t sample_model_element_count(const sample_model *sm);
