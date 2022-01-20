@@ -61,9 +61,9 @@ double exit_angle_delta(const sim_workspace *ws, const char direction) {
     double det_tilt = C_PI - detector_angle(ws->det, direction);
     double exit = C_PI - det_tilt - sample_tilt;
     double geo = cos(exit)/cos(sample_tilt);
-    double w = aperture_width_shape_product(&ws->sim->beam_aperture, direction);
+    double w = aperture_width_shape_product(ws->sim->beam_aperture, direction);
     double delta_beam = w *  geo / ws->det->distance;
-    double delta_detector = aperture_width_shape_product(&ws->det->aperture, direction) / ws->det->distance;
+    double delta_detector = aperture_width_shape_product(ws->det->aperture, direction) / ws->det->distance;
     double result = sqrt(pow2(delta_beam) + pow2(delta_detector));
 #ifdef DEBUG
     fprintf(stderr, "Direction %c: detector angles %g deg, sample angle %g deg, exit angle %g deg\n", direction, det_tilt/C_DEG, sample_tilt/C_DEG, exit/C_DEG);

@@ -45,13 +45,13 @@ typedef struct detector {
     double theta; /* Polar angle [0, pi] */
     double phi; /* Azimuthal angle [0, 2pi] */
     double solid;
-    aperture aperture;
+    aperture *aperture;
     double distance;
     size_t column;
     size_t channels;
     size_t compress;
+    sample_model *foil_sm;
     sample *foil;
-    char *foil_description;
 } detector;
 
 inline double detector_calibrated(const detector *det, size_t ch) {return det->offset + det->slope * (unsigned int)(ch*det->compress);}
@@ -62,7 +62,9 @@ detector **detectors_from_file(const jibal *jibal, const char *filename, size_t 
 detector *detector_default(detector *det); /* if det is NULL, this returns pointer to a newly allocated det */
 void detector_free(detector *det);
 int detector_print(const char *filename, const detector *det);
-int detector_update_foil(const jibal *jibal, detector *det);
+int detector_aperture_set_from_argv(const jibal *jibal, detector *det, int *argc, char * const **argv);
+int detector_foil_set_from_argv(const jibal *jibal, detector *det, int *argc, char * const **argv);
+int detector_update_foil(detector *det);
 int detector_set_var(const jibal *jibal, detector *det, const char *var_str, const char *val_str);
 jibal_config_var *detector_make_vars(detector *det);
 double detector_angle(const detector *det, char direction);

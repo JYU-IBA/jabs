@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include "win_compat.h"
 
 
@@ -193,4 +194,24 @@ char *strdup_non_null(const char *s) {
         return strdup(s);
     else
         return NULL;
+}
+
+int asprintf_append(char **ret, const char * restrict format, ...) {
+    if(!ret)
+        return -1;
+    va_list argp;
+    char *s;
+    va_start(argp, format);
+    int len = vasprintf(&s, format, argp);
+    va_end(argp);
+    if(len < 0)
+        return len;
+    size_t len_input = *ret ? strlen(*ret) : 0;
+    len += len_input;
+    *ret = realloc(*ret, sizeof(char) * (len + 1));
+    if(ret) {
+        strncat(*ret, s, len);
+    }
+    free(s);
+    return len;
 }

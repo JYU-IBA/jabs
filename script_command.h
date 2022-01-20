@@ -50,7 +50,7 @@ void options_sort(script_command_option *opt);
 int option_compare(const void *a, const void *b);
 size_t options_size(const script_command_option *opt);
 void options_print(FILE *f, const script_command_option *opt);
-int script_getopt(script_session *s, int argc, char * const *argv, const script_command_option *options);
+int script_getopt(script_session *s, const script_command_option *options, int *argc, char *const **argv, script_command_status *status_out);
 
 void script_print_commands(FILE *f, const struct script_command *commands);
 size_t script_commands_size(const script_command *commands);

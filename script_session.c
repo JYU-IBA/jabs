@@ -59,7 +59,7 @@ jibal_config_var *script_make_vars(script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",         &sim->beam_E_broad,                  NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "emin",                 &sim->emin,                          NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "alpha",                &sim->sample_theta,                  NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "sample_azi",           &sim->sample_phi,                    NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "phi",                  &sim->sample_phi,                    NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "channeling",           &sim->channeling_offset,             NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",     &sim->channeling_slope,              NULL},
             {JIBAL_CONFIG_VAR_STRING, "output",               &s->output_filename,                 NULL},

@@ -497,7 +497,6 @@ script_command_option *options_append(script_command_option *opt_to, const scrip
 
 void options_sort(script_command_option *opt) {
     qsort((void *)opt, options_size(opt), sizeof(script_command_option), &option_compare);
-
 }
 
 
@@ -523,14 +522,18 @@ void options_print(FILE *f, const script_command_option *opt) {
     }
 }
 
-int script_getopt(script_session *s, int argc, char * const *argv, const script_command_option *options) {
+int script_getopt(script_session *s, const script_command_option *options, int *argc, char *const **argv, script_command_status *status_out) {
     int found = 0;
-    if(!options)
+    if(!options || !argc || !argv) {
+        *status_out = SCRIPT_COMMAND_FAILURE;
         return -1;
-    if(argc == 0)
+    }
+    if(*argc == 0) { /* Nothing remains */
+        *status_out = SCRIPT_COMMAND_SUCCESS;
         return -1;
-    const char *a = (argv)[0];
-    unsigned long len = strlen(a);
+    }
+    const char *a = (*argv)[0];
+    size_t len = strlen(a);
     const script_command_option *opt_found = NULL;
     for(const script_command_option *o = options; o->name != NULL; o++) {
         if(strncmp(o->name, a, len) == 0) { /* At least partial match */
@@ -541,33 +544,43 @@ int script_getopt(script_session *s, int argc, char * const *argv, const script_
             }
         }
     }
-    if(found > 2) {
-        jabs_message(MSG_ERROR, stderr, "Ambiguous: %s\n", a);
-        return -2;
+    if(found > 1) {
+        jabs_message(MSG_ERROR, stderr, "Ambiguous: %s. Matches:\n", a);
+        for(const script_command_option *o = options; o->name != NULL; o++) {
+            if(strncmp(o->name, a, len) == 0) {
+                jabs_message(MSG_ERROR, stderr, " %s\n", o->name);
+            }
+        }
+        jabs_message(MSG_ERROR, stderr, "\n");
+        return -1;
     }
     if(found == 0) {
         jabs_message(MSG_ERROR, stderr, "No match: %s\n", a);
-        return -2;
+        *status_out = SCRIPT_COMMAND_NOT_FOUND;
+        return -1;
     }
-    if(!opt_found) {
-        jabs_message(MSG_ERROR, stderr, "Impossible has happened in script_getopt()\n");
-        return -2;
-    }
-    argc--;
-    argv++;
+#ifdef DEBUG
+    fprintf(stderr, "Found exactly 1 hit (%s matched with %s). c = %p, var = %p, val = %i\n", opt_found->name, a, (void *)opt_found->c, (void *)opt_found->var, opt_found->val);
+#endif
+    (*argc)--;
+    (*argv)++;
     if(opt_found->c) {
         if(opt_found->c->f) {
-            opt_found->c->f(s, argc, argv);
+            *status_out = opt_found->c->f(s, *argc, *argv);
         } else {
             jabs_message(MSG_WARNING, stderr, "Command found, but no there is no function in it.\n");
+            *status_out = SCRIPT_COMMAND_FAILURE;
         }
     } else if(opt_found->var) {
-        if(argc < 1) {
+        if(*argc < 1) {
             jabs_message(MSG_WARNING, stderr, "Not enough arguments for setting a variable!\n");
+            *status_out = SCRIPT_COMMAND_FAILURE;
+            return -1;
         }
-        jibal_config_var_set(s->cf->units, opt_found->var, (argv)[0], s->cf->filename);
-        argc--;
-        argv++;
+        jibal_config_var_set(s->cf->units, opt_found->var, (*argv)[0], s->cf->filename);
+        *status_out = SCRIPT_COMMAND_SUCCESS;
+        (*argc)--;
+        (*argv)++;
     }
     return opt_found->val;
 }
@@ -768,6 +781,11 @@ script_command_status script_show_sample(script_session *s, int argc, char * con
         jabs_message(MSG_WARNING, stderr, "No sample has been set.\n");
         return SCRIPT_COMMAND_SUCCESS;
     } else {
+#ifdef DEBUG
+        char *sample_str = sample_model_to_string(fit->sm);
+        fprintf(stderr, "Sample: %s\n", sample_str);
+        free(sample_str);
+#endif
         return sample_model_print(NULL, fit->sm);
     }
 }
@@ -849,15 +867,16 @@ script_command_status script_set(script_session *s, int argc, char * const *argv
     opt = options_append(opt, options_from_commands(script_set_commands));
     opt = options_append(opt, options_from_jibal_config(s->cf->vars));
     options_sort(opt); /* TODO: this does not need to be built every time this function is called */
-    options_print(stderr, opt);
+    //options_print(stderr, opt);
 
     if(argc == 0) {
         script_command_not_found(NULL, script_set_commands);
         jabs_message(MSG_INFO, stderr, "\nAlso see 'help set' and 'show variables' for additional variables you can set.\nExample: 'set alpha \"10 deg\"'\n");
     }
-    script_getopt(s, argc, argv, opt);
+    script_command_status status = SCRIPT_COMMAND_SUCCESS;
+    script_getopt(s, opt, &argc, &argv, &status);
     free(opt);
-    return SCRIPT_COMMAND_SUCCESS;
+    return status;
 }
 
 script_command_status script_set_ion(script_session *s, int argc, char * const *argv) {
@@ -877,39 +896,21 @@ script_command_status script_set_ion(script_session *s, int argc, char * const *
 
 script_command_status script_set_aperture(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
-    aperture *a = &fit->sim->beam_aperture;
     if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: set aperture (type) [width|height|diameter (value)] ...\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    while(argc >= 1) {
-        for(const jibal_option *o = aperture_option; o->s; o++) { /* look for a matching aperture_option keyword (circle, rectangle) */
-            if(strcmp(o->s, argv[0]) == 0) {
-                a->type = o->val;
-                argv++;
-                argc--;
-                break;
-            }
-        }
-        if(argc < 2) /* Following things need two arguments */
-            break;
-        if(strcmp(argv[0], "width") == 0) {
-            a->width = jibal_get_val(fit->jibal->units, UNIT_TYPE_DISTANCE, argv[1]);
-        } else if(strcmp(argv[0], "height") == 0) {
-            a->height = jibal_get_val(fit->jibal->units, UNIT_TYPE_DISTANCE, argv[1]);
-        } else if(strcmp(argv[0], "diameter") == 0) {
-            a->diameter = jibal_get_val(fit->jibal->units, UNIT_TYPE_DISTANCE, argv[1]);
-        } else {
-            jabs_message(MSG_ERROR, stderr, "Unrecognized argument (%s)\n", argv[0]);
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        argc -= 2;
-        argv += 2;
+    aperture *a = aperture_from_argv(s->jibal, &argc, &argv);
+    if(!a) {
+        jabs_message(MSG_ERROR, stderr, "Aperture could not be parsed.\n");
+        return SCRIPT_COMMAND_FAILURE;
     }
     if(argc) {
+        free(a);
         jabs_message(MSG_ERROR, stderr, "Unexpected extra arguments (%i), starting with %s\n", argc, argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
+    fit->sim->beam_aperture = a;
     return SCRIPT_COMMAND_SUCCESS;
 }
 
@@ -954,15 +955,44 @@ script_command_status script_set_detector(script_session *s, int argc, char * co
         jabs_message(MSG_ERROR, stderr, "Usage: set detector [number] variable value variable2 value2 ...\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    while(argc >= 2) { /* TODO: replace by argument vector parsing */
-        if(detector_set_var(s->jibal, sim_det(fit->sim, i_det), argv[0], argv[1])) {
-            jabs_message(MSG_ERROR, stderr, "Can't set \"%s\" to be \"%s\"!\n", argv[0], argv[1]);
-            return SCRIPT_COMMAND_FAILURE;
+    script_command_option *opt = NULL;
+    detector *det = sim_det(fit->sim, i_det);
+    jibal_config_var *vars = detector_make_vars(det);
+    opt = options_append(opt, options_from_jibal_config(vars));
+    static const script_command_option extra_opt[] = {
+            {"aperture", 'a', NULL, NULL},
+            {"foil", 'f', NULL, NULL},
+            {NULL,   0,   NULL, NULL}
+    };
+    opt = options_append(opt, extra_opt);
+    options_sort(opt);
+    //options_print(stderr, opt);
+    script_command_status status = SCRIPT_COMMAND_SUCCESS;
+    while(argc >= 2) {
+        int val = script_getopt(s, opt, &argc, &argv, &status);
+        if(val < 0)
+            break;
+        switch(val) {
+            case 'a':
+                detector_aperture_set_from_argv(s->jibal, det, &argc, &argv);
+                break;
+            case 'f':
+                detector_foil_set_from_argv(s->jibal, det, &argc, &argv); /* This will consume as many arguments as are valid */
+                break;
+            default:
+                break;
         }
-        argv += 2;
-        argc -= 2;
+        if(status != SCRIPT_COMMAND_SUCCESS) {
+            break;
+        }
     }
-    return SCRIPT_COMMAND_SUCCESS;
+    free(opt);
+    free(vars);
+    if(SCRIPT_COMMAND_SUCCESS && argc != 0) {
+        jabs_message(MSG_ERROR, stderr, "Extra arguments or parse error.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return status;
 }
 
 script_command_status script_set_sample(script_session *s, int argc, char * const *argv) {

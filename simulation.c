@@ -22,7 +22,7 @@
 simulation *sim_init(jibal *jibal) {
     simulation *sim = malloc(sizeof(simulation));
     sim->beam_isotope = jibal_isotope_find(jibal->isotopes, NULL, 2, 4);
-    sim->beam_aperture = aperture_default();
+    sim->beam_aperture = NULL;
     sim->sample_theta = ALPHA; /* These defaults are for IBM geometry */
     sim->sample_phi = 0.0;
     sim->fluence = FLUENCE;
@@ -49,6 +49,7 @@ void sim_free(simulation *sim) {
     if(!sim)
         return;
     sample_free(sim->sample);
+    aperture_free(sim->beam_aperture);
     if(sim->det) {
         for(size_t i = 0; i < sim->n_det; i++) {
             detector_free(sim->det[i]);
@@ -452,13 +453,15 @@ void simulation_print(FILE *f, const simulation *sim) {
     jabs_message(MSG_INFO, f, "sample tilt (vertical) = %.3lf deg\n", angle_tilt(sim->sample_theta, sim->sample_phi, 'y')/C_DEG);
     rot_vect v = rot_vect_from_angles(C_PI - sim->sample_theta, sim->sample_phi); /* By default our sample faces the beam and tilt angles are based on that choice. Pi is there for a reason. */
     jabs_message(MSG_INFO, f, "surf normal unit vector (beam in z direction) = (%.3lf, %.3lf, %.3lf)\n", v.x, v.y, v.z);
-    jabs_message(MSG_INFO, f, "aperture = %s ", aperture_name(&sim->beam_aperture));
-    if(sim->beam_aperture.type == APERTURE_CIRCLE) {
-        jabs_message(MSG_INFO, f, "diameter %g  mm\n", sim->beam_aperture.diameter/C_MM);
-    } else if(sim->beam_aperture.type == APERTURE_RECTANGLE) {
-        jabs_message(MSG_INFO, f, "width %g mm height %g mm\n", sim->beam_aperture.width/C_MM, sim->beam_aperture.height/C_MM);
-    } else {
-        jabs_message(MSG_INFO, f, "\n");
+    jabs_message(MSG_INFO, f, "aperture = %s ", aperture_name(sim->beam_aperture));
+    if(sim->beam_aperture) {
+        if(sim->beam_aperture->type == APERTURE_CIRCLE) {
+            jabs_message(MSG_INFO, f, "diameter %g mm\n", sim->beam_aperture->diameter/C_MM);
+        } else if(sim->beam_aperture->type == APERTURE_RECTANGLE) {
+            jabs_message(MSG_INFO, f, "width %g mm height %g mm\n", sim->beam_aperture->width/C_MM, sim->beam_aperture->height/C_MM);
+        } else {
+            jabs_message(MSG_INFO, f, "\n");
+        }
     }
     jabs_message(MSG_INFO, f, "n_detectors = %zu\n", sim->n_det);
     for(size_t i = 0; i < sim->n_det; i++) {

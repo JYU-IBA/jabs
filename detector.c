@@ -58,7 +58,7 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
     jibal_config_file_free(cf);
     det->resolution /= C_FWHM;
     det->resolution *= det->resolution;
-    detector_update_foil(jibal, det);
+    detector_update_foil(det);
 #ifdef DEBUG
     fprintf(stderr, "Read detector from \"%s\":\n", filename);
     detector_print(NULL, det);
@@ -124,7 +124,7 @@ detector *detector_default(detector *det) {
     det->theta = DETECTOR_THETA;
     det->phi = DETECTOR_PHI;
     det->solid = DETECTOR_SOLID;
-    det->aperture = aperture_default();
+    det->aperture = NULL;
     det->distance = DETECTOR_DISTANCE;
     det->length = DETECTOR_LENGTH;
     det->resolution = (DETECTOR_RESOLUTION*DETECTOR_RESOLUTION);
@@ -134,14 +134,15 @@ detector *detector_default(detector *det) {
     det->channels = 16384;
     det->compress = 1;
     det->foil = NULL;
-    det->foil_description = NULL;
     return det;
 }
 
 void detector_free(detector *det) {
     if(!det)
         return;
+    sample_model_free(det->foil_sm);
     sample_free(det->foil);
+    aperture_free(det->aperture);
     free(det);
 }
 
@@ -169,12 +170,14 @@ int detector_print(const char *filename, const detector *det) {
     jabs_message(MSG_INFO, f, "angle from vertical = %.3lf deg\n", detector_angle(det, 'y')/C_DEG);
 #endif
     jabs_message(MSG_INFO, f, "solid = %g msr\n", det->solid/C_MSR);
-    jabs_message(MSG_INFO, f, "aperture = %s\n", aperture_name(&det->aperture));
-    if(det->aperture.type == APERTURE_CIRCLE) {
-        jabs_message(MSG_INFO, f, "diameter = %g mm\n", det->aperture.diameter/C_MM);
-    } else if (det->aperture.type == APERTURE_RECTANGLE) {
-        jabs_message(MSG_INFO, f, "width = %g mm\n", det->aperture.width/C_MM);
-        jabs_message(MSG_INFO, f, "height = %g mm\n", det->aperture.height/C_MM);
+    jabs_message(MSG_INFO, f, "aperture = %s\n", aperture_name(det->aperture));
+    if(det->aperture) { /* TODO: aperture_print() or something else */
+        if(det->aperture->type == APERTURE_CIRCLE) {
+            jabs_message(MSG_INFO, f, "diameter = %g mm\n", det->aperture->diameter/C_MM);
+        } else if (det->aperture->type == APERTURE_RECTANGLE) {
+            jabs_message(MSG_INFO, f, "width = %g mm\n", det->aperture->width/C_MM);
+            jabs_message(MSG_INFO, f, "height = %g mm\n", det->aperture->height/C_MM);
+        }
     }
     jabs_message(MSG_INFO, f, "distance = %g mm\n", det->distance/C_MM);
 #if 0
@@ -184,13 +187,39 @@ int detector_print(const char *filename, const detector *det) {
 #endif
     jabs_message(MSG_INFO, f, "column = %zu\n", det->column);
     jabs_message(MSG_INFO, f, "channels = %zu\n", det->channels);
-    if(det->foil_description) {
-        jabs_message(MSG_INFO, f, "foil = %s\n", det->foil_description);
+    if(det->foil) {
+        char *foil_str = sample_model_to_string(det->foil_sm);
+        jabs_message(MSG_INFO, f, "foil = %s\n", foil_str);
+        free(foil_str);
     }
     fclose_file_or_stream(f);
     return EXIT_SUCCESS;
 }
 
+int detector_aperture_set_from_argv(const jibal *jibal, detector *det, int *argc, char * const **argv) {
+    aperture *a = aperture_from_argv(jibal, argc, argv);
+    if(a) {
+        free(det->aperture);
+        det->aperture = a;
+    } else {
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
+int detector_foil_set_from_argv(const jibal *jibal, detector *det, int *argc, char * const **argv) {
+    sample_model *sm = sample_model_from_argv(jibal, argc, argv);
+    if(sm) {
+        free(det->foil_sm);
+        det->foil_sm = sm;
+        detector_update_foil(det);
+    } else {
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
+#if 0
 int detector_update_foil(const jibal *jibal, detector *det) {
     if(!det)
         return EXIT_FAILURE;
@@ -208,6 +237,12 @@ int detector_update_foil(const jibal *jibal, detector *det) {
     }
     return EXIT_SUCCESS;
 }
+#else
+int detector_update_foil(detector *det) {
+    det->foil = sample_from_sample_model(det->foil_sm);
+    return 0;
+}
+#endif
 
 int detector_set_var(const jibal *jibal, detector *det, const char *var_str, const char *val_str) {
     if(!jibal || !det || !var_str || !val_str)
@@ -220,11 +255,7 @@ int detector_set_var(const jibal *jibal, detector *det, const char *var_str, con
     for(jibal_config_var *var = vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
         if(strcmp(var_str, var->name) == 0) {
             jibal_config_var_set(jibal->units, var, val_str, NULL);
-            if(var->variable == &det->foil_description) {
-                if(detector_update_foil(jibal, det)) {
-                    error = TRUE;
-                }
-            } else if(var->variable == &det->resolution) {
+            if(var->variable == &det->resolution) {
                 det->resolution /= C_FWHM;
                 det->resolution *= det->resolution;
             }
@@ -252,15 +283,10 @@ jibal_config_var *detector_make_vars(detector *det) {
             {JIBAL_CONFIG_VAR_UNIT,   "theta",      &det->theta,             NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "phi",        &det->phi,               NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "solid",      &det->solid,             NULL},
-            {JIBAL_CONFIG_VAR_OPTION, "aperture",   &det->aperture.type, aperture_option},
-            {JIBAL_CONFIG_VAR_UNIT,   "width",      &det->aperture.width,    NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "height",     &det->aperture.height,   NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "diameter",   &det->aperture.diameter, NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "distance",   &det->distance,          NULL},
             {JIBAL_CONFIG_VAR_INT,    "column",     &det->column,            NULL},
             {JIBAL_CONFIG_VAR_INT,    "channels",   &det->channels,          NULL},
             {JIBAL_CONFIG_VAR_INT,    "compress",   &det->compress,          NULL},
-            {JIBAL_CONFIG_VAR_STRING, "foil",       &det->foil_description,  NULL},
             {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                              NULL}
     };
     int n_vars;
@@ -304,12 +330,14 @@ double detector_theta_deriv(const detector *det, const char direction) { /* We d
 double detector_solid_angle_calc(const detector *det) {
     if(det->distance < 1.0*C_MM)
         return 0.0;
-    if(det->aperture.type == APERTURE_CIRCLE) {
-        return 2.0*C_PI*(1.0 - 1.0/(sqrt(pow2(det->aperture.diameter/2.0/det->distance)+1.0)));
+    if(!det->aperture)
+        return 0.0;
+    if(det->aperture->type == APERTURE_CIRCLE) {
+        return 2.0*C_PI*(1.0 - 1.0/(sqrt(pow2(det->aperture->diameter/2.0/det->distance)+1.0)));
     }
-    if(det->aperture.type == APERTURE_RECTANGLE) {
-        double alpha = det->aperture.width / det->distance / 2.0;
-        double beta =  det->aperture.height / det->distance / 2.0;
+    if(det->aperture->type == APERTURE_RECTANGLE) {
+        double alpha = det->aperture->width / det->distance / 2.0;
+        double beta =  det->aperture->height / det->distance / 2.0;
         return 4.0 * atan(alpha * beta / sqrt(1 + pow2(alpha) + pow2(beta)));
     }
     return 0.0;

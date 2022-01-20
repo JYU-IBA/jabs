@@ -19,6 +19,7 @@
 #include "sample.h"
 #include "message.h"
 #include "win_compat.h"
+#include "generic.h"
 
 depth depth_seek(const sample *sample, double x) {
     depth depth;
@@ -270,7 +271,7 @@ sample *sample_from_sample_model(const sample_model *sm) {
 
     for(size_t i_range = 0; i_range < s->n_ranges; i_range++) { /* Set defaults for roughness */
         sample_range *r = &s->ranges[i_range];
-        if(r->rough.x < 0.01 * C_TFU) {
+        if(r->rough.x < ROUGH_TOLERANCE) {
             r->rough.model = ROUGHNESS_NONE;
             r->rough.x = 0.0;
         }
@@ -510,7 +511,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
     sm->n_materials = 0;
     sm->materials = NULL;
     sm->ranges = NULL;
-    while (*argc >= 2) {
+    while ((*argc) >= 2) {
         if(sm->n_ranges == n) {
             if(n == 0) {
                 n = 8;
@@ -527,7 +528,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
         }
         if(sm->n_ranges && strcmp((*argv)[0], "rough") == 0) {
             sample_range *range = &sm->ranges[sm->n_ranges - 1];
-            range->rough.x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, *argv[1]);
+            range->rough.x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1]);
             range->rough.model = ROUGHNESS_GAMMA;
         } else if(sm->n_ranges && strcmp((*argv)[0], "n_rough") == 0) {
                 sample_range *range = &sm->ranges[sm->n_ranges - 1];
@@ -542,7 +543,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, (*argv)[0]);
             if(!sm->materials[sm->n_ranges]) {
 #ifdef DEBUG
-                fprintf(stderr, "Material from formula \"%s\" was NOT created.\n", (*argv)[0]);
+                fprintf(stderr, "Material from formula \"%s\" was NOT created. Finishing after %zu ranges and %zu materials.\n", (*argv)[0], sm->n_ranges, sm->n_materials);
 #endif
                 break;
             }
@@ -590,6 +591,39 @@ sample_model *sample_model_from_string(const jibal *jibal, const char *str) {
 #endif
     argv_free(argv_orig, argc_orig);
     return sm;
+}
+
+char *sample_model_to_string(const sample_model *sm) {
+    char *out = NULL;
+    if(sm->type != SAMPLE_MODEL_LAYERED) /* TODO: point-by-point */
+        return NULL;
+    for(size_t i_range= 0; i_range < sm->n_ranges; i_range++) {
+        const sample_range *r = &sm->ranges[i_range];
+        asprintf_append(&out, "%s", i_range?" ":"");
+        for(size_t i_material = 0; i_material < sm->n_materials; i_material++) {
+            double conc = *(sample_model_conc_bin(sm, i_range, i_material));
+            const char *name = sm->materials[i_material]->name;
+            if(conc > (1.0 - CONC_TOLERANCE)) { /* Omit unnecessary "1" */
+                asprintf_append(&out, "%s", name);
+            } else if(conc > CONC_TOLERANCE) { /* Only print if concentration above zero. */
+                asprintf_append(&out, "%s%g", name, conc);
+            }
+        }
+        asprintf_append(&out, " %g%s", r->x/C_TFU, "tfu");
+        if(r->rough.model != ROUGHNESS_NONE && r->x > ROUGH_TOLERANCE) {
+            asprintf_append(&out, " rough %gtfu", r->rough.x/C_TFU, "tfu");
+            if(r->rough.n != 0) {
+                asprintf_append(&out, " n_rough %zu", r->rough.n);
+            }
+        }
+        if(r->bragg != 1.0) {
+            asprintf_append(&out, " bragg %g", r->bragg);
+        }
+        if(r->yield != 1.0) {
+            asprintf_append(&out, " yield %g", r->yield);
+        }
+    }
+    return out;
 }
 
 sample *sample_copy(const sample *s_in) {

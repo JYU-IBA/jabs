@@ -53,7 +53,7 @@ typedef struct {
     double sample_theta; /* Polar angle. Kind of. Zero is sample perpendicular to beam. */
     double sample_phi; /* Typically one uses a zero here, unless doing channeling stuff. Note that this is an azimuthal angle. */
     const jibal_isotope *beam_isotope;
-    aperture beam_aperture;
+    aperture *beam_aperture;
     double beam_E;
     double beam_E_broad; /* Variance */
     double emin;

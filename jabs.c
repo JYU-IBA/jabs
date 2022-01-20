@@ -24,7 +24,7 @@ double stop_sample(const sim_workspace *ws, const ion *incident, const sample *s
         } else {
             c = get_conc(sample, depth, i_isotope);
         }
-        if(c < ABUNDANCE_THRESHOLD)
+        if(c < CONC_TOLERANCE)
             continue;
         if (type == GSTO_STO_TOT) {
             S1 += c * (

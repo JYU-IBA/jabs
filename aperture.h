@@ -14,7 +14,9 @@
 
 #ifndef JABS_APERTURE_H
 #define JABS_APERTURE_H
-#include <jibal_option.h>
+
+#include <jibal.h>
+
 
 typedef enum {
     APERTURE_NONE = 0,
@@ -37,7 +39,9 @@ typedef struct aperture {
 } aperture;
 
 const char *aperture_name(const aperture *a);
-aperture aperture_default();
-double aperture_width_shape_product(const aperture *a, const char direction);
+aperture *aperture_default();
+void aperture_free(aperture *a);
+double aperture_width_shape_product(const aperture *a, char direction);
+aperture *aperture_from_argv(const jibal *jibal, int * const argc, char * const ** const argv);
 
 #endif // JABS_APERTURE_H
