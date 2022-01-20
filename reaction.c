@@ -127,34 +127,34 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     return r;
 }
 
-reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incident, int argc, char * const *argv) {
-    if(argc < 2) {
+reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incident, int *argc, char * const **argv) {
+    if((*argc) < 2) {
         jabs_message(MSG_ERROR, stderr, "Not enough arguments\n");
         return NULL;
     }
-    reaction_type type = reaction_type_from_string(argv[0]);
-    const jibal_isotope *target = jibal_isotope_find(jibal->isotopes, argv[1], 0, 0);
+    reaction_type type = reaction_type_from_string((*argv)[0]);
+    const jibal_isotope *target = jibal_isotope_find(jibal->isotopes, (*argv)[1], 0, 0);
     if(type == REACTION_NONE) {
-        jabs_message(MSG_ERROR, stderr, "This is not a valid reaction type: \"%s\".\n", argv[0]);
+        jabs_message(MSG_ERROR, stderr, "This is not a valid reaction type: \"%s\".\n", (*argv)[0]);
         return NULL;
     }
     if(!target) {
-        jabs_message(MSG_ERROR, stderr, "This is not a valid isotope: \"%s\".\n", argv[1]);
+        jabs_message(MSG_ERROR, stderr, "This is not a valid isotope: \"%s\".\n", (*argv)[1]);
         return NULL;
     }
     reaction *r = reaction_make(incident, target, type, JIBAL_CS_NONE); /* Warning: JIBAL_CS_NONE used here, something sane must be supplied after this somewhere! */
-    argc -= 2;
-    argv += 2;
-    while (argc >= 2) {
-        if(strcmp(argv[0], "max") == 0) {
-            r->E_max = jibal_get_val(jibal->units, 'E', argv[1]);
-        } else if(strcmp(argv[0], "min") == 0) {
-            r->E_min = jibal_get_val(jibal->units, 'E', argv[1]);
-        } else if(strcmp(argv[0], "cs") == 0) {
-            r->cs =  jibal_option_get_value(jibal_cs_types, argv[1]);
+    (*argc) -= 2;
+    (*argv) += 2;
+    while ((*argc) >= 2) {
+        if(strcmp((*argv)[0], "max") == 0) {
+            r->E_max = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, (*argv)[1]);
+        } else if(strcmp((*argv)[0], "min") == 0) {
+            r->E_min = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, (*argv)[1]);
+        } else if(strcmp((*argv)[0], "cs") == 0) {
+            r->cs =  jibal_option_get_value(jibal_cs_types, (*argv)[1]);
         }
-        argc -= 2;
-        argv += 2;
+        (*argc) -= 2;
+        (*argv) += 2;
     }
     return r;
 }

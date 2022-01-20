@@ -55,7 +55,7 @@ typedef struct reaction {
 
 void reactions_print(FILE *f, reaction * const *reactions, size_t n_reactions);
 reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs);
-reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incident, int argc, char * const *argv);
+reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incident, int *argc, char * const **argv);
 const char *reaction_name(const reaction *r);
 reaction_type reaction_type_from_string(const char *s);
 void reaction_free(reaction *r);
