@@ -450,6 +450,128 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
     }
 }
 
+script_command_option *options_from_commands(const script_command *commands) {
+    size_t n = script_commands_size(commands);
+    script_command_option *out = malloc((n+1)*sizeof(script_command_option));
+    for(size_t i = 0; i < n; i++) {
+        out[i].name = commands[i].name;
+        out[i].val = 0;
+        out[i].c = &commands[i];
+        out[i].var = NULL;
+    }
+    out[n].name = NULL;
+    return out;
+}
+
+script_command_option *options_from_jibal_config(jibal_config_var *vars) {
+    if(!vars)
+        return NULL;
+    size_t n = 0;
+    for(const jibal_config_var *var = vars; var->type != 0; var++) {
+        n++;
+    }
+    script_command_option *out = malloc((n+1)*sizeof(script_command_option));
+    for(size_t i = 0; i < n; i++) {
+        out[i].name = vars[i].name;
+        out[i].var = &(vars[i]);
+        out[i].val = 0;
+        out[i].c = NULL;
+    }
+    out[n].name = NULL;
+    return out;
+}
+
+script_command_option *options_append(script_command_option *opt_to, const script_command_option *opt_from) { /* Keeps opt_to mostly intact and appends a shallow copy of opt_from to it */
+    if(!opt_from)
+        return opt_to;
+    size_t n_to = options_size(opt_to);
+    size_t n_from = options_size(opt_from);
+    size_t n = n_to + n_from; /* n real entries */
+    opt_to = realloc(opt_to, (n+1) * sizeof(script_command_option)); /* n + 1 allocated (null terminated) */
+    for(size_t i = n_to; i < n; i++) {
+        opt_to[i] = opt_from[i - n_to];
+    }
+    opt_to[n].name = NULL;
+    return opt_to;
+}
+
+void options_sort(script_command_option *opt) {
+    qsort((void *)opt, options_size(opt), sizeof(script_command_option), &option_compare);
+
+}
+
+
+int option_compare(const void *a, const void *b) {
+    const script_command_option *o_a = (const script_command_option *)a;
+    const script_command_option *o_b = (const script_command_option *)b;
+    return strcmp(o_a->name, o_b->name);
+}
+
+size_t options_size(const script_command_option *opt) {
+    size_t n = 0;
+    if(!opt)
+        return 0;
+    for(const script_command_option *o = opt; o->name != NULL; o++) {
+        n++;
+    }
+    return n;
+}
+
+void options_print(FILE *f, const script_command_option *opt) {
+    for(const script_command_option *o = opt; o->name != NULL; o++) {
+        jabs_message(MSG_INFO, f, "%24s %6i %16p %16p\n", o->name, o->val, o->c, o->var);
+    }
+}
+
+int script_getopt(script_session *s, int argc, char * const *argv, const script_command_option *options) {
+    int found = 0;
+    if(!options)
+        return -1;
+    if(argc == 0)
+        return -1;
+    const char *a = (argv)[0];
+    unsigned long len = strlen(a);
+    const script_command_option *opt_found = NULL;
+    for(const script_command_option *o = options; o->name != NULL; o++) {
+        if(strncmp(o->name, a, len) == 0) { /* At least partial match */
+            found++;
+            opt_found = o;
+            if(strcmp(o->name, a) == 0) { /* Exact match */
+                break;
+            }
+        }
+    }
+    if(found > 2) {
+        jabs_message(MSG_ERROR, stderr, "Ambiguous: %s\n", a);
+        return -2;
+    }
+    if(found == 0) {
+        jabs_message(MSG_ERROR, stderr, "No match: %s\n", a);
+        return -2;
+    }
+    if(!opt_found) {
+        jabs_message(MSG_ERROR, stderr, "Impossible has happened in script_getopt()\n");
+        return -2;
+    }
+    argc--;
+    argv++;
+    if(opt_found->c) {
+        if(opt_found->c->f) {
+            opt_found->c->f(s, argc, argv);
+        } else {
+            jabs_message(MSG_WARNING, stderr, "Command found, but no there is no function in it.\n");
+        }
+    } else if(opt_found->var) {
+        if(argc < 1) {
+            jabs_message(MSG_WARNING, stderr, "Not enough arguments for setting a variable!\n");
+        }
+        jibal_config_var_set(s->cf->units, opt_found->var, (argv)[0], s->cf->filename);
+        argc--;
+        argv++;
+    }
+    return opt_found->val;
+}
+
 void script_print_commands(FILE *f, const struct script_command *commands) {
     if(!commands)
         return;
@@ -458,6 +580,16 @@ void script_print_commands(FILE *f, const struct script_command *commands) {
             continue;
         jabs_message(MSG_INFO, f, " %16s    %s\n", c->name, c->help_text);
     }
+}
+
+size_t script_commands_size(const script_command *commands) {
+    if(!commands)
+        return 0;
+    size_t n = 0;
+    for(const struct script_command *c = commands; c->name != NULL; c++) {
+        n++;
+    }
+    return n;
 }
 
 void script_print_command_tree(FILE *f, const struct script_command *commands) {
@@ -713,11 +845,19 @@ script_command_status script_show_variables(script_session *s, int argc, char *c
     return SCRIPT_COMMAND_SUCCESS;
 }
 script_command_status script_set(script_session *s, int argc, char * const *argv) {
+    script_command_option *opt = NULL;
+    opt = options_append(opt, options_from_commands(script_set_commands));
+    opt = options_append(opt, options_from_jibal_config(s->cf->vars));
+    options_sort(opt); /* TODO: this does not need to be built every time this function is called */
+    options_print(stderr, opt);
+
     if(argc == 0) {
         script_command_not_found(NULL, script_set_commands);
         jabs_message(MSG_INFO, stderr, "\nAlso see 'help set' and 'show variables' for additional variables you can set.\nExample: 'set alpha \"10 deg\"'\n");
     }
-    return script_set_variable(s, argc, argv);
+    script_getopt(s, argc, argv, opt);
+    free(opt);
+    return SCRIPT_COMMAND_SUCCESS;
 }
 
 script_command_status script_set_ion(script_session *s, int argc, char * const *argv) {
@@ -814,7 +954,7 @@ script_command_status script_set_detector(script_session *s, int argc, char * co
         jabs_message(MSG_ERROR, stderr, "Usage: set detector [number] variable value variable2 value2 ...\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    while(argc >= 2) {
+    while(argc >= 2) { /* TODO: replace by argument vector parsing */
         if(detector_set_var(s->jibal, sim_det(fit->sim, i_det), argv[0], argv[1])) {
             jabs_message(MSG_ERROR, stderr, "Can't set \"%s\" to be \"%s\"!\n", argv[0], argv[1]);
             return SCRIPT_COMMAND_FAILURE;
@@ -824,7 +964,6 @@ script_command_status script_set_detector(script_session *s, int argc, char * co
     }
     return SCRIPT_COMMAND_SUCCESS;
 }
-
 
 script_command_status script_set_sample(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
@@ -868,9 +1007,14 @@ script_command_status script_add_reaction(script_session *s, int argc, char * co
         jabs_message(MSG_ERROR, stderr, "Usage: add reaction TYPE isotope\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    reaction *r = reaction_make_from_argv(fit->jibal, fit->sim->beam_isotope, argc, argv);
+    reaction *r = reaction_make_from_argv(fit->jibal, fit->sim->beam_isotope, &argc, &argv);
     if(!r) {
         jabs_message(MSG_ERROR, stderr, "Could not make a reaction based on given description.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(argc != 0) {
+        jabs_message(MSG_ERROR, stderr, "Unexpected extra arguments (%i), starting with %s\n", argc, argv[0]);
+        reaction_free(r);
         return SCRIPT_COMMAND_FAILURE;
     }
     if(r->cs == JIBAL_CS_NONE) {

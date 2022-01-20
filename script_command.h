@@ -36,7 +36,24 @@ struct help_topic {
     const char *help_text;
 };
 
+typedef struct script_command_option { /* Command options are parsed by name, store an int and optionally a pointer to script command (c) or configuration variable (var). */
+    const char *name;
+    int val;
+    const script_command *c;
+    jibal_config_var *var;
+} script_command_option; /* Note that name, c and var are all const pointers. No deep copies are made! */
+
+script_command_option *options_from_commands(const script_command *commands);
+script_command_option *options_from_jibal_config(jibal_config_var *vars);
+script_command_option *options_append(script_command_option *opt_to, const script_command_option *opt_from);
+void options_sort(script_command_option *opt);
+int option_compare(const void *a, const void *b);
+size_t options_size(const script_command_option *opt);
+void options_print(FILE *f, const script_command_option *opt);
+int script_getopt(script_session *s, int argc, char * const *argv, const script_command_option *options);
+
 void script_print_commands(FILE *f, const struct script_command *commands);
+size_t script_commands_size(const script_command *commands);
 void script_print_command_tree(FILE *f, const struct script_command *commands);
 script_command_status script_execute_command(script_session *s, const char *cmd);
 script_command_status script_execute_command_argv(script_session *s, const script_command *commands, int argc, char **argv);
@@ -84,6 +101,7 @@ script_command_status script_set_ion(script_session *s, int argc, char * const *
 script_command_status script_set_detector(script_session *s, int argc, char * const *argv);
 script_command_status script_set_sample(script_session *s, int argc, char * const *argv);
 script_command_status script_set_variable(script_session *s, int argc, char * const *argv);
+
 
 static const struct script_command script_set_commands[] = {
         {"aperture", &script_set_aperture, "Set aperture.",               NULL},
