@@ -43,5 +43,6 @@ aperture *aperture_default();
 void aperture_free(aperture *a);
 double aperture_width_shape_product(const aperture *a, char direction);
 aperture *aperture_from_argv(const jibal *jibal, int * const argc, char * const ** const argv);
-
+aperture *aperture_from_string(const jibal *jibal, const char *str);
+char *aperture_to_string(const aperture *a);
 #endif // JABS_APERTURE_H

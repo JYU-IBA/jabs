@@ -24,8 +24,6 @@
 #include "script_command.h"
 
 int script_prepare_sim_or_fit(script_session *s) {
-    /* TODO: option to disable RBS or ERD */
-    /* TODO: reactions from files? Should "sim_reactions_add" be somewhere else? */
     fit_data *fit = s->fit;
     if(!fit->sm) {
         jabs_message(MSG_ERROR, stderr,"No sample has been defined!\n");
@@ -516,10 +514,35 @@ size_t options_size(const script_command_option *opt) {
     return n;
 }
 
-void options_print(FILE *f, const script_command_option *opt) {
-    for(const script_command_option *o = opt; o->name != NULL; o++) {
+void options_print(FILE *f, const script_command_option *options) {
+    for(const script_command_option *o = options; o->name != NULL; o++) {
         jabs_message(MSG_INFO, f, "%24s %6i %16p %16p\n", o->name, o->val, o->c, o->var);
     }
+}
+
+char *options_list_matches(const script_command_option *options, const char *str) {
+    size_t len = strlen(str);
+    size_t n = 0;
+    int found = 0;
+    for(const script_command_option *o = options; o->name != NULL; o++) {
+        if(strncmp(o->name, str, len) == 0) { /* At least partial match */
+            n += strlen(o->name) + 1;
+            found++;
+        }
+    }
+    n++;
+    char *out = malloc(sizeof(char) * n);
+    out[0] = '\0';
+    for(const script_command_option *o = options; o->name != NULL; o++) {
+        if(strncmp(o->name, str, len) == 0) { /* At least partial match */
+            strcat(out, o->name);
+            found--;
+            if(found) {
+                strcat(out, " ");
+            }
+        }
+    }
+    return out;
 }
 
 int script_getopt(script_session *s, const script_command_option *options, int *argc, char *const **argv, script_command_status *status_out) {
@@ -555,7 +578,7 @@ int script_getopt(script_session *s, const script_command_option *options, int *
         return -1;
     }
     if(found == 0) {
-        jabs_message(MSG_ERROR, stderr, "No match: %s\n", a);
+        jabs_message(MSG_ERROR, stderr, "Could not find an option or command with \"%s\".\n", a);
         *status_out = SCRIPT_COMMAND_NOT_FOUND;
         return -1;
     }
@@ -568,12 +591,12 @@ int script_getopt(script_session *s, const script_command_option *options, int *
         if(opt_found->c->f) {
             *status_out = opt_found->c->f(s, *argc, *argv);
         } else {
-            jabs_message(MSG_WARNING, stderr, "Command found, but no there is no function in it.\n");
+            jabs_message(MSG_WARNING, stderr, "Command %s found, but no there is no function in it.\n", opt_found->c->name);
             *status_out = SCRIPT_COMMAND_FAILURE;
         }
     } else if(opt_found->var) {
         if(*argc < 1) {
-            jabs_message(MSG_WARNING, stderr, "Not enough arguments for setting a variable!\n");
+            jabs_message(MSG_WARNING, stderr, "Not enough arguments for setting a variable (%s)!\n", opt_found->var->name);
             *status_out = SCRIPT_COMMAND_FAILURE;
             return -1;
         }
@@ -656,6 +679,10 @@ script_command_status script_load_sample(script_session *s, int argc, char * con
     }
     sample_model_free(fit->sm);
     fit->sm = sm;
+    if(s->fit->sim->n_reactions > 0) {
+        jabs_message(MSG_WARNING, stderr, "Reactions were reset automatically, since the sample was changed.\n");
+        sim_reactions_free(fit->sim);
+    }
     return 0;
 }
 
@@ -947,51 +974,61 @@ script_command_status script_set_beam(script_session *s, int argc, char * const 
 
 script_command_status script_set_detector(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
+    static const script_command_option extra_opt[] = {
+            {"aperture", 'a', NULL, NULL},
+            {"calibration", 'c', NULL, NULL},
+            {"foil", 'f', NULL, NULL},
+            {NULL,   0,   NULL, NULL}
+    };
     size_t i_det = 0;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    if(argc < 2) {
-        jabs_message(MSG_ERROR, stderr, "Usage: set detector [number] variable value variable2 value2 ...\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     script_command_option *opt = NULL;
     detector *det = sim_det(fit->sim, i_det);
     jibal_config_var *vars = detector_make_vars(det);
     opt = options_append(opt, options_from_jibal_config(vars));
-    static const script_command_option extra_opt[] = {
-            {"aperture", 'a', NULL, NULL},
-            {"foil", 'f', NULL, NULL},
-            {NULL,   0,   NULL, NULL}
-    };
     opt = options_append(opt, extra_opt);
     options_sort(opt);
     //options_print(stderr, opt);
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: set detector [number] variable value variable2 value2 ...\n");
+        char *matches = options_list_matches(opt, "");
+        jabs_message(MSG_ERROR, stderr, "These variables can be set: %s\n", matches);
+        free(matches);
+        free(vars);
+        free(opt);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+
     script_command_status status = SCRIPT_COMMAND_SUCCESS;
-    while(argc >= 2) {
+    while(argc >= 1 && status == SCRIPT_COMMAND_SUCCESS) {
         int val = script_getopt(s, opt, &argc, &argv, &status);
         if(val < 0)
             break;
         switch(val) {
             case 'a':
-                detector_aperture_set_from_argv(s->jibal, det, &argc, &argv);
+                if(detector_aperture_set_from_argv(s->jibal, det, &argc, &argv)) {
+                    status = SCRIPT_COMMAND_FAILURE;
+                }
                 break;
             case 'f':
-                detector_foil_set_from_argv(s->jibal, det, &argc, &argv); /* This will consume as many arguments as are valid */
+                if(detector_foil_set_from_argv(s->jibal, det, &argc, &argv)) {
+                    status = SCRIPT_COMMAND_FAILURE;
+                }
                 break;
             default:
                 break;
         }
-        if(status != SCRIPT_COMMAND_SUCCESS) {
-            break;
-        }
     }
     free(opt);
     free(vars);
-    if(SCRIPT_COMMAND_SUCCESS && argc != 0) {
-        jabs_message(MSG_ERROR, stderr, "Extra arguments or parse error.\n");
+    if(argc != 0) {
+        jabs_message(MSG_ERROR, stderr, "Extra arguments, not enough arguments or generic parse error starting at \"%s\"\n", argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
+    if(status == SCRIPT_COMMAND_NOT_FOUND)
+        status = SCRIPT_COMMAND_FAILURE;
     return status;
 }
 
@@ -1009,6 +1046,10 @@ script_command_status script_set_sample(script_session *s, int argc, char * cons
     }
     sample_model_free(fit->sm);
     fit->sm = sm_new;
+    if(s->fit->sim->n_reactions > 0) {
+        jabs_message(MSG_WARNING, stderr, "Reactions were reset automatically, since the sample was changed.\n");
+        sim_reactions_free(fit->sim);
+    }
     return SCRIPT_COMMAND_SUCCESS;
 }
 

@@ -41,7 +41,8 @@ typedef struct detector {
     double slope;
     double offset;
     double length; /* For ToF */
-    double resolution; /* Stored as variance, i.e. energy squared (in SI-units J^2) */
+    double resolution; /* Stored as FWHM in relevant SI units. Note that can be e.g. energy or time depending on detector type. */
+    double resolution_variance; /* Calculated based on "resolution" before needed by detector_update(). */
     double theta; /* Polar angle [0, pi] */
     double phi; /* Azimuthal angle [0, 2pi] */
     double solid;
@@ -71,4 +72,5 @@ double detector_angle(const detector *det, char direction);
 double detector_theta_deriv(const detector *det, char direction);
 double detector_solid_angle_calc(const detector *det);
 double detector_resolution(const detector *det, const jibal_isotope *isotope, double E);
+void detector_update(detector *det);
 #endif //JABS_DETECTOR_H

@@ -97,3 +97,21 @@ aperture *aperture_from_string(const jibal *jibal, const char *str) {
     argv_free(argv_orig, argc_orig);
     return a;
 }
+
+char *aperture_to_string(const aperture *a) {
+    char *out = NULL;
+    asprintf_append(&out, "%s", aperture_name(a));
+    if(!a)
+        return out;
+    switch(a->type) {
+        case APERTURE_NONE:
+            break;
+        case APERTURE_CIRCLE:
+            asprintf_append(&out, " diameter %gmm", a->diameter/C_MM);
+            break;
+        case APERTURE_RECTANGLE:
+            asprintf_append(&out, " width %gmm height %gmm", a->width/C_MM, a->height/C_MM);
+            break;
+    }
+    return out;
+}

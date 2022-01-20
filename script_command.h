@@ -49,8 +49,9 @@ script_command_option *options_append(script_command_option *opt_to, const scrip
 void options_sort(script_command_option *opt);
 int option_compare(const void *a, const void *b);
 size_t options_size(const script_command_option *opt);
-void options_print(FILE *f, const script_command_option *opt);
-int script_getopt(script_session *s, const script_command_option *options, int *argc, char *const **argv, script_command_status *status_out);
+void options_print(FILE *f, const script_command_option *options);
+char *options_list_matches(const script_command_option *options, const char *str);
+int script_getopt(script_session *s, const script_command_option *options, int *argc, char *const **argv, script_command_status *status_out); /* Parses argument vector, finds script_command_option "c" and calls "c->f()" or sets c->var. */
 
 void script_print_commands(FILE *f, const struct script_command *commands);
 size_t script_commands_size(const script_command *commands);

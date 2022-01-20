@@ -286,20 +286,24 @@ size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_d
 int fit_data_workspaces_init(struct fit_data *fit_data) {
     int status = EXIT_SUCCESS;
     fit_data_workspaces_free(fit_data);
-    fit_data->ws = calloc(fit_data->sim->n_det, sizeof(sim_workspace *));
+    size_t n = fit_data->sim->n_det;
+    fit_data->ws = calloc(n, sizeof(sim_workspace *));
     if(!fit_data->ws)
         return EXIT_FAILURE;
-    for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
-        if(detector_sanity_check(fit_data->sim->det[i_det])) {
-            jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!\n", i_det);
+    for(size_t i = 0; i < n; i++) {
+        detector *det = sim_det(fit_data->sim, i);
+        if(detector_sanity_check(det)) {
+            jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!\n", i);
             status = EXIT_FAILURE;
             break;
         }
-        fit_data->ws[i_det] = sim_workspace_init(fit_data->jibal, fit_data->sim, fit_data->sim->det[i_det]);
-        if(!fit_data->ws[i_det]) {
-            jabs_message(MSG_ERROR, stderr, "Workspace %zu failed to initialize!\n", i_det);
+        detector_update(det);
+        sim_workspace *ws = sim_workspace_init(fit_data->jibal, fit_data->sim, det);
+        if(!ws) {
+            jabs_message(MSG_ERROR, stderr, "Workspace %zu failed to initialize!\n", i);
             status = EXIT_FAILURE;
         }
+        fit_data->ws[i] = ws;
     }
     if(status == EXIT_FAILURE) {
         fit_data_workspaces_free(fit_data);

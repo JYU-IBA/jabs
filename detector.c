@@ -45,7 +45,6 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
     detector *det = detector_default(NULL);
     if(!det)
         return NULL;
-    det->resolution = C_FWHM * sqrt(det->resolution); /* Convert resolution to FWHM from variance for the duration of input parsing */
     jibal_config_file *cf = jibal_config_file_init(jibal->units);
     jibal_config_var *vars = detector_make_vars(det); /* Will be freed when config is free'd */
     jibal_config_file_set_vars(cf, vars);
@@ -56,9 +55,7 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
         return NULL;
     }
     jibal_config_file_free(cf);
-    det->resolution /= C_FWHM;
-    det->resolution *= det->resolution;
-    detector_update_foil(det);
+    detector_update_foil(det); /* TODO: foil and aperture are not read! */
 #ifdef DEBUG
     fprintf(stderr, "Read detector from \"%s\":\n", filename);
     detector_print(NULL, det);
@@ -127,7 +124,8 @@ detector *detector_default(detector *det) {
     det->aperture = NULL;
     det->distance = DETECTOR_DISTANCE;
     det->length = DETECTOR_LENGTH;
-    det->resolution = (DETECTOR_RESOLUTION*DETECTOR_RESOLUTION);
+    det->resolution = DETECTOR_RESOLUTION;
+    det->resolution_variance = 0.0; /* Calculated before needed. */
     det->slope = ENERGY_SLOPE;
     det->offset = 0.0*C_KEV;
     det->column = 1; /* This implies default file format has channel numbers. Values are in the second column (number 1). */
@@ -156,12 +154,12 @@ int detector_print(const char *filename, const detector *det) {
     jabs_message(MSG_INFO, f, "slope = %g keV\n", det->slope/C_KEV);
     jabs_message(MSG_INFO, f, "offset = %g keV\n", det->offset/C_KEV);
     if(det->type == DETECTOR_ENERGY) {
-        jabs_message(MSG_INFO, f, "resolution = %g keV\n", C_FWHM * sqrt(det->resolution)/C_KEV);
+        jabs_message(MSG_INFO, f, "resolution = %g keV\n", det->resolution/C_KEV);
     } else if(det->type == DETECTOR_TOF) {
         jabs_message(MSG_INFO, f, "length = %g mm\n", det->length/C_MM);
-        jabs_message(MSG_INFO, f, "resolution = %g ps\n", C_FWHM * sqrt(det->resolution)/C_PS);
+        jabs_message(MSG_INFO, f, "resolution = %g ps\n", det->resolution/C_PS);
     } else if(det->type == DETECTOR_ELECTROSTATIC) {
-        jabs_message(MSG_INFO, f, "resolution = %g\n", C_FWHM * sqrt(det->resolution));
+        jabs_message(MSG_INFO, f, "resolution = %g\n", det->resolution);
     }
     jabs_message(MSG_INFO, f, "theta = %g deg\n", det->theta/C_DEG);
     jabs_message(MSG_INFO, f, "phi = %g deg\n", det->phi/C_DEG);
@@ -170,14 +168,10 @@ int detector_print(const char *filename, const detector *det) {
     jabs_message(MSG_INFO, f, "angle from vertical = %.3lf deg\n", detector_angle(det, 'y')/C_DEG);
 #endif
     jabs_message(MSG_INFO, f, "solid = %g msr\n", det->solid/C_MSR);
-    jabs_message(MSG_INFO, f, "aperture = %s\n", aperture_name(det->aperture));
-    if(det->aperture) { /* TODO: aperture_print() or something else */
-        if(det->aperture->type == APERTURE_CIRCLE) {
-            jabs_message(MSG_INFO, f, "diameter = %g mm\n", det->aperture->diameter/C_MM);
-        } else if (det->aperture->type == APERTURE_RECTANGLE) {
-            jabs_message(MSG_INFO, f, "width = %g mm\n", det->aperture->width/C_MM);
-            jabs_message(MSG_INFO, f, "height = %g mm\n", det->aperture->height/C_MM);
-        }
+    if(det->aperture) {
+        char *s = aperture_to_string(det->aperture);
+        jabs_message(MSG_INFO, f, "aperture = %s\n", s);
+        free(s);
     }
     jabs_message(MSG_INFO, f, "distance = %g mm\n", det->distance/C_MM);
 #if 0
@@ -189,8 +183,10 @@ int detector_print(const char *filename, const detector *det) {
     jabs_message(MSG_INFO, f, "channels = %zu\n", det->channels);
     if(det->foil) {
         char *foil_str = sample_model_to_string(det->foil_sm);
-        jabs_message(MSG_INFO, f, "foil = %s\n", foil_str);
-        free(foil_str);
+        if(foil_str) {
+            jabs_message(MSG_INFO, f, "foil = %s\n", foil_str);
+            free(foil_str);
+        }
     }
     fclose_file_or_stream(f);
     return EXIT_SUCCESS;
@@ -219,30 +215,10 @@ int detector_foil_set_from_argv(const jibal *jibal, detector *det, int *argc, ch
     return EXIT_SUCCESS;
 }
 
-#if 0
-int detector_update_foil(const jibal *jibal, detector *det) {
-    if(!det)
-        return EXIT_FAILURE;
-    sample_free(det->foil);
-    det->foil = NULL;
-    if(!det->foil_description)
-        return EXIT_SUCCESS; /* Successfully cleared foil */
-    sample_model *sm = sample_model_from_string(jibal, det->foil_description);
-    det->foil = sample_from_sample_model(sm);
-    sample_model_free(sm);
-    if(!det->foil) {
-        jabs_message(MSG_ERROR, stderr, "Error: detector foil description %s was not parsed successfully!\n", det->foil_description);
-        free(det->foil_description);
-        det->foil_description = NULL;
-    }
-    return EXIT_SUCCESS;
-}
-#else
 int detector_update_foil(detector *det) {
     det->foil = sample_from_sample_model(det->foil_sm);
     return 0;
 }
-#endif
 
 int detector_set_var(const jibal *jibal, detector *det, const char *var_str, const char *val_str) {
     if(!jibal || !det || !var_str || !val_str)
@@ -255,10 +231,6 @@ int detector_set_var(const jibal *jibal, detector *det, const char *var_str, con
     for(jibal_config_var *var = vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
         if(strcmp(var_str, var->name) == 0) {
             jibal_config_var_set(jibal->units, var, val_str, NULL);
-            if(var->variable == &det->resolution) {
-                det->resolution /= C_FWHM;
-                det->resolution *= det->resolution;
-            }
             found = TRUE;
             break;
         }
@@ -348,11 +320,16 @@ double detector_resolution(const detector *det, const jibal_isotope *isotope, do
         case DETECTOR_NONE:
             return 0.0;
         case DETECTOR_ENERGY:
-            return det->resolution;
+            return det->resolution_variance;
         case DETECTOR_TOF:
-            return det->resolution * pow3(2*E)/(pow2(det->length)*isotope->mass);
+            return det->resolution_variance * pow3(2*E)/(pow2(det->length)*isotope->mass);
         case DETECTOR_ELECTROSTATIC:
-            return det->resolution * pow2(E);
+            return det->resolution_variance * pow2(E);
     }
     return 0.0; /* Never reached */
+}
+
+void detector_update(detector *det) {
+    det->resolution_variance = pow2(det->resolution/C_FWHM);
+    fprintf(stderr, "Updated detector, resolution = %g keV FWHM, variance = %g\n", det->resolution/C_KEV, det->resolution_variance);
 }

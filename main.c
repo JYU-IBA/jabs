@@ -105,7 +105,7 @@ int main(int argc, char * const *argv) {
         if(script_files) {
             for(int i = 0; i < argc; i++) {
                 status = script_process(session, argv[i]);
-                if(status) {
+                if(status != SCRIPT_COMMAND_EOF) {
                     return status;
                 }
             }
