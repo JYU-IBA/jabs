@@ -72,6 +72,17 @@ aperture *aperture_from_argv(const jibal *jibal, int * const argc, char * const 
         return NULL;
     }
 
+#if 0
+    jibal_config_var vars[] = {
+            {JIBAL_CONFIG_VAR_UNIT, "width",    &a->width,    NULL},
+            {JIBAL_CONFIG_VAR_UNIT, "height",   &a->height,   NULL},
+            {JIBAL_CONFIG_VAR_UNIT, "diameter", &a->diameter, NULL},
+            {JIBAL_CONFIG_VAR_NONE, NULL, NULL,               NULL}
+    };
+#endif
+
+
+
     while((*argc) >= 2) {
         if(strcmp((*argv)[0], "width") == 0) {
             a->width = jibal_get_val(jibal->units, UNIT_TYPE_DISTANCE, (*argv)[1]);

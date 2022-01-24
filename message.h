@@ -11,8 +11,8 @@
     See LICENSE.txt for the full license.
 
  */
-#ifndef _JABS_MESSAGE_H_
-#define _JABS_MESSAGE_H_
+#ifndef JABS_MESSAGE_H
+#define JABS_MESSAGE_H
 
 #include <stdio.h>
 

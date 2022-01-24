@@ -331,5 +331,7 @@ double detector_resolution(const detector *det, const jibal_isotope *isotope, do
 
 void detector_update(detector *det) {
     det->resolution_variance = pow2(det->resolution/C_FWHM);
+#ifdef DEBUG
     fprintf(stderr, "Updated detector, resolution = %g keV FWHM, variance = %g\n", det->resolution/C_KEV, det->resolution_variance);
+#endif
 }
