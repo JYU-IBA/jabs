@@ -37,14 +37,14 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
     s->output_filename = NULL;
     s->file_depth = 0;
     s->files[0] = NULL;
-    s->commands = script_commands;
+    s->commands = script_commands_create(s);
     return s;
 }
 
 int script_session_reset_vars(script_session *s) {
     free(s->cf->vars);
     s->cf->vars = NULL;
-    return jibal_config_file_set_vars(s->cf, script_make_vars(s)); /* Loading and resetting things can reset some pointers (like fit->det, so we need to update those to the vars */
+    return jibal_config_file_set_vars(s->cf, script_make_vars(s));
 }
 
 jibal_config_var *script_make_vars(script_session *s) {
