@@ -30,7 +30,7 @@ typedef struct script_session {
     clock_t start, end;
     script_file *files[SCRIPT_NESTED_MAX];
     size_t file_depth;
-    struct script_command *commands; /* TODO: populate */
+    const struct script_command *commands; /* TODO: populate */
 } script_session;
 
 script_session *script_session_init(jibal *jibal, simulation *sim); /* sim can be NULL or a previously initialized sim can be given. Note that it will be free'd by script_session_free()! */

@@ -37,6 +37,7 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
     s->output_filename = NULL;
     s->file_depth = 0;
     s->files[0] = NULL;
+    s->commands = script_commands;
     return s;
 }
 

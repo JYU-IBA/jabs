@@ -385,7 +385,7 @@ script_command_status script_execute_command(script_session *s, const char *cmd)
         return SCRIPT_COMMAND_FAILURE;
     }
     if(argc) {
-        status = script_execute_command_argv(s, script_commands, argc, argv); /* Note that s->file_depth may be altered (e.g. by script_load_script() */
+        status = script_execute_command_argv(s, s->commands, argc, argv); /* Note that s->file_depth may be altered (e.g. by script_load_script() */
     } else {
         status = SCRIPT_COMMAND_SUCCESS; /* Doing nothing successfully */
     }
@@ -1188,9 +1188,9 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
                 }
                 jabs_message(MSG_INFO, stderr, "\n");
             } else if(strcmp(t->name, "commands") == 0) {
-                script_print_commands(stderr, script_commands);
+                script_print_commands(stderr, s->commands);
             } else if(strcmp(t->name, "command_tree") == 0) {
-                script_print_command_tree(stderr, script_commands);
+                script_print_command_tree(stderr, s->commands);
             } else if(strcmp(t->name, "version") == 0) {
                 jabs_message(MSG_INFO, stderr, "%s\n", jabs_version());
             } else if(strcmp(t->name, "set") == 0) {
@@ -1228,7 +1228,7 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
         }
     }
 
-    for(const struct script_command *c = script_commands; c->name != NULL; c++) {
+    for(const struct script_command *c = s->commands; c->name != NULL; c++) {
         if(strcmp(c->name, argv[0]) == 0) {
             if(!found) { /* There wasn't a help topic  */
                 jabs_message(MSG_INFO, stderr, "\"%s\" is a valid command, but no additional help is available!\n\n", c->name);
