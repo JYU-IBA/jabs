@@ -119,6 +119,7 @@ void script_session_free(script_session *s) {
     sim_free(s->fit->sim);
     sample_model_free(s->fit->sm);
     fit_data_free(s->fit);
+    script_commands_free(s->commands);
     free(s);
 }
 

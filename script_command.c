@@ -333,7 +333,7 @@ script_command_status script_exit(script_session *s, int argc, char * const *arg
 const script_command *script_command_find(const script_command *commands, const char *cmd_string) {
     int found = 0;
     const script_command *c_found = NULL;
-    for(const struct script_command *c = commands; c->name != NULL; c++) {
+    for(const script_command *c = commands; c; c = c->next) {
         if(strncmp(c->name, cmd_string, strlen(cmd_string)) == 0) {
             found++;
             c_found = c;
@@ -351,7 +351,7 @@ const script_command *script_command_find(const script_command *commands, const 
     }
     if(found > 1) {
         jabs_message(MSG_ERROR, stderr, "\"%s\" is ambiguous (%i matches):", cmd_string, found);
-        for(const struct script_command *c = commands; c->name != NULL; c++) {
+        for(const script_command *c = commands; c; c = c->next) {
             if(strncmp(c->name, cmd_string, strlen(cmd_string)) == 0) {
                 jabs_message(MSG_ERROR, stderr, " %s", c->name);
             }
@@ -360,6 +360,15 @@ const script_command *script_command_find(const script_command *commands, const 
         return NULL;
     }
     return NULL;
+}
+
+script_command_status script_set_var(struct script_session *s, jibal_config_var *var, int argc,  char * const *argv) {
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Not enough arguments to set variable.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    jibal_config_var_set(s->jibal->units, var, argv[0], NULL);
+    return SCRIPT_COMMAND_SUCCESS;
 }
 
 script_command_status script_set_boolean(script_session *s, const char *variable, int value) {
@@ -411,25 +420,35 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
 #endif
                 if(c->f) {
 #ifdef DEBUG
-                    fprintf(stderr, "There is a function %p in command %s. Calling it with %i arguments.\n", (void *) c->f, c->name, argc);
+                    fprintf(stderr, "There is a function %p in command %s. Calling it with %i arguments.\n", (void *) c->f, c->name, argc - 1);
 #endif
                     script_command_status status = c->f(s, argc - 1, argv + 1);
                     if(status != SCRIPT_COMMAND_NOT_FOUND) {
                         return status;
                     }
+                } else if(c->var) {
+                    if(!c_parent) {
+                        jabs_message(MSG_ERROR, stderr, "Command/option \"%s\" is a variable, but there is no parent command. This is highly unusual.\n", c->name);
+                        return SCRIPT_COMMAND_FAILURE;
+                    }
+                    if(!c_parent->f_var) {
+                        jabs_message(MSG_ERROR, stderr, "Command/option \"%s\" is a variable, but there is no function to handle variables in parent command (\"%s\"). This is highly unusual.\n", c->name, c_parent->name);
+                        return SCRIPT_COMMAND_FAILURE;
+                    }
+                    c_parent->f_var(s, c->var, argc - 1, argv + 1);
                 }
-                if(!c->subcommands) {
-#ifdef DEBUG
-                    fprintf(stderr, "Debug: there are no subcommands.\n");
-#endif
-                    script_command_not_found(argv[1], NULL);
-                    return SCRIPT_COMMAND_NOT_FOUND;
-                } else {
+                if(c->subcommands) {
                     cmds = c->subcommands;
                     argc--;
                     argv++;
                     c_parent = c;
                     continue;
+                }  else {
+#ifdef DEBUG
+                    fprintf(stderr, "Debug: there are no subcommands or a function / variable in \"%s\". There is a val: %i\n", c->name, c->val);
+#endif
+                    script_command_not_found(argv[1], NULL);
+                    return SCRIPT_COMMAND_NOT_FOUND;
                 }
             } else {
 #ifdef DEBUG
@@ -458,7 +477,7 @@ char *script_commands_list_matches(const script_command *commands, const char *s
     size_t len = strlen(str);
     size_t n = 0;
     int found = 0;
-    for(const script_command *c = commands; c->name != NULL; c++) {
+    for(const script_command *c = commands; c; c = c->next) {
         if(strncmp(c->name, str, len) == 0) { /* At least partial match */
             n += strlen(c->name) + 1;
             found++;
@@ -467,7 +486,7 @@ char *script_commands_list_matches(const script_command *commands, const char *s
     n++;
     char *out = malloc(sizeof(char) * n);
     out[0] = '\0';
-    for(const script_command *c = commands; c->name != NULL; c++) {
+    for(const script_command *c = commands; c; c = c->next) {
         if(strncmp(c->name, str, len) == 0) { /* At least partial match */
             strcat(out, c->name);
             found--;
@@ -492,7 +511,7 @@ int script_getopt(script_session *s, const script_command *commands, int *argc, 
     const char *a = (*argv)[0];
     size_t len = strlen(a);
     const script_command *c_found = NULL;
-    for(const script_command *c = commands; c->name != NULL; c++) {
+    for(const script_command *c = commands; c; c = c->next) {
         if(strncmp(c->name, a, len) == 0) { /* At least partial match */
             found++;
             c_found = c;
@@ -503,7 +522,7 @@ int script_getopt(script_session *s, const script_command *commands, int *argc, 
     }
     if(found > 1) {
         jabs_message(MSG_ERROR, stderr, "Ambiguous: %s. Matches:\n", a);
-        for(const script_command *c = commands; c->name != NULL; c++) {
+        for(const script_command *c = commands; c; c = c->next) {
             if(strncmp(c->name, a, len) == 0) {
                 jabs_message(MSG_ERROR, stderr, " %s\n", c->name);
             }
@@ -537,29 +556,212 @@ int script_getopt(script_session *s, const script_command *commands, int *argc, 
     return c_found->val;
 }
 
-struct script_command *script_commands_create(struct script_session *s) {
-    (void) s;
-    script_command *cmds = NULL;
-    static const struct script_command script_set_commands[] = {
-            {"aperture", &script_set_aperture, "Set aperture.",               NULL, NULL, 0},
-            {"beam",     &script_set_beam,     "Set beam properties.",        NULL, NULL, 0},
-            {"detector", &script_set_detector, "Set detector properties.",    NULL, NULL, 0},
-            {"ion",      &script_set_ion,      "Set incident ion (isotope).", NULL, NULL, 0},
-            {"sample",   &script_set_sample,   "Set sample.",                 NULL, NULL, 0},
-            {"variable", &script_set_variable, "Set a variable",              NULL, NULL, 0},
-            {NULL, NULL, NULL,                                                NULL, NULL, 0}
+script_command *script_command_new(const char *name, const char *help_text, int val, script_command_status (*f)(struct script_session *, int, char * const *)) {
+    if(!name)
+        return NULL;
+    script_command *c = malloc(sizeof(script_command));
+    if(!c)
+        return NULL;
+    c->name = strdup_non_null(name);
+    c->help_text = strdup_non_null(help_text);
+    c->f = f;
+    c->f_var = NULL;
+    c->var = NULL;
+    c->val = val;
+    c->subcommands = NULL;
+    c->next = NULL;
+    return c;
+}
+int script_command_set_function(script_command *c, script_command_status (*f)(struct script_session *, int, char * const *)) {
+    if(!c)
+        return EXIT_FAILURE;
+    c->f = f;
+    if(c->var) {
+        free(c->var);
+        c->var = NULL;
+    }
+    return EXIT_SUCCESS;
+}
+
+int script_command_set_var(script_command *c, jibal_config_var_type type, const void *variable, const jibal_option *option_list) {
+    if(!c->var) {
+        c->var = malloc(sizeof(jibal_config_var));
+    }
+    c->var->variable = variable;
+    c->var->type = type;
+    c->var->name = c->name; /* The pointer is shared, so "var" doesn't get its own */
+    c->var->option_list = option_list;
+    c->f = NULL; /* These guys can't coexist */
+    return EXIT_SUCCESS;
+}
+
+void script_command_free(script_command *c) {
+    if(!c)
+        return;
+#ifdef DEBUG
+    fprintf(stderr, "Freeing command \"%s\" (%p)\n", c->name, (void *)c);
+#endif
+    free(c->var);
+    free(c->help_text);
+    free(c->name);
+    free(c);
+}
+
+void script_commands_free(script_command *head) {
+    if(!head)
+        return;
+    struct script_command *stack[COMMAND_DEPTH];
+    struct script_command *c, *c_old = NULL;
+    stack[0] = head;
+    size_t i = 0;
+    c = stack[0];
+    while(c) {
+        if(c->subcommands && i < COMMAND_DEPTH) { /* Go deeper, push existing pointer to stack */
+            stack[i] = c;
+            i++;
+            c = c->subcommands;
+            continue;
+        } else {
+            c_old = c;
+            c = c->next; /* Go to next on the same level */
+            script_command_free(c_old);
+        }
+        while(!c) {
+            if(i == 0)
+                break;
+            i--;
+            c = stack[i]->next;
+            script_command_free(stack[i]);
+        }
+    }
+}
+script_command *script_command_list_find_tail(script_command *head) {
+    if(!head)
+        return NULL;
+    script_command *c = head;
+    while(c->next != NULL) {
+        c = c->next;
+    }
+    return c;
+}
+
+void script_command_list_add_command(script_command **head, script_command *c_new) {
+    if(!c_new)
+        return;
+    if(*head == NULL) {
+        *head = c_new;
+        return;
+    }
+    script_command *tail = script_command_list_find_tail(*head);
+    if(tail) {
+        tail->next = c_new;
+    }
+}
+
+script_command *script_command_list_from_command_array(const script_command *commands) {
+    if(!commands)
+        return NULL;
+    script_command *head = NULL;
+    script_command *tail = NULL;
+    for(const script_command *c = commands; c->name != NULL; c++) {
+        script_command *c_new = script_command_new(c->name, c->help_text, c->val, c->f);
+        if(c->var) {
+            script_command_set_var(c_new, c->var->type, c->var->variable, c->var->option_list);
+        }
+        if(!head) {
+            head = c_new;
+            tail = c_new;
+            continue;
+        }
+        tail->next = c_new;
+        tail = c_new;
+    }
+    return head;
+}
+
+script_command *script_command_list_from_vars_array(const jibal_config_var *vars, jibal_config_var_type type) {
+    script_command *head = NULL;
+    for(const jibal_config_var *var = vars; var->type != 0; var++) {
+        if(type != 0 && var->type != type) { /* Restrict by type */
+            continue;
+        }
+        script_command *c = script_command_new(var->name, jibal_config_var_type_name(var->type), 0, NULL);
+        script_command_set_var(c, var->type, var->variable, var->option_list);
+        script_command_list_add_command(&head, c);
+    }
+    return head;
+}
+
+
+script_command *script_commands_create(struct script_session *s) {
+    fit_data *fit = s->fit;
+    simulation *sim = fit->sim;
+    script_command *head = NULL;
+
+
+    script_command *c = script_command_new("help", "Help.", 0, &script_help);
+    script_command_list_add_command(&head, c);
+
+    script_command *c_set = script_command_new("set", "Set something.", 0, NULL);
+    c_set->f_var = &script_set_var;
+    script_command_list_add_command(&head, c_set);
+    script_command_list_add_command(&c_set->subcommands, script_command_new("aperture", "Set aperture.", 0, &script_set_aperture));
+    script_command_list_add_command(&c_set->subcommands, script_command_new("beam", "Set beam properties.", 0, &script_set_beam));
+#if 0
+    script_command_list_add_command(&c_set->subcommands, script_command_new("detector", "Set detector properties.", 0, &script_set_detector));
+#endif
+    script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
+    script_command_list_add_command(&c_set->subcommands, script_command_new("sample", "Set sample.", 0, &script_set_sample));
+    script_command_list_add_command(&c_set->subcommands, script_command_new("variable", "Set a variable.", 0, &script_set_variable)); /* TODO: unnecessary / incomplete, remove */
+
+    const jibal_config_var vars[] = {
+            {JIBAL_CONFIG_VAR_UNIT,   "fluence",              &sim->fluence,                       NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "energy",               &sim->beam_E,                        NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",         &sim->beam_E_broad,                  NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "emin",                 &sim->emin,                          NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "alpha",                &sim->sample_theta,                  NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "phi",                  &sim->sample_phi,                    NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "channeling",           &sim->channeling_offset,             NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",     &sim->channeling_slope,              NULL},
+            {JIBAL_CONFIG_VAR_STRING, "output",               &s->output_filename,                 NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "erd",                  &sim->erd,                           NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "rbs",                  &sim->rbs,                           NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "fit_maxiter",          &fit->n_iters_max,                   NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "fit_xtol",             &fit->xtol,                          NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "fit_gtol",             &fit->gtol,                          NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "fit_ftol",             &fit->ftol,                          NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "ds",                   &sim->params.ds,                     NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "rk4",                  &sim->params.rk4,                    NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_incident",   &sim->params.stop_step_incident,     NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_exiting",    &sim->params.stop_step_exiting,      NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "stop_step_fudge",      &sim->params.stop_step_fudge_factor, NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "nucl_stop_accurate",   &sim->params.nucl_stop_accurate,     NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy", &sim->params.mean_conc_and_energy,   NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "geostragg",            &sim->params.geostragg,              NULL},
+            {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                                                      NULL}
     };
+    c = script_command_list_from_vars_array(vars, 0);
+    script_command_list_add_command(&c_set->subcommands, c);
 
-    static const struct script_command script_load_commands[] = {
-            {"detector",     &script_load_detector,     "Load (replace) a detector.",     NULL, NULL, 0},
-            {"experimental", &script_load_experimental, "Load an experimental spectrum.", NULL, NULL, 0},
-            {"script",       &script_load_script,       "Load (run) a script.",           NULL, NULL, 0},
-            {"sample",       &script_load_sample,       "Load a sample.",                 NULL, NULL, 0},
-            {"reaction",     &script_load_reaction,     "Load a reaction from R33 file.", NULL, NULL, 0},
-            {NULL, NULL, NULL,                                                            NULL, NULL, 0}
-    };
+    script_command *c_load = script_command_new("load", "Load something.", 0, NULL);
+    script_command_list_add_command(&head, c_load);
+    script_command_list_add_command(&c_load->subcommands, script_command_new("detector", "Load (replace) a detector.", 0, &script_load_detector));
+    script_command_list_add_command(&c_load->subcommands, script_command_new("experimental", "Load an experimental spectrum.", 0, &script_load_experimental));
+    script_command_list_add_command(&c_load->subcommands, script_command_new("script", "Load (run) a script.", 0, &script_load_script));
+    script_command_list_add_command(&c_load->subcommands, script_command_new("sample", "Load a sample.", 0, &script_load_sample));
+    script_command_list_add_command(&c_load->subcommands, script_command_new("reaction",  "Load a reaction from R33 file.", 0, &script_load_reaction));
 
+    script_command *c_show = script_command_new("show", "Show information on things.", 0, NULL);
+    script_command_list_add_command(&head, c_show);
+    script_command_list_add_command(&c_show->subcommands, script_command_new("detector", "Show detector.", 0, &script_show_detector));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("fit" ,"Show fit." , 0, &script_show_fit));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("reactions","Show reactions." , 0, &script_show_reactions));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("sample", "Show sample.", 0, &script_show_sample));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("simulation", "Show simulation.", 0, &script_show_simulation));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("variables" , "Show variables.", 0, &script_show_variables));
 
+    script_command_list_add_command(&head, script_command_new("exit", "Exit.", 0, &script_exit));
+#if 0
     static const struct script_command script_save_commands[] = {
             {"bricks",   &script_save_bricks,   "Save bricks.",   NULL, NULL, 0},
             {"detector", &script_save_detector, "Save detector.", NULL, NULL, 0},
@@ -601,78 +803,33 @@ struct script_command *script_commands_create(struct script_session *s) {
     };
 
     static const struct script_command script_commands[] = {
-            {"add",    NULL,               "Add things.",                 script_add_commands,    NULL, 0},
+            {"add",    NULL,               "Add things.",                 script_add_commands,    NULL, 0}, // done
             {"disable",  &script_disable,  "Set boolean variable to false.",              NULL,   NULL, 0},
             {"enable",   &script_enable,   "Set boolean variable to true.",               NULL,   NULL, 0},
-            {"exit",     &script_exit,     "Exit.",                                       NULL,   NULL, 0},
+            {"exit",     &script_exit,     "Exit.",                                       NULL,   NULL, 0},  // done
             {"fit",      &script_fit,      "Do a fit.",                                   NULL,   NULL, 0},
             {"save",   NULL,               "Save something.",             script_save_commands,   NULL, 0},
             {"set",    NULL,               "Set variables.",              script_set_commands,    NULL, 0},
-            {"show",   NULL,               "Show information on things.", script_show_commands,   NULL, 0},
+            {"show",   NULL,               "Show information on things.", script_show_commands,   NULL, 0},  // done
             {"help",     &script_help,     "Print help.",                                 NULL,   NULL, 0},
-            {"load",   NULL,               "Load something.",             script_load_commands,   NULL, 0},
+            {"load",   NULL,               "Load something.",             script_load_commands,   NULL, 0}, // done
             {"remove", NULL,               "Remove something",            script_remove_commands, NULL, 0},
             {"reset",    &script_reset,    "Reset something.",            script_reset_commands,  NULL, 0},
             {"roi",      &script_roi,      "Show information from a region of interest.", NULL,   NULL, 0},
             {"simulate", &script_simulate, "Run a simulation.",                           NULL,   NULL, 0},
             {NULL,     NULL, NULL,                                                        NULL,   NULL, 0}
     };
-    cmds = script_commands_append(cmds, script_commands);
-    return cmds;
-}
-
-script_command *script_commands_append(script_command *c_to, const script_command *c_from) { /* Keeps c_to mostly intact and appends a shallow copy of c_from to it */
-    if(!c_from)
-        return c_to;
-    size_t n_to = script_commands_size(c_to);
-    size_t n_from = script_commands_size(c_from);
-    size_t n = n_to + n_from; /* n real entries */
-#ifdef DEBUG
-    fprintf(stderr, "Append commands: sum size is %zu.\n", n);
 #endif
-    c_to = realloc(c_to, (n+1) * sizeof(script_command)); /* n + 1 allocated (null terminated) */
-    for(size_t i = n_to; i < n; i++) {
-        c_to[i] = c_from[i - n_to];
-    }
-    c_to[n].name = NULL;
-    return c_to;
-}
-
-void script_commands_sort(script_command *commands) {
-    if(!commands)
-        return;
-    qsort((void *)commands, script_commands_size(commands), sizeof(script_command), &command_compare);
-}
-
-script_command *script_commands_from_jibal_config(jibal_config_var *vars) {
-    if(!vars)
-        return NULL;
-    size_t n = 0;
-    for(const jibal_config_var *var = vars; var->type != 0; var++) {
-        n++;
-    }
-#ifdef DEBUG
-    fprintf(stderr, "Got %zu vars in %p\n.", n, (void *)vars);
-#endif
-    script_command *out = malloc((n+1)*sizeof(script_command));
-    for(size_t i = 0; i < n; i++) {
-        out[i].name = vars[i].name;
-        out[i].var = &(vars[i]);
-        out[i].val = 0;
-        out[i].f = NULL;
-        out[i].help_text = jibal_config_var_type_name(vars[i].type);
-    }
-    out[n].name = NULL;
-    return out;
+    return head;
 }
 
 void script_commands_print(FILE *f, const struct script_command *commands) {
     if(!commands)
         return;
-    for(const struct script_command *c = commands; c->name != NULL; c++) {
+    for(const struct script_command *c = commands; c; c = c->next) {
         if(!c->help_text)
             continue;
-        jabs_message(MSG_INFO, f, " %16s    %s\n", c->name, c->help_text);
+        jabs_message(MSG_INFO, f, " %20s    %s\n", c->name, c->help_text);
     }
 }
 
@@ -680,7 +837,7 @@ size_t script_commands_size(const script_command *commands) {
     if(!commands)
         return 0;
     size_t n = 0;
-    for(const struct script_command *c = commands; c->name != NULL; c++) {
+    for(const struct script_command *c = commands; c; c++) {
         n++;
     }
 #ifdef DEBUG
@@ -695,27 +852,31 @@ void script_print_command_tree(FILE *f, const struct script_command *commands) {
     stack[0] = commands;
     size_t i = 0;
     c = stack[0];
-    while(c->name != NULL) {
-        while(c->name != NULL) {
-            if(c->f || c->var || c->val) {
-                for(size_t j = 1; j <= i; j++) {
-                    jabs_message(MSG_INFO, f, "%s ", stack[j]->name);
-                }
-                jabs_message(MSG_INFO, f, "%s\n", c->name);
+    while(c) {
+#ifdef DEBUG
+        if(TRUE) {
+#else
+        if(c->f || c->var || c->val) { /* If none of these is set, we shouldn't print the command name at all */
+#endif
+            for(size_t j = 0; j < i; j++) {
+                jabs_message(MSG_INFO, f, "%s ", stack[j]->name);
             }
-            if(c->subcommands && i < (COMMAND_DEPTH - 1)) {
-                i++;
-                stack[i] = c;
-                c = c->subcommands;
-            } else {
-                c++;
-            }
+            jabs_message(MSG_INFO, f, "%s\n", c->name);
         }
-        if(i == 0)
-            break;
-        c = stack[i];
-        i--;
-        c++;
+        if(c->subcommands && i < COMMAND_DEPTH) { /* Go deeper, push existing pointer to stack */
+            stack[i] = c;
+            i++;
+            c = c->subcommands;
+            continue;
+        } else {
+            c = c->next; /* Go to next on the same level */
+        }
+        while(!c) {
+            if(i == 0)
+                break;
+            i--;
+            c = stack[i]->next;
+        }
     }
 }
 
@@ -1017,6 +1178,7 @@ script_command_status script_set_beam(script_session *s, int argc, char * const 
     return SCRIPT_COMMAND_SUCCESS;
 }
 
+#if 0
 script_command_status script_set_detector(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     static const script_command extra_commands[] = {
@@ -1076,6 +1238,7 @@ script_command_status script_set_detector(script_session *s, int argc, char * co
         status = SCRIPT_COMMAND_FAILURE;
     return status;
 }
+#endif
 
 script_command_status script_set_sample(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
@@ -1271,7 +1434,7 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
         }
     }
 
-    for(const struct script_command *c = s->commands; c->name != NULL; c++) {
+    for(const script_command *c = s->commands; c; c = c->next) { /* TODO: deeper? */
         if(strcmp(c->name, argv[0]) == 0) {
             if(!found) { /* There wasn't a help topic  */
                 jabs_message(MSG_INFO, stderr, "\"%s\" is a valid command, but no additional help is available!\n\n", c->name);

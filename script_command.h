@@ -30,12 +30,14 @@ typedef enum script_command_status {
 } script_command_status;
 
 typedef struct script_command {
-    const char *name;
-    script_command_status (*f)(struct script_session *, int, char * const *);
-    const char *help_text; /* Short help text */
-    const struct script_command *subcommands;
+    char *name;
+    script_command_status (*f)(struct script_session *, int, char * const *); /* Function to process argument vectors. Called if it is non-NULL, even if subcommands exist! Return value is important.*/
+    script_command_status (*f_var)(struct script_session *, jibal_config_var *var, int, char * const *); /* Function to process variables (from subcommands). */
+    char *help_text; /* Short help text */
+    struct script_command *subcommands;
     jibal_config_var *var;
     int val;
+    struct script_command *next;
 } script_command;
 
 struct help_topic {
@@ -45,11 +47,19 @@ struct help_topic {
 
 int script_getopt(struct script_session *s, const script_command *commands, int *argc, char *const **argv, script_command_status *status_out); /* Parses argument vector, finds script_command_option "c" and calls "c->f()" or sets c->var. */
 
-struct script_command *script_commands_create(struct script_session *s);
-script_command *script_commands_append(script_command *c_to, const script_command *c_from);
-void script_commands_sort(script_command *commands);
+script_command *script_command_new(const char *name, const char *help_text, int val, script_command_status (*f)(struct script_session *, int, char * const *)); /* Allocates new command that doesn't do anything. Can return var. */
+int script_command_set_var(script_command *c, jibal_config_var_type type, const void *variable, const jibal_option *option_list);
+void script_command_free(script_command *c);
+void script_commands_free(script_command *head);
+
+script_command *script_command_list_find_tail(script_command *head);
+void script_command_list_add_command(script_command **head, script_command *c_new);
+script_command *script_command_list_from_command_array(const script_command *commands); /* commands is an array, must be "null-terminated" (name of last element is NULL pointer). Deep copy will be made. */
+script_command *script_command_list_from_vars_array(const jibal_config_var *vars, jibal_config_var_type type); /* vars is an array, must be "null-terminated" (name of last element is NULL pointer). Deep copy will be made. Can be restricted to type. */
+
+
+script_command *script_commands_create(struct script_session *s);
 int command_compare(const void *a, const void *b);
-script_command *script_commands_from_jibal_config(jibal_config_var *vars);
 void script_commands_print(FILE *f, const struct script_command *commands);
 size_t script_commands_size(const script_command *commands);
 void script_print_command_tree(FILE *f, const struct script_command *commands);
@@ -57,8 +67,9 @@ script_command_status script_execute_command(struct script_session *s, const cha
 script_command_status script_execute_command_argv(struct script_session *s, const script_command *commands, int argc, char **argv);
 void script_command_not_found(const char *cmd, const script_command *c);
 const script_command *script_command_find(const script_command *commands, const char *cmd_string);
-script_command_status script_set_boolean(struct script_session *s, const char *variable, int value);
 
+script_command_status script_set_var(struct script_session *s, jibal_config_var *var, int, char * const *);
+script_command_status script_set_boolean(struct script_session *s, const char *variable, int value);
 script_command_status script_add_detector(struct script_session *s, int argc, char * const *argv);
 script_command_status script_add_fit_range(struct script_session *s, int argc, char * const *argv);
 script_command_status script_add_reaction(struct script_session *s, int argc, char * const *argv);
