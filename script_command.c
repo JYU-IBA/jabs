@@ -104,15 +104,17 @@ int script_finish_sim_or_fit(script_session *s) {
 }
 
 
-void script_command_not_found(const char *cmd, const script_command *c) {
-    if(c) {
+void script_command_not_found(const char *cmd, const script_command *c_parent) {
+    if(c_parent) {
         if(cmd) {
             jabs_message(MSG_ERROR, stderr, "Sub-command \"%s\" is invalid!\n\n", cmd);
         } else {
             jabs_message(MSG_ERROR, stderr, "Not enough arguments!\n\n");
         }
-        jabs_message(MSG_ERROR, stderr, "Following subcommands are recognized:\n");
-        script_commands_print(stderr, c);
+        if(c_parent->subcommands) {
+            jabs_message(MSG_ERROR, stderr, "Following subcommands of \"%s\" are recognized:\n", c_parent->name);
+            script_commands_print(stderr, c_parent->subcommands);
+        }
     } else {
         if(cmd) {
             jabs_message(MSG_ERROR, stderr, "Invalid command or argument: \"%s\".\n", cmd);
@@ -428,7 +430,7 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
 #ifdef DEBUG
             fprintf(stderr, "Debug: Didn't find command %s.\n", argv[0]);
 #endif
-            script_command_not_found(argv[0], c_parent ? c_parent->subcommands : NULL);
+            script_command_not_found(argv[0], c_parent);
             return SCRIPT_COMMAND_NOT_FOUND;
         }
         while(c) { /* Subcommand found */
@@ -472,6 +474,8 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                     argc -= status;
                     argv += status;
                 }
+            } else if(!argc) {
+                script_command_not_found(NULL, c); /* No function, no nothing, no arguments. */
             }
             if(c->subcommands) {
                 cmds = c->subcommands;
