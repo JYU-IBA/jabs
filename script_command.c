@@ -452,9 +452,8 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                 fprintf(stderr, "Debug: Command run, returned %i (%s). Number of arguments remaining: %i\n", status,
                         script_command_status_to_string(status), argc);
 #endif
-                if(status == SCRIPT_COMMAND_FAILURE) {
-                    jabs_message(MSG_ERROR, stderr, "Command failed.\n");
-                    return SCRIPT_COMMAND_FAILURE;
+                if(status < 0 && status != SCRIPT_COMMAND_NOT_FOUND) { /* Command not found is acceptable, we try to find subcommands later. All other errors cause an immediate return. */
+                    return status;
                 }
             } else if(c->var) {
                 if(!c_parent) {
