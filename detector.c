@@ -195,7 +195,7 @@ int detector_print(const char *filename, const detector *det) {
 int detector_aperture_set_from_argv(const jibal *jibal, detector *det, int *argc, char * const **argv) {
     aperture *a = aperture_from_argv(jibal, argc, argv);
     if(a) {
-        free(det->aperture);
+        aperture_free(det->aperture);
         det->aperture = a;
     } else {
         return EXIT_FAILURE;

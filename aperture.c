@@ -55,46 +55,51 @@ double aperture_width_shape_product(const aperture *a, const char direction) {
 }
 
 aperture *aperture_from_argv(const jibal *jibal, int * const argc, char * const ** const argv) {
-    aperture *a = aperture_default();
     int found = 0;
+    if(*argc < 1) {
+        return NULL;
+    }
+    char *str = (*argv[0]);
+    size_t len = strlen(str);
+    aperture_type type = APERTURE_NONE;
     for(const jibal_option *o = aperture_option; o->s; o++) { /* look for a matching aperture_option keyword (circle, rectangle) */
-        if(strcmp(o->s, (*argv)[0]) == 0) {
-            a->type = o->val;
+        if(strncmp(o->s, str, len) == 0) {
+            type = o->val;
             (*argv)++;
             (*argc)--;
-            found = 1;
-            break;
+            found++;
         }
     }
 
-    if(!found) {
-        aperture_free(a);
+    if(found != 1) {
         return NULL;
     }
 
-#if 0
-    jibal_config_var vars[] = {
-            {JIBAL_CONFIG_VAR_UNIT, "width",    &a->width,    NULL},
-            {JIBAL_CONFIG_VAR_UNIT, "height",   &a->height,   NULL},
-            {JIBAL_CONFIG_VAR_UNIT, "diameter", &a->diameter, NULL},
-            {JIBAL_CONFIG_VAR_NONE, NULL, NULL,               NULL}
-    };
-#endif
+    aperture *a = aperture_default();
+    a->type = type;
 
-
-
-    while((*argc) >= 2) {
-        if(strcmp((*argv)[0], "width") == 0) {
-            a->width = jibal_get_val(jibal->units, UNIT_TYPE_DISTANCE, (*argv)[1]);
-        } else if(strcmp((*argv)[0], "height") == 0) {
-            a->height = jibal_get_val(jibal->units, UNIT_TYPE_DISTANCE, (*argv)[1]);
-        } else if(strcmp((*argv)[0], "diameter") == 0) {
-            a->diameter = jibal_get_val(jibal->units, UNIT_TYPE_DISTANCE, (*argv)[1]);
-        } else {
-            break;
+    while((*argc) >= 1) {
+        str = (*argv)[0];
+        if((*argc) >= 2) {
+            double *val = NULL;
+            if(type == APERTURE_RECTANGLE && strcmp(str, "width") == 0) {
+                val = &(a->width);
+            } else if(type == APERTURE_RECTANGLE && strcmp(str, "height") == 0) {
+                val = &(a->height);
+            } else if(type == APERTURE_CIRCLE && strncmp(str, "dia", 3) == 0) { /* Diameter can be abbreviated */
+                val = &(a->diameter);
+            }
+            if(val) {
+                *val = jibal_get_val(jibal->units, UNIT_TYPE_DISTANCE, (*argv)[1]);
+                (*argc) -= 2;
+                (*argv) += 2;
+                continue;
+            }
         }
-        (*argc) -= 2;
-        (*argv) += 2;
+#ifdef DEBUG
+        fprintf(stderr, "Aperture parsing ends, starting from str = %s. %i remain.\n", str, *argc);
+#endif
+        break;
     }
     return a; /* Does not guarantee the aperture makes sense, unparsed arguments may remain! */
 }

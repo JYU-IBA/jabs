@@ -204,15 +204,21 @@ script_command_status script_save_bricks(script_session *s, int argc, char * con
 script_command_status script_save_spectra(script_session *s, int argc, char * const *argv) {
     size_t i_det = 0;
     struct fit_data *fit = s->fit;
+    int argc_orig = argc;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det) || argc != 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: save spectra [detector] file\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Not enough arguments for save spectra.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(print_spectra(argv[0], fit_data_ws(fit, i_det), fit_data_exp(fit, i_det))) {
         jabs_message(MSG_ERROR, stderr, "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n", i_det + 1, argv[0], fit->sim->n_det);
         return SCRIPT_COMMAND_FAILURE;
     }
-    return SCRIPT_COMMAND_SUCCESS;
+    argc -= 1;
+    return argc_orig - argc;
 }
 
 
@@ -254,11 +260,15 @@ script_command_status script_remove_reaction(script_session *s, int argc, char *
         return SCRIPT_COMMAND_FAILURE;
     }
     char *end;
-    size_t i = strtoull(argv[0], &end, 10);
+    size_t i_reaction = strtoull(argv[0], &end, 10);
     if(*end == '\0') {
-        return sim_reactions_remove_reaction(fit_data->sim, i - 1);
+        if(sim_reactions_remove_reaction(fit_data->sim, i_reaction - 1)) {
+            return SCRIPT_COMMAND_FAILURE;
+        } else {
+            return 1; /* Number of consumed arguments */
+        }
     }
-    if(argc != 2) {
+    if(argc < 2) {
         jabs_message(MSG_ERROR, stderr, "Usage: remove reaction [TYPE] [target_isotope]   OR   remove reaction [number]\n");
         return SCRIPT_COMMAND_FAILURE;
     }
@@ -274,7 +284,11 @@ script_command_status script_remove_reaction(script_session *s, int argc, char *
     }
     for(size_t i = 0; i < fit_data->sim->n_reactions; i++) {
         if(fit_data->sim->reactions[i]->type == type && fit_data->sim->reactions[i]->target == target) {
-            return sim_reactions_remove_reaction(fit_data->sim, i);
+            if(sim_reactions_remove_reaction(fit_data->sim, i)) {
+                return SCRIPT_COMMAND_FAILURE;
+            } else {
+                return 2; /* Number of consumed arguments. */
+            }
         }
     }
     jabs_message(MSG_ERROR, stderr, "No matching reaction found!\n");
@@ -474,9 +488,10 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
     }
     if(argc) {
         jabs_message(MSG_ERROR, stderr, "Debug: Didn't find command or an error with \"%s\" (%i arguments remain).\n", argv[0], argc);
+        return SCRIPT_COMMAND_NOT_FOUND;
     }
         //script_command_not_found(NULL, c_parent ? c_parent->subcommands : NULL);
-    return SCRIPT_COMMAND_NOT_FOUND;
+    return SCRIPT_COMMAND_SUCCESS;
 }
 
 int command_compare(const void *a, const void *b) {
@@ -631,7 +646,7 @@ int script_command_set_var(script_command *c, jibal_config_var_type type, void *
 void script_command_free(script_command *c) {
     if(!c)
         return;
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
     fprintf(stderr, "Freeing command \"%s\" (%p)\n", c->name, (void *)c);
 #endif
     free(c->var);
@@ -1144,7 +1159,7 @@ script_command_status script_show_variables(script_session *s, int argc, char *c
 
 script_command_status script_set_ion(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
-    if(argc != 1) {
+    if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: set ion [ion]\nExample: set ion 4He\n");
         return SCRIPT_COMMAND_FAILURE;
     }
@@ -1154,11 +1169,12 @@ script_command_status script_set_ion(script_session *s, int argc, char * const *
         return SCRIPT_COMMAND_FAILURE;
     }
     s->fit->sim->beam_isotope = isotope;
-    return SCRIPT_COMMAND_SUCCESS;
+    return 1;
 }
 
 script_command_status script_set_aperture(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
+    int argc_orig = argc;
     if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: set aperture (type) [width|height|diameter (value)] ...\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -1169,12 +1185,13 @@ script_command_status script_set_aperture(script_session *s, int argc, char * co
         return SCRIPT_COMMAND_FAILURE;
     }
     if(argc) {
-        free(a);
+        aperture_free(a);
         jabs_message(MSG_ERROR, stderr, "Unexpected extra arguments (%i), starting with %s\n", argc, argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
+    aperture_free(fit->sim->beam_aperture);
     fit->sim->beam_aperture = a;
-    return SCRIPT_COMMAND_SUCCESS;
+    return argc_orig - argc;
 }
 
 script_command_status script_set_detector(script_session *s, int argc, char * const *argv) {
@@ -1368,7 +1385,7 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
             {"commands", "I recognize the following commands (try 'help' followed by command name):\n"},
             {"command_tree", "Almost full list of recognized commands:\n"},
             {"version", "JaBS version: "},
-            {"set", "The following variables can be set (unit optional, SI units assumed otherwise):\n"},
+            {"set", "Set command allows things to be set.\n"},
             {"show", "Show things. Possible things: sim, fit, sample, detector, variables.\n"},
             {"fit", "Make a fit. Provide list of variables to fit.\n"},
             {NULL, NULL}
@@ -1382,7 +1399,7 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
     for(const struct help_topic *t = topics; t->name != NULL; t++) {
         if(strcmp(t->name, argv[0]) == 0) {
             found++;
-            jabs_message(MSG_INFO, stderr, "%s", t->help_text);
+            jabs_message(MSG_INFO, stderr, "%s\n", t->help_text);
             if(strcmp(t->name, "help") == 0) {
                 size_t i = 0;
                 for(const struct help_topic *t2 = topics; t2->name != NULL; t2++) {

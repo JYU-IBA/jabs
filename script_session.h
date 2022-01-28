@@ -38,6 +38,6 @@ jibal_config_var *script_make_vars(script_session *s);
 int script_session_reset_vars(script_session *s);
 void script_session_free(script_session *s);
 int script_session_load_script(script_session *s, const char *filename);
-int script_get_detector_number(const simulation *sim, int allow_empty, int * const argc, char * const ** const argv, size_t *i_det);
+int script_get_detector_number(const simulation *sim, int allow_empty, int *argc, char * const **argv, size_t *i_det);
 
 #endif //JABS_SCRIPT_SESSION_H

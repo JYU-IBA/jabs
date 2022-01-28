@@ -46,7 +46,8 @@ int script_process(script_session *s, const char *filename) {
             }
             status = script_execute_command(s, sfile->line);
             if(!interactive && status != SCRIPT_COMMAND_SUCCESS) {
-                jabs_message(MSG_ERROR, stderr, "Error (%i) on line %zu in file \"%s\". Aborting.\n", status, sfile->lineno, sfile->filename);
+                jabs_message(MSG_ERROR, stderr, "Error %i (%s) on line %zu in file \"%s\". Aborting.\n", status,
+                             script_command_status_to_string(status), sfile->lineno, sfile->filename);
             }
         } else {
             status = SCRIPT_COMMAND_EOF;

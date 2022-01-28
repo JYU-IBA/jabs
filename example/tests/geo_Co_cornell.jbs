@@ -3,18 +3,10 @@ set ion 7Li
 set geostragg true
 set energy 2MeV
 set alpha 50deg
-set sample_azi 0deg
-set beam_aperture rectangle
-set beam_aperture_width 5mm
-set beam_aperture_height 4mm
-#set beam_aperture circle
-#set beam_aperture_diameter 10mm
-set det theta 120deg
-set det phi 90deg
-set det resolution 10keV
-set det aperture circle
-set det aperture_diameter 8mm
-set det distance 100mm
+set phi 0deg
+set aperture rectangle width 5mm height 4mm
+set det theta 120deg phi 90deg slope 1keV resolution 10keV
+set det aperture circle diameter 8mm distance 100mm
 set sample Co 2000tfu
 add reactions RBS
 simulate
