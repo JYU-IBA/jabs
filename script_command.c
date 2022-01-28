@@ -307,22 +307,6 @@ script_command_status script_roi(script_session *s, int argc, char * const *argv
     return SCRIPT_COMMAND_SUCCESS;
 }
 
-script_command_status script_disable(script_session *s, int argc, char *const *argv) {
-    if(argc != 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: disable (variable)\n");
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    return script_set_boolean(s, argv[0], FALSE);
-}
-
-script_command_status script_enable(script_session *s, int argc, char * const *argv) {
-    if(argc != 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: enable (variable)\n");
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    return script_set_boolean(s, argv[0], TRUE);
-}
-
 script_command_status script_exit(script_session *s, int argc, char * const *argv) {
     (void) s;
     (void) argc;
@@ -371,18 +355,28 @@ script_command_status script_set_var(struct script_session *s, jibal_config_var 
     return 1; /* Number of arguments */
 }
 
-script_command_status script_set_boolean(script_session *s, const char *variable, int value) {
-    for(jibal_config_var *var = s->cf->vars; var->type != 0; var++) {
-        if(strcmp(var->name, variable) == 0) {
-            if(var->type != JIBAL_CONFIG_VAR_BOOL) {
-                jabs_message(MSG_ERROR, stderr, "Variable exists, but is not boolean.\n");
-                return SCRIPT_COMMAND_FAILURE;
-            }
-            *((int *)var->variable) = value;
-            return SCRIPT_COMMAND_SUCCESS;
-        }
+script_command_status script_enable_var(struct script_session *s, jibal_config_var *var, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
+    (void) s;
+    if(var->type == JIBAL_CONFIG_VAR_BOOL) {
+        *((int *)var->variable) = TRUE;
+    } else {
+        jabs_message(MSG_ERROR, stderr, "Variable %s is not boolean.\n", var->name);
     }
-    return SCRIPT_COMMAND_NOT_FOUND;
+    return 0; /* Number of arguments */
+}
+
+script_command_status script_disable_var(struct script_session *s, jibal_config_var *var, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
+    (void) s;
+    if(var->type == JIBAL_CONFIG_VAR_BOOL) {
+        *((int *)var->variable) = FALSE;
+    } else {
+        jabs_message(MSG_ERROR, stderr, "Variable %s is not boolean.\n", var->name);
+    }
+    return 0; /* Number of arguments */
 }
 
 script_command_status script_execute_command(script_session *s, const char *cmd) {
@@ -411,60 +405,78 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
     }
     const script_command *cmds = commands;
     const script_command *c_parent = NULL;
-    while(1) {
-        if(argc && cmds) { /* Arguments and subcommands remain. Try to find the right one, if possible. */
-            const script_command *c = script_command_find(cmds, argv[0]);
-            if(c) { /* Subcommand found */
+    while(argc && cmds) { /* Arguments and subcommands remain. Try to find the right one, if possible. */
 #ifdef DEBUG
-                fprintf(stderr, "Debug: Found command %s.\n", c->name);
+        fprintf(stderr, "Top level script_execute_command_argv() loop, %i arguments remain (start with %s).\n", argc, argv[0]);
 #endif
-                if(c->f) {
+        const script_command *c = script_command_find(cmds, argv[0]);
+        if(!c) {
 #ifdef DEBUG
-                    fprintf(stderr, "There is a function %p in command %s. Calling it with %i arguments.\n", (void *) c->f, c->name, argc - 1);
+            fprintf(stderr, "Debug: Didn't find command %s.\n", argv[0]);
 #endif
-                    script_command_status status = c->f(s, argc - 1, argv + 1);
-                    if(status != SCRIPT_COMMAND_NOT_FOUND) {
-                        return status;
-                    }
-                } else if(c->var) {
-                    if(!c_parent) {
-                        jabs_message(MSG_ERROR, stderr, "Command/option \"%s\" is a variable, but there is no parent command. This is highly unusual.\n", c->name);
-                        return SCRIPT_COMMAND_FAILURE;
-                    }
-                    if(!c_parent->f_var) {
-                        jabs_message(MSG_ERROR, stderr, "Command/option \"%s\" is a variable, but there is no function to handle variables in parent command (\"%s\"). This is highly unusual.\n", c->name, c_parent->name);
-                        return SCRIPT_COMMAND_FAILURE;
-                    }
-                    c_parent->f_var(s, c->var, argc - 1, argv + 1);
+            script_command_not_found(argv[0], c_parent ? c_parent->subcommands : NULL);
+            return SCRIPT_COMMAND_NOT_FOUND;
+        }
+        while(c) { /* Subcommand found */
+            argc--;
+            argv++;
+#ifdef DEBUG
+            fprintf(stderr, "Debug: Found command %s.\n", c->name);
+#endif
+            if(c->f) {
+#ifdef DEBUG
+                fprintf(stderr, "Debug: There is a function %p in command %s. Calling it with %i arguments.\n", (void *) c->f, c->name, argc);
+#endif
+                script_command_status status = c->f(s, argc, argv);
+                if(status > 0) { /* Positive numbers indicate number of arguments consumed */
+                    argc -= status;
+                    argv += status;
                 }
-                if(c->subcommands) {
-                    cmds = c->subcommands;
-                    argc--;
-                    argv++;
-                    c_parent = c;
-                    continue;
-                }  else {
 #ifdef DEBUG
-                    fprintf(stderr, "Debug: there are no subcommands or a function / variable in \"%s\". There is a val: %i\n", c->name, c->val);
+                fprintf(stderr, "Debug: Command run, returned %i (%s). Number of arguments remaining: %i\n", status,
+                        script_command_status_to_string(status), argc);
 #endif
-                    script_command_not_found(argv[1], NULL);
-                    return SCRIPT_COMMAND_NOT_FOUND;
+                if(status == SCRIPT_COMMAND_FAILURE) {
+                    jabs_message(MSG_ERROR, stderr, "Command failed.\n");
+                    return SCRIPT_COMMAND_FAILURE;
                 }
+            } else if(c->var) {
+                if(!c_parent) {
+                    jabs_message(MSG_ERROR, stderr,
+                                 "Command/option \"%s\" is a variable, but there is no parent command. This is highly unusual.\n",
+                                 c->name);
+                    return SCRIPT_COMMAND_FAILURE;
+                }
+                if(!c_parent->f_var) {
+                    jabs_message(MSG_ERROR, stderr,
+                                 "Command/option \"%s\" is a variable, but there is no function to handle variables in parent command (\"%s\"). This is highly unusual.\n",
+                                 c->name, c_parent->name);
+                    return SCRIPT_COMMAND_FAILURE;
+                }
+                script_command_status status = c_parent->f_var(s, c->var, argc, argv);
+                if(status > 0) { /* Positive numbers indicate number of arguments consumed */
+                    argc -= status;
+                    argv += status;
+                }
+            }
+            if(c->subcommands) {
+                cmds = c->subcommands;
+                c_parent = c;
+                break;
             } else {
 #ifdef DEBUG
-                fprintf(stderr, "Debug: Didn't find command %s.\n", argv[0]);
+                fprintf(stderr,"Debug: there are no subcommands in \"%s\" (this is not an error). There is a val as always: %i.\n", c->name, c->val);
 #endif
-                script_command_not_found(argv[0], c_parent?c_parent->subcommands:NULL);
+                //script_command_not_found(argv[1], NULL); /* TODO: argv is long gone by this point */
+                c = NULL; /* Moving back to upper level. */
             }
-
-        } else {
-#ifdef DEBUG
-            fprintf(stderr, "Debug: Didn't find command %s (and no more arguments remain).\n", argv[0]);
-#endif
-            script_command_not_found(NULL, c_parent?c_parent->subcommands:NULL);
         }
-        return SCRIPT_COMMAND_NOT_FOUND;
     }
+    if(argc) {
+        jabs_message(MSG_ERROR, stderr, "Debug: Didn't find command or an error with \"%s\" (%i arguments remain).\n", argv[0], argc);
+    }
+        //script_command_not_found(NULL, c_parent ? c_parent->subcommands : NULL);
+    return SCRIPT_COMMAND_NOT_FOUND;
 }
 
 int command_compare(const void *a, const void *b) {
@@ -496,6 +508,27 @@ char *script_commands_list_matches(const script_command *commands, const char *s
         }
     }
     return out;
+}
+
+const char *script_command_status_to_string(script_command_status status) {
+    switch(status) {
+        case SCRIPT_COMMAND_NOT_FOUND:
+            return "not found";
+        case SCRIPT_COMMAND_FAILURE:
+            return "failure";
+        case SCRIPT_COMMAND_SUCCESS:
+            return "success, no arguments consumed";
+        case SCRIPT_COMMAND_EOF:
+            return "end-of-file";
+        case SCRIPT_COMMAND_EXIT:
+            return "exit";
+        default:
+            break;
+    }
+    if(status > 0) {
+        return "number of arguments consumed";
+    }
+    return "unknown";
 }
 
 int script_getopt(script_session *s, const script_command *commands, int *argc, char *const **argv, script_command_status *status_out) {
@@ -583,7 +616,7 @@ int script_command_set_function(script_command *c, script_command_status (*f)(st
     return EXIT_SUCCESS;
 }
 
-int script_command_set_var(script_command *c, jibal_config_var_type type, const void *variable, const jibal_option *option_list) {
+int script_command_set_var(script_command *c, jibal_config_var_type type, void *variable, const jibal_option *option_list) {
     if(!c->var) {
         c->var = malloc(sizeof(jibal_config_var));
     }
@@ -706,10 +739,9 @@ script_command *script_commands_create(struct script_session *s) {
     c_set->f_var = &script_set_var;
     script_command_list_add_command(&head, c_set);
     script_command_list_add_command(&c_set->subcommands, script_command_new("aperture", "Set aperture.", 0, &script_set_aperture));
-    script_command_list_add_command(&c_set->subcommands, script_command_new("beam", "Set beam properties.", 0, &script_set_beam));
-#if 0
-    script_command_list_add_command(&c_set->subcommands, script_command_new("detector", "Set detector properties.", 0, &script_set_detector));
-#endif
+
+    script_command *c_detector = script_command_new("detector", "Set detector properties.", 0, &script_set_detector);
+    script_command_list_add_command(&c_set->subcommands, c_detector);
     script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
     script_command_list_add_command(&c_set->subcommands, script_command_new("sample", "Set sample.", 0, &script_set_sample));
     script_command_list_add_command(&c_set->subcommands, script_command_new("variable", "Set a variable.", 0, &script_set_variable)); /* TODO: unnecessary / incomplete, remove */
@@ -791,11 +823,17 @@ script_command *script_commands_create(struct script_session *s) {
     c = script_command_new("fit", "Do a fit.", 0, script_fit);
     script_command_list_add_command(&head, c);
 
-    c = script_command_new("enable", "Set boolean variable to true.", 0, script_enable);
-    script_command_list_add_command(&head, c);
+    script_command *c_enable = script_command_new("enable", "Set boolean variable to true.", 0, NULL);
+    c_enable->f_var = &script_enable_var;
+    script_command_list_add_command(&head, c_enable);
+    c = script_command_list_from_vars_array(vars, JIBAL_CONFIG_VAR_BOOL);
+    script_command_list_add_command(&c_enable->subcommands, c);
 
-    c = script_command_new("disable", "Set boolean variable to false.", 0, script_disable);
-    script_command_list_add_command(&head, c);
+    script_command *c_disable = script_command_new("disable", "Set boolean variable to true.", 0, NULL);
+    c_disable->f_var = &script_disable_var;
+    script_command_list_add_command(&head, c_disable);
+    c = script_command_list_from_vars_array(vars, JIBAL_CONFIG_VAR_BOOL);
+    script_command_list_add_command(&c_disable->subcommands, c);
 
     c = script_command_new("roi", "Show information from a region of interest.", 0, script_roi);
     script_command_list_add_command(&head, c);
@@ -1139,57 +1177,21 @@ script_command_status script_set_aperture(script_session *s, int argc, char * co
     return SCRIPT_COMMAND_SUCCESS;
 }
 
-script_command_status script_set_beam(script_session *s, int argc, char * const *argv) {
-    struct fit_data *fit = s->fit;
-    int argc_consumed = 0;
-    if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: set beam energy|fluence|ion (value)...\n");
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    while(argc >= 2) { /* TODO: replace with something */
-        if(strcmp(argv[0], "energy") == 0) {
-            fit->sim->beam_E = jibal_get_val(fit->jibal->units, UNIT_TYPE_ENERGY, argv[1]);
-        } else if(strcmp(argv[0], "energy_broad") == 0) {
-            fit->sim->beam_E_broad = jibal_get_val(fit->jibal->units, UNIT_TYPE_ENERGY, argv[1]);
-        } else if(strcmp(argv[0], "fluence") == 0) {
-            fit->sim->fluence = jibal_get_val(fit->jibal->units, UNIT_TYPE_ANY, argv[1]);
-        } else if(strcmp(argv[0], "ion") == 0) { /* Alternative to 'set ion' is 'set beam ion' here. */
-            const jibal_isotope *isotope = jibal_isotope_find(fit->jibal->isotopes, argv[1], 0, 0);
-            if(!isotope) {
-                jabs_message(MSG_ERROR, stderr, "\"%s\" is not a valid isotope!\n");
-                return SCRIPT_COMMAND_FAILURE;
-            }
-            fit->sim->beam_isotope = isotope;
-        } else {
-            break;
-        }
-        argc -= 2;
-        argv += 2;
-        argc_consumed += 2;
-    }
-    return argc_consumed;
-}
-
-#if 0
 script_command_status script_set_detector(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
-    static const script_command extra_commands[] = {
-            {"aperture",    NULL, "Aperture description", NULL, NULL, 'a'},
-            {"calibration", NULL, "Calibration",          NULL, NULL, 'c'},
-            {"foil",        NULL, NULL,                   NULL, NULL, 'f'},
-            {NULL, 0,             NULL,                   NULL, NULL, 0}
-    };
     size_t i_det = 0;
+    int argc_orig = argc;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
     script_command *commands = NULL;
     detector *det = sim_det(fit->sim, i_det);
     jibal_config_var *vars = detector_make_vars(det);
-    commands = script_commands_append(commands, script_commands_from_jibal_config(vars));
-    commands = script_commands_append(commands, extra_commands);
-    script_commands_sort(commands);
-    //options_print(stderr, opt);
+    commands = script_command_list_from_vars_array(vars, 0);
+    script_command_list_add_command(&commands, script_command_new("aperture", "Set aperture", 'a', NULL));
+    script_command_list_add_command(&commands, script_command_new("foil", "Set foil", 'f', NULL));
+    script_command_list_add_command(&commands, script_command_new("calibration", "Set calibration", 'c', NULL));
+
     if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: set detector [number] variable value variable2 value2 ...\n");
         char *matches = script_commands_list_matches(commands, "");
@@ -1211,6 +1213,9 @@ script_command_status script_set_detector(script_session *s, int argc, char * co
                     status = SCRIPT_COMMAND_FAILURE;
                 }
                 break;
+            case 'c':
+                jabs_message(MSG_ERROR, stderr, "Not implemented yet!\n");
+                status = SCRIPT_COMMAND_FAILURE;
             case 'f':
                 if(detector_foil_set_from_argv(s->jibal, det, &argc, &argv)) {
                     status = SCRIPT_COMMAND_FAILURE;
@@ -1222,15 +1227,10 @@ script_command_status script_set_detector(script_session *s, int argc, char * co
     }
     free(commands);
     free(vars);
-    if(argc != 0) {
-        jabs_message(MSG_ERROR, stderr, "Extra arguments, not enough arguments or generic parse error starting at \"%s\"\n", argv[0]);
-        return SCRIPT_COMMAND_FAILURE;
-    }
     if(status == SCRIPT_COMMAND_NOT_FOUND)
         status = SCRIPT_COMMAND_FAILURE;
-    return status;
+    return argc_orig - argc;
 }
-#endif
 
 script_command_status script_set_sample(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
@@ -1375,7 +1375,7 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
     };
     if(argc == 0) {
         jabs_message(MSG_INFO, stderr, "Type help [topic] for information on a particular topic or \"help help\" for help on help.\n");
-        return SCRIPT_COMMAND_FAILURE;
+        return SCRIPT_COMMAND_NOT_FOUND;
     }
 
     int found = 0;
@@ -1399,36 +1399,8 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
                 script_print_command_tree(stderr, s->commands);
             } else if(strcmp(t->name, "version") == 0) {
                 jabs_message(MSG_INFO, stderr, "%s\n", jabs_version());
-            } else if(strcmp(t->name, "set") == 0) {
-                if(!s->cf || !s->cf->vars)
-                    break;
-                size_t i = 0;
-                for(jibal_config_var *var = s->cf->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
-                    if(var->type != JIBAL_CONFIG_VAR_UNIT)
-                        continue;
-                    i++;
-                    jabs_message(MSG_INFO, stderr," %25s", var->name);
-                    if(i % 3 == 0) {
-                        jabs_message(MSG_INFO, stderr,"\n");
-                    }
-                }
-                fprintf(stderr, "\n\nThe following variables are not in SI units:\n");
-                for(jibal_config_var *var = s->cf->vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
-                    if(var->type == JIBAL_CONFIG_VAR_UNIT)
-                        continue;
-                    jabs_message(MSG_INFO, stderr, " %25s: %s", var->name, jibal_config_var_type_name(var->type));
-                    if(var->type == JIBAL_CONFIG_VAR_OPTION && var->option_list) {
-                        jabs_message(MSG_INFO, stderr, " (");
-                        for(const jibal_option *o = var->option_list; o->s; o++) {
-                            jabs_message(MSG_INFO, stderr, "%s%s", o == var->option_list ? "":", ", o->s);
-                        }
-                        jabs_message(MSG_INFO, stderr, ")\n");
-                    } else {
-                        jabs_message(MSG_INFO, stderr, "\n");
-                    }
-                }
             }
-            return 0;
+            break;
         }
     }
 

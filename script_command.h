@@ -45,10 +45,13 @@ struct help_topic {
     const char *help_text;
 };
 
+
+const char *script_command_status_to_string(script_command_status status);
+
 int script_getopt(struct script_session *s, const script_command *commands, int *argc, char *const **argv, script_command_status *status_out); /* Parses argument vector, finds script_command_option "c" and calls "c->f()" or sets c->var. */
 
 script_command *script_command_new(const char *name, const char *help_text, int val, script_command_status (*f)(struct script_session *, int, char * const *)); /* Allocates new command that doesn't do anything. Can return var. */
-int script_command_set_var(script_command *c, jibal_config_var_type type, const void *variable, const jibal_option *option_list);
+int script_command_set_var(script_command *c, jibal_config_var_type type, void *variable, const jibal_option *option_list);
 void script_command_free(script_command *c);
 void script_commands_free(script_command *head);
 
@@ -69,13 +72,12 @@ void script_command_not_found(const char *cmd, const script_command *c);
 const script_command *script_command_find(const script_command *commands, const char *cmd_string);
 
 script_command_status script_set_var(struct script_session *s, jibal_config_var *var, int, char * const *);
-script_command_status script_set_boolean(struct script_session *s, const char *variable, int value);
+script_command_status script_enable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
+script_command_status script_disable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_add_detector(struct script_session *s, int argc, char * const *argv);
 script_command_status script_add_fit_range(struct script_session *s, int argc, char * const *argv);
 script_command_status script_add_reaction(struct script_session *s, int argc, char * const *argv);
 script_command_status script_add_reactions(struct script_session *s, int argc, char * const *argv);
-script_command_status script_disable(struct script_session *s, int argc, char * const *argv);
-script_command_status script_enable(struct script_session *s, int argc, char * const *argv);
 script_command_status script_exit(struct script_session *s, int argc, char * const *argv);
 script_command_status script_fit(struct script_session *s, int argc, char * const *argv);
 script_command_status script_help(struct script_session *s, int argc, char * const *argv);
@@ -104,7 +106,6 @@ script_command_status script_show_simulation(struct script_session *s, int argc,
 script_command_status script_show_variables(struct script_session *s, int argc, char * const *argv);
 script_command_status script_simulate(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_aperture(struct script_session *s, int argc, char * const *argv);
-script_command_status script_set_beam(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_ion(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_detector(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_sample(struct script_session *s, int argc, char * const *argv);
