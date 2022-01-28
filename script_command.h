@@ -21,13 +21,13 @@ struct script_session;
 
 #define COMMAND_DEPTH 8
 
-typedef enum script_command_status {
-    SCRIPT_COMMAND_SUCCESS = EXIT_SUCCESS,
-    SCRIPT_COMMAND_FAILURE = EXIT_FAILURE,
-    SCRIPT_COMMAND_NOT_FOUND = 101,
-    SCRIPT_COMMAND_EXIT = 102,
-    SCRIPT_COMMAND_EOF = 103
-} script_command_status;
+#define SCRIPT_COMMAND_SUCCESS (0) /* Anything above and including zero is success */
+#define SCRIPT_COMMAND_FAILURE (-1)
+#define SCRIPT_COMMAND_NOT_FOUND (-2)
+#define SCRIPT_COMMAND_EXIT (-3)
+#define SCRIPT_COMMAND_EOF (-4)
+
+typedef int script_command_status; /* Script commands should return negative on error (see defines above) and number of arguments (zero or positive) consumed successfully */
 
 typedef struct script_command {
     char *name;
