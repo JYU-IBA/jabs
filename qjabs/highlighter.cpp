@@ -1,4 +1,4 @@
-/* Original copyright notice of highlighter.cpp below, used
+﻿/* Original copyright notice of highlighter.cpp below, used
  * under the terms of the BSD license.
  *
  * Modifications by Jaakko Julin for JaBS. Modified version may be distributed
@@ -57,64 +57,67 @@
 ****************************************************************************/
 
 #include "highlighter.h"
-extern "C" {
-#include "../script.h"
-}
 
 Highlighter::Highlighter(QTextDocument *parent)
     : QSyntaxHighlighter(parent)
 {
     HighlightingRule rule;
-
-    commandFormat.setForeground(Qt::darkBlue);
-    commandFormat.setFontWeight(QFont::Bold);
-#if 0
-    const QString commandPatterns[] = {
-
-    };
-    for (const QString &pattern : commandPatterns) {
-        rule.pattern = QRegularExpression(pattern);
-        rule.format = commandFormat;
-        highlightingRules.append(rule);
-    }
-#endif
-     const struct script_command *stack[COMMAND_DEPTH];
-     const struct script_command *c;
-     stack[0] = script_commands;
-     size_t i = 0;
-     c = stack[0];
-     while(c->name != NULL) {
-         while(c->name != NULL) {
-             QString pattern = QString("^");
-             for(size_t j = 1; j <= i; j++) {
-                 pattern += stack[j]->name;
-                 pattern += " ";
-             }
-             pattern += c->name;
-             pattern + "\\b";
-             if(c->subcommands && i < (COMMAND_DEPTH - 1)) {
-                 i++;
-                 stack[i] = c;
-                 c = c->subcommands;
-             } else {
-                 c++;
-             }
-             rule.pattern = QRegularExpression(pattern);
-             //qDebug() << pattern;
-             rule.format = commandFormat;
-             highlightingRules.append(rule);
-         }
-         if(i == 0)
-             break;
-         c = stack[i];
-         i--;
-         c++;
-     }
-
+    QTextCharFormat singleLineCommentFormat;
     singleLineCommentFormat.setForeground(Qt::gray);
-    rule.pattern = QRegularExpression(QStringLiteral("#[^\n]*"));
+    rule.pattern = QRegularExpression(QStringLiteral("^#[^\n]*"));
     rule.format = singleLineCommentFormat;
     highlightingRules.append(rule);
+}
+
+void Highlighter::addHighLightingRulesFromScriptCommands(const script_command *commands)
+{
+    const struct script_command *stack[COMMAND_DEPTH];
+    const struct script_command *c;
+    stack[0] = commands;
+    size_t i = 0;
+    c = stack[0];
+    HighlightingRule rule;
+    QTextCharFormat commandFormat;
+    QTextCharFormat variableFormat;
+    commandFormat.setForeground(Qt::darkBlue);
+    commandFormat.setFontWeight(QFont::Bold);
+    variableFormat.setForeground(Qt::darkYellow);
+    variableFormat.setFontWeight(QFont::StyleItalic);
+    while(c) {
+
+            /*
+            QString pattern = QString("^");
+            for(size_t j = 0; j < i; j++) {
+                pattern += stack[j]->name;
+                pattern += " .*";
+            }*/
+            QString pattern = QString("\\b");
+            pattern += c->name;
+            pattern + "\\b";
+            rule.pattern = QRegularExpression(pattern);
+            if(c->f || c->f_var || c->subcommands) {
+                rule.format = commandFormat;
+                highlightingRules.append(rule);
+            } else if(c->var) {
+                rule.format = variableFormat;
+                highlightingRules.append(rule);
+            }
+
+        if(c->subcommands && i < COMMAND_DEPTH) { /* Go deeper, push existing pointer to stack */
+            stack[i] = c;
+            i++;
+            c = c->subcommands;
+            continue;
+        } else {
+            c = c->next; /* Go to next on the same level */
+        }
+        while(!c) {
+            if(i == 0)
+                break;
+            i--;
+            c = stack[i]->next;
+        }
+    }
 }
 
 void Highlighter::highlightBlock(const QString &text)
@@ -126,6 +129,5 @@ void Highlighter::highlightBlock(const QString &text)
             setFormat(match.capturedStart(), match.capturedLength(), rule.format);
         }
     }
-
     setCurrentBlockState(0);
 }

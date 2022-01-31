@@ -132,6 +132,7 @@ detector *detector_default(detector *det) {
     det->channels = 16384;
     det->compress = 1;
     det->foil = NULL;
+    det->foil_sm = NULL;
     return det;
 }
 

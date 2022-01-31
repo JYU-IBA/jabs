@@ -24,5 +24,5 @@ FILE *fopen_file_or_stream(const char *filename, const char *mode); /* opens fil
 void fclose_file_or_stream(FILE *f); /* fclose() if f is not stdout or stderr */
 
 char *strdup_non_null(const char *s); /* if s is NULL, returns NULL, else strdup(s) */
-int asprintf_append(char **ret, const char * restrict format, ...);
+int asprintf_append(char **ret, const char *format, ...);
 #endif //JABS_GENERIC_H

@@ -46,6 +46,7 @@ MainWindow::MainWindow(QWidget *parent)
     session = script_session_init(jibal, NULL);
     ui->action_Run->setShortcutContext(Qt::ApplicationShortcut);
     highlighter = new Highlighter(ui->plainTextEdit->document());
+    highlighter->addHighLightingRulesFromScriptCommands(session->commands);
     ui->action_New_File->setShortcut(QKeySequence::New);
     ui->action_Open_File->setShortcut(QKeySequence::Open);
     ui->action_Save_File->setShortcut(QKeySequence::Save);
