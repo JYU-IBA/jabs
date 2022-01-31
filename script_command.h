@@ -70,7 +70,7 @@ script_command_status script_execute_command(struct script_session *s, const cha
 script_command_status script_execute_command_argv(struct script_session *s, const script_command *commands, int argc, char **argv);
 void script_command_not_found(const char *cmd, const script_command *c);
 const script_command *script_command_find(const script_command *commands, const char *cmd_string);
-
+size_t script_command_print_possible_matches_if_ambiguous(const script_command *commands, const char *cmd_string);
 script_command_status script_set_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_enable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_disable_var(struct script_session *s, jibal_config_var *var, int, char * const *);

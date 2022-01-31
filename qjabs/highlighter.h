@@ -77,7 +77,8 @@ class Highlighter : public QSyntaxHighlighter
 
 public:
     Highlighter(QTextDocument *parent = nullptr);
-    void addHighLightingRulesFromScriptCommands(const script_command *commands);
+    void setCommands(const script_command *commands);
+    void perkele(int argc, char **argv);
 
 protected:
     void highlightBlock(const QString &text) override;
@@ -89,6 +90,10 @@ private:
         QTextCharFormat format;
     };
     QList<HighlightingRule> highlightingRules;
+    QTextCharFormat singleLineCommentFormat;
+    QTextCharFormat commandFormat;
+    QTextCharFormat variableFormat;
+    const script_command *commands;
 };
 //! [0]
 

@@ -107,7 +107,9 @@ char **string_to_argv(const char *str, int *argc) { /* Returns allocated array o
         }
     }
     for(i = 0; i < n; i++) { /* We should have our final strings now, let's make deep copies */
+#ifdef ARGV_DEEP_COPY
         out[i] = strdup(out[i]);
+#endif
 #ifdef DEBUG
         fprintf(stderr, "argv[%zu] = %s\n", i, out[i]);
 #endif
@@ -116,14 +118,20 @@ char **string_to_argv(const char *str, int *argc) { /* Returns allocated array o
     if(argc) {
         *argc = n;
     }
+#ifdef ARGV_DEEP_COPY
     free(s);
+#endif
     return out;
 }
 
 void argv_free(char **argv, int argc) {
+#ifdef ARGV_DEEP_COPY
     for(int i = 0; i < argc; i++) {
         free(argv[i]);
     }
+#else
+    free(argv[0]);
+#endif
     free(argv);
 }
 

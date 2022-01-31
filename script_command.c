@@ -112,8 +112,11 @@ void script_command_not_found(const char *cmd, const script_command *c_parent) {
             jabs_message(MSG_ERROR, stderr, "Not enough arguments!\n\n");
         }
         if(c_parent->subcommands) {
-            jabs_message(MSG_ERROR, stderr, "Following subcommands of \"%s\" are recognized:\n", c_parent->name);
-            script_commands_print(stderr, c_parent->subcommands);
+            size_t matches = script_command_print_possible_matches_if_ambiguous(c_parent->subcommands, cmd);
+            if(matches == 0) {
+                jabs_message(MSG_ERROR, stderr, "Following subcommands of \"%s\" are recognized:\n", c_parent->name);
+                script_commands_print(stderr, c_parent->subcommands);
+            }
         }
     } else {
         if(cmd) {
@@ -186,7 +189,7 @@ script_command_status script_fit(script_session *s, int argc, char * const *argv
     sample_model_print(NULL, fit_data->sm);
     jabs_message(MSG_INFO, stderr, "\n");
     fit_stats_print(stderr, &fit_data->stats);
-    return 0;
+    return 1;
 }
 
 script_command_status script_save_bricks(script_session *s, int argc, char * const *argv) {
@@ -207,7 +210,7 @@ script_command_status script_save_spectra(script_session *s, int argc, char * co
     size_t i_det = 0;
     struct fit_data *fit = s->fit;
     int argc_orig = argc;
-    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det) || argc != 1) {
+    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det) || argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: save spectra [detector] file\n");
         return SCRIPT_COMMAND_FAILURE;
     }
@@ -227,8 +230,9 @@ script_command_status script_save_spectra(script_session *s, int argc, char * co
 
 script_command_status script_save_sample(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit_data = s->fit;
-    if(argc != 1) {
+    if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: save sample [file]\n");
+        return SCRIPT_COMMAND_FAILURE;
     }
     if(!fit_data->sm) {
         jabs_message(MSG_ERROR, stderr, "No sample set.\n");
@@ -238,13 +242,14 @@ script_command_status script_save_sample(script_session *s, int argc, char * con
         jabs_message(MSG_ERROR, stderr, "Could not write sample to file \"%s\".\n", argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
-    return SCRIPT_COMMAND_SUCCESS;
+    return 1;
 }
 
 script_command_status script_save_detector(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit_data = s->fit;
     size_t i_det = 0;
-    if(script_get_detector_number(fit_data->sim, TRUE, &argc, &argv, &i_det) || argc != 1) {
+    int argc_orig = argc;
+    if(script_get_detector_number(fit_data->sim, TRUE, &argc, &argv, &i_det) || argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: save detector [detector] file\n");
         return SCRIPT_COMMAND_FAILURE;
     }
@@ -252,7 +257,8 @@ script_command_status script_save_detector(script_session *s, int argc, char * c
         jabs_message(MSG_ERROR, stderr,"Could not write detector %zu to file \"%s\".\n", i_det, argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
-    return SCRIPT_COMMAND_SUCCESS;
+    argc -= 1;
+    return argc_orig - argc;
 }
 
 script_command_status script_remove_reaction(script_session *s, int argc, char * const *argv) {
@@ -349,6 +355,22 @@ const script_command *script_command_find(const script_command *commands, const 
     if(found == 1) {
         return c_found;
     }
+    return NULL;
+}
+
+size_t script_command_print_possible_matches_if_ambiguous(const script_command *commands, const char *cmd_string) {
+    size_t found = 0;
+    if(!cmd_string || !commands)
+        return 0;
+    for(const script_command *c = commands; c; c = c->next) {
+        if(strncmp(c->name, cmd_string, strlen(cmd_string)) == 0) {
+            found++;
+            if(strlen(cmd_string) == strlen(c->name)) { /* Exact match, can not be ambiguous */
+                found = 1;
+                break;
+            }
+        }
+    }
     if(found > 1) {
         jabs_message(MSG_ERROR, stderr, "\"%s\" is ambiguous (%i matches):", cmd_string, found);
         for(const script_command *c = commands; c; c = c->next) {
@@ -357,9 +379,8 @@ const script_command *script_command_find(const script_command *commands, const 
             }
         }
         jabs_message(MSG_ERROR, stderr, "\n");
-        return NULL;
     }
-    return NULL;
+    return found;
 }
 
 script_command_status script_set_var(struct script_session *s, jibal_config_var *var, int argc,  char * const *argv) {
@@ -433,9 +454,9 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
             script_command_not_found(argv[0], c_parent);
             return SCRIPT_COMMAND_NOT_FOUND;
         }
-        while(c) { /* Subcommand found */
-            argc--;
-            argv++;
+            while(c) { /* Subcommand found */
+                argc--;
+                argv++;
 #ifdef DEBUG
             fprintf(stderr, "Debug: Found command %s.\n", c->name);
 #endif
@@ -1245,7 +1266,7 @@ script_command_status script_set_detector(script_session *s, int argc, char * co
                 break;
         }
     }
-    free(commands);
+    script_commands_free(commands);
     free(vars);
     if(status == SCRIPT_COMMAND_NOT_FOUND)
         status = SCRIPT_COMMAND_FAILURE;
