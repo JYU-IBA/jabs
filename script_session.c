@@ -27,67 +27,16 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
         sim = sim_init(jibal);
     }
     s->fit = fit_data_new(jibal, sim); /* Not just fit, but this conveniently holds everything we need. */
-    s->cf = jibal_config_file_init(jibal->units);
-    if(!s->fit || !s->cf) {
+    if(!s->fit) {
         jabs_message(MSG_ERROR, stderr,"Script session initialization failed.\n");
         free(s);
         return NULL;
     }
-    script_session_reset_vars(s);
     s->output_filename = NULL;
     s->file_depth = 0;
     s->files[0] = NULL;
     s->commands = script_commands_create(s);
     return s;
-}
-
-int script_session_reset_vars(script_session *s) {
-    free(s->cf->vars);
-    s->cf->vars = NULL;
-    return jibal_config_file_set_vars(s->cf, script_make_vars(s));
-}
-
-jibal_config_var *script_make_vars(script_session *s) {
-    struct fit_data *fit = s->fit;
-    if(!fit)
-        return NULL;
-    simulation *sim = fit->sim;
-    if(!sim)
-        return NULL;
-    jibal_config_var vars[] = {
-            {JIBAL_CONFIG_VAR_UNIT,   "fluence",              &sim->fluence,                       NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "energy",               &sim->beam_E,                        NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",         &sim->beam_E_broad,                  NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "emin",                 &sim->emin,                          NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "alpha",                &sim->sample_theta,                  NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "phi",                  &sim->sample_phi,                    NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "channeling",           &sim->channeling_offset,             NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",     &sim->channeling_slope,              NULL},
-            {JIBAL_CONFIG_VAR_STRING, "output",               &s->output_filename,                 NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "erd",                  &sim->erd,                           NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "rbs",                  &sim->rbs,                           NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "fit_maxiter",          &fit->n_iters_max,                   NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "fit_xtol",             &fit->xtol,                          NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "fit_gtol",             &fit->gtol,                          NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "fit_ftol",             &fit->ftol,                          NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "ds",                   &sim->params.ds,                     NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "rk4",                  &sim->params.rk4,                    NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_incident",   &sim->params.stop_step_incident,     NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_exiting",    &sim->params.stop_step_exiting,      NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "stop_step_fudge",      &sim->params.stop_step_fudge_factor, NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "nucl_stop_accurate",   &sim->params.nucl_stop_accurate,     NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy", &sim->params.mean_conc_and_energy,   NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "geostragg",            &sim->params.geostragg,              NULL},
-            {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                                                      NULL}
-    };
-    int n_vars;
-    for(n_vars = 0; vars[n_vars].type != 0; n_vars++);
-    size_t var_size = sizeof(jibal_config_var)*(n_vars + 1); /* +1 because the null termination didn't count */
-    jibal_config_var *vars_out = malloc(var_size);
-    if(vars_out) {
-        memcpy(vars_out, vars, var_size);
-    }
-    return vars_out;
 }
 
 int script_session_load_script(script_session *s, const char *filename) {
@@ -113,7 +62,6 @@ void script_session_free(script_session *s) {
     if(!s)
         return;
     free(s->output_filename);
-    jibal_config_file_free(s->cf);
     fit_data_workspaces_free(s->fit);
     fit_data_exp_free(s->fit);
     sim_free(s->fit->sim);

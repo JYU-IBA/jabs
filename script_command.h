@@ -33,6 +33,7 @@ typedef struct script_command {
     char *name;
     script_command_status (*f)(struct script_session *, int, char * const *); /* Function to process argument vectors. Called if it is non-NULL, even if subcommands exist! Return value is important.*/
     script_command_status (*f_var)(struct script_session *, jibal_config_var *var, int, char * const *); /* Function to process variables (from subcommands). */
+    script_command_status (*f_val)(struct script_session *, int, int, char * const *); /* Function to process vals (from subcommands). */
     char *help_text; /* Short help text */
     struct script_command *subcommands;
     jibal_config_var *var;
@@ -72,6 +73,8 @@ void script_command_not_found(const char *cmd, const script_command *c);
 const script_command *script_command_find(const script_command *commands, const char *cmd_string);
 size_t script_command_print_possible_matches_if_ambiguous(const script_command *commands, const char *cmd_string);
 script_command_status script_set_var(struct script_session *s, jibal_config_var *var, int, char * const *);
+script_command_status script_set_detector_var(struct script_session *s, jibal_config_var *var, int argc,  char * const *argv);
+script_command_status script_show_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_enable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_disable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_add_detector(struct script_session *s, int argc, char * const *argv);

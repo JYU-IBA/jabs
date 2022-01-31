@@ -392,6 +392,73 @@ script_command_status script_set_var(struct script_session *s, jibal_config_var 
     return 1; /* Number of arguments */
 }
 
+script_command_status script_set_detector_val(struct script_session *s, int val, int argc,  char * const *argv) {
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Not enough arguments to set detector variable.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Active detector is %zu.\n", s->i_det_active);
+#endif
+    detector *det = sim_det(s->fit->sim, s->i_det_active);
+    if(!det) {
+        jabs_message(MSG_ERROR, stderr, "Detector %zu does not exist.\n", s->i_det_active);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    double *target = NULL;
+    switch(val) { /* TODO: implement the rest! */
+        case 't': /* theta */
+            target = &det->theta;
+            break;
+        default:
+            jabs_message(MSG_ERROR, stderr, "Unhandled value %i in script_set_detector_val. Report to developer.\n", val);
+            return SCRIPT_COMMAND_FAILURE;
+            break;
+    }
+    if(target) {
+        *target = jibal_get_val(s->jibal->units, 0, argv[0]);
+    }
+    return 1; /* Number of arguments */
+}
+
+script_command_status script_show_var(struct script_session *s, jibal_config_var *var, int argc, char * const *argv) {
+    (void) argv;
+    (void) argc;
+    (void) s;
+    if(var->variable == NULL)
+        return SCRIPT_COMMAND_FAILURE;
+    switch(var->type) {
+        case JIBAL_CONFIG_VAR_NONE:
+            break;
+        case JIBAL_CONFIG_VAR_PATH:
+        case JIBAL_CONFIG_VAR_STRING:
+            if(*((void **) var->variable) == NULL)
+                break;
+            jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name, *((char **) var->variable));
+            break;
+        case JIBAL_CONFIG_VAR_BOOL:
+            jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name, *((int *) var->variable) ? "true" : "false");
+            break;
+        case JIBAL_CONFIG_VAR_INT:
+            jabs_message(MSG_INFO, stderr, "%s = %i\n", var->name, *((int *) var->variable));
+            break;
+        case JIBAL_CONFIG_VAR_DOUBLE:
+            jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
+            break;
+        case JIBAL_CONFIG_VAR_UNIT:
+            jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
+            break;
+        case JIBAL_CONFIG_VAR_OPTION:
+            jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name,
+                         jibal_option_get_string(var->option_list, *((int *) var->variable)));
+            break;
+        case JIBAL_CONFIG_VAR_SIZE:
+            jabs_message(MSG_INFO, stderr, "%s = %zu\n", var->name, *((size_t *) var->variable));
+            break;
+    }
+    return 0;
+}
+
 script_command_status script_enable_var(struct script_session *s, jibal_config_var *var, int argc, char * const *argv) {
     (void) argc;
     (void) argv;
@@ -477,9 +544,12 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                     return status;
                 }
             } else if(c->var) {
+#ifdef DEBUG
+                fprintf(stderr, "Debug: %s is a var.\n", c->name);
+#endif
                 if(!c_parent) {
                     jabs_message(MSG_ERROR, stderr,
-                                 "Command/option \"%s\" is a variable, but there is no parent command. This is highly unusual.\n",
+                                 "Command/option \"%s\" is a variable, but there is no parent command at all. This is highly unusual.\n",
                                  c->name);
                     return SCRIPT_COMMAND_FAILURE;
                 }
@@ -489,12 +559,40 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                                  c->name, c_parent->name);
                     return SCRIPT_COMMAND_FAILURE;
                 }
+#ifdef DEBUG
+                fprintf(stderr, "Debug: Using function f_var()=%p in %s. %i arguments. Arguments start with: %s\n", (void *)c_parent->f_var, c_parent->name, argc, argc?argv[0]:"(no arguments)");
+#endif
                 script_command_status status = c_parent->f_var(s, c->var, argc, argv);
-                if(status > 0) { /* Positive numbers indicate number of arguments consumed */
+                if(status >= 0) { /* Positive numbers indicate number of arguments consumed */
                     argc -= status;
                     argv += status;
+                } else {
+                    return status;
                 }
-            } else if(!argc) {
+            } else if (c->val) {
+                if(!c_parent) {
+                    jabs_message(MSG_ERROR, stderr,
+                                 "Command/option \"%s\" has a non-zero value, but there is no parent command at all. This is highly unusual.\n",
+                                 c->name);
+                    return SCRIPT_COMMAND_FAILURE;
+                }
+                if(!c_parent->f_val) {
+                    jabs_message(MSG_ERROR, stderr,
+                                 "Command/option \"%s\" has a non-zero value, but there is no function to handle values in parent command (\"%s\"). This is highly unusual.\n",
+                                 c->name, c_parent->name);
+                    return SCRIPT_COMMAND_FAILURE;
+                }
+#ifdef DEBUG
+                fprintf(stderr, "Debug: Using function f_val()=%p in %s. %i arguments. Arguments start with: %s\n", (void *)c_parent->f_val, c_parent->name, argc, argc?argv[0]:"(no arguments)");
+#endif
+                script_command_status status = c_parent->f_val(s, c->val, argc, argv);
+                if(status >= 0) { /* Positive numbers indicate number of arguments consumed */
+                    argc -= status;
+                    argv += status;
+                } else {
+                    return status;
+                }            }
+            else if(!argc) {
                 script_command_not_found(NULL, c); /* No function, no nothing, no arguments. */
             }
             if(c->subcommands) {
@@ -615,15 +713,8 @@ int script_getopt(script_session *s, const script_command *commands, int *argc, 
     if(c_found->f) {
         *status_out = c_found->f(s, *argc, *argv);
     } else if(c_found->var) {
-        if(*argc < 1) {
-            jabs_message(MSG_WARNING, stderr, "Not enough arguments for setting a variable (%s)!\n", c_found->var->name);
-            *status_out = SCRIPT_COMMAND_FAILURE;
-            return -1;
-        }
-        jibal_config_var_set(s->cf->units, c_found->var, (*argv)[0], s->cf->filename);
-        *status_out = SCRIPT_COMMAND_SUCCESS;
-        (*argc)--;
-        (*argv)++;
+        jabs_message(MSG_ERROR, stderr, "Unsupported.\n");
+        *status_out = SCRIPT_COMMAND_FAILURE;
     }
     return c_found->val;
 }
@@ -780,10 +871,34 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_set->subcommands, script_command_new("aperture", "Set aperture.", 0, &script_set_aperture));
 
     script_command *c_detector = script_command_new("detector", "Set detector properties.", 0, &script_set_detector);
+    c_detector->f_val = &script_set_detector_val;
     script_command_list_add_command(&c_set->subcommands, c_detector);
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("aperture", "Set aperture", 'a', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("foil", "Set foil", 'f', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("calibration", "Set calibration", 'c', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("theta", "Set detector (scattering) angle.", 't', NULL));
+    /* TODO: rest of the stuff from below */
+#if 0
+    jibal_config_var det_vars[] = {
+            {JIBAL_CONFIG_VAR_OPTION, "type",       &s->det.type,          detector_option},
+            {JIBAL_CONFIG_VAR_UNIT,   "slope",      &s->det.slope,             NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "offset",     &s->det.offset,            NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "length",     &s->det.length,            NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "resolution", &s->det.resolution,        NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "theta",      &s->det.theta,             NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "phi",        &s->det.phi,               NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "solid",      &s->det.solid,             NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "distance",   &s->det.distance,          NULL},
+            {JIBAL_CONFIG_VAR_INT,    "column",     &s->det.column,            NULL},
+            {JIBAL_CONFIG_VAR_INT,    "channels",   &s->det.channels,          NULL},
+            {JIBAL_CONFIG_VAR_INT,    "compress",   &s->det.compress,          NULL},
+            {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                              NULL}
+    };
+#endif
+
     script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
     script_command_list_add_command(&c_set->subcommands, script_command_new("sample", "Set sample.", 0, &script_set_sample));
-    script_command_list_add_command(&c_set->subcommands, script_command_new("variable", "Set a variable.", 0, &script_set_variable)); /* TODO: unnecessary / incomplete, remove */
+    script_command_list_add_command(&c_set->subcommands, script_command_new("variable", "Set a variable.", 0, NULL));
 
     const jibal_config_var vars[] = {
             {JIBAL_CONFIG_VAR_UNIT,   "fluence",              &sim->fluence,                       NULL},
@@ -829,7 +944,11 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_show->subcommands, script_command_new("reactions","Show reactions." , 0, &script_show_reactions));
     script_command_list_add_command(&c_show->subcommands, script_command_new("sample", "Show sample.", 0, &script_show_sample));
     script_command_list_add_command(&c_show->subcommands, script_command_new("simulation", "Show simulation.", 0, &script_show_simulation));
-    script_command_list_add_command(&c_show->subcommands, script_command_new("variables" , "Show variables.", 0, &script_show_variables));
+    script_command *c_show_variable = script_command_new("variable" , "Show variable.", 0, NULL);
+    c_show_variable->f_var = script_show_var;
+    script_command_list_add_command(&c_show->subcommands, c_show_variable);
+    c = script_command_list_from_vars_array(vars, 0);
+    script_command_list_add_command(&c_show_variable->subcommands, c);
 
     script_command_list_add_command(&head, script_command_new("exit", "Exit.", 0, &script_exit));
 
@@ -851,7 +970,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("reaction", "Remove reaction.", 0, &script_remove_reaction));
 
-    c = script_command_new("reset", "Reset something (or everything).", 0, NULL);
+    c = script_command_new("reset", "Reset something (or everything).", 0, &script_reset);
     script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("detectors", "Reset detectors.", 0, &script_reset_detectors));
     script_command_list_add_command(&c->subcommands, script_command_new("experimental", "Reset experimental spectra.", 0, &script_reset_experimental));
@@ -1082,7 +1201,8 @@ script_command_status script_reset(script_session *s, int argc, char * const *ar
     fit->sim = sim_init(s->jibal);
     fit->exp = calloc(fit->sim->n_det, sizeof(gsl_histogram *));
     jibal_gsto_assign_clear_all(fit->jibal->gsto);
-    script_session_reset_vars(s);
+    script_commands_free(s->commands);
+    s->commands = script_commands_create(s);
     return 0;
 }
 
@@ -1126,7 +1246,9 @@ script_command_status script_show_detector(script_session *s, int argc, char * c
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    detector_print(NULL, fit->sim->det[i_det]);
+    if(detector_print(NULL, sim_det(fit->sim, i_det))) {
+        jabs_message(MSG_ERROR, stderr, "No detectors set or other error.\n");
+    }
     return argc_orig - argc; /* Number of arguments */
 }
 
@@ -1138,46 +1260,6 @@ script_command_status script_show_reactions(script_session *s, int argc, char * 
         jabs_message(MSG_INFO, stderr, "No reactions.\n");
     }
     reactions_print(stderr, fit->sim->reactions, fit->sim->n_reactions);
-    return 0;
-}
-
-script_command_status script_show_variables(script_session *s, int argc, char *const *argv) {
-    (void) argc;
-    (void) argv;
-    const jibal_config_var *var;
-    for(var = s->cf->vars; var->type != 0; var++) {
-        if(var->variable == NULL)
-            continue;
-        switch(var->type) {
-            case JIBAL_CONFIG_VAR_NONE:
-                break;
-            case JIBAL_CONFIG_VAR_PATH:
-            case JIBAL_CONFIG_VAR_STRING:
-                if(*((void **) var->variable) == NULL)
-                    continue;
-                jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name, *((char **) var->variable));
-                break;
-            case JIBAL_CONFIG_VAR_BOOL:
-                jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name, *((int *) var->variable) ? "true" : "false");
-                break;
-            case JIBAL_CONFIG_VAR_INT:
-                jabs_message(MSG_INFO, stderr, "%s = %i\n", var->name, *((int *) var->variable));
-                break;
-            case JIBAL_CONFIG_VAR_DOUBLE:
-                jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
-                break;
-            case JIBAL_CONFIG_VAR_UNIT:
-                jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
-                break;
-            case JIBAL_CONFIG_VAR_OPTION:
-                jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name,
-                             jibal_option_get_string(var->option_list, *((int *) var->variable)));
-                break;
-            case JIBAL_CONFIG_VAR_SIZE:
-                jabs_message(MSG_INFO, stderr, "%s = %zu\n", var->name, *((size_t *) var->variable));
-                break;
-        }
-    }
     return 0;
 }
 
@@ -1225,8 +1307,13 @@ script_command_status script_set_detector(script_session *s, int argc, char * co
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    script_command *commands = NULL;
-    detector *det = sim_det(fit->sim, i_det);
+    if(argc == 0)
+        return SCRIPT_COMMAND_NOT_FOUND; /* TODO: set detector without arguments, should we do something? */
+
+    s->i_det_active = i_det;
+    return argc_orig - argc;
+    /* TODO: implement the stuff from below in script_set_detector_val() */
+#if 0
     jibal_config_var *vars = detector_make_vars(det);
     commands = script_command_list_from_vars_array(vars, 0);
     script_command_list_add_command(&commands, script_command_new("aperture", "Set aperture", 'a', NULL));
@@ -1271,6 +1358,7 @@ script_command_status script_set_detector(script_session *s, int argc, char * co
     if(status == SCRIPT_COMMAND_NOT_FOUND)
         status = SCRIPT_COMMAND_FAILURE;
     return argc_orig - argc;
+#endif
 }
 
 script_command_status script_set_sample(script_session *s, int argc, char * const *argv) {
@@ -1289,28 +1377,6 @@ script_command_status script_set_sample(script_session *s, int argc, char * cons
         sim_reactions_free(fit->sim);
     }
     return argc_consumed;
-}
-
-script_command_status script_set_variable(script_session *s, int argc, char * const *argv) {
-    if(argc < 1)
-        return SCRIPT_COMMAND_FAILURE;
-    for(jibal_config_var *var = s->cf->vars; var->type != 0; var++) {
-        if(strcmp(var->name, argv[0]) == 0) {
-#ifdef DEBUG
-            fprintf(stderr, "Setting variable %s to \"%s\"\n", var->name, argv[1]);
-#endif
-            if(argc != 2) { /* Yes, this check is quite late, but it allows us to check if the variable exists */
-                jabs_message(MSG_ERROR, stderr, "Usage: set variable %s [value]\n", var->name);
-                return SCRIPT_COMMAND_FAILURE;
-            }
-            if(jibal_config_var_set(s->cf->units, var, argv[1], s->cf->filename)) {
-                return SCRIPT_COMMAND_FAILURE;
-            } else {
-                return 2; /* Number of arguments consumed */
-            }
-        }
-    }
-    return SCRIPT_COMMAND_NOT_FOUND;
 }
 
 

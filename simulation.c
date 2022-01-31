@@ -459,9 +459,9 @@ void simulation_print(FILE *f, const simulation *sim) {
             jabs_message(MSG_INFO, f, "diameter %g mm\n", sim->beam_aperture->diameter/C_MM);
         } else if(sim->beam_aperture->type == APERTURE_RECTANGLE) {
             jabs_message(MSG_INFO, f, "width %g mm height %g mm\n", sim->beam_aperture->width/C_MM, sim->beam_aperture->height/C_MM);
-        } else {
-            jabs_message(MSG_INFO, f, "\n");
         }
+    } else {
+        jabs_message(MSG_INFO, f, "\n");
     }
     jabs_message(MSG_INFO, f, "n_detectors = %zu\n", sim->n_det);
     for(size_t i = 0; i < sim->n_det; i++) {

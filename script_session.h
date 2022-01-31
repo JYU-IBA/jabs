@@ -25,17 +25,15 @@
 typedef struct script_session {
     jibal *jibal;
     struct fit_data *fit;
-    jibal_config_file *cf; /* a pseudo-configuration "file" for our session */
     char *output_filename; /* File name for automatic spectra saving */ /* TODO: multidetector! */
     clock_t start, end;
     script_file *files[SCRIPT_NESTED_MAX];
     size_t file_depth;
     struct script_command *commands;
+    size_t i_det_active;
 } script_session;
 
 script_session *script_session_init(jibal *jibal, simulation *sim); /* sim can be NULL or a previously initialized sim can be given. Note that it will be free'd by script_session_free()! */
-jibal_config_var *script_make_vars(script_session *s);
-int script_session_reset_vars(script_session *s);
 void script_session_free(script_session *s);
 int script_session_load_script(script_session *s, const char *filename);
 int script_get_detector_number(const simulation *sim, int allow_empty, int *argc, char * const **argv, size_t *i_det);
