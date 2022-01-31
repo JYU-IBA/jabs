@@ -62,7 +62,7 @@
 #include <QTextCharFormat>
 #include <QRegularExpression>
 extern "C" {
-#include "../script_command.h"
+#include "../script_session.h"
 }
 
 
@@ -77,8 +77,8 @@ class Highlighter : public QSyntaxHighlighter
 
 public:
     Highlighter(QTextDocument *parent = nullptr);
-    void setCommands(const script_command *commands);
-    void perkele(int argc, char **argv);
+    void setSession(const script_session *session);
+    void highlightArgv(int argc, char **argv);
 
 protected:
     void highlightBlock(const QString &text) override;
@@ -93,7 +93,7 @@ private:
     QTextCharFormat singleLineCommentFormat;
     QTextCharFormat commandFormat;
     QTextCharFormat variableFormat;
-    const script_command *commands;
+    const script_session *session;
 };
 //! [0]
 

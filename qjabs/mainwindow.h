@@ -65,7 +65,7 @@ private slots:
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);
-    int runLine(const QString &line, size_t lineno = 0);
+    int runLine(const QString &line);
     void plotSession();
     Ui::MainWindow *ui;
     struct jibal *jibal;

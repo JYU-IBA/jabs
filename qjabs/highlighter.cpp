@@ -71,9 +71,9 @@ Highlighter::Highlighter(QTextDocument *parent)
     variableFormat.setFontWeight(QFont::StyleItalic);
 }
 
-void Highlighter::setCommands(const script_command *commands)
+void Highlighter::setSession(const script_session *session)
 {
-    Highlighter::commands = commands;
+    Highlighter::session = session;
 }
 
 void Highlighter::highlightBlock(const QString &text)
@@ -94,7 +94,7 @@ void Highlighter::highlightBlock(const QString &text)
         return;
 
     }
-    perkele(argc, argv);
+    highlightArgv(argc, argv);
     argv_free(argv, argc);
 
 
@@ -110,8 +110,8 @@ void Highlighter::highlightBlock(const QString &text)
     setCurrentBlockState(0);
 }
 
-void Highlighter::perkele(int argc, char **argv) {
-    const script_command *cmds = commands;
+void Highlighter::highlightArgv(int argc, char **argv) {
+    const script_command *cmds = session->commands;
     const script_command *c_parent = NULL;
     const char *argv_start = argv[0];
     while(argc && cmds) {

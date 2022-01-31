@@ -46,7 +46,7 @@ MainWindow::MainWindow(QWidget *parent)
     session = script_session_init(jibal, NULL);
     ui->action_Run->setShortcutContext(Qt::ApplicationShortcut);
     highlighter = new Highlighter(ui->plainTextEdit->document());
-    highlighter->setCommands(session->commands);
+    highlighter->setSession(session);
     ui->action_New_File->setShortcut(QKeySequence::New);
     ui->action_Open_File->setShortcut(QKeySequence::Open);
     ui->action_Save_File->setShortcut(QKeySequence::Save);
@@ -91,8 +91,7 @@ void MainWindow::openFile(const QString &filename)
 }
 
 
-int MainWindow::runLine(const QString &line, size_t lineno) {
-    //jabs_message(MSG_INFO, stderr, "jabs> %s\n", qPrintable(line));
+int MainWindow::runLine(const QString &line) {
     int status = script_execute_command(session, qPrintable(line));
     return status;
 }
@@ -135,8 +134,9 @@ void MainWindow::on_action_Run_triggered()
                 continue;
         if(line.at(0) == '#')
             continue;
-        if(runLine(line, lineno))
+        if(runLine(line) < 0) {
             return;
+        }
     }
     plotSession();
 }
@@ -324,7 +324,7 @@ void MainWindow::on_actionAbout_triggered()
 
 void MainWindow::on_commandLineEdit_returnPressed()
 {
-    if(runLine(ui->commandLineEdit->text()) == EXIT_SUCCESS) {
+    if(runLine(ui->commandLineEdit->text()) == SCRIPT_COMMAND_SUCCESS) {
             ui->commandLineEdit->clear();
     }
     plotSession();
