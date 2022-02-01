@@ -73,7 +73,6 @@ void script_command_not_found(const char *cmd, const script_command *c);
 const script_command *script_command_find(const script_command *commands, const char *cmd_string);
 size_t script_command_print_possible_matches_if_ambiguous(const script_command *commands, const char *cmd_string);
 script_command_status script_set_var(struct script_session *s, jibal_config_var *var, int, char * const *);
-script_command_status script_set_detector_var(struct script_session *s, jibal_config_var *var, int argc,  char * const *argv);
 script_command_status script_show_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_enable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_disable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
@@ -106,12 +105,10 @@ script_command_status script_show_fit(struct script_session *s, int argc, char *
 script_command_status script_show_reactions(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_sample(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_simulation(struct script_session *s, int argc, char * const *argv);
-script_command_status script_show_variables(struct script_session *s, int argc, char * const *argv);
 script_command_status script_simulate(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_aperture(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_ion(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_detector(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_sample(struct script_session *s, int argc, char * const *argv);
-script_command_status script_set_variable(struct script_session *s, int argc, char * const *argv);
 
 #endif //JABS_SCRIPT_COMMAND_H

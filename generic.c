@@ -130,6 +130,7 @@ void argv_free(char **argv, int argc) {
         free(argv[i]);
     }
 #else
+    (void) argc;
     free(argv[0]);
 #endif
     free(argv);
