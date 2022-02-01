@@ -49,8 +49,6 @@ struct help_topic {
 
 const char *script_command_status_to_string(script_command_status status);
 
-int script_getopt(struct script_session *s, const script_command *commands, int *argc, char *const **argv, script_command_status *status_out); /* Parses argument vector, finds script_command_option "c" and calls "c->f()" or sets c->var. */
-
 script_command *script_command_new(const char *name, const char *help_text, int val, script_command_status (*f)(struct script_session *, int, char * const *)); /* Allocates new command that doesn't do anything. Can return var. */
 int script_command_set_var(script_command *c, jibal_config_var_type type, void *variable, const jibal_option *option_list);
 void script_command_free(script_command *c);
@@ -109,6 +107,9 @@ script_command_status script_simulate(struct script_session *s, int argc, char *
 script_command_status script_set_aperture(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_ion(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_detector(struct script_session *s, int argc, char * const *argv);
+script_command_status script_set_detector_aperture(struct script_session *s, int argc, char * const *argv);
+script_command_status script_set_detector_calibration(struct script_session *s, int argc, char * const *argv);
+script_command_status script_set_detector_foil(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_sample(struct script_session *s, int argc, char * const *argv);
 
 #endif //JABS_SCRIPT_COMMAND_H

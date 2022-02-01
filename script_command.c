@@ -405,18 +405,75 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
         jabs_message(MSG_ERROR, stderr, "Detector %zu does not exist.\n", s->i_det_active);
         return SCRIPT_COMMAND_FAILURE;
     }
-    double *target = NULL;
-    switch(val) { /* TODO: implement the rest! */
-        case 't': /* theta */
-            target = &det->theta;
+    double *value_double = NULL;
+    size_t *value_size = NULL;
+
+#if 0
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("aperture", "Set aperture", 0, &script_set_detector_aperture));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("calibration", "Set calibration", 0, &script_set_detector_calibration));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("column", "", 'c', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("channels", "", 'h', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("compress", "", 'C', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("distance", "", 'd', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("foil", "Set foil", 0, &script_set_detector_foil));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("type", "", 't', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("slope", "", 'S', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("offset", "", 'O', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("resolution", "", 'r', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("solid", "", 's', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("theta", "", 'T', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("length", "", 'l', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "", 'p', NULL));
+#endif
+    switch(val) {
+        case 'c': /* column */
+            value_size = &(det->column);
+            break;
+        case 'h': /* channels */
+            value_size = &(det->channels);
+            break;
+        case 'C': /* compress */
+            value_size = &(det->compress);
+            break;
+        case 'd': /* distance */
+            value_double = &(det->distance);
+            break;
+        case 't': /* type */
+            det->type = jibal_option_get_value(detector_option, argv[0]);
+            if(det->type == 0) {
+                jabs_message(MSG_WARNING, stderr, "Detector type \"%s\" is none or unknown.\n", argv[0]);
+            }
+            break;
+        case 'S': /* slope */
+            value_double = &(det->slope);
+            break;
+        case 'O': /* offset */
+            value_double = &(det->offset);
+            break;
+        case 'r': /* resolution */
+            value_double = &(det->resolution);
+            break;
+        case 's': /* solid */
+            value_double = &(det->solid);
+            break;
+        case 'T': /* theta */
+            value_double = &(det->theta);
+            break;
+        case 'l': /* length */
+            value_double = &(det->length);
+            break;
+        case 'p': /* phi */
+            value_double = &(det->phi);
             break;
         default:
             jabs_message(MSG_ERROR, stderr, "Unhandled value %i in script_set_detector_val. Report to developer.\n", val);
             return SCRIPT_COMMAND_FAILURE;
             break;
     }
-    if(target) {
-        *target = jibal_get_val(s->jibal->units, 0, argv[0]);
+    if(value_double) {
+        *value_double = jibal_get_val(s->jibal->units, 0, argv[0]);
+    } else if(value_size) {
+        *value_size = strtoull(argv[0], NULL, 10);
     }
     return 1; /* Number of arguments */
 }
@@ -668,57 +725,6 @@ const char *script_command_status_to_string(script_command_status status) {
     return "unknown";
 }
 
-int script_getopt(script_session *s, const script_command *commands, int *argc, char *const **argv, script_command_status *status_out) {
-    int found = 0;
-    if(!commands || !argc || !argv) {
-        *status_out = SCRIPT_COMMAND_FAILURE;
-        return -1;
-    }
-    if(*argc == 0) { /* Nothing remains */
-        *status_out = SCRIPT_COMMAND_SUCCESS;
-        return -1;
-    }
-    const char *a = (*argv)[0];
-    size_t len = strlen(a);
-    const script_command *c_found = NULL;
-    for(const script_command *c = commands; c; c = c->next) {
-        if(strncmp(c->name, a, len) == 0) { /* At least partial match */
-            found++;
-            c_found = c;
-            if(strcmp(c->name, a) == 0) { /* Exact match */
-                break;
-            }
-        }
-    }
-    if(found > 1) {
-        jabs_message(MSG_ERROR, stderr, "Ambiguous: %s. Matches:\n", a);
-        for(const script_command *c = commands; c; c = c->next) {
-            if(strncmp(c->name, a, len) == 0) {
-                jabs_message(MSG_ERROR, stderr, " %s\n", c->name);
-            }
-        }
-        jabs_message(MSG_ERROR, stderr, "\n");
-        return -1;
-    }
-    if(found == 0) {
-        jabs_message(MSG_ERROR, stderr, "Could not find an option or command with \"%s\".\n", a);
-        *status_out = SCRIPT_COMMAND_NOT_FOUND;
-        return -1;
-    }
-#ifdef DEBUG
-    fprintf(stderr, "Found exactly 1 hit (%s matched with %s). f = %p, var = %p, val = %i\n", c_found->name, a, (void *)c_found->f, (void *)c_found->var, c_found->val);
-#endif
-    (*argc)--;
-    (*argv)++;
-    if(c_found->f) {
-        *status_out = c_found->f(s, *argc, *argv);
-    } else if(c_found->var) {
-        jabs_message(MSG_ERROR, stderr, "Unsupported.\n");
-        *status_out = SCRIPT_COMMAND_FAILURE;
-    }
-    return c_found->val;
-}
-
 script_command *script_command_new(const char *name, const char *help_text, int val, script_command_status (*f)(struct script_session *, int, char * const *)) {
     if(!name)
         return NULL;
@@ -811,9 +817,21 @@ script_command *script_command_list_find_tail(script_command *head) {
 void script_command_list_add_command(script_command **head, script_command *c_new) {
     if(!c_new)
         return;
+#ifdef WARN_ON_DUMMY_COMMANDS
+    if(!c_new->subcommands && !c_new->f && !c_new->var && !c_new->val) { /* Everything needs to be set before calling this function to avoid this warning. */
+        jabs_message(MSG_WARNING, stderr, "Warning: \"%s\" commands/option does not have subcommands and doesn't define a function, variable or a value!\n", c_new->name);
+    }
+#endif
     if(*head == NULL) {
         *head = c_new;
         return;
+    }
+    if(c_new->val) { /* Check if vals are multiply defined, because that would suck. */
+        for(const script_command *c = *head; c; c = c->next) {
+            if(c->val == c_new->val) {
+                jabs_message(MSG_WARNING, stderr, "Warning: value %i (='%c') defined both in \"%s\" and \"%s\" commands/options!\n", c->val, c->val, c->name, c_new->name);
+            }
+        }
     }
     script_command *tail = script_command_list_find_tail(*head);
     if(tail) {
@@ -873,28 +891,22 @@ script_command *script_commands_create(struct script_session *s) {
     script_command *c_detector = script_command_new("detector", "Set detector properties.", 0, &script_set_detector);
     c_detector->f_val = &script_set_detector_val;
     script_command_list_add_command(&c_set->subcommands, c_detector);
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("aperture", "Set aperture", 'a', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("foil", "Set foil", 'f', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("calibration", "Set calibration", 'c', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("theta", "Set detector (scattering) angle.", 't', NULL));
-    /* TODO: rest of the stuff from below */
-#if 0
-    jibal_config_var det_vars[] = {
-            {JIBAL_CONFIG_VAR_OPTION, "type",       &s->det.type,          detector_option},
-            {JIBAL_CONFIG_VAR_UNIT,   "slope",      &s->det.slope,             NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "offset",     &s->det.offset,            NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "length",     &s->det.length,            NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "resolution", &s->det.resolution,        NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "theta",      &s->det.theta,             NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "phi",        &s->det.phi,               NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "solid",      &s->det.solid,             NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "distance",   &s->det.distance,          NULL},
-            {JIBAL_CONFIG_VAR_INT,    "column",     &s->det.column,            NULL},
-            {JIBAL_CONFIG_VAR_INT,    "channels",   &s->det.channels,          NULL},
-            {JIBAL_CONFIG_VAR_INT,    "compress",   &s->det.compress,          NULL},
-            {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                              NULL}
-    };
-#endif
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("aperture", "Set aperture", 0, &script_set_detector_aperture));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("calibration", "Set calibration", 0, &script_set_detector_calibration));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("column", "", 'c', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("channels", "", 'h', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("compress", "", 'C', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("distance", "", 'd', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("foil", "Set foil", 0, &script_set_detector_foil));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("type", "", 't', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("slope", "", 'S', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("offset", "", 'O', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("resolution", "", 'r', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("solid", "", 's', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("theta", "", 'T', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("length", "", 'l', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "", 'p', NULL));
+
 
     script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
     script_command_list_add_command(&c_set->subcommands, script_command_new("sample", "Set sample.", 0, &script_set_sample));
@@ -1300,7 +1312,7 @@ script_command_status script_set_aperture(script_session *s, int argc, char * co
     return argc_orig - argc;
 }
 
-script_command_status script_set_detector(script_session *s, int argc, char * const *argv) {
+script_command_status script_set_detector(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
     size_t i_det = 0;
     int argc_orig = argc;
@@ -1312,53 +1324,35 @@ script_command_status script_set_detector(script_session *s, int argc, char * co
 
     s->i_det_active = i_det;
     return argc_orig - argc;
-    /* TODO: implement the stuff from below in script_set_detector_val() */
-#if 0
-    jibal_config_var *vars = detector_make_vars(det);
-    commands = script_command_list_from_vars_array(vars, 0);
-    script_command_list_add_command(&commands, script_command_new("aperture", "Set aperture", 'a', NULL));
-    script_command_list_add_command(&commands, script_command_new("foil", "Set foil", 'f', NULL));
-    script_command_list_add_command(&commands, script_command_new("calibration", "Set calibration", 'c', NULL));
+}
 
-    if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: set detector [number] variable value variable2 value2 ...\n");
-        char *matches = script_commands_list_matches(commands, "");
-        jabs_message(MSG_ERROR, stderr, "These variables can be set: %s\n", matches);
-        free(matches);
-        free(vars);
-        free(commands);
+script_command_status script_set_detector_aperture(struct script_session *s, int argc, char * const *argv) {
+    int argc_orig = argc;
+    detector *det = sim_det(s->fit->sim, s->i_det_active);
+    if(!det) {
+        jabs_message(MSG_ERROR, stderr, "No detector.\n"); /* TODO: prettify */
+    }
+    if(detector_aperture_set_from_argv(s->jibal, det, &argc, &argv)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-
-    script_command_status status = SCRIPT_COMMAND_SUCCESS;
-    while(argc >= 1 && status == SCRIPT_COMMAND_SUCCESS) {
-        int val = script_getopt(s, commands, &argc, &argv, &status);
-        if(val < 0)
-            break;
-        switch(val) {
-            case 'a':
-                if(detector_aperture_set_from_argv(s->jibal, det, &argc, &argv)) {
-                    status = SCRIPT_COMMAND_FAILURE;
-                }
-                break;
-            case 'c':
-                jabs_message(MSG_ERROR, stderr, "Not implemented yet!\n");
-                status = SCRIPT_COMMAND_FAILURE;
-            case 'f':
-                if(detector_foil_set_from_argv(s->jibal, det, &argc, &argv)) {
-                    status = SCRIPT_COMMAND_FAILURE;
-                }
-                break;
-            default:
-                break;
-        }
-    }
-    script_commands_free(commands);
-    free(vars);
-    if(status == SCRIPT_COMMAND_NOT_FOUND)
-        status = SCRIPT_COMMAND_FAILURE;
     return argc_orig - argc;
-#endif
+}
+
+script_command_status script_set_detector_calibration(struct script_session *s, int argc, char * const *argv) {
+    jabs_message(MSG_ERROR, stderr, "Setting calibration not implemented, use slope and offset.");
+    return SCRIPT_COMMAND_FAILURE;
+}
+
+script_command_status script_set_detector_foil(struct script_session *s, int argc, char * const *argv) {
+        int argc_orig = argc;
+        detector *det = sim_det(s->fit->sim, s->i_det_active);
+        if(!det) {
+            jabs_message(MSG_ERROR, stderr, "No detector.\n"); /* TODO: prettify */
+        }
+        if(detector_foil_set_from_argv(s->jibal, det, &argc, &argv)) {
+            return SCRIPT_COMMAND_FAILURE;
+        }
+        return argc_orig - argc;
 }
 
 script_command_status script_set_sample(script_session *s, int argc, char * const *argv) {
