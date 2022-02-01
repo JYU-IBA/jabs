@@ -29,7 +29,7 @@ class MainWindow : public QMainWindow
 
 public:
     MainWindow(QWidget *parent = nullptr);
-    void addMessage(const char *msg);
+    void addMessage(jabs_msg_level level, const char *msg);
     ~MainWindow();
 
 public slots:

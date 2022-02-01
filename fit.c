@@ -137,20 +137,19 @@ void fit_stats_print(FILE *f, const struct fit_stats *stats) {
     }
 }
 
-void fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range) { /* Makes a deep copy */
-    if(range->low == 0 && range->high == 0) {
-#ifdef DEBUG
-        fprintf(stderr, "No valid range given (from zero to zero).\n"); /* Yeah, this is technically valid... */
-#endif
-        return;
+int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range) { /* Makes a deep copy */
+    if(range->high < range->low || range->high == 0) {
+        jabs_message(MSG_ERROR, stderr, "Range from %zu to %zu is not valid!\n", range->low, range->high);
+        return EXIT_FAILURE;
     }
     fit_data->n_fit_ranges++;
     fit_data->fit_ranges = realloc(fit_data->fit_ranges, fit_data->n_fit_ranges * sizeof(roi));
     if(!fit_data->fit_ranges) {
         fit_data->n_fit_ranges = 0;
-        return;
+        return EXIT_FAILURE;
     }
     fit_data->fit_ranges[fit_data->n_fit_ranges - 1] = *range;
+    return EXIT_SUCCESS;
 }
 
 void fit_data_fit_ranges_free(struct fit_data *fit_data) {
@@ -508,4 +507,37 @@ int fit(struct fit_data *fit_data) {
     gsl_vector_free(x);
     free(weights);
     return 0;
+}
+
+int fit_set_roi_from_string(roi *r, const char *str) {
+    const char *str_orig = str;
+    if(!str)
+        return EXIT_FAILURE;
+    if(*str != '[') { /* Silent failure, intentionally, since this can signal end of valid roi range arguments. */
+#ifdef DEBUG
+        fprintf(stderr, "fit_set_roi_from_string() fails silently.\n");
+#endif
+        return EXIT_FAILURE;
+    }
+    str++; /* Skipping '[' */
+    char *end;
+    r->low = strtoull(str, &end, 10);
+    str = end;
+    if(*str != ':') {
+        jabs_message(MSG_ERROR, stderr,"Can not parse range from \"%s\". Is ':' missing?\n", str_orig);
+        return EXIT_FAILURE;
+    }
+    str++; /* Skipping ':' */
+    r->high = strtoull(str, &end, 10);
+    str = end;
+    if(*str != ']') {
+        jabs_message(MSG_ERROR, stderr,"Can not parse range from \"%s\". Is ']' missing near \"%s\"?\n", str_orig, str);
+        return EXIT_FAILURE;
+    }
+    str++;
+    if(*str != '\0') {
+        jabs_message(MSG_ERROR, stderr, "Unexpected input when parsing a range, \"%s\" at end of \"%s\"\n", str, str_orig);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
 }

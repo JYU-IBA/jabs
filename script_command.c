@@ -209,7 +209,7 @@ script_command_status script_save_bricks(script_session *s, int argc, char * con
 script_command_status script_save_spectra(script_session *s, int argc, char * const *argv) {
     size_t i_det = 0;
     struct fit_data *fit = s->fit;
-    int argc_orig = argc;
+    const int argc_orig = argc;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det) || argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: save spectra [detector] file\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -248,7 +248,7 @@ script_command_status script_save_sample(script_session *s, int argc, char * con
 script_command_status script_save_detector(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit_data = s->fit;
     size_t i_det = 0;
-    int argc_orig = argc;
+    const int argc_orig = argc;
     if(script_get_detector_number(fit_data->sim, TRUE, &argc, &argv, &i_det) || argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: save detector [detector] file\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -891,22 +891,21 @@ script_command *script_commands_create(struct script_session *s) {
     script_command *c_detector = script_command_new("detector", "Set detector properties.", 0, &script_set_detector);
     c_detector->f_val = &script_set_detector_val;
     script_command_list_add_command(&c_set->subcommands, c_detector);
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("aperture", "Set aperture", 0, &script_set_detector_aperture));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("calibration", "Set calibration", 0, &script_set_detector_calibration));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("column", "", 'c', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("channels", "", 'h', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("compress", "", 'C', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("distance", "", 'd', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("foil", "Set foil", 0, &script_set_detector_foil));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("type", "", 't', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("slope", "", 'S', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("offset", "", 'O', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("resolution", "", 'r', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("solid", "", 's', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("theta", "", 'T', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("length", "", 'l', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "", 'p', NULL));
-
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("aperture", "Set detector aperture.", 0, &script_set_detector_aperture));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("calibration", "Set calibration.", 0, &script_set_detector_calibration));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("column", "Set column number (for data input).", 'c', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("channels", "Set number of channels.", 'h', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("compress", "Set compress (summing of channels).", 'C', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("distance", "Set detector distance from target.", 'd', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("foil", "Set detector foil.", 0, &script_set_detector_foil));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("type", "Set detector type.", 't', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("slope", "Set detector calibration slope.", 'S', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("offset", "Set detector calibration offset.", 'O', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("resolution", "Set detector resolution (FWHM).", 'r', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("solid", "Set detector solid angle.", 's', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("theta", "Set detector (scattering) angle.", 'T', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("length", "Set detector length (for ToF).", 'l', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "Set detector azimuth angle, 0 = IBM, 90 deg = Cornell.", 'p', NULL));
 
     script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
     script_command_list_add_command(&c_set->subcommands, script_command_new("sample", "Set sample.", 0, &script_set_sample));
@@ -924,10 +923,10 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_STRING, "output",               &s->output_filename,                 NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "erd",                  &sim->erd,                           NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "rbs",                  &sim->rbs,                           NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "fit_maxiter",          &fit->n_iters_max,                   NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "fit_xtol",             &fit->xtol,                          NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "fit_gtol",             &fit->gtol,                          NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "fit_ftol",             &fit->ftol,                          NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "maxiter",              &fit->n_iters_max,                   NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",           &fit->xtol,                          NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "gtolerance",           &fit->gtol,                          NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "ftolerance",           &fit->ftol,                          NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "ds",                   &sim->params.ds,                     NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "rk4",                  &sim->params.rk4,                    NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "stop_step_incident",   &sim->params.stop_step_incident,     NULL},
@@ -936,7 +935,7 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_BOOL,   "nucl_stop_accurate",   &sim->params.nucl_stop_accurate,     NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy", &sim->params.mean_conc_and_energy,   NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "geostragg",            &sim->params.geostragg,              NULL},
-            {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                                                      NULL}
+            {JIBAL_CONFIG_VAR_NONE,   NULL,                   NULL,                                NULL}
     };
     c = script_command_list_from_vars_array(vars, 0);
     script_command_list_add_command(&c_set->subcommands, c);
@@ -974,7 +973,11 @@ script_command *script_commands_create(struct script_session *s) {
     c = script_command_new("add", "Add something.", 0, NULL);
     script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("detector", "Add a detector.", 0, &script_add_detector));
-    script_command_list_add_command(&c->subcommands, script_command_new("fit_range", "Add a fit range", 0, &script_add_fit_range));
+
+    script_command *c_add_fit =  script_command_new("fit", "Add something related to fit.", 0, NULL);
+    script_command_list_add_command(&c->subcommands, c_add_fit);
+    script_command_list_add_command(&c_add_fit->subcommands, script_command_new("range", "Add a fit range", 0, &script_add_fit_range));
+
     script_command_list_add_command(&c->subcommands, script_command_new("reaction", "Add a reaction.", 0, &script_add_reaction));
     script_command_list_add_command(&c->subcommands, script_command_new("reactions", "Add reactions (of some type).", 0, &script_add_reactions));
 
@@ -1076,7 +1079,10 @@ script_command_status script_load_script(script_session *s, int argc, char * con
         jabs_message(MSG_ERROR, stderr, "Usage: load script [file]\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    return script_session_load_script(s, argv[0]);
+    if(script_session_load_script(s, argv[0])) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return 1;
 }
 
 script_command_status script_load_sample(script_session *s, int argc, char * const *argv) {
@@ -1254,7 +1260,7 @@ script_command_status script_show_fit(script_session *s, int argc, char * const 
 script_command_status script_show_detector(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     size_t i_det = 0;
-    int argc_orig = argc;
+    const int argc_orig = argc;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
@@ -1292,7 +1298,7 @@ script_command_status script_set_ion(script_session *s, int argc, char * const *
 
 script_command_status script_set_aperture(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
-    int argc_orig = argc;
+    const int argc_orig = argc;
     if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: set aperture (type) [width|height|diameter (value)] ...\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -1315,7 +1321,7 @@ script_command_status script_set_aperture(script_session *s, int argc, char * co
 script_command_status script_set_detector(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
     size_t i_det = 0;
-    int argc_orig = argc;
+    const int argc_orig = argc;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
@@ -1327,7 +1333,7 @@ script_command_status script_set_detector(script_session *s, int argc, char *con
 }
 
 script_command_status script_set_detector_aperture(struct script_session *s, int argc, char * const *argv) {
-    int argc_orig = argc;
+    const int argc_orig = argc;
     detector *det = sim_det(s->fit->sim, s->i_det_active);
     if(!det) {
         jabs_message(MSG_ERROR, stderr, "No detector.\n"); /* TODO: prettify */
@@ -1338,21 +1344,24 @@ script_command_status script_set_detector_aperture(struct script_session *s, int
     return argc_orig - argc;
 }
 
-script_command_status script_set_detector_calibration(struct script_session *s, int argc, char * const *argv) {
+script_command_status script_set_detector_calibration(struct script_session *s, int argc, char *const *argv) {
+    (void) s;
+    (void) argc;
+    (void) argv;
     jabs_message(MSG_ERROR, stderr, "Setting calibration not implemented, use slope and offset.");
     return SCRIPT_COMMAND_FAILURE;
 }
 
-script_command_status script_set_detector_foil(struct script_session *s, int argc, char * const *argv) {
-        int argc_orig = argc;
-        detector *det = sim_det(s->fit->sim, s->i_det_active);
-        if(!det) {
-            jabs_message(MSG_ERROR, stderr, "No detector.\n"); /* TODO: prettify */
-        }
-        if(detector_foil_set_from_argv(s->jibal, det, &argc, &argv)) {
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        return argc_orig - argc;
+script_command_status script_set_detector_foil(struct script_session *s, int argc, char *const *argv) {
+    const int argc_orig = argc;
+    detector *det = sim_det(s->fit->sim, s->i_det_active);
+    if(!det) {
+        jabs_message(MSG_ERROR, stderr, "No detector.\n"); /* TODO: prettify */
+    }
+    if(detector_foil_set_from_argv(s->jibal, det, &argc, &argv)) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return argc_orig - argc;
 }
 
 script_command_status script_set_sample(script_session *s, int argc, char * const *argv) {
@@ -1361,7 +1370,7 @@ script_command_status script_set_sample(script_session *s, int argc, char * cons
         jabs_message(MSG_ERROR, stderr, "Usage: set sample [sample]\nExample: set sample TiO2 1000tfu Si 10000tfu\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    int argc_orig = argc;
+    const int argc_orig = argc;
     sample_model *sm_new = sample_model_from_argv(fit->jibal, &argc, &argv);
     int argc_consumed = argc_orig - argc;
     sample_model_free(fit->sm);
@@ -1380,7 +1389,7 @@ script_command_status script_add_reaction(script_session *s, int argc, char * co
         jabs_message(MSG_ERROR, stderr, "Usage: add reaction TYPE isotope\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    int argc_orig = argc;
+    const int argc_orig = argc;
     reaction *r = reaction_make_from_argv(fit->jibal, fit->sim->beam_isotope, &argc, &argv);
     int argc_consumed = argc_orig - argc;
     if(!r) {
@@ -1419,7 +1428,17 @@ script_command_status script_add_reactions(script_session *s, int argc, char * c
     if(fit->sim->rbs) {
         sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim, REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
     }
-    if(fit->sim->erd) {
+
+    int forward_angles = FALSE;
+    for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
+        const detector *det = sim_det(fit->sim, i_det);
+        if(det->theta < C_PI_2) {
+            forward_angles = TRUE;
+            break;
+        }
+    }
+
+    if(fit->sim->erd && (forward_angles || fit->sim->params.ds)) { /* ERD can be disabled, but otherwise we'll turn the reactions on only if necessary. */
         sim_reactions_add_auto(fit->sim, fit->sm, REACTION_ERD, sim_cs(fit->sim, REACTION_ERD));
     }
     return 0;
@@ -1440,26 +1459,33 @@ script_command_status script_add_detector(script_session *s, int argc, char * co
 
 script_command_status script_add_fit_range(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
-    roi range = {.i_det = 0};
-    if(argc == 3) { /* Three arguments, first is the detector number */ /* TODO: we can't rely on fixed number of arguments! */
-        range.i_det = strtoul(argv[0], NULL, 10);
-        if(range.i_det == 0 || range.i_det > fit->sim->n_det) {
-            jabs_message(MSG_ERROR, stderr, "Detector number %zu is not valid (n_det = %zu).\n", range.i_det, fit->sim->n_det);
+    size_t i_det = 0;
+    const int argc_orig = argc;
+    script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det);
+    int n_ranges = 0;
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: add fit_range {detector} <range> {<range> <range> ...}\nExample: add fit_range 1 [400:900] [980:1200]\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    while(argc > 0) {
+        roi r = {.i_det = i_det};
+        if(fit_set_roi_from_string(&r,argv[0])) {
+            if(n_ranges == 0) {
+                jabs_message(MSG_ERROR, stderr, "No ranges added! Failed on parsing \"%s\".\n", argv[0]);
+                return SCRIPT_COMMAND_FAILURE;
+            } else {
+                break;
+            }
+        }
+        if(fit_data_fit_range_add(fit, &r)) {
+            jabs_message(MSG_ERROR, stderr, "Range not valid! Failed on parsing \"%s\".\n", argv[0]);
             return SCRIPT_COMMAND_FAILURE;
         }
-        range.i_det--;
+        n_ranges++;
         argc--;
         argv++;
     }
-    if(argc == 2) {
-        range.low = strtoul(argv[0], NULL, 10);
-        range.high = strtoul(argv[1], NULL, 10);
-    } else {
-        jabs_message(MSG_ERROR, stderr, "Usage: add fit_range [detector] low high\n");
-        return -1;
-    }
-    fit_data_fit_range_add(fit, &range);
-    return argc; /* TODO: we can't rely on fixed number of arguments! */
+    return argc_orig - argc;
 }
 
 script_command_status script_help(script_session *s, int argc, char * const *argv) {

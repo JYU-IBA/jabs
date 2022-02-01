@@ -31,8 +31,8 @@ MainWindow::MainWindow(QWidget *parent)
     fixedFont.setPointSize(12);
     ui->plainTextEdit->setFont(fixedFont);
     fixedFont.setPointSize(11);
-    ui->msgPlainTextEdit->setFont(fixedFont);
-    ui->msgPlainTextEdit->appendPlainText(aboutString);
+    ui->msgTextEdit->setFont(fixedFont);
+    ui->msgTextEdit->insertPlainText(aboutString);
     QString config_filename_str;
 #if defined(Q_OS_OSX)
     config_filename_str = QApplication::applicationDirPath() + "/../Resources/jibal.conf";
@@ -42,7 +42,7 @@ MainWindow::MainWindow(QWidget *parent)
     } else {
          jibal = jibal_init(qPrintable(config_filename_str));
     }
-    ui->msgPlainTextEdit->appendPlainText(jibal_status_string(jibal));
+    ui->msgTextEdit->insertPlainText(jibal_status_string(jibal));
     session = script_session_init(jibal, NULL);
     ui->action_Run->setShortcutContext(Qt::ApplicationShortcut);
     highlighter = new Highlighter(ui->plainTextEdit->document());
@@ -61,12 +61,25 @@ MainWindow::MainWindow(QWidget *parent)
 
 }
 
-void MainWindow::addMessage(const char *msg)
+void MainWindow::addMessage(jabs_msg_level level, const char *msg)
 {
-    ui->msgPlainTextEdit->moveCursor(QTextCursor::End);
-    ui->msgPlainTextEdit->insertPlainText(msg);
+    ui->msgTextEdit->moveCursor(QTextCursor::End);
+    switch(level) {
+    case MSG_ERROR:
+        ui->msgTextEdit->setTextColor(Qt::red);
+        break;
+    case MSG_WARNING:
+        ui->msgTextEdit->setTextColor(Qt::darkYellow);
+        break;
+    case MSG_DEBUG:
+        ui->msgTextEdit->setTextColor(Qt::gray);
+        break;
+    default:
+        ui->msgTextEdit->setTextColor(Qt::black); /* TODO: defaults from theme? */
+        break;
+    }
+    ui->msgTextEdit->insertPlainText(msg);
     repaint();
-    //ui->msgTextEdit->append(msg);
 }
 
 MainWindow::~MainWindow()
@@ -118,13 +131,13 @@ void MainWindow::on_action_Run_triggered()
         resetAll();
     } else {
         ui->widget->clearAll();
-        ui->msgPlainTextEdit->clear();
+        ui->msgTextEdit->clear();
         script_reset(session, 0, NULL);
     }
     QString text = ui->plainTextEdit->toPlainText();
     QTextStream stream = QTextStream(&text, QIODevice::ReadOnly);
     size_t lineno = 0;
-    while(!stream.atEnd()) {
+    while(!stream.atEnd()) { /* TODO: this needs a loop to process script files. Loading script files has currently no effect (other than files getting opened) since the execution of session->files is not implemented! */
         QString line = stream.readLine();
         lineno++;
 #ifdef DEBUG
@@ -134,8 +147,9 @@ void MainWindow::on_action_Run_triggered()
                 continue;
         if(line.at(0) == '#')
             continue;
+        jabs_message(MSG_INFO, stderr, "%s%s\n", PROMPT, qPrintable(line));
         if(runLine(line) < 0) {
-            return;
+            return; /* or break? */
         }
     }
     plotSession();
@@ -311,7 +325,7 @@ void MainWindow::resetAll()
 {
     ui->widget->clearAll();
     ui->widget->replot();
-    ui->msgPlainTextEdit->clear();
+    ui->msgTextEdit->clear();
     firstRun = true;
     script_reset(session, 0, NULL);
 }

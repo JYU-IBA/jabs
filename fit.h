@@ -86,6 +86,7 @@ fit_params *fit_params_new();
 void fit_params_add_parameter(fit_params *p, double *value);
 void fit_params_free(fit_params *p);
 void fit_stats_print(FILE *f, const struct fit_stats *stats);
-void fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range); /* Makes a deep copy */
+int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range); /* Makes a deep copy */
 void fit_data_fit_ranges_free(struct fit_data *fit_data);
+int fit_set_roi_from_string(roi *r, const char *str); /* Parses only low and high from "[low:high]". */
 #endif // JABS_FIT_H
