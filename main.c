@@ -68,7 +68,7 @@ int main(int argc, char * const *argv) {
     sim->rbs = cmd_opt->rbs;
     sim->erd = cmd_opt->erd;
     session->output_filename = strdup_non_null(cmd_opt->output_filename);
-    roi range = {.low = cmd_opt->fit_low, .high = cmd_opt->fit_high};
+    roi range = {.i_det = 0, .low = cmd_opt->fit_low, .high = cmd_opt->fit_high};
     fit_data_fit_range_add(fit_data, &range); /* We add just this one range (or none) */
     sim_sanity_check(sim);
     if(cmd_opt->exp_filename) {

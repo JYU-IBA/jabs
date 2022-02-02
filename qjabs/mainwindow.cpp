@@ -157,6 +157,11 @@ void MainWindow::on_action_Run_triggered()
         if(runLine(line) < 0) {
             return; /* or break? */
         }
+        if(session->file_depth > 0) {
+            if(script_process(session) < 0) {
+                return;
+            }
+        }
     }
     plotSession();
 }

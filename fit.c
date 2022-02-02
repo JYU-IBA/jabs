@@ -138,7 +138,10 @@ void fit_stats_print(FILE *f, const struct fit_stats *stats) {
 }
 
 int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range) { /* Makes a deep copy */
-    if(range->high < range->low || range->high == 0) {
+    if(range->low == 0 && range->high == 0) {
+        return EXIT_FAILURE;
+    }
+    if(range->high < range->low) {
         jabs_message(MSG_ERROR, stderr, "Range from %zu to %zu is not valid!\n", range->low, range->high);
         return EXIT_FAILURE;
     }
