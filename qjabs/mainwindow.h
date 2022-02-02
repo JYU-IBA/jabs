@@ -8,7 +8,7 @@ extern "C" {
 #include <jibal_units.h>
 #include "jabs.h"
 #include "sample.h"
-#include "script.h"
+#include "script_generic.h"
 #include "generic.h"
 #include "message.h"
 #include "defaults.h"

@@ -59,6 +59,7 @@
 #include "highlighter.h"
 extern "C" {
 #include <../generic.h>
+#include <../script_command.h>
 }
 
 Highlighter::Highlighter(QTextDocument *parent)
@@ -116,8 +117,11 @@ void Highlighter::highlightArgv(int argc, char **argv) {
     const char *argv_start = argv[0];
     while(argc && cmds) {
         const script_command *c = script_command_find(cmds, argv[0]);
+        //qDebug() << "Parsing" << argv[0] << "first of cmds is" << cmds->name << cmds;
         if(!c) {
-            return;
+            argc--;
+            argv++;
+            continue;
         }
         while(c) { /* Subcommand found */
             size_t arg_len = strlen(argv[0]);
@@ -125,6 +129,8 @@ void Highlighter::highlightArgv(int argc, char **argv) {
                 setFormat(argv[0] - argv_start, arg_len, commandFormat);
             } else if(c->var) {
                 setFormat(argv[0] - argv_start, arg_len, variableFormat);
+            } else if(c->val) {
+                setFormat(argv[0] - argv_start, arg_len, commandFormat);
             }
             if(c->subcommands) {
                 setFormat(argv[0] - argv_start, arg_len, commandFormat);

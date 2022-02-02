@@ -4,6 +4,12 @@
 #include <QDebug>
 #include <QTextStream>
 
+extern "C" {
+#include "script.h"
+#include "script_session.h"
+#include "script_command.h"
+}
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
