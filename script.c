@@ -20,10 +20,7 @@
 #include "script_command.h"
 #include "script_file.h"
 
-int script_process(script_session *s, const char *filename) {
-    if(script_session_load_script(s, filename)) {
-        return EXIT_FAILURE;
-    }
+int script_process(script_session *s) {
     static const char *prompt = PROMPT;
     script_command_status status = SCRIPT_COMMAND_SUCCESS;
     while(s->file_depth > 0) {
@@ -51,9 +48,6 @@ int script_process(script_session *s, const char *filename) {
             if(interactive)
                 status = SCRIPT_COMMAND_EXIT;
         }
-    }
-    if(s->files[0]->interactive) {
-        jabs_message(MSG_INFO, stderr, "\nBye!\n");
     }
     fflush(stderr);
     return status;

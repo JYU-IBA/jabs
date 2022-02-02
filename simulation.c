@@ -645,3 +645,21 @@ double sim_exit_angle(const simulation *sim, const detector *det) {
     rotate(sim->sample_theta, sim->sample_phi, det->theta, det->phi, &theta, &phi);
     return C_PI - theta;
 }
+
+int sim_do_we_need_erd(const simulation *sim) {
+    if(!sim->erd) {
+        return FALSE; /* ERD has been (intentionally) disabled */
+    }
+    if(sim->params.ds) {
+        return TRUE; /* In case of DS, ERD becomes possible kind-of possible with any detector geometry */
+    }
+    int forward_angles = FALSE;
+    for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
+        const detector *det = sim_det(sim, i_det);
+        if(det->theta < C_PI_2) {
+            forward_angles = TRUE;
+            break;
+        }
+    }
+    return forward_angles; /* If any detector is in forward angle, we might need ERD */
+}

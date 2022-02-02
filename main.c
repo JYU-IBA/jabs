@@ -106,7 +106,10 @@ int main(int argc, char * const *argv) {
     if(cmd_opt->interactive || script_files) {
         if(script_files) {
             for(int i = 0; i < argc; i++) {
-                status = script_process(session, argv[i]);
+                if(script_session_load_script(session, argv[i])) {
+                    return EXIT_FAILURE;
+                }
+                status = script_process(session);
                 if(status != SCRIPT_COMMAND_EOF) {
                     return status;
                 }
@@ -114,7 +117,10 @@ int main(int argc, char * const *argv) {
         }
         if(cmd_opt->interactive) {
             greeting(TRUE);
-            status = script_process(session, NULL);
+            if(script_session_load_script(session, NULL)) {
+                return EXIT_FAILURE;
+            }
+            status = script_process(session);
         }
     } else { /* Non-interactive, pure command line mode. Run a single sim or fit. */
         if(!session->output_filename) {

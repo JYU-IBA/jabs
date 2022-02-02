@@ -30,7 +30,7 @@ void script_command_list_add_command(script_command **head, script_command *c_ne
 script_command *script_command_list_from_command_array(const script_command *commands); /* commands is an array, must be "null-terminated" (name of last element is NULL pointer). Deep copy will be made. */
 script_command *script_command_list_from_vars_array(const jibal_config_var *vars, jibal_config_var_type type); /* vars is an array, must be "null-terminated" (name of last element is NULL pointer). Deep copy will be made. Can be restricted to type. */
 
-
+int script_do_we_need_erd(const struct script_session *s);
 script_command *script_commands_create(struct script_session *s);
 int command_compare(const void *a, const void *b);
 void script_commands_print(FILE *f, const struct script_command *commands);

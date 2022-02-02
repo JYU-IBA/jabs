@@ -55,7 +55,7 @@ int script_prepare_sim_or_fit(script_session *s) {
         if(fit->sim->rbs) {
             sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim, REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
         }
-        if(fit->sim->erd) {
+        if(sim_do_we_need_erd(fit->sim)) {
             sim_reactions_add_auto(fit->sim, fit->sm, REACTION_ERD, sim_cs(fit->sim, REACTION_ERD));
         }
     }
@@ -875,7 +875,6 @@ script_command *script_command_list_from_vars_array(const jibal_config_var *vars
     return head;
 }
 
-
 script_command *script_commands_create(struct script_session *s) {
     fit_data *fit = s->fit;
     simulation *sim = fit->sim;
@@ -1431,16 +1430,7 @@ script_command_status script_add_reactions(script_session *s, int argc, char * c
         sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim, REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
     }
 
-    int forward_angles = FALSE;
-    for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
-        const detector *det = sim_det(fit->sim, i_det);
-        if(det->theta < C_PI_2) {
-            forward_angles = TRUE;
-            break;
-        }
-    }
-
-    if(fit->sim->erd && (forward_angles || fit->sim->params.ds)) { /* ERD can be disabled, but otherwise we'll turn the reactions on only if necessary. */
+    if(sim_do_we_need_erd(fit->sim)) {
         sim_reactions_add_auto(fit->sim, fit->sm, REACTION_ERD, sim_cs(fit->sim, REACTION_ERD));
     }
     return 0;
@@ -1449,10 +1439,16 @@ script_command_status script_add_reactions(script_session *s, int argc, char * c
 script_command_status script_add_detector(script_session *s, int argc, char * const *argv) {
     struct fit_data *fit = s->fit;
     if(argc < 1) {
-        jabs_message(MSG_ERROR,  stderr,"Usage: add detector filename\n", argv[0]);
+        jabs_message(MSG_ERROR,  stderr,"Usage: add detector {<filename> | default}\n", argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(fit_data_add_det(fit, detector_from_file(fit->jibal, argv[0]))) { /* Adds a new detector (and space for experimental spectrum) */
+    detector *det;
+    if(strcmp(argv[0], "default") == 0) {
+        det = detector_default(NULL);
+    } else {
+        det = detector_from_file(fit->jibal, argv[0]);
+    }
+    if(fit_data_add_det(fit, det)) {
         return SCRIPT_COMMAND_FAILURE;
     } else {
         return 1;

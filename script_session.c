@@ -98,11 +98,11 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
     }
     if(*end == '\0') { /* Entire string was valid */
         *i_det = number - 1;
-        if(*i_det > sim->n_det) {
+        if(*i_det >= sim->n_det) {
             jabs_message(MSG_ERROR, stderr, "Detector number %zu is not valid (n_det = %zu).\n", number, sim->n_det);
             return EXIT_FAILURE;
         }
-        *argc -= 1;
+        (*argc)--;
         (*argv)++;
         return EXIT_SUCCESS;
     }

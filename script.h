@@ -16,5 +16,5 @@
 #define JABS_SCRIPT_H
 
 #include "script_generic.h"
-int script_process(script_session *s, const char *filename);
+int script_process(script_session *s);
 #endif // JABS_SCRIPT_H
