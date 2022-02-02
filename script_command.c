@@ -69,7 +69,6 @@ int script_prepare_sim_or_fit(script_session *s) {
 
     reactions_print(stderr, fit->sim->reactions, fit->sim->n_reactions);
 
-    jibal_gsto_assign_clear_all(fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
     if(assign_stopping(fit->jibal->gsto, fit->sim)) {
         jabs_message(MSG_ERROR, stderr,"Could not assign stopping or straggling. Failure. Provide more data, check that JIBAL Z2_max is sufficiently large (currently %i) or disable unwanted reactions (e.g. ERD).\n", s->jibal->config->Z_max);
         return -1;
@@ -87,10 +86,11 @@ int script_finish_sim_or_fit(script_session *s) {
     s->end = clock();
     double cputime_total = (((double) (s->end - s->start)) / CLOCKS_PER_SEC);
     jabs_message(MSG_INFO, stderr, "...finished! Total CPU time: %.3lf s.\n", cputime_total);
+    jibal_gsto_assign_clear_all(s->fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
 
     struct fit_data *fit = s->fit;
 
-    if(fit->sim->n_det == 1) { /* TODO: multidetector automatic spectra saving! */
+    if(fit->sim->n_det == 1) { /* TODO: This is primarily used for command line mode, but multidetector mode could be supported. */
         size_t i_det = 0;
         sim_workspace *ws = fit_data_ws(fit, i_det);
         if(ws) {
@@ -686,7 +686,6 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
 #ifdef DEBUG
                 fprintf(stderr,"Debug: there are no subcommands in \"%s\" (this is not an error). There is a val as always: %i.\n", c->name, c->val);
 #endif
-                //script_command_not_found(argv[1], NULL); /* TODO: argv is long gone by this point */
                 c = NULL; /* Moving back to upper level. */
             }
         }
@@ -1354,10 +1353,10 @@ script_command_status script_set_detector(script_session *s, int argc, char *con
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(argc == 0)
-        return SCRIPT_COMMAND_NOT_FOUND; /* TODO: set detector without arguments, should we do something? */
-
-    s->i_det_active = i_det;
+    s->i_det_active = i_det; /* This is not used beyond a single command currently, but this is possible in the future. */
+    if(argc == 0) {
+        return SCRIPT_COMMAND_NOT_FOUND;
+    }
     return argc_orig - argc;
 }
 
@@ -1365,7 +1364,8 @@ script_command_status script_set_detector_aperture(struct script_session *s, int
     const int argc_orig = argc;
     detector *det = sim_det(s->fit->sim, s->i_det_active);
     if(!det) {
-        jabs_message(MSG_ERROR, stderr, "No detector.\n"); /* TODO: prettify */
+        jabs_message(MSG_ERROR, stderr, "No detector(s)\n");
+        return SCRIPT_COMMAND_SUCCESS;
     }
     if(detector_aperture_set_from_argv(s->jibal, det, &argc, &argv)) {
         return SCRIPT_COMMAND_FAILURE;
@@ -1385,7 +1385,8 @@ script_command_status script_set_detector_foil(struct script_session *s, int arg
     const int argc_orig = argc;
     detector *det = sim_det(s->fit->sim, s->i_det_active);
     if(!det) {
-        jabs_message(MSG_ERROR, stderr, "No detector.\n"); /* TODO: prettify */
+        jabs_message(MSG_ERROR, stderr, "No detector(s)\n");
+        return SCRIPT_COMMAND_SUCCESS;
     }
     if(detector_foil_set_from_argv(s->jibal, det, &argc, &argv)) {
         return SCRIPT_COMMAND_FAILURE;
@@ -1542,20 +1543,6 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
                 jabs_message(MSG_INFO, stderr, "\n");
             }
             jabs_message(MSG_INFO, stderr, "\n");
-            break;
-        }
-    }
-
-    for(const script_command *c = s->commands; c; c = c->next) { /* TODO: deeper? */
-        if(strcmp(c->name, argv[0]) == 0) {
-            if(!found) { /* There wasn't a help topic  */
-                jabs_message(MSG_INFO, stderr, "\"%s\" is a valid command, but no additional help is available!\n\n", c->name);
-            }
-            found++;
-            if(c->subcommands) {
-                jabs_message(MSG_INFO, stderr, "At least the following sub-commands of %s are recognized:\n", c->name);
-                script_commands_print(stderr, c->subcommands);
-            }
             break;
         }
     }

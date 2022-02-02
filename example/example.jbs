@@ -26,7 +26,7 @@ set maxiter 100
 
 simulate
 save spectra "simulated_out.csv"
-fit calib,fluence,thickness1,thickness2,rough1
+#fit calib,fluence,thickness1,thickness2,rough1
 save spectra "out.csv"
 save det "det_out.txt"
 #fitted sample can be saved (and loaded back in later!)
