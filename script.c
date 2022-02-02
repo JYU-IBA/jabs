@@ -12,16 +12,13 @@
 
  */
 
-#include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <jibal_units.h>
-#include "fit.h"
-#include "generic.h"
-#include "spectrum.h"
-#include "script.h"
-#include "jabs.h"
 #include "message.h"
+#include "script.h"
+#include "script_session.h"
+#include "script_command.h"
+#include "script_file.h"
 
 int script_process(script_session *s, const char *filename) {
     if(script_session_load_script(s, filename)) {

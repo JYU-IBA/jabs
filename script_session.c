@@ -16,6 +16,8 @@
 #include <string.h>
 #include "fit.h"
 #include "message.h"
+#include "script_command.h"
+#include "script_file.h"
 #include "script_session.h"
 
 script_session *script_session_init(jibal *jibal, simulation *sim) {

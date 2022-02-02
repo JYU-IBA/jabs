@@ -14,10 +14,7 @@
 
 #ifndef JABS_SCRIPT_H
 #define JABS_SCRIPT_H
-#include <stdio.h>
-#include "jabs.h"
 
-#include "script_command.h"
+#include "script_generic.h"
 int script_process(script_session *s, const char *filename);
-script_command_status script_execute_command(script_session *s, const char *cmd);
 #endif // JABS_SCRIPT_H

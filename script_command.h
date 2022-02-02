@@ -11,41 +11,12 @@
     See LICENSE.txt for the full license.
 
  */
+
+
 #ifndef JABS_SCRIPT_COMMAND_H
 #define JABS_SCRIPT_COMMAND_H
 
-
-struct script_session;
-
-#include "script_session.h"
-
-#define COMMAND_DEPTH 8
-
-#define SCRIPT_COMMAND_SUCCESS (0) /* Anything above and including zero is success */
-#define SCRIPT_COMMAND_FAILURE (-1)
-#define SCRIPT_COMMAND_NOT_FOUND (-2)
-#define SCRIPT_COMMAND_EXIT (-3)
-#define SCRIPT_COMMAND_EOF (-4)
-
-typedef int script_command_status; /* Script commands should return negative on error (see defines above) and number of arguments (zero or positive) consumed successfully */
-
-typedef struct script_command {
-    char *name;
-    script_command_status (*f)(struct script_session *, int, char * const *); /* Function to process argument vectors. Called if it is non-NULL, even if subcommands exist! Return value is important.*/
-    script_command_status (*f_var)(struct script_session *, jibal_config_var *var, int, char * const *); /* Function to process variables (from subcommands). */
-    script_command_status (*f_val)(struct script_session *, int, int, char * const *); /* Function to process vals (from subcommands). */
-    char *help_text; /* Short help text */
-    struct script_command *subcommands;
-    jibal_config_var *var;
-    int val;
-    struct script_command *next;
-} script_command;
-
-struct help_topic {
-    const char *name;
-    const char *help_text;
-};
-
+#include "script_generic.h"
 
 const char *script_command_status_to_string(script_command_status status);
 

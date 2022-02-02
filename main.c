@@ -28,14 +28,16 @@
 #include <jibal.h>
 #include <jibal_cs.h>
 
+#include "defaults.h"
+#include "generic.h"
 #include "options.h"
 #include "sample.h"
 #include "simulation.h"
 #include "spectrum.h"
 #include "fit.h"
 #include "script.h"
-#include "generic.h"
-#include "defaults.h"
+#include "script_session.h"
+#include "script_command.h"
 
 int main(int argc, char * const *argv) {
 #ifdef DEBUG

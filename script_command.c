@@ -21,7 +21,9 @@
 #include "options.h"
 #include "jabs.h"
 #include "generic.h"
+#include "script_session.h"
 #include "script_command.h"
+
 
 int script_prepare_sim_or_fit(script_session *s) {
     fit_data *fit = s->fit;
@@ -779,13 +781,13 @@ void script_command_free(script_command *c) {
 void script_commands_free(script_command *head) {
     if(!head)
         return;
-    struct script_command *stack[COMMAND_DEPTH];
+    struct script_command *stack[SCRIPT_NESTED_MAX];
     struct script_command *c, *c_old = NULL;
     stack[0] = head;
     size_t i = 0;
     c = stack[0];
     while(c) {
-        if(c->subcommands && i < COMMAND_DEPTH) { /* Go deeper, push existing pointer to stack */
+        if(c->subcommands && i < SCRIPT_NESTED_MAX) { /* Go deeper, push existing pointer to stack */
             stack[i] = c;
             i++;
             c = c->subcommands;
@@ -1041,7 +1043,7 @@ size_t script_commands_size(const script_command *commands) {
 }
 
 void script_print_command_tree(FILE *f, const struct script_command *commands) {
-    const struct script_command *stack[COMMAND_DEPTH];
+    const struct script_command *stack[SCRIPT_NESTED_MAX];
     const struct script_command *c;
     stack[0] = commands;
     size_t i = 0;
@@ -1057,7 +1059,7 @@ void script_print_command_tree(FILE *f, const struct script_command *commands) {
             }
             jabs_message(MSG_INFO, f, "%s\n", c->name);
         }
-        if(c->subcommands && i < COMMAND_DEPTH) { /* Go deeper, push existing pointer to stack */
+        if(c->subcommands && i < SCRIPT_NESTED_MAX) { /* Go deeper, push existing pointer to stack */
             stack[i] = c;
             i++;
             c = c->subcommands;
