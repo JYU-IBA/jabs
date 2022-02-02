@@ -66,6 +66,7 @@ script_command_status script_reset_experimental(struct script_session *s, int ar
 script_command_status script_reset_fit_ranges(struct script_session *s, int argc, char * const *argv);
 script_command_status script_reset_reactions(struct script_session *s, int argc, char * const *argv);
 script_command_status script_reset_sample(struct script_session *s, int argc, char * const *argv);
+script_command_status script_reset_stopping(struct script_session *s, int argc, char * const *argv);
 script_command_status script_roi(struct script_session *s, int argc, char * const *argv);
 script_command_status script_save_bricks(struct script_session *s, int argc, char * const *argv);
 script_command_status script_save_detector(struct script_session *s, int argc, char * const *argv);
@@ -76,6 +77,7 @@ script_command_status script_show_fit(struct script_session *s, int argc, char *
 script_command_status script_show_reactions(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_sample(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_simulation(struct script_session *s, int argc, char * const *argv);
+script_command_status script_show_stopping(script_session *s, int argc, char * const *argv);
 script_command_status script_simulate(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_aperture(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_ion(struct script_session *s, int argc, char * const *argv);
@@ -84,5 +86,6 @@ script_command_status script_set_detector_aperture(struct script_session *s, int
 script_command_status script_set_detector_calibration(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_detector_foil(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_sample(struct script_session *s, int argc, char * const *argv);
+script_command_status script_set_stopping(struct script_session *s, int argc, char * const *argv);
 
 #endif //JABS_SCRIPT_COMMAND_H

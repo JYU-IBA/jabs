@@ -600,23 +600,23 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
                     fit_params_add_parameter(params, &det->slope); /* TODO: prevent adding already added things */
                     fit_params_add_parameter(params, &det->offset);
                     fit_params_add_parameter(params, &det->resolution);
-                    jabs_message(MSG_INFO, stderr, "Added fit parameters (slope, offset, resolution) for detector %zu calibration\n", i_det);
+                    jabs_message(MSG_INFO, stderr, "Added fit parameters (slope, offset, resolution) for detector %zu calibration\n", i_det + 1);
                 }
                 if(strcmp(token, "slope") == 0) {
                     fit_params_add_parameter(params, &det->slope);
-                    jabs_message(MSG_INFO,  stderr, "Added fit parameters for detector %zu calibration slope\n", i_det);
+                    jabs_message(MSG_INFO,  stderr, "Added fit parameters for detector %zu calibration slope\n", i_det + 1);
                 }
                 if(strcmp(token, "offset") == 0) {
                     fit_params_add_parameter(params, &det->offset);
-                    jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu calibration offset\n", i_det);
+                    jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu calibration offset\n", i_det + 1);
                 }
                 if(strncmp(token, "reso", 4) == 0) {
                     fit_params_add_parameter(params, &det->resolution);
-                    jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu resolution\n", i_det);
+                    jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu resolution\n", i_det + 1);
                 }
                 if(strncmp(token, "solid", 5) == 0) {
                     fit_params_add_parameter(params, &det->solid);
-                    jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu solid angle\n", i_det);
+                    jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu solid angle\n", i_det + 1);
                 }
             }
             if(strcmp(token, "fluence") == 0) {

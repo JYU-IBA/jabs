@@ -412,12 +412,12 @@ int fit(struct fit_data *fit_data) {
         detector *det = sim_det(fit_data->sim, range->i_det);
         gsl_histogram *exp = fit_data_exp(fit_data, range->i_det);
         if(!det) {
-            jabs_message(MSG_ERROR, stderr, "Detector %zu (fit range %zu) does not exist.\n", range->i_det, i_range);
+            jabs_message(MSG_ERROR, stderr, "Detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
             free(weights);
             return 1;
         }
         if(!exp) {
-            jabs_message(MSG_ERROR, stderr,  "Experimental spectrum for detector %zu (fit range %zu) does not exist.\n", range->i_det, i_range);
+            jabs_message(MSG_ERROR, stderr,  "Experimental spectrum for detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
             free(weights);
             return 1;
         }
