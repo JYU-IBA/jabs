@@ -443,38 +443,46 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     return EXIT_SUCCESS;
 }
 
-int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) {
+int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) { /* Assigns stopping and straggling (GSTO) for given Z2. Goes through all possible Z1s (beam and reaction products). */
     int fail = FALSE;
-    if (!jibal_gsto_auto_assign(gsto, sim->beam_isotope->Z, Z2)) { /* This should handle RBS */
-        jabs_message(MSG_ERROR, stderr, "Can not assign stopping or straggling for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
-        fail = TRUE;
-    }
-    if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, sim->beam_isotope->Z, Z2)) {
-        jabs_message(MSG_ERROR, stderr, "Could not assign stopping for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
-        fail = TRUE;
-    }
-    if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, sim->beam_isotope->Z, Z2)) {
-        jabs_message(MSG_ERROR, stderr, "Could not assign straggling for incident beam (Z = %i) in Z2 = %i.\n", sim->beam_isotope->Z, Z2);
+    int Z1 = sim->beam_isotope->Z;
+#ifdef DEBUG
+    fprintf(stderr, "Assigning stopping in Z2 = %i\n", Z2);
+#endif
+    if(assign_stopping_Z1_Z2(gsto, Z1, Z2)) {
+        jabs_message(MSG_ERROR, stderr, "Can not assign stopping or straggling for beam.\n");
         fail = TRUE;
     }
     for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
         const reaction *r = sim->reactions[i_reaction];
         if(!r)
             continue;
-        if (!jibal_gsto_auto_assign(gsto, r->product->Z, Z2)) {
-            jabs_message(MSG_ERROR, stderr, "Can not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
-            fail = TRUE;
+        if(r->product->Z == Z1) {/* Z1 repeats, skip */
+            continue;
         }
-        if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, r->product->Z, Z2)) {
-            jabs_message(MSG_ERROR, stderr, "Could not assign stopping for reaction product (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
-            fail = TRUE;
-        }
-        if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, r->product->Z, Z2)) {
-            jabs_message(MSG_ERROR, stderr, "Could not assign straggling for reaction product  (Z = %i) in Z2 = %i. Reaction: %s.\n", r->product->Z, Z2, reaction_name(r));
+        Z1 = r->product->Z;
+        if(assign_stopping_Z1_Z2(gsto, Z1, Z2)) {
+            jabs_message(MSG_ERROR, stderr, "Can not assign stopping or straggling for reaction product. Reaction: %s.\n", reaction_name(r));
             fail = TRUE;
         }
     }
     return fail;
+}
+
+int assign_stopping_Z1_Z2(jibal_gsto *gsto, int Z1, int Z2) {
+    if(!jibal_gsto_auto_assign(gsto, Z1, Z2)) {
+        jabs_message(MSG_ERROR, stderr, "Assign of stopping for Z1 = %i in Z2 = %i fails.\n", Z1, Z2);
+        return EXIT_FAILURE;
+    }
+    if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, Z1, Z2)) {
+        jabs_message(MSG_ERROR, stderr, "No electronic stopping assigned for Z1 = %i in Z2 = %i.\n", Z1, Z2);
+        return EXIT_FAILURE;
+    }
+    if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, Z1, Z2)) {
+        jabs_message(MSG_ERROR, stderr, "No energy loss straggling assigned for Z1 = %i in Z2 = %i.\n", Z1, Z2);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
 }
 
 int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
