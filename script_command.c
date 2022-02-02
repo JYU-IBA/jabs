@@ -264,7 +264,7 @@ script_command_status script_save_detector(script_session *s, int argc, char * c
 }
 
 script_command_status script_remove_reaction(script_session *s, int argc, char * const *argv) {
-    struct fit_data *fit_data = s->fit;
+    struct fit_data *fit = s->fit;
     if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: remove reaction [TYPE] [target_isotope]   OR   remove reaction [number]\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -272,7 +272,7 @@ script_command_status script_remove_reaction(script_session *s, int argc, char *
     char *end;
     size_t i_reaction = strtoull(argv[0], &end, 10);
     if(*end == '\0') {
-        if(sim_reactions_remove_reaction(fit_data->sim, i_reaction - 1)) {
+        if(sim_reactions_remove_reaction(fit->sim, i_reaction - 1)) {
             return SCRIPT_COMMAND_FAILURE;
         } else {
             return 1; /* Number of consumed arguments */
@@ -283,7 +283,7 @@ script_command_status script_remove_reaction(script_session *s, int argc, char *
         return SCRIPT_COMMAND_FAILURE;
     }
     reaction_type type = reaction_type_from_string(argv[0]);
-    const jibal_isotope *target = jibal_isotope_find(fit_data->jibal->isotopes, argv[1], 0, 0);
+    const jibal_isotope *target = jibal_isotope_find(fit->jibal->isotopes, argv[1], 0, 0);
     if(type == REACTION_NONE) {
         jabs_message(MSG_ERROR, stderr, "This is not a valid reaction type: \"%s\".\n", argv[0]);
         return SCRIPT_COMMAND_FAILURE;
@@ -292,9 +292,9 @@ script_command_status script_remove_reaction(script_session *s, int argc, char *
         jabs_message(MSG_ERROR, stderr, "This is not a valid isotope: \"%s\".\n", argv[1]);
         return SCRIPT_COMMAND_FAILURE;
     }
-    for(size_t i = 0; i < fit_data->sim->n_reactions; i++) {
-        if(fit_data->sim->reactions[i]->type == type && fit_data->sim->reactions[i]->target == target) {
-            if(sim_reactions_remove_reaction(fit_data->sim, i)) {
+    for(size_t i = 0; i < fit->sim->n_reactions; i++) {
+        if(fit->sim->reactions[i]->type == type && fit->sim->reactions[i]->target == target) {
+            if(sim_reactions_remove_reaction(fit->sim, i)) {
                 return SCRIPT_COMMAND_FAILURE;
             } else {
                 return 2; /* Number of consumed arguments. */
@@ -306,7 +306,30 @@ script_command_status script_remove_reaction(script_session *s, int argc, char *
 }
 
 script_command_status script_roi(script_session *s, int argc, char * const *argv) {
-    struct roi r;
+    const struct fit_data *fit = s->fit;
+    const simulation *sim = fit->sim;
+    const int argc_orig = argc;
+    size_t i_det = 0;
+
+    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
+
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: roi <range> {<range> <range> ...}\nExample: roi [400:900] [980:1200]\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    while(argc > 0) {
+        roi r = {.i_det = i_det};
+        if(fit_set_roi_from_string(&r,argv[0])) {
+                break;
+        }
+        fit_data_roi_print(stderr, s->fit, &r);
+        argc--;
+        argv++;
+    }
+    return argc_orig - argc;
+#if 0
     if(argc == 3) {
         size_t i = strtoul(argv[0], NULL, 10);
         if(i == 0) {
@@ -329,6 +352,7 @@ script_command_status script_roi(script_session *s, int argc, char * const *argv
     }
     fit_data_roi_print(stderr, s->fit, &r);
     return SCRIPT_COMMAND_SUCCESS;
+#endif
 }
 
 script_command_status script_exit(script_session *s, int argc, char * const *argv) {
@@ -881,8 +905,12 @@ script_command *script_commands_create(struct script_session *s) {
     script_command *head = NULL;
 
 
-    script_command *c = script_command_new("help", "Help.", 0, &script_help);
-    script_command_list_add_command(&head, c);
+    script_command *c;
+    script_command *c_help = script_command_new("help", "Help.", 0, &script_help);
+    script_command_list_add_command(&head, c_help);
+    script_command_list_add_command(&c_help->subcommands, script_command_new("commands", "Help on commands.", 0, &script_help_commands));
+    script_command_list_add_command(&c_help->subcommands, script_command_new("version", "Help on (show) version.", 0, &script_help_version));
+
 
     script_command *c_set = script_command_new("set", "Set something.", 0, NULL);
     c_set->f_var = &script_set_var;
@@ -1489,13 +1517,7 @@ script_command_status script_add_fit_range(script_session *s, int argc, char * c
 script_command_status script_help(script_session *s, int argc, char * const *argv) {
     (void) fit; /* Unused */
     static const struct help_topic topics[] = {
-            {"help", "This is help on help. How meta.\nHelp is available on following topics:\n"},
-            {"commands", "I recognize the following commands (try 'help' followed by command name):\n"},
-            {"command_tree", "Almost full list of recognized commands:\n"},
-            {"version", "JaBS version: "},
-            {"set", "Set command allows things to be set.\n"},
-            {"show", "Show things. Possible things: sim, fit, sample, detector, variables.\n"},
-            {"fit", "Make a fit. Provide list of variables to fit.\n"},
+            {"help", "This is help on help.\nHelp is available on following topics:\n"},
             {NULL, NULL}
     };
     if(argc == 0) {
@@ -1507,7 +1529,7 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
     for(const struct help_topic *t = topics; t->name != NULL; t++) {
         if(strcmp(t->name, argv[0]) == 0) {
             found++;
-            jabs_message(MSG_INFO, stderr, "%s\n", t->help_text);
+            jabs_message(MSG_INFO, stderr, "%s", t->help_text);
             if(strcmp(t->name, "help") == 0) {
                 size_t i = 0;
                 for(const struct help_topic *t2 = topics; t2->name != NULL; t2++) {
@@ -1518,13 +1540,8 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
                     }
                 }
                 jabs_message(MSG_INFO, stderr, "\n");
-            } else if(strcmp(t->name, "commands") == 0) {
-                script_commands_print(stderr, s->commands);
-            } else if(strcmp(t->name, "command_tree") == 0) {
-                script_print_command_tree(stderr, s->commands);
-            } else if(strcmp(t->name, "version") == 0) {
-                jabs_message(MSG_INFO, stderr, "%s\n", jabs_version());
             }
+            jabs_message(MSG_INFO, stderr, "\n");
             break;
         }
     }
@@ -1536,7 +1553,7 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
             }
             found++;
             if(c->subcommands) {
-                jabs_message(MSG_INFO, stderr, "At least the following sub-commands are recognized:\n", c->name);
+                jabs_message(MSG_INFO, stderr, "At least the following sub-commands of %s are recognized:\n", c->name);
                 script_commands_print(stderr, c->subcommands);
             }
             break;
@@ -1544,10 +1561,20 @@ script_command_status script_help(script_session *s, int argc, char * const *arg
     }
 
     if(!found) {
-        jabs_message(MSG_ERROR, stderr,"Sorry, no help for '%s' available.\n", argv[0]);
         return SCRIPT_COMMAND_NOT_FOUND;
     }
     return 1; /* TODO: this stuff only works with one argument, right? */
 }
 
+script_command_status script_help_version(script_session *s, int argc, char *const *argv) {
+    jabs_message(MSG_ERROR, stderr, "%s\n", jabs_version());
+    return SCRIPT_COMMAND_SUCCESS;
+}
 
+script_command_status script_help_commands(script_session *s, int argc, char *const *argv) {
+    if(argc == 0) {
+        script_print_command_tree(stderr, s->commands);
+        return SCRIPT_COMMAND_SUCCESS;
+    }
+    return SCRIPT_COMMAND_NOT_FOUND;
+}

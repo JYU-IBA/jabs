@@ -52,6 +52,8 @@ script_command_status script_add_reactions(struct script_session *s, int argc, c
 script_command_status script_exit(struct script_session *s, int argc, char * const *argv);
 script_command_status script_fit(struct script_session *s, int argc, char * const *argv);
 script_command_status script_help(struct script_session *s, int argc, char * const *argv);
+script_command_status script_help_version(struct script_session *s, int argc, char *const *argv);
+script_command_status script_help_commands(script_session *s, int argc, char *const *argv);
 script_command_status script_load_detector(struct script_session *s, int argc, char *const *argv);
 script_command_status script_load_experimental(struct script_session *s, int argc, char *const *argv);
 script_command_status script_load_reaction(struct script_session *s, int argc, char *const *argv);
