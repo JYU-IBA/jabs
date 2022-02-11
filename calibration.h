@@ -38,8 +38,10 @@ calibration *calibration_init();
 void calibration_free(calibration *c);
 calibration *calibration_init_linear(double offset, double slope);
 double calibration_linear(const void *params, double x);
-double calibration_eval(const calibration *c, double x);
+double calibration_none(const void *params, double x);
+inline double calibration_eval(const calibration *c, double x) {return c->f(c->params, x);}
 int calibration_set_param(calibration *c, calibration_param_type type, double value);
 double calibration_get_param(const calibration *c, calibration_param_type type);
+double *calibration_get_param_ref(calibration *c, calibration_param_type type);
 const char *calibration_name(const calibration *c);
 #endif //CALIB_CALIBRATION_H

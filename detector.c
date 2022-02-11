@@ -25,8 +25,13 @@ char *detector_calibration_to_string(const detector *det) {
             break;
         case CALIBRATION_LINEAR:
             asprintf_append(&out, " slope %g%s offset %g%s",
+#ifdef DETECTOR_NATIVE_SPECTRA /* TODO: when simulating ToF spectra with a ToF detector, we want to use the code below, otherwise slope and offset are in energy units (see else-branch) */
                             calibration_get_param(c, CALIBRATION_PARAM_SLOPE)/detector_param_unit_factor(det), detector_param_unit(det),
                             calibration_get_param(c, CALIBRATION_PARAM_OFFSET)/detector_param_unit_factor(det), detector_param_unit(det)
+#else
+                            calibration_get_param(c, CALIBRATION_PARAM_SLOPE)/C_KEV, "keV",
+                            calibration_get_param(c, CALIBRATION_PARAM_OFFSET)/C_KEV, "keV"
+#endif
                             );
             break;
         case CALIBRATION_ARB:
@@ -49,8 +54,9 @@ int detector_sanity_check(const detector *det) {
         jabs_message(MSG_ERROR, stderr, "Warning: detector resolution (%g) is negative.\n", det->resolution);
         return -1;
     }
-    if(det->slope <= 0.0) {
-        jabs_message(MSG_ERROR, stderr, "Warning: detector slope (%g) is negative.\n", det->slope);
+    double slope = calibration_get_param(det->calibration, CALIBRATION_PARAM_SLOPE);
+    if(slope < 0.0) {
+        jabs_message(MSG_ERROR, stderr, "Warning: detector slope (%g) is negative.\n", slope);
         return -1;
     }
     if(det->type == DETECTOR_TOF && det->length < 1 * C_MM) {
@@ -150,13 +156,12 @@ detector *detector_default(detector *det) {
     det->length = DETECTOR_LENGTH;
     det->resolution = DETECTOR_RESOLUTION;
     det->resolution_variance = 0.0; /* Calculated before needed. */
-    det->slope = ENERGY_SLOPE;
-    det->offset = 0.0*C_KEV;
     det->column = 1; /* This implies default file format has channel numbers. Values are in the second column (number 1). */
     det->channels = 16384;
     det->compress = 1;
     det->foil = NULL;
     det->foil_sm = NULL;
+    det->calibration = calibration_init_linear(ENERGY_SLOPE, 0.0);
     return det;
 }
 
@@ -177,8 +182,6 @@ int detector_print(const char *filename, const detector *det) {
     if(!f)
         return EXIT_FAILURE;
     jabs_message(MSG_INFO, f, "type = %s\n", detector_type_name(det));
-    jabs_message(MSG_INFO, f, "slope = %g keV\n", det->slope/C_KEV);
-    jabs_message(MSG_INFO, f, "offset = %g keV\n", det->offset/C_KEV);
     char *calib_str = detector_calibration_to_string(det);
     jabs_message(MSG_INFO, f, "calibration = %s\n", calib_str);
     free(calib_str);
@@ -277,8 +280,6 @@ jibal_config_var *detector_make_vars(detector *det) {
         return NULL;
     jibal_config_var vars[] = {
             {JIBAL_CONFIG_VAR_OPTION, "type",       &det->type,          detector_option},
-            {JIBAL_CONFIG_VAR_UNIT,   "slope",      &det->slope,             NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "offset",     &det->offset,            NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "length",     &det->length,            NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "resolution", &det->resolution,        NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "theta",      &det->theta,             NULL},

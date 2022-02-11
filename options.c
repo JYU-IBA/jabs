@@ -146,10 +146,10 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
                 cmd_opt->stop_step_exiting = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case '1':
-                sim->det[0]->slope = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
+                calibration_set_param(sim->det[0]->calibration, CALIBRATION_PARAM_SLOPE, jibal_get_val(jibal->units, UNIT_TYPE_ANY, optarg));
                 break;
             case '2':
-                sim->det[0]->offset = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
+                calibration_set_param(sim->det[0]->calibration, CALIBRATION_PARAM_OFFSET, jibal_get_val(jibal->units, UNIT_TYPE_ANY, optarg));
                 break;
             case 'c':
                 sim->det[0]->compress = atoi(optarg);

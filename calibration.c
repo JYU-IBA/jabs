@@ -6,7 +6,7 @@ calibration *calibration_init() {
     calibration *c = malloc(sizeof(calibration));
     if(!c)
         return NULL;
-    c->f = NULL;
+    c->f = calibration_none;
     c->type = CALIBRATION_NONE;
     c->params = NULL;
     return c;
@@ -39,13 +39,8 @@ double calibration_linear(const void *params, double x) {
     return p->offset + p->slope * x;
 }
 
-double calibration_eval(const calibration *c, double x) {
-    if(c->type == CALIBRATION_NONE) {
-        return x;
-    } else {
-        assert(c->f);
-        return c->f(c->params, x);
-    }
+double calibration_none(const void *params, double x) {
+    return x;
 }
 
 int calibration_set_param(calibration *c, calibration_param_type type, double value) {
@@ -84,6 +79,23 @@ double calibration_get_param(const calibration *c, calibration_param_type type) 
             break;
     }
     return 0.0;
+}
+
+double *calibration_get_param_ref(calibration *c, calibration_param_type type) {
+    if(!c || !c->params)
+        return NULL;
+    if(c->type != CALIBRATION_LINEAR)
+        return NULL;
+    calibration_params_linear *p = (calibration_params_linear *) c->params;
+    switch(type) {
+        case CALIBRATION_PARAM_OFFSET:
+            return &(p->offset);
+        case CALIBRATION_PARAM_SLOPE:
+            return &(p->slope);
+        default:
+            break;
+    }
+    return NULL;
 }
 
 const char *calibration_name(const calibration *c) {

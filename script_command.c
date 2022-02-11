@@ -441,24 +441,6 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
     }
     double *value_double = NULL;
     size_t *value_size = NULL;
-
-#if 0
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("aperture", "Set aperture", 0, &script_set_detector_aperture));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("calibration", "Set calibration", 0, &script_set_detector_calibration));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("column", "", 'c', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("channels", "", 'h', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("compress", "", 'C', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("distance", "", 'd', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("foil", "Set foil", 0, &script_set_detector_foil));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("type", "", 't', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("slope", "", 'S', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("offset", "", 'O', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("resolution", "", 'r', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("solid", "", 's', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("theta", "", 'T', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("length", "", 'l', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "", 'p', NULL));
-#endif
     switch(val) {
         case 'c': /* column */
             value_size = &(det->column);
@@ -475,14 +457,15 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
         case 't': /* type */
             det->type = jibal_option_get_value(detector_option, argv[0]);
             if(det->type == 0) {
-                jabs_message(MSG_WARNING, stderr, "Detector type \"%s\" is none or unknown.\n", argv[0]);
+                jabs_message(MSG_ERROR, stderr, "Detector type \"%s\" is none or unknown.\n", argv[0]);
+                return SCRIPT_COMMAND_FAILURE;
             }
             break;
-        case 'S': /* slope */
-            value_double = &(det->slope);
+        case 'S': /* slope, this is for backwards compatibility (and ease of use with linear calibration) */
+            value_double = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE);
             break;
-        case 'O': /* offset */
-            value_double = &(det->offset);
+        case 'O': /* offset, this is for backwards compatibility */
+            value_double = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET);
             break;
         case 'r': /* resolution */
             value_double = &(det->resolution);

@@ -415,7 +415,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
     fprintf(stderr, "E_max of this simulation is %g keV\n", E_max/C_KEV);
 #endif
     size_t i=0;
-    while(detector_calibrated(ws->det, i) < E_max && i <= 1000000) {i++;}
+    while(detector_calibrated(ws->det, i) < E_max && i <= 1000000) {i++;} /* TODO: this requires changes for ToF spectra */
 #ifdef DEBUG
     fprintf(stderr, "Simulating %zu channels\n", i);
 #endif

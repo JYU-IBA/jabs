@@ -83,7 +83,7 @@ int fit(struct fit_data *fit_data);
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 void fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspace *w);
 fit_params *fit_params_new();
-void fit_params_add_parameter(fit_params *p, double *value);
+int fit_params_add_parameter(fit_params *p, double *value);
 void fit_params_free(fit_params *p);
 void fit_stats_print(FILE *f, const struct fit_stats *stats);
 int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range); /* Makes a deep copy */

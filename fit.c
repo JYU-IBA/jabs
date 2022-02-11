@@ -113,11 +113,26 @@ fit_params *fit_params_new() {
     p->func_params_err = NULL;
     return p;
 }
-void fit_params_add_parameter(fit_params *p, double *value) {
+int fit_params_add_parameter(fit_params *p, double *value) {
+    if(!value) {
+#ifdef DEBUG
+        fprintf(stderr, "Didn't add a fit parameter since a NULL pointer was passed.\n");
+#endif
+        return EXIT_FAILURE;
+    }
+    for(size_t i = 0; i < p->n; i++) {
+        if(p->func_params[i] == value) {
+#ifdef DEBUG
+            fprintf(stderr, "Didn't add fit parameter that points to value %p\n", (void *)value);
+#endif
+            return EXIT_SUCCESS; /* Parameter already exists, don't add. */
+        }
+    }
     p->n++;
     p->func_params = realloc(p->func_params, sizeof(double *)*p->n);
     p->func_params_err = realloc(p->func_params_err, sizeof(double)*p->n);
     p->func_params[p->n-1] = value;
+    return EXIT_SUCCESS;
 }
 void fit_params_free(fit_params *p) {
     if(!p)
