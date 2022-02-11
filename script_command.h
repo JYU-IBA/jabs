@@ -46,6 +46,8 @@ const script_command *script_command_find(const script_command *commands, const 
 size_t script_command_print_possible_matches_if_ambiguous(const script_command *commands, const char *cmd_string);
 script_command_status script_set_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_show_var(struct script_session *s, jibal_config_var *var, int, char * const *);
+script_command_status script_set_detector_val(struct script_session *s, int val, int argc, char *const *argv);
+script_command_status script_set_detector_calibration_val(struct script_session *s, int val, int argc, char *const *argv);
 script_command_status script_enable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_disable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_add_detector(struct script_session *s, int argc, char * const *argv);

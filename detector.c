@@ -12,6 +12,30 @@
 
 extern inline double detector_calibrated(const detector *det, size_t ch);
 
+char *detector_calibration_to_string(const detector *det) {
+    if(!det)
+        return NULL;
+    const calibration *c = det->calibration;
+    char *out = NULL;
+    asprintf_append(&out, "%s", calibration_name(c));
+    if(!c)
+        return out;
+    switch(c->type) {
+        case CALIBRATION_NONE:
+            break;
+        case CALIBRATION_LINEAR:
+            asprintf_append(&out, " slope %g%s offset %g%s",
+                            calibration_get_param(c, CALIBRATION_PARAM_SLOPE)/detector_param_unit_factor(det), detector_param_unit(det),
+                            calibration_get_param(c, CALIBRATION_PARAM_OFFSET)/detector_param_unit_factor(det), detector_param_unit(det)
+                            );
+            break;
+        case CALIBRATION_ARB:
+            break;
+    }
+    return out;
+}
+
+
 const char *detector_type_name(const detector *det) {
     return detector_option[det->type].s;
 }
@@ -142,6 +166,7 @@ void detector_free(detector *det) {
     sample_model_free(det->foil_sm);
     sample_free(det->foil);
     aperture_free(det->aperture);
+    calibration_free(det->calibration);
     free(det);
 }
 
@@ -154,6 +179,9 @@ int detector_print(const char *filename, const detector *det) {
     jabs_message(MSG_INFO, f, "type = %s\n", detector_type_name(det));
     jabs_message(MSG_INFO, f, "slope = %g keV\n", det->slope/C_KEV);
     jabs_message(MSG_INFO, f, "offset = %g keV\n", det->offset/C_KEV);
+    char *calib_str = detector_calibration_to_string(det);
+    jabs_message(MSG_INFO, f, "calibration = %s\n", calib_str);
+    free(calib_str);
     if(det->type == DETECTOR_ENERGY) {
         jabs_message(MSG_INFO, f, "resolution = %g keV\n", det->resolution/C_KEV);
     } else if(det->type == DETECTOR_TOF) {
@@ -335,4 +363,26 @@ void detector_update(detector *det) {
 #ifdef DEBUG
     fprintf(stderr, "Updated detector, resolution = %g keV FWHM, variance = %g\n", det->resolution/C_KEV, det->resolution_variance);
 #endif
+}
+
+const char *detector_param_unit(const detector *det) { /* Match these with detector_param_unit_factor() */
+    switch(det->type) {
+        case DETECTOR_TOF:
+            return "ns";
+        case DETECTOR_ENERGY:
+            return "keV";
+        default:
+            return "";
+    }
+}
+
+double detector_param_unit_factor(const detector *det) {
+    switch(det->type) {
+        case DETECTOR_TOF:
+            return C_NS;
+        case DETECTOR_ENERGY:
+            return C_KEV;
+        default:
+            return 1.0;
+    }
 }

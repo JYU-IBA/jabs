@@ -512,6 +512,56 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
     return 1; /* Number of arguments */
 }
 
+script_command_status script_set_detector_calibration_val(struct script_session *s, int val, int argc, char *const *argv) {
+    (void) argv;
+#ifdef DEBUG
+    fprintf(stderr, "Active detector is %zu.\n", s->i_det_active);
+#endif
+    detector *det = sim_det(s->fit->sim, s->i_det_active);
+    if(!det) {
+        jabs_message(MSG_ERROR, stderr, "Detector %zu does not exist.\n", s->i_det_active);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(!det->calibration) {
+        det->calibration = calibration_init();
+    }
+    switch(val) { /* Handle cases where we don't expect (consume) arguments */
+        case 'L': /* linear */
+           if(det->calibration->type != CALIBRATION_LINEAR) {
+                calibration_free(det->calibration);
+                det->calibration = calibration_init_linear(ENERGY_SLOPE, 0.0);
+           }
+           return 0;
+        default:
+            break;
+    }
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Not enough parameters to set detector calibration values.\n", val);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    double value_double = jibal_get_val(s->jibal->units, 0, argv[0]);
+    switch(val) {
+        case 's': /* slope */
+            if(det->calibration->type == CALIBRATION_LINEAR) {
+                calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, value_double);
+            } else {
+                jabs_message(MSG_ERROR, stderr, "Can not set calibration slope, calibration is not linear.\n");
+            }
+            return 1;
+        case 'o': /* offset */
+            if(det->calibration->type == CALIBRATION_LINEAR) {
+                calibration_set_param(det->calibration, CALIBRATION_PARAM_OFFSET, value_double);
+            } else {
+                jabs_message(MSG_ERROR, stderr, "Can not set calibration slope, calibration is not linear.\n");
+            }
+            return 1;
+        default:
+            break;
+    }
+    jabs_message(MSG_ERROR, stderr, "Unhandled value %i in script_set_detector_calibration_val. Report to developer.\n", val);
+    return SCRIPT_COMMAND_FAILURE;
+}
+
 script_command_status script_show_var(struct script_session *s, jibal_config_var *var, int argc, char *const *argv) {
     (void) argv;
     (void) argc;
@@ -1003,7 +1053,13 @@ script_command *script_commands_create(struct script_session *s) {
     c_detector->f_val = &script_set_detector_val;
     script_command_list_add_command(&c_set->subcommands, c_detector);
     script_command_list_add_command(&c_detector->subcommands, script_command_new("aperture", "Set detector aperture.", 0, &script_set_detector_aperture));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("calibration", "Set calibration.", 0, &script_set_detector_calibration));
+    script_command *c_calibration = script_command_new("calibration", "Set calibration.", 0, &script_set_detector_calibration);
+    c_calibration->f_val = &script_set_detector_calibration_val;
+    script_command_list_add_command(&c_detector->subcommands, c_calibration);
+    script_command_list_add_command(&c_calibration->subcommands, script_command_new("linear", "Set the calibration to be linear (default).", 'L', NULL));
+    script_command_list_add_command(&c_calibration->subcommands, script_command_new("slope", "Set the slope of a linear calibration.", 's', NULL));
+    script_command_list_add_command(&c_calibration->subcommands, script_command_new("offset", "Set the offset of a linear calibration.", 'o', NULL));
+
     script_command_list_add_command(&c_detector->subcommands, script_command_new("column", "Set column number (for data input).", 'c', NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("channels", "Set number of channels.", 'h', NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("compress", "Set compress (summing of channels).", 'C', NULL));
@@ -1525,7 +1581,7 @@ script_command_status script_set_detector_aperture(struct script_session *s, int
         jabs_message(MSG_ERROR, stderr, "No detector(s)\n");
         return SCRIPT_COMMAND_SUCCESS;
     }
-    if(detector_aperture_set_from_argv(s->jibal, det, &argc, &argv)) {
+    if(detector_aperture_set_from_argv(s->jibal, det, &argc, &argv)) { /* TODO: handle parsing with subcommands */
         return SCRIPT_COMMAND_FAILURE;
     }
     return argc_orig - argc;
@@ -1535,8 +1591,10 @@ script_command_status script_set_detector_calibration(struct script_session *s, 
     (void) s;
     (void) argc;
     (void) argv;
-    jabs_message(MSG_ERROR, stderr, "Setting calibration not implemented, use slope and offset.");
-    return SCRIPT_COMMAND_FAILURE;
+    if(argc == 0) {
+        return SCRIPT_COMMAND_NOT_FOUND;
+    }
+    return 0;
 }
 
 script_command_status script_set_detector_foil(struct script_session *s, int argc, char *const *argv) {

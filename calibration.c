@@ -1,4 +1,5 @@
 #include <assert.h>
+#include "generic.h"
 #include "calibration.h"
 
 calibration *calibration_init() {
@@ -66,4 +67,27 @@ int calibration_set_param(calibration *c, calibration_param_type type, double va
             return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
+}
+
+double calibration_get_param(const calibration *c, calibration_param_type type) {
+    if(!c || !c->params)
+        return 0.0;
+    if(c->type != CALIBRATION_LINEAR)
+        return 0.0;
+    calibration_params_linear *p = (calibration_params_linear *) c->params;
+    switch(type) {
+        case CALIBRATION_PARAM_OFFSET:
+            return p->offset;
+        case CALIBRATION_PARAM_SLOPE:
+            return p->slope;
+        default:
+            break;
+    }
+    return 0.0;
+}
+
+const char *calibration_name(const calibration *c) {
+    if(!c)
+        return calibration_option[CALIBRATION_NONE].s;
+    return calibration_option[c->type].s;
 }
