@@ -113,11 +113,26 @@ fit_params *fit_params_new() {
     p->func_params_err = NULL;
     return p;
 }
-void fit_params_add_parameter(fit_params *p, double *value) {
+int fit_params_add_parameter(fit_params *p, double *value) {
+    if(!value) {
+#ifdef DEBUG
+        fprintf(stderr, "Didn't add a fit parameter since a NULL pointer was passed.\n");
+#endif
+        return EXIT_FAILURE;
+    }
+    for(size_t i = 0; i < p->n; i++) {
+        if(p->func_params[i] == value) {
+#ifdef DEBUG
+            fprintf(stderr, "Didn't add fit parameter that points to value %p\n", (void *)value);
+#endif
+            return EXIT_SUCCESS; /* Parameter already exists, don't add. */
+        }
+    }
     p->n++;
     p->func_params = realloc(p->func_params, sizeof(double *)*p->n);
     p->func_params_err = realloc(p->func_params_err, sizeof(double)*p->n);
     p->func_params[p->n-1] = value;
+    return EXIT_SUCCESS;
 }
 void fit_params_free(fit_params *p) {
     if(!p)
@@ -137,20 +152,22 @@ void fit_stats_print(FILE *f, const struct fit_stats *stats) {
     }
 }
 
-void fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range) { /* Makes a deep copy */
+int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range) { /* Makes a deep copy */
     if(range->low == 0 && range->high == 0) {
-#ifdef DEBUG
-        fprintf(stderr, "No valid range given (from zero to zero).\n"); /* Yeah, this is technically valid... */
-#endif
-        return;
+        return EXIT_FAILURE;
+    }
+    if(range->high < range->low) {
+        jabs_message(MSG_ERROR, stderr, "Range from %zu to %zu is not valid!\n", range->low, range->high);
+        return EXIT_FAILURE;
     }
     fit_data->n_fit_ranges++;
     fit_data->fit_ranges = realloc(fit_data->fit_ranges, fit_data->n_fit_ranges * sizeof(roi));
     if(!fit_data->fit_ranges) {
         fit_data->n_fit_ranges = 0;
-        return;
+        return EXIT_FAILURE;
     }
     fit_data->fit_ranges[fit_data->n_fit_ranges - 1] = *range;
+    return EXIT_SUCCESS;
 }
 
 void fit_data_fit_ranges_free(struct fit_data *fit_data) {
@@ -410,12 +427,12 @@ int fit(struct fit_data *fit_data) {
         detector *det = sim_det(fit_data->sim, range->i_det);
         gsl_histogram *exp = fit_data_exp(fit_data, range->i_det);
         if(!det) {
-            jabs_message(MSG_ERROR, stderr, "Detector %zu (fit range %zu) does not exist.\n", range->i_det, i_range);
+            jabs_message(MSG_ERROR, stderr, "Detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
             free(weights);
             return 1;
         }
         if(!exp) {
-            jabs_message(MSG_ERROR, stderr,  "Experimental spectrum for detector %zu (fit range %zu) does not exist.\n", range->i_det, i_range);
+            jabs_message(MSG_ERROR, stderr,  "Experimental spectrum for detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
             free(weights);
             return 1;
         }
@@ -508,4 +525,37 @@ int fit(struct fit_data *fit_data) {
     gsl_vector_free(x);
     free(weights);
     return 0;
+}
+
+int fit_set_roi_from_string(roi *r, const char *str) {
+    const char *str_orig = str;
+    if(!str)
+        return EXIT_FAILURE;
+    if(*str != '[') { /* Silent failure, intentionally, since this can signal end of valid roi range arguments. */
+#ifdef DEBUG
+        fprintf(stderr, "fit_set_roi_from_string() fails silently.\n");
+#endif
+        return EXIT_FAILURE;
+    }
+    str++; /* Skipping '[' */
+    char *end;
+    r->low = strtoull(str, &end, 10);
+    str = end;
+    if(*str != ':') {
+        jabs_message(MSG_ERROR, stderr,"Can not parse range from \"%s\". Is ':' missing?\n", str_orig);
+        return EXIT_FAILURE;
+    }
+    str++; /* Skipping ':' */
+    r->high = strtoull(str, &end, 10);
+    str = end;
+    if(*str != ']') {
+        jabs_message(MSG_ERROR, stderr,"Can not parse range from \"%s\". Is ']' missing near \"%s\"?\n", str_orig, str);
+        return EXIT_FAILURE;
+    }
+    str++;
+    if(*str != '\0') {
+        jabs_message(MSG_ERROR, stderr, "Unexpected input when parsing a range, \"%s\" at end of \"%s\"\n", str, str_orig);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
 }

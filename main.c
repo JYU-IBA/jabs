@@ -28,14 +28,16 @@
 #include <jibal.h>
 #include <jibal_cs.h>
 
+#include "defaults.h"
+#include "generic.h"
 #include "options.h"
 #include "sample.h"
 #include "simulation.h"
 #include "spectrum.h"
 #include "fit.h"
 #include "script.h"
-#include "generic.h"
-#include "defaults.h"
+#include "script_session.h"
+#include "script_command.h"
 
 int main(int argc, char * const *argv) {
 #ifdef DEBUG
@@ -66,7 +68,7 @@ int main(int argc, char * const *argv) {
     sim->rbs = cmd_opt->rbs;
     sim->erd = cmd_opt->erd;
     session->output_filename = strdup_non_null(cmd_opt->output_filename);
-    roi range = {.low = cmd_opt->fit_low, .high = cmd_opt->fit_high};
+    roi range = {.i_det = 0, .low = cmd_opt->fit_low, .high = cmd_opt->fit_high};
     fit_data_fit_range_add(fit_data, &range); /* We add just this one range (or none) */
     sim_sanity_check(sim);
     if(cmd_opt->exp_filename) {
@@ -104,7 +106,10 @@ int main(int argc, char * const *argv) {
     if(cmd_opt->interactive || script_files) {
         if(script_files) {
             for(int i = 0; i < argc; i++) {
-                status = script_process(session, argv[i]);
+                if(script_session_load_script(session, argv[i])) {
+                    return EXIT_FAILURE;
+                }
+                status = script_process(session);
                 if(status != SCRIPT_COMMAND_EOF) {
                     return status;
                 }
@@ -112,7 +117,10 @@ int main(int argc, char * const *argv) {
         }
         if(cmd_opt->interactive) {
             greeting(TRUE);
-            status = script_process(session, NULL);
+            if(script_session_load_script(session, NULL)) {
+                return EXIT_FAILURE;
+            }
+            status = script_process(session);
         }
     } else { /* Non-interactive, pure command line mode. Run a single sim or fit. */
         if(!session->output_filename) {

@@ -16,7 +16,9 @@
 #define COPYRIGHT_STRING "\n    This program is free software; you can redistribute it and/or modify \n    it under the terms of the GNU General Public License as published by\n    the Free Software Foundation; either version 2 of the License, or\n    (at your option) any later version.\n\n   See LICENSE.txt for the full license.\n\n"
 #include <jibal_units.h>
 
-#define SCRIPT_NESTED_MAX 8 /* How deep (number of levels) scripts can be nested, i.e. script file loads a script file loads a script file... */
+#define SCRIPT_FILES_NESTED_MAX 8 /* How deep (number of levels) scripts can be nested, i.e. script file loads a script file loads a script file... */
+#define SCRIPT_COMMANDS_NESTED_MAX 8 /* How deep (number of levels) script commands can be nested, i.e. script command has a subcommand, which has a subcommand... */
+#define SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE 16 /* Commands are sorted alphabetically using a merge sort, the algorithm uses a "Bottom-up" approach with a small fixed size array (can sort up to 2^SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE elements) */
 #define PROMPT "jabs> "
 
 /* Defaults for new simulations */

@@ -12,21 +12,15 @@
 
  */
 
-#include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <jibal_units.h>
-#include "fit.h"
-#include "generic.h"
-#include "spectrum.h"
-#include "script.h"
-#include "jabs.h"
 #include "message.h"
+#include "script.h"
+#include "script_session.h"
+#include "script_command.h"
+#include "script_file.h"
 
-int script_process(script_session *s, const char *filename) {
-    if(script_session_load_script(s, filename)) {
-        return EXIT_FAILURE;
-    }
+int script_process(script_session *s) {
     static const char *prompt = PROMPT;
     script_command_status status = SCRIPT_COMMAND_SUCCESS;
     while(s->file_depth > 0) {
@@ -35,6 +29,12 @@ int script_process(script_session *s, const char *filename) {
         if(status == SCRIPT_COMMAND_EXIT || (status != SCRIPT_COMMAND_SUCCESS && !interactive)) { /* on exit, close all nested script files. When non-interactive, close scripts on error until interactive (or exit). */
             script_file_close(sfile);
             s->file_depth--;
+#ifdef DEBUG
+            fprintf(stderr, "Depth now %zu, status = %s\n", s->file_depth, script_command_status_to_string(status));
+#endif
+            if(status == SCRIPT_COMMAND_EOF) {
+                status = SCRIPT_COMMAND_SUCCESS;
+            }
             continue;
         }
         if(interactive) {
@@ -46,16 +46,14 @@ int script_process(script_session *s, const char *filename) {
             }
             status = script_execute_command(s, sfile->line);
             if(!interactive && status != SCRIPT_COMMAND_SUCCESS) {
-                jabs_message(MSG_ERROR, stderr, "Error (%i) on line %zu in file \"%s\". Aborting.\n", status, sfile->lineno, sfile->filename);
+                jabs_message(MSG_ERROR, stderr, "Error %i (%s) on line %zu in file \"%s\". Aborting.\n", status,
+                             script_command_status_to_string(status), sfile->lineno, sfile->filename);
             }
         } else {
             status = SCRIPT_COMMAND_EOF;
             if(interactive)
                 status = SCRIPT_COMMAND_EXIT;
         }
-    }
-    if(s->files[0]->interactive) {
-        jabs_message(MSG_INFO, stderr, "\nBye!\n");
     }
     fflush(stderr);
     return status;

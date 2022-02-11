@@ -13,15 +13,7 @@
  */
 
 #include <stdio.h>
-
-typedef struct script_file {
-    FILE *f;
-    char *filename;
-    char *line;
-    size_t line_size;
-    size_t lineno;
-    int interactive;
-} script_file;
+#include "script_generic.h"
 
 script_file *script_file_open(const char *filename);
 void script_file_close(script_file *sfile);

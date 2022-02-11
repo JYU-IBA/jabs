@@ -8,7 +8,7 @@ extern "C" {
 #include <jibal_units.h>
 #include "jabs.h"
 #include "sample.h"
-#include "script.h"
+#include "script_generic.h"
 #include "generic.h"
 #include "message.h"
 #include "defaults.h"
@@ -29,7 +29,7 @@ class MainWindow : public QMainWindow
 
 public:
     MainWindow(QWidget *parent = nullptr);
-    void addMessage(const char *msg);
+    void addMessage(jabs_msg_level level, const char *msg);
     ~MainWindow();
 
 public slots:
@@ -65,7 +65,7 @@ private slots:
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);
-    int runLine(const QString &line, size_t lineno = 0);
+    int runLine(const QString &line);
     void plotSession();
     Ui::MainWindow *ui;
     struct jibal *jibal;

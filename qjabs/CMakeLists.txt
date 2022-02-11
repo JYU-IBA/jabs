@@ -81,6 +81,7 @@ set(PROJECT_SOURCES
         ../script_session.h
         ../script_file.c
         ../script_file.h
+        ../script_generic.h
        main.cpp
        mainwindow.cpp
        mainwindow.h

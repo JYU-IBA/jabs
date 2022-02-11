@@ -61,6 +61,10 @@
 #include <QSyntaxHighlighter>
 #include <QTextCharFormat>
 #include <QRegularExpression>
+extern "C" {
+#include "../script_generic.h"
+}
+
 
 QT_BEGIN_NAMESPACE
 class QTextDocument;
@@ -73,6 +77,8 @@ class Highlighter : public QSyntaxHighlighter
 
 public:
     Highlighter(QTextDocument *parent = nullptr);
+    void setSession(const script_session *session);
+    void highlightArgv(int argc, char **argv);
 
 protected:
     void highlightBlock(const QString &text) override;
@@ -84,9 +90,10 @@ private:
         QTextCharFormat format;
     };
     QList<HighlightingRule> highlightingRules;
-
-    QTextCharFormat commandFormat;
     QTextCharFormat singleLineCommentFormat;
+    QTextCharFormat commandFormat;
+    QTextCharFormat variableFormat;
+    const script_session *session;
 };
 //! [0]
 

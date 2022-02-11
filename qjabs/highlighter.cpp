@@ -1,4 +1,4 @@
-/* Original copyright notice of highlighter.cpp below, used
+﻿/* Original copyright notice of highlighter.cpp below, used
  * under the terms of the BSD license.
  *
  * Modifications by Jaakko Julin for JaBS. Modified version may be distributed
@@ -58,67 +58,49 @@
 
 #include "highlighter.h"
 extern "C" {
-#include "../script.h"
+#include <../generic.h>
+#include <../script_command.h>
 }
 
 Highlighter::Highlighter(QTextDocument *parent)
     : QSyntaxHighlighter(parent)
 {
-    HighlightingRule rule;
-
+    singleLineCommentFormat.setForeground(Qt::gray);
     commandFormat.setForeground(Qt::darkBlue);
     commandFormat.setFontWeight(QFont::Bold);
-#if 0
-    const QString commandPatterns[] = {
+    variableFormat.setForeground(Qt::darkYellow);
+    variableFormat.setFontWeight(QFont::StyleItalic);
+}
 
-    };
-    for (const QString &pattern : commandPatterns) {
-        rule.pattern = QRegularExpression(pattern);
-        rule.format = commandFormat;
-        highlightingRules.append(rule);
-    }
-#endif
-     const struct script_command *stack[COMMAND_DEPTH];
-     const struct script_command *c;
-     stack[0] = script_commands;
-     size_t i = 0;
-     c = stack[0];
-     while(c->name != NULL) {
-         while(c->name != NULL) {
-             QString pattern = QString("^");
-             for(size_t j = 1; j <= i; j++) {
-                 pattern += stack[j]->name;
-                 pattern += " ";
-             }
-             pattern += c->name;
-             pattern + "\\b";
-             if(c->subcommands && i < (COMMAND_DEPTH - 1)) {
-                 i++;
-                 stack[i] = c;
-                 c = c->subcommands;
-             } else {
-                 c++;
-             }
-             rule.pattern = QRegularExpression(pattern);
-             //qDebug() << pattern;
-             rule.format = commandFormat;
-             highlightingRules.append(rule);
-         }
-         if(i == 0)
-             break;
-         c = stack[i];
-         i--;
-         c++;
-     }
-
-    singleLineCommentFormat.setForeground(Qt::gray);
-    rule.pattern = QRegularExpression(QStringLiteral("#[^\n]*"));
-    rule.format = singleLineCommentFormat;
-    highlightingRules.append(rule);
+void Highlighter::setSession(const script_session *session)
+{
+    Highlighter::session = session;
 }
 
 void Highlighter::highlightBlock(const QString &text)
 {
+    qsizetype len = text.length();
+    if(len == 0) {
+        setCurrentBlockState(0);
+        return;
+    }
+    if(text.at(0) == '#') {
+        setFormat(0, text.length(), singleLineCommentFormat);
+        setCurrentBlockState(0);
+        return;
+    }
+    int argc = 0;
+    char **argv = string_to_argv(qPrintable(text), &argc);
+    if(!argv) {
+        return;
+
+    }
+    highlightArgv(argc, argv);
+    argv_free(argv, argc);
+
+
+    return;
+
     for (const HighlightingRule &rule : qAsConst(highlightingRules)) {
         QRegularExpressionMatchIterator matchIterator = rule.pattern.globalMatch(text);
         while (matchIterator.hasNext()) {
@@ -126,6 +108,42 @@ void Highlighter::highlightBlock(const QString &text)
             setFormat(match.capturedStart(), match.capturedLength(), rule.format);
         }
     }
-
     setCurrentBlockState(0);
+}
+
+void Highlighter::highlightArgv(int argc, char **argv) {
+    const script_command *cmds = session->commands;
+    const script_command *c_parent = NULL;
+    const char *argv_start = argv[0];
+    while(argc && cmds) {
+        const script_command *c = script_command_find(cmds, argv[0]);
+        //qDebug() << "Parsing" << argv[0] << "first of cmds is" << cmds->name << cmds;
+        if(!c) {
+            argc--;
+            argv++;
+            continue;
+        }
+        while(c) { /* Subcommand found */
+            size_t arg_len = strlen(argv[0]);
+            if(c->f) {
+                setFormat(argv[0] - argv_start, arg_len, commandFormat);
+            } else if(c->var) {
+                setFormat(argv[0] - argv_start, arg_len, variableFormat);
+            } else if(c->val) {
+                setFormat(argv[0] - argv_start, arg_len, commandFormat);
+            }
+            if(c->subcommands) {
+                setFormat(argv[0] - argv_start, arg_len, commandFormat);
+                argc--;
+                argv++;
+                cmds = c->subcommands;
+                c_parent = c;
+                break;
+            } else {
+                argc--;
+                argv++;
+                c = NULL;
+            }
+        }
+    }
 }

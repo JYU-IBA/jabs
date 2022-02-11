@@ -415,7 +415,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
     fprintf(stderr, "E_max of this simulation is %g keV\n", E_max/C_KEV);
 #endif
     size_t i=0;
-    while(detector_calibrated(ws->det, i) < E_max && i <= 1000000) {i++;}
+    while(detector_calibrated(ws->det, i) < E_max && i <= 1000000) {i++;} /* TODO: this requires changes for ToF spectra */
 #ifdef DEBUG
     fprintf(stderr, "Simulating %zu channels\n", i);
 #endif
@@ -459,9 +459,9 @@ void simulation_print(FILE *f, const simulation *sim) {
             jabs_message(MSG_INFO, f, "diameter %g mm\n", sim->beam_aperture->diameter/C_MM);
         } else if(sim->beam_aperture->type == APERTURE_RECTANGLE) {
             jabs_message(MSG_INFO, f, "width %g mm height %g mm\n", sim->beam_aperture->width/C_MM, sim->beam_aperture->height/C_MM);
-        } else {
-            jabs_message(MSG_INFO, f, "\n");
         }
+    } else {
+        jabs_message(MSG_INFO, f, "\n");
     }
     jabs_message(MSG_INFO, f, "n_detectors = %zu\n", sim->n_det);
     for(size_t i = 0; i < sim->n_det; i++) {
@@ -644,4 +644,22 @@ double sim_exit_angle(const simulation *sim, const detector *det) {
     double theta, phi;
     rotate(sim->sample_theta, sim->sample_phi, det->theta, det->phi, &theta, &phi);
     return C_PI - theta;
+}
+
+int sim_do_we_need_erd(const simulation *sim) {
+    if(!sim->erd) {
+        return FALSE; /* ERD has been (intentionally) disabled */
+    }
+    if(sim->params.ds) {
+        return TRUE; /* In case of DS, ERD becomes possible kind-of possible with any detector geometry */
+    }
+    int forward_angles = FALSE;
+    for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
+        const detector *det = sim_det(sim, i_det);
+        if(det->theta < C_PI_2) {
+            forward_angles = TRUE;
+            break;
+        }
+    }
+    return forward_angles; /* If any detector is in forward angle, we might need ERD */
 }

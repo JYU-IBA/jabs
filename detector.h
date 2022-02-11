@@ -20,6 +20,7 @@
 #include "sample.h"
 #include "aperture.h"
 #include "rotate.h"
+#include "calibration.h"
 
 typedef enum {
     DETECTOR_NONE = 0,
@@ -38,8 +39,7 @@ static const jibal_option detector_option[] = {
 
 typedef struct detector {
     detector_type type;
-    double slope;
-    double offset;
+    struct calibration *calibration;
     double length; /* For ToF */
     double resolution; /* Stored as FWHM in relevant SI units. Note that can be e.g. energy or time depending on detector type. */
     double resolution_variance; /* Calculated based on "resolution" before needed by detector_update(). */
@@ -55,7 +55,8 @@ typedef struct detector {
     sample *foil;
 } detector;
 
-inline double detector_calibrated(const detector *det, size_t ch) {return det->offset + det->slope * (unsigned int)(ch*det->compress);}
+inline double detector_calibrated(const detector *det, size_t ch) {return calibration_eval(det->calibration, ch*det->compress);}
+char *detector_calibration_to_string(const detector *det);
 const char *detector_type_name(const detector *det);
 int detector_sanity_check(const detector *det);
 detector *detector_from_file(const jibal *jibal, const char *filename); /* one detector from JIBAL configuration style file */
@@ -73,4 +74,6 @@ double detector_theta_deriv(const detector *det, char direction);
 double detector_solid_angle_calc(const detector *det);
 double detector_resolution(const detector *det, const jibal_isotope *isotope, double E);
 void detector_update(detector *det);
+const char *detector_param_unit(const detector *det); /* return a suitable unit based on detector type, e.g. "keV" when type == DETECTOR_ENERGY. TODO: use this wisely (we can simulate energy spectra with a ToF detector!) */
+double detector_param_unit_factor(const detector *det);
 #endif //JABS_DETECTOR_H

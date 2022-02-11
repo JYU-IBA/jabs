@@ -136,4 +136,5 @@ void sim_sort_reactions(const simulation *sim);
 void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident);
 double sim_alpha_angle(const simulation *sim);
 double sim_exit_angle(const simulation *sim, const detector *det);
+int sim_do_we_need_erd(const simulation *sim);
 #endif // JABS_SIMULATION_H

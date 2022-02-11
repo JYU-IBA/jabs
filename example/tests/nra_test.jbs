@@ -1,14 +1,16 @@
-#Reaction 7Li(p,a)4He from file "li7pa0n.r33"
-load reaction "li7pa0n.r33"
-set sample "6Li0.075 7Li0.925 O2" 12000tfu Si 10000tfu
-#set sample LiO2 12000tfu Si 10000tfu
-set ion p
-set energy 2.2MeV
-set det theta 160deg
+#!/usr/bin/env jabs
+set ion p energy 2.2MeV
+set det theta 160deg solid 70msr
 set det slope 2keV
 set fluence 1e13
-set det solid 70msr
+
+set sample "6Li0.075 7Li0.925 O2" 12000tfu Si 10000tfu
+#Note: isotopic ratios of Li may vary, the commented command below will set them with defaults from JIBAL
+#set sample LiO2 12000tfu Si 10000tfu
+
+#Reaction 7Li(p,a)4He from file "li7pa0n.r33"
+load reaction "li7pa0n.r33"
+add reactions RBS
 show reactions
-set stop_step_fudge 0.5
 simulate
 save spectra "out.csv"

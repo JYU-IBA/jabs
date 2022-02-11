@@ -58,7 +58,7 @@ void jabs_message(jabs_msg_level level, FILE *f, const char * format, ...) {
     if(f == stderr)     {
         char *str_out;
         vasprintf(&str_out, format, argp);
-        mainWindow->addMessage(str_out);
+        mainWindow->addMessage(level, str_out);
         fputs(str_out, stderr);
         free(str_out);
     } else {
