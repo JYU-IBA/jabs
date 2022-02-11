@@ -82,6 +82,8 @@ set(PROJECT_SOURCES
         ../script_file.c
         ../script_file.h
         ../script_generic.h
+        ../calibration.c
+        ../calibration.h
        main.cpp
        mainwindow.cpp
        mainwindow.h
