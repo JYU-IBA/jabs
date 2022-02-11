@@ -1,0 +1,69 @@
+#include <assert.h>
+#include "calibration.h"
+
+calibration *calibration_init() {
+    calibration *c = malloc(sizeof(calibration));
+    if(!c)
+        return NULL;
+    c->f = NULL;
+    c->type = CALIBRATION_NONE;
+    c->params = NULL;
+    return c;
+}
+
+void calibration_free(calibration *c) {
+    if(!c)
+        return;
+    free(c->params);
+    free(c);
+}
+
+calibration *calibration_init_linear(double offset, double slope) {
+    calibration *c = calibration_init();
+    if(!c)
+        return NULL;
+    c->f = calibration_linear;
+    c->type = CALIBRATION_LINEAR;
+    calibration_params_linear *p = malloc(sizeof(calibration_params_linear));
+    p->offset = offset;
+    p->slope = slope;
+    c->params = p;
+    return c;
+}
+
+
+
+double calibration_linear(const void *params, double x) {
+    calibration_params_linear *p = (calibration_params_linear *)params;
+    return p->offset + p->slope * x;
+}
+
+double calibration_eval(const calibration *c, double x) {
+    if(c->type == CALIBRATION_NONE) {
+        return x;
+    } else {
+        assert(c->f);
+        return c->f(c->params, x);
+    }
+}
+
+int calibration_set_param(calibration *c, calibration_param_type type, double value) {
+    if(!c || !c->params)
+        return EXIT_FAILURE;
+    if(c->type != CALIBRATION_LINEAR)
+        return EXIT_FAILURE;
+    calibration_params_linear *p = (calibration_params_linear *) c->params;
+    switch(type) {
+        case CALIBRATION_PARAM_NONE:
+            break;
+        case CALIBRATION_PARAM_OFFSET:
+            p->offset = value;
+            break;
+        case CALIBRATION_PARAM_SLOPE:
+            p->slope = value;
+            break;
+        default:
+            return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
