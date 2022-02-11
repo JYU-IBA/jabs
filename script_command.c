@@ -812,13 +812,13 @@ void script_command_free(script_command *c) {
 void script_commands_free(script_command *head) {
     if(!head)
         return;
-    struct script_command *stack[SCRIPT_NESTED_MAX];
+    struct script_command *stack[SCRIPT_COMMANDS_NESTED_MAX];
     struct script_command *c, *c_old = NULL;
     stack[0] = head;
     size_t i = 0;
     c = stack[0];
     while(c) {
-        if(c->subcommands && i < SCRIPT_NESTED_MAX) { /* Go deeper, push existing pointer to stack */
+        if(c->subcommands && i < SCRIPT_COMMANDS_NESTED_MAX) { /* Go deeper, push existing pointer to stack */
             stack[i] = c;
             i++;
             c = c->subcommands;
@@ -846,6 +846,80 @@ script_command *script_command_list_find_tail(script_command *head) {
         c = c->next;
     }
     return c;
+}
+
+script_command *script_command_list_merge(script_command *left, script_command *right) {
+    script_command *result = NULL;
+    script_command *tmp = NULL;
+
+    while(left != NULL && right != NULL) {
+        if(strcmp(left->name, right->name) < 0) {
+            result = script_command_list_append(result, left);
+            tmp = left;
+            left = left->next;
+            tmp->next = NULL;
+        } else {
+            result = script_command_list_append(result, right);
+            tmp = right;
+            right = right->next;
+            tmp->next = NULL;
+        }
+    }
+    while (left != NULL) {
+        result = script_command_list_append(result, left);
+        tmp = left;
+        left = left->next;
+        tmp->next = NULL;
+    }
+    while (right != NULL) {
+        result = script_command_list_append(result, right);
+        tmp = right;
+        right = right->next;
+        tmp->next = NULL;
+    }
+    return result;
+}
+
+script_command *script_command_list_merge_sort(script_command *head) {
+    if(!head)
+        return NULL;
+    script_command *a[SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE];
+    memset(a, 0, sizeof(script_command *)*SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE);
+    script_command *result;
+    script_command *next;
+    result = head;
+    size_t i;
+#ifdef DEBUG
+    fprintf(stderr, "Sorting command list (head %p = %s)\n", (void *)head, head->name);
+#endif
+    while(result != NULL) {
+        next = result->next;
+        result->next = NULL;
+
+        for(i = 0; (i < SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE) && (a[i] != NULL); i++) {
+            result = script_command_list_merge(a[i], result);
+            a[i] = NULL;
+        }
+        if(i == SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE)
+            i--;
+        a[i] = result;
+        result = next;
+    }
+    result = NULL;
+    for(i = 0; i < SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE; i++) {
+        result = script_command_list_merge(a[i], result);
+    }
+    return result;
+}
+
+script_command *script_command_list_append(script_command *head, script_command *cmd) {
+    if(!head) {
+        return cmd;
+    } else {
+        script_command *tail = script_command_list_find_tail(head);
+        tail->next = cmd;
+    }
+    return head;
 }
 
 void script_command_list_add_command(script_command **head, script_command *c_new) {
@@ -1055,6 +1129,38 @@ script_command *script_commands_create(struct script_session *s) {
     c = script_command_new("simulate", "Run a simulation.", 0, script_simulate);
     script_command_list_add_command(&head, c);
 
+    return script_commands_sort_all(head);
+}
+
+script_command *script_commands_sort_all(script_command *head) {
+    if(!head)
+        return NULL;
+    struct script_command *stack[SCRIPT_COMMANDS_NESTED_MAX];
+    struct script_command *c;
+    head = script_command_list_merge_sort(head);
+    stack[0] = head;
+    size_t i = 0;
+    c = stack[0];
+    while(c) {
+        if(c->subcommands && i < SCRIPT_COMMANDS_NESTED_MAX) { /* Go deeper, push existing pointer to stack */
+            stack[i] = c;
+            i++;
+#ifdef DEBUG
+            fprintf(stderr, "Sorting all commands, level %zu, subcommands of %s\n", i, c->name);
+#endif
+            c->subcommands = script_command_list_merge_sort(c->subcommands);
+            c = c->subcommands;
+            continue;
+        } else {
+            c = c->next; /* Go to next on the same level */
+        }
+        while(!c) {
+            if(i == 0)
+                break;
+            i--;
+            c = stack[i]->next;
+        }
+    }
     return head;
 }
 
@@ -1082,7 +1188,7 @@ size_t script_commands_size(const script_command *commands) {
 }
 
 void script_print_command_tree(FILE *f, const struct script_command *commands) {
-    const struct script_command *stack[SCRIPT_NESTED_MAX];
+    const struct script_command *stack[SCRIPT_COMMANDS_NESTED_MAX];
     const struct script_command *c;
     stack[0] = commands;
     size_t i = 0;
@@ -1098,7 +1204,7 @@ void script_print_command_tree(FILE *f, const struct script_command *commands) {
             }
             jabs_message(MSG_INFO, f, "%s\n", c->name);
         }
-        if(c->subcommands && i < SCRIPT_NESTED_MAX) { /* Go deeper, push existing pointer to stack */
+        if(c->subcommands && i < SCRIPT_COMMANDS_NESTED_MAX) { /* Go deeper, push existing pointer to stack */
             stack[i] = c;
             i++;
             c = c->subcommands;
@@ -1301,6 +1407,8 @@ script_command_status script_show_simulation(script_session *s, int argc, char *
 }
 
 script_command_status script_show_stopping(script_session *s, int argc, char *const *argv) {
+    (void) argc;
+    (void) argv;
     jibal_gsto *gsto = s->jibal->gsto;
     int n = 0;
     jabs_message(MSG_INFO, stderr, "List of assigned stopping and straggling files:\n");

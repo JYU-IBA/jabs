@@ -26,12 +26,15 @@ void script_command_free(script_command *c);
 void script_commands_free(script_command *head);
 
 script_command *script_command_list_find_tail(script_command *head);
+script_command *script_command_list_merge(script_command *left, script_command *right);
+script_command *script_command_list_merge_sort(script_command *head); /* Performs a merge sort of command list, sorts in alphabetical order by command name. Does not sort subcommands. */
+script_command *script_command_list_append(script_command *head, script_command *cmd);
 void script_command_list_add_command(script_command **head, script_command *c_new);
 script_command *script_command_list_from_command_array(const script_command *commands); /* commands is an array, must be "null-terminated" (name of last element is NULL pointer). Deep copy will be made. */
 script_command *script_command_list_from_vars_array(const jibal_config_var *vars, jibal_config_var_type type); /* vars is an array, must be "null-terminated" (name of last element is NULL pointer). Deep copy will be made. Can be restricted to type. */
 
-int script_do_we_need_erd(const struct script_session *s);
 script_command *script_commands_create(struct script_session *s);
+script_command *script_commands_sort_all(script_command *head); /* Sorts all commands (tree) so that each subcommand (branch) is sorted by script_command_list_merge_sort() */
 int command_compare(const void *a, const void *b);
 void script_commands_print(FILE *f, const struct script_command *commands);
 size_t script_commands_size(const script_command *commands);

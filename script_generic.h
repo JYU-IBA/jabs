@@ -21,7 +21,7 @@ typedef struct script_session {
     struct fit_data *fit;
     char *output_filename; /* File name for automatic spectra saving */ /* TODO: multidetector! */
     clock_t start, end;
-    script_file *files[SCRIPT_NESTED_MAX];
+    script_file *files[SCRIPT_FILES_NESTED_MAX];
     size_t file_depth;
     struct script_command *commands;
     size_t i_det_active;
