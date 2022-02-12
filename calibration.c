@@ -2,6 +2,8 @@
 #include "generic.h"
 #include "calibration.h"
 
+extern inline double calibration_eval(const calibration *c, double x);
+
 calibration *calibration_init() {
     calibration *c = malloc(sizeof(calibration));
     if(!c)
