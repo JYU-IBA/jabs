@@ -1,7 +1,9 @@
 #!/usr/bin/env jabs
 set ion p energy 2.2MeV
 set det theta 160deg solid 70msr
-set det slope 2keV
+set det calibration slope 2keV
+#we can set a different calibration for He (or H) reaction product. Note that this is not isotope specific, but element specific.
+set det calibration He linear slope 3keV offset 10keV
 set fluence 1e13
 
 set sample "6Li0.075 7Li0.925 O2" 12000tfu Si 10000tfu
@@ -14,3 +16,4 @@ add reactions RBS
 show reactions
 simulate
 save spectra "out.csv"
+show det

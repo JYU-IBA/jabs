@@ -119,6 +119,9 @@ gsl_histogram *spectrum_read(const char *filename, const detector *det) {
 void spectrum_set_calibration(gsl_histogram *h, const detector *det, int Z) {
     if(!h || !det)
         return;
+#ifdef DEBUG
+    fprintf(stderr, "Updating spectrum %p, detector %p calibration. Z = %i\n", (void *) h, (void *) det, Z);
+#endif
     for(size_t i = 0; i < h->n + 1; i++) {
         h->range[i] = detector_calibrated(det, Z, i);
     }
