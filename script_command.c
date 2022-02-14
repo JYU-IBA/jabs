@@ -1614,7 +1614,7 @@ script_command_status script_set_detector_calibration_poly(struct script_session
     size_t n = strtoull(argv[0], NULL, 10);
     argc--;
     argv++;
-    if(argc < (n + 1)) {
+    if(argc < (int)(n + 1)) {
         jabs_message(MSG_ERROR, stderr, "Not enough parameters for a %zu degree polynomial. Expected %zu.\n", n, n + 1);
         return SCRIPT_COMMAND_FAILURE;
     }

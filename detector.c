@@ -149,6 +149,8 @@ detector **detectors_from_file(const jibal *jibal, const char *filename, size_t 
 detector *detector_default(detector *det) {
     if(!det) {
         det = malloc(sizeof(detector));
+    } else {
+        calibration_free(det->calibration);
     }
     det->type = DETECTOR_ENERGY;
     det->theta = DETECTOR_THETA;
