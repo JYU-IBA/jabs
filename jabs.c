@@ -545,18 +545,11 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
         }
     }
     for(size_t i = 0; i < ws->n_channels; i++) {
-        double sum = 0.0;
-        for (size_t j = 0; j < ws->n_reactions; j++) { /* Sum comes always first, which means we have to compute it first. */
-            if(!ws->reactions[j].r)
-                continue;
-            if(i < ws->reactions[j].histo->n)
-                sum += ws->reactions[j].histo->bin[i];
-        }
         fprintf(f,"%lu%c%.3lf%c", i, sep, detector_calibrated(ws->det, i)/C_KEV, sep); /* Channel, energy */
-        if(sum == 0.0) {
+        if(ws->histo_sum->bin[i] == 0.0) {
             fprintf(f, "0"); /* Tidier output with a clean zero sum */
         } else {
-            fprintf(f, "%e", sum);
+            fprintf(f, "%e", ws->histo_sum->bin[i]);
         }
         if(exp) {
             if(i < exp->n) {

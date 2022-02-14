@@ -10,6 +10,5 @@ set xlabel "Energy (keV)"
 set ylabel "Counts"
 
 plot \
-file u 4:3 w histeps lc rgbcolor "blue", \
-file u 4:2 w lines lc rgbcolor "black",\
-#file u 1:2 w steps lc rgbcolor "black",\
+file u 2:4 w lines lc rgbcolor "black",\
+file u 2:3 w histeps lc rgbcolor "blue"
