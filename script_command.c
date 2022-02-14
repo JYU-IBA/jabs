@@ -512,7 +512,8 @@ script_command_status script_set_detector_calibration_val(struct script_session 
         case 'L': /* linear */
            if(det->calibration->type != CALIBRATION_LINEAR) {
                 calibration_free(det->calibration);
-                det->calibration = calibration_init_linear(ENERGY_SLOPE, 0.0);
+                det->calibration = calibration_init_linear();
+                calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, ENERGY_SLOPE);
            }
            return 0;
         default:

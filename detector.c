@@ -21,8 +21,6 @@ char *detector_calibration_to_string(const detector *det) {
     if(!c)
         return out;
     switch(c->type) {
-        case CALIBRATION_NONE:
-            break;
         case CALIBRATION_LINEAR:
             asprintf_append(&out, " slope %g%s offset %g%s",
 #ifdef DETECTOR_NATIVE_SPECTRA /* TODO: when simulating ToF spectra with a ToF detector, we want to use the code below, otherwise slope and offset are in energy units (see else-branch) */
@@ -34,7 +32,12 @@ char *detector_calibration_to_string(const detector *det) {
 #endif
                             );
             break;
-        case CALIBRATION_ARB:
+        case CALIBRATION_POLY:
+            for(size_t i = 0; i < calibration_get_number_of_params(c); i++) {
+                asprintf_append(&out, " %g", calibration_get_param_number(c, i));
+            }
+            break;
+        default:
             break;
     }
     return out;
@@ -161,7 +164,8 @@ detector *detector_default(detector *det) {
     det->compress = 1;
     det->foil = NULL;
     det->foil_sm = NULL;
-    det->calibration = calibration_init_linear(ENERGY_SLOPE, 0.0);
+    det->calibration = calibration_init_linear();
+    calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, ENERGY_SLOPE);
     return det;
 }
 

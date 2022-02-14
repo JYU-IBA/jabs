@@ -15,28 +15,54 @@ calibration *calibration_init() {
 void calibration_free(calibration *c) {
     if(!c)
         return;
+    if(c->type == CALIBRATION_POLY) {
+        calibration_params_poly *p = (calibration_params_poly *)c->params;
+        free(p->a);
+    }
     free(c->params);
     free(c);
 }
 
-calibration *calibration_init_linear(double offset, double slope) {
+calibration *calibration_init_linear() {
     calibration *c = calibration_init();
     if(!c)
         return NULL;
     c->f = calibration_linear;
     c->type = CALIBRATION_LINEAR;
     calibration_params_linear *p = malloc(sizeof(calibration_params_linear));
-    p->offset = offset;
-    p->slope = slope;
+    p->offset = 0.0;
+    p->slope = 0.0;
     c->params = p;
     return c;
 }
 
-
+calibration *calibration_init_poly(size_t n) {
+    calibration *c = calibration_init();
+    if(!c)
+        return NULL;
+    c->f = calibration_poly;
+    c->type = CALIBRATION_POLY;
+    calibration_params_poly *p = malloc(sizeof(calibration_params_poly));
+    c->params = p;
+    p->n = n;
+    p->a = calloc(p->n + 1, sizeof(double));
+    return c;
+}
 
 double calibration_linear(const void *params, double x) {
     calibration_params_linear *p = (calibration_params_linear *)params;
     return p->offset + p->slope * x;
+}
+
+double calibration_poly(const void *params, double x) {
+    calibration_params_poly *p = (calibration_params_poly *)params;
+    double mul = x;
+    double sum = p->a[0];
+    for(size_t i = 1; i <= p->n; i++) {
+        sum += mul * p->a[i];
+        mul *= x;
+    }
+    return sum;
 }
 
 double calibration_none(const void *params, double x) {
@@ -77,6 +103,40 @@ double calibration_get_param(const calibration *c, calibration_param_type type) 
             return p->slope;
         default:
             break;
+    }
+    return 0.0;
+}
+
+size_t calibration_get_number_of_params(const calibration *c) {
+    if(c->type == CALIBRATION_LINEAR) {
+        return 2;
+    }
+    if(c->type == CALIBRATION_POLY) {
+        const calibration_params_poly *pp = (const calibration_params_poly *) c->params;
+        return pp->n + 1;
+    }
+    return 0;
+}
+
+double calibration_get_param_number(const calibration *c, size_t i) {
+    if(c->type == CALIBRATION_LINEAR) {
+        const calibration_params_linear *pl = (const calibration_params_linear *) c->params;
+        switch(i) {
+            case 0:
+                return pl->offset;
+            case 1:
+                return pl->slope;
+            default:
+                return 0.0;
+        }
+    }
+    if(c->type == CALIBRATION_POLY) {
+        const calibration_params_poly *pp = (const calibration_params_poly *) c->params;
+        if(i <= pp->n) {
+            return pp->a[i];
+        } else {
+            return 0.0;
+        }
     }
     return 0.0;
 }
