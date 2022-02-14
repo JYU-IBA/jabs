@@ -13,6 +13,7 @@
  */
 #ifndef JABS_GENERIC_H
 #define JABS_GENERIC_H
+
 #include <stdio.h>
 
 char *strsep_with_quotes(char **stringp, const char *delim);

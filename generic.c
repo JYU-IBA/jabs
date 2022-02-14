@@ -1,9 +1,11 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE /* Needed by vasprintf() on Linux, since it is a GNU extension */
+#endif
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <stdarg.h>
 #include "win_compat.h"
-
+#include "generic.h"
 
 /* strsep from NetBSD, modified by Jaakko Julin. Original copyright note below */
 
@@ -209,7 +211,7 @@ int asprintf_append(char **ret, const char * restrict format, ...) {
     if(!ret)
         return -1;
     va_list argp;
-    char *s;
+    char *s = NULL;
     va_start(argp, format);
     int len = vasprintf(&s, format, argp);
     va_end(argp);
@@ -219,7 +221,11 @@ int asprintf_append(char **ret, const char * restrict format, ...) {
     len += len_input;
     *ret = realloc(*ret, sizeof(char) * (len + 1));
     if(ret) {
-        strncat(*ret, s, len);
+        if(len_input == 0) {
+            strncpy(*ret, s, len);
+        } else {
+            strncat(*ret, s, len);
+        }
     }
     free(s);
     return len;
