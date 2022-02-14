@@ -773,7 +773,7 @@ const char *script_command_status_to_string(script_command_status status) {
         case SCRIPT_COMMAND_FAILURE:
             return "failure";
         case SCRIPT_COMMAND_SUCCESS:
-            return "success, no arguments consumed";
+            return "success (no arguments consumed)";
         case SCRIPT_COMMAND_EOF:
             return "end-of-file";
         case SCRIPT_COMMAND_EXIT:
@@ -781,8 +781,14 @@ const char *script_command_status_to_string(script_command_status status) {
         default:
             break;
     }
-    if(status > 0) {
-        return "number of arguments consumed";
+    if(status == 1) {
+        return "success (1 argument consumed)";
+    } else if(status == 2) {
+        return "success (2 arguments consumed)";
+    } else if(status == 3) {
+        return "success (3 arguments consumed)";
+    } else if(status > 3) {
+        return "success (> 3 arguments consumed)";
     }
     return "unknown";
 }

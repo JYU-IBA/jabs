@@ -25,13 +25,13 @@
 script_file *script_file_open(const char *filename) {
     script_file *sfile = malloc(sizeof(script_file));
     sfile->filename = strdup_non_null(filename);
-    if(sfile->f == stdin) {
-        sfile->filename = strdup("(standard input)");
-    }
     sfile->line_size = 0;
     sfile->lineno = 0;
     sfile->line = NULL;
     sfile->f = fopen_file_or_stream(filename, "r");
+    if(sfile->f == stdin) {
+        sfile->filename = strdup("(standard input)");
+    }
     if(!sfile->f) {
         script_file_close(sfile);
         return NULL;

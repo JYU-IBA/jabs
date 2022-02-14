@@ -110,11 +110,18 @@ int main(int argc, char * const *argv) {
                     return EXIT_FAILURE;
                 }
                 status = script_process(session);
-                if(status != SCRIPT_COMMAND_EOF) {
+#ifdef DEBUG
+                fprintf(stderr, "Script %i/%i given from command line has been processed. Status: %s\n", i+1, argc, script_command_status_to_string(status));
+#endif
+                if(status != SCRIPT_COMMAND_SUCCESS) {
+
                     return status;
                 }
             }
         }
+#ifdef DEBUG
+        fprintf(stderr, "All scripts given from command line have been processed.\n");
+#endif
         if(cmd_opt->interactive) {
             greeting(TRUE);
             if(script_session_load_script(session, NULL)) {
