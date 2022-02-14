@@ -221,7 +221,7 @@ script_command_status script_save_spectra(script_session *s, int argc, char *con
     struct fit_data *fit = s->fit;
     const int argc_orig = argc;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det) || argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: save spectra [detector] file\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: save spectra {<detector>} file\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(argc < 1) {
@@ -242,7 +242,7 @@ script_command_status script_save_spectra(script_session *s, int argc, char *con
 script_command_status script_save_sample(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit_data = s->fit;
     if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: save sample [file]\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: save sample <file>\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(!fit_data->sm) {
@@ -261,10 +261,10 @@ script_command_status script_save_detector(script_session *s, int argc, char *co
     size_t i_det = 0;
     const int argc_orig = argc;
     if(script_get_detector_number(fit_data->sim, TRUE, &argc, &argv, &i_det) || argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: save detector [detector] file\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: save detector {<detector>} file\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(detector_print(argv[0], sim_det(fit_data->sim, i_det))) {
+    if(detector_print(s->jibal, argv[0], sim_det(fit_data->sim, i_det))) {
         jabs_message(MSG_ERROR, stderr, "Could not write detector %zu to file \"%s\".\n", i_det, argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
@@ -274,8 +274,9 @@ script_command_status script_save_detector(script_session *s, int argc, char *co
 
 script_command_status script_remove_reaction(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
+    static const char *remove_reaction_usage = "Usage: remove reaction {<number | <type> <target isotope>}\n";
     if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: remove reaction [TYPE] [target_isotope]   OR   remove reaction [number]\n");
+        jabs_message(MSG_ERROR, stderr, remove_reaction_usage);
         return SCRIPT_COMMAND_FAILURE;
     }
     char *end;
@@ -288,7 +289,7 @@ script_command_status script_remove_reaction(script_session *s, int argc, char *
         }
     }
     if(argc < 2) {
-        jabs_message(MSG_ERROR, stderr, "Usage: remove reaction [TYPE] [target_isotope]   OR   remove reaction [number]\n");
+        jabs_message(MSG_ERROR, stderr, remove_reaction_usage);
         return SCRIPT_COMMAND_FAILURE;
     }
     reaction_type type = reaction_type_from_string(argv[0]);
@@ -505,16 +506,16 @@ script_command_status script_set_detector_calibration_val(struct script_session 
         jabs_message(MSG_ERROR, stderr, "Detector %zu does not exist.\n", s->i_det_active);
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(!det->calibration) {
-        det->calibration = calibration_init();
-    }
+    calibration *c;
     switch(val) { /* Handle cases where we don't expect (consume) arguments */
         case 'L': /* linear */
-           if(det->calibration->type != CALIBRATION_LINEAR) {
-                calibration_free(det->calibration);
-                det->calibration = calibration_init_linear();
-                calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, ENERGY_SLOPE);
-           }
+            c = calibration_init_linear();
+            calibration_set_param(c, CALIBRATION_PARAM_SLOPE, ENERGY_SLOPE);
+            if(detector_set_calibration_Z(s->jibal->config, det, c, s->Z_active)) {
+                jabs_message(MSG_ERROR, stderr, "Could not set linear calibration (element = %s).\n",
+                             jibal_element_name(s->jibal->elements, s->Z_active));
+                return SCRIPT_COMMAND_FAILURE;
+            }
            return 0;
         default:
             break;
@@ -523,15 +524,20 @@ script_command_status script_set_detector_calibration_val(struct script_session 
         jabs_message(MSG_ERROR, stderr, "Not enough parameters to set detector calibration values.\n", val);
         return SCRIPT_COMMAND_FAILURE;
     }
+    c = detector_get_calibration(det, s->Z_active);
+    if(!c) {
+        jabs_message(MSG_ERROR, stderr, "No calibration set for element = %s\n", jibal_element_name(s->jibal->elements, s->Z_active));
+        return SCRIPT_COMMAND_FAILURE;
+    }
     double value_double = jibal_get_val(s->jibal->units, 0, argv[0]);
     switch(val) {
         case 's': /* slope */
-            if(calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, value_double)) {
+            if(calibration_set_param(c, CALIBRATION_PARAM_SLOPE, value_double)) {
                 jabs_message(MSG_ERROR, stderr, "Can not set calibration slope.\n");
             }
             return 1;
         case 'o': /* offset */
-            if(calibration_set_param(det->calibration, CALIBRATION_PARAM_OFFSET, value_double)) {
+            if(calibration_set_param(c, CALIBRATION_PARAM_OFFSET, value_double)) {
                 jabs_message(MSG_ERROR, stderr, "Can not set calibration slope, calibration is not linear.\n");
             }
             return 1;
@@ -1496,7 +1502,7 @@ script_command_status script_show_detector(script_session *s, int argc, char *co
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(detector_print(NULL, sim_det(fit->sim, i_det))) {
+    if(detector_print(s->jibal, NULL, sim_det(fit->sim, i_det))) {
         jabs_message(MSG_ERROR, stderr, "No detectors set or other error.\n");
     }
     return argc_orig - argc; /* Number of arguments */
@@ -1581,10 +1587,21 @@ script_command_status script_set_detector_calibration(struct script_session *s, 
     (void) s;
     (void) argc;
     (void) argv;
+    const int argc_orig = argc;
     if(argc == 0) {
         return SCRIPT_COMMAND_NOT_FOUND;
     }
-    return 0;
+    const jibal_element *e = jibal_element_find(s->jibal->elements, argv[0]);
+    if(e) {
+        s->Z_active = e->Z;
+        argc--;
+    } else {
+        s->Z_active = JIBAL_ANY_Z;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Active Z is now %i\n", s->Z_active);
+#endif
+    return argc_orig - argc;
 }
 
 script_command_status script_set_detector_foil(struct script_session *s, int argc, char *const *argv) {
@@ -1624,8 +1641,7 @@ script_command_status script_set_detector_calibration_poly(struct script_session
         argc--;
         argv++;
     }
-    calibration_free(det->calibration);
-    det->calibration = c;
+    detector_set_calibration_Z(s->jibal->config, det, c, s->Z_active);
     return argc_orig - argc;
 }
 

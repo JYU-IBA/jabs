@@ -24,7 +24,8 @@ typedef struct script_session {
     script_file *files[SCRIPT_FILES_NESTED_MAX];
     size_t file_depth;
     struct script_command *commands;
-    size_t i_det_active;
+    size_t i_det_active; /* Used by "set detector" */
+    int Z_active; /* Used by "set detector calibration" */
 } script_session;
 
 #define SCRIPT_COMMAND_SUCCESS (0) /* Anything above and including zero is success */

@@ -12,36 +12,58 @@
 
 extern inline double detector_calibrated(const detector *det, size_t ch);
 
-char *detector_calibration_to_string(const detector *det) {
-    if(!det)
+calibration *detector_get_calibration(const detector *det, int Z) {
+    if(det == NULL)
         return NULL;
-    const calibration *c = det->calibration;
-    char *out = NULL;
-    asprintf_append(&out, "%s", calibration_name(c));
-    if(!c)
-        return out;
-    switch(c->type) {
-        case CALIBRATION_LINEAR:
-            asprintf_append(&out, " slope %g%s offset %g%s",
-#ifdef DETECTOR_NATIVE_SPECTRA /* TODO: when simulating ToF spectra with a ToF detector, we want to use the code below, otherwise slope and offset are in energy units (see else-branch) */
-                            calibration_get_param(c, CALIBRATION_PARAM_SLOPE)/detector_param_unit_factor(det), detector_param_unit(det),
-                            calibration_get_param(c, CALIBRATION_PARAM_OFFSET)/detector_param_unit_factor(det), detector_param_unit(det)
-#else
-                            calibration_get_param(c, CALIBRATION_PARAM_SLOPE)/C_KEV, "keV",
-                            calibration_get_param(c, CALIBRATION_PARAM_OFFSET)/C_KEV, "keV"
-#endif
-                            );
-            break;
-        case CALIBRATION_POLY:
-            for(size_t i = 0; i < calibration_get_number_of_params(c); i++) {
-                asprintf_append(&out, " %g%s", calibration_get_param(c, i)/C_KEV, "keV");
-            }
-            break;
-        default:
-            break;
+    if(Z == JIBAL_ANY_Z)
+        return det->calibration;
+    if(Z < 1 || (unsigned int) Z > det->cal_Z_max)
+        return NULL;
+    if(det->calibration_Z[Z]) {
+        return det->calibration_Z[Z];
+    } else {
+        return det->calibration; /* Fallback */
     }
-    return out;
 }
+
+int detector_set_calibration_Z(const jibal_config *jibal_config, detector *det, calibration *cal, int Z) { /* TODO: test! */
+    if(!det || !cal)
+        return EXIT_FAILURE;
+    if(Z == JIBAL_ANY_Z) {
+        calibration_free(det->calibration);
+        det->calibration = cal;
+        return EXIT_SUCCESS;
+    }
+    if(Z < 1) {
+        return EXIT_FAILURE;
+    }
+    if(Z > jibal_config->Z_max) { /* This is not strictly necessary, but makes things easier later on. */
+        return EXIT_FAILURE;
+    }
+    if((unsigned int) Z > det->cal_Z_max) {
+        det->calibration_Z = realloc(det->calibration_Z, sizeof(calibration *) * (Z+1)); /* Allocate more space */
+        if(!det->calibration_Z) {
+            det->cal_Z_max = 0;
+            return EXIT_FAILURE;
+        }
+        for(int i = (int) det->cal_Z_max + 1; i <= Z; i++) { /* Initialize */
+            det->calibration_Z[Z] = NULL;
+        }
+#ifdef DEBUG
+        fprintf(stderr, "More space allocated for detector = %p calibrations. Z_max = %zu.\n", (void *) det, det->cal_Z_max);
+#endif
+    }
+    calibration_free(det->calibration_Z[Z]);
+    det->calibration_Z[Z] = cal;
+    det->cal_Z_max = Z;
+#ifdef DEBUG
+    fprintf(stderr, "Calibration initialized (Z = %i) with this: %p.", Z, (void *)cal);
+#endif
+
+    return EXIT_SUCCESS;
+}
+
+
 
 
 const char *detector_type_name(const detector *det) {
@@ -91,7 +113,7 @@ detector *detector_from_file(const jibal *jibal, const char *filename) {
     detector_update_foil(det); /* TODO: foil and aperture are not read! */
 #ifdef DEBUG
     fprintf(stderr, "Read detector from \"%s\":\n", filename);
-    detector_print(NULL, det);
+    detector_print(jibal, NULL, det);
 #endif
     return det;
 }
@@ -167,6 +189,8 @@ detector *detector_default(detector *det) {
     det->foil = NULL;
     det->foil_sm = NULL;
     det->calibration = calibration_init_linear();
+    det->cal_Z_max = 0;
+    det->calibration_Z = NULL;
     calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, ENERGY_SLOPE);
     return det;
 }
@@ -177,20 +201,39 @@ void detector_free(detector *det) {
     sample_model_free(det->foil_sm);
     sample_free(det->foil);
     aperture_free(det->aperture);
-    calibration_free(det->calibration);
+    detector_calibrations_free(det);
     free(det);
 }
 
-int detector_print(const char *filename, const detector *det) {
+void detector_calibrations_free(detector *det) {
+    calibration_free(det->calibration);
+    if(det->calibration_Z) {
+        for(size_t Z = 0;  Z <= det->cal_Z_max; Z++) {
+            calibration_free(det->calibration_Z[Z]);
+        }
+        free(det->calibration_Z);
+    }
+    det->cal_Z_max = 0;
+}
+
+int detector_print(const jibal *jibal, const char *filename, const detector *det) {
     if(!det)
         return EXIT_FAILURE;
     FILE *f = fopen_file_or_stream(filename, "w");
     if(!f)
         return EXIT_FAILURE;
     jabs_message(MSG_INFO, f, "type = %s\n", detector_type_name(det));
-    char *calib_str = detector_calibration_to_string(det);
+    char *calib_str = calibration_to_string(det->calibration);
     jabs_message(MSG_INFO, f, "calibration = %s\n", calib_str);
     free(calib_str);
+    for(int Z = 0; Z <= (int)det->cal_Z_max; Z++) {
+        const calibration *c = detector_get_calibration(det, Z);
+        if(det->calibration == c || !c) /* Z calibration is same as default (fallback) or NULL (shouldn't happen) */
+            continue;
+        calib_str = calibration_to_string(c);
+        jabs_message(MSG_INFO, f, "calibration(%s) = %s\n", jibal_element_name(jibal->elements, Z), calib_str);
+        free(calib_str);
+    }
     if(det->type == DETECTOR_ENERGY) {
         jabs_message(MSG_INFO, f, "resolution = %g keV\n", det->resolution/C_KEV);
     } else if(det->type == DETECTOR_TOF) {

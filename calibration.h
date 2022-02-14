@@ -51,4 +51,5 @@ size_t calibration_get_number_of_params(const calibration *c);
 double calibration_get_param(const calibration *c, size_t i); /* get i'th param in range [0..n-1], get n by  calibration_get_number_of_params()*/
 double *calibration_get_param_ref(const calibration *c, size_t  i);
 const char *calibration_name(const calibration *c);
+char *calibration_to_string(const calibration *c);
 #endif //CALIB_CALIBRATION_H

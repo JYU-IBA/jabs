@@ -40,6 +40,8 @@ static const jibal_option detector_option[] = {
 typedef struct detector {
     detector_type type;
     struct calibration *calibration;
+    struct calibration **calibration_Z; /* Array of calibrations for a given Z. calibration_Z[i] NULL means use default calibration for Z == i. Array is dynamically allocated (number of elements: cal_Z_max + 1) as and when required, so this should be NULL when cal_Z_max == 0. */
+    size_t cal_Z_max;
     double length; /* For ToF */
     double resolution; /* Stored as FWHM in relevant SI units. Note that can be e.g. energy or time depending on detector type. */
     double resolution_variance; /* Calculated based on "resolution" before needed by detector_update(). */
@@ -56,14 +58,16 @@ typedef struct detector {
 } detector;
 
 inline double detector_calibrated(const detector *det, size_t ch) {return calibration_eval(det->calibration, ch*det->compress);}
-char *detector_calibration_to_string(const detector *det);
+calibration *detector_get_calibration(const detector *det, int Z); /* Returns Z specific calibration (if it exists) det->calibration otherwise. */
+int detector_set_calibration_Z(const jibal_config *jibal_config, detector *det, calibration *cal, int Z); /* Sets Z specific calibration, (re)allocates space for det->calibration_Z if required. */
 const char *detector_type_name(const detector *det);
 int detector_sanity_check(const detector *det);
 detector *detector_from_file(const jibal *jibal, const char *filename); /* one detector from JIBAL configuration style file */
 detector **detectors_from_file(const jibal *jibal, const char *filename, size_t *n_detectors_out); /* multiple detectors in a table. TODO: work in progress */
 detector *detector_default(detector *det); /* if det is NULL, this returns pointer to a newly allocated det */
 void detector_free(detector *det);
-int detector_print(const char *filename, const detector *det);
+void detector_calibrations_free(detector *det);
+int detector_print(const jibal *jibal, const char *filename, const detector *det);
 int detector_aperture_set_from_argv(const jibal *jibal, detector *det, int *argc, char * const **argv);
 int detector_foil_set_from_argv(const jibal *jibal, detector *det, int *argc, char * const **argv);
 int detector_update_foil(detector *det);

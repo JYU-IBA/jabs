@@ -1,4 +1,4 @@
-#include <assert.h>
+#include <jibal_units.h>
 #include "generic.h"
 #include "calibration.h"
 
@@ -68,6 +68,7 @@ double calibration_poly(const void *params, double x) {
 }
 
 double calibration_none(const void *params, double x) {
+    (void) params;
     return x;
 }
 
@@ -175,4 +176,27 @@ const char *calibration_name(const calibration *c) {
     if(!c)
         return calibration_option[CALIBRATION_NONE].s;
     return calibration_option[c->type].s;
+}
+
+char *calibration_to_string(const calibration *c) {
+    char *out = NULL;
+    asprintf_append(&out, "%s", calibration_name(c));
+    if(!c)
+        return out;
+    switch(c->type) {
+        case CALIBRATION_LINEAR:
+            asprintf_append(&out, " slope %g%s offset %g%s",
+                            calibration_get_param(c, CALIBRATION_PARAM_SLOPE)/C_KEV, "keV",
+                            calibration_get_param(c, CALIBRATION_PARAM_OFFSET)/C_KEV, "keV"
+            );
+            break;
+        case CALIBRATION_POLY:
+            for(size_t i = 0; i < calibration_get_number_of_params(c); i++) {
+                asprintf_append(&out, " %g%s", calibration_get_param(c, i)/C_KEV, "keV");
+            }
+            break;
+        default:
+            break;
+    }
+    return out;
 }
