@@ -304,7 +304,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     if(!ws->histo_sum) {
         return NULL;
     }
-    spectrum_set_calibration(ws->histo_sum, ws->det); /* Calibration can be set however already */
+    spectrum_set_calibration(ws->histo_sum, ws->det, JIBAL_ANY_Z); /* Calibration (assuming default calibration) can be set now. */
     gsl_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
 
     size_t n_bricks = 0;
@@ -354,7 +354,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
             }
         }
         r->histo = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
-        spectrum_set_calibration(r->histo, ws->det);
+        spectrum_set_calibration(r->histo, ws->det, r->r->product->Z); /* Setting histogram with Z-specific (or as fallback, default) calibration. */
         gsl_histogram_reset(r->histo);
         r->n_bricks = n_bricks;
         r->bricks = calloc(r->n_bricks, sizeof(brick));
@@ -415,7 +415,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
     fprintf(stderr, "E_max of this simulation is %g keV\n", E_max/C_KEV);
 #endif
     size_t i=0;
-    while(detector_calibrated(ws->det, i) < E_max && i <= 1000000) {i++;} /* TODO: this requires changes for ToF spectra */
+    while(detector_calibrated(ws->det, JIBAL_ANY_Z, i) < E_max && i <= 1000000) {i++;} /* TODO: this requires changes for ToF spectra. Also TODO: Z-specific calibrations are ignored here */
 #ifdef DEBUG
     fprintf(stderr, "Simulating %zu channels\n", i);
 #endif

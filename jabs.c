@@ -545,7 +545,7 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
         }
     }
     for(size_t i = 0; i < ws->n_channels; i++) {
-        fprintf(f,"%lu%c%.3lf%c", i, sep, detector_calibrated(ws->det, i)/C_KEV, sep); /* Channel, energy */
+        fprintf(f,"%lu%c%.3lf%c", i, sep, detector_calibrated(ws->det, JIBAL_ANY_Z, i)/C_KEV, sep); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
         if(ws->histo_sum->bin[i] == 0.0) {
             fprintf(f, "0"); /* Tidier output with a clean zero sum */
         } else {

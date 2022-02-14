@@ -57,8 +57,8 @@ typedef struct detector {
     sample *foil;
 } detector;
 
-inline double detector_calibrated(const detector *det, size_t ch) {return calibration_eval(det->calibration, ch*det->compress);}
 calibration *detector_get_calibration(const detector *det, int Z); /* Returns Z specific calibration (if it exists) det->calibration otherwise. */
+inline double detector_calibrated(const detector *det, int Z, size_t ch) {return calibration_eval(detector_get_calibration(det, Z), ch*det->compress);}
 int detector_set_calibration_Z(const jibal_config *jibal_config, detector *det, calibration *cal, int Z); /* Sets Z specific calibration, (re)allocates space for det->calibration_Z if required. */
 const char *detector_type_name(const detector *det);
 int detector_sanity_check(const detector *det);

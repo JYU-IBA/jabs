@@ -112,15 +112,15 @@ gsl_histogram *spectrum_read(const char *filename, const detector *det) {
     free(line);
     free(columns);
     fclose_file_or_stream(in);
-    spectrum_set_calibration(h, det);
+    //spectrum_set_calibration(h, det);
     return h;
 }
 
-void spectrum_set_calibration(gsl_histogram *h, const detector *det) {
+void spectrum_set_calibration(gsl_histogram *h, const detector *det, int Z) {
     if(!h || !det)
         return;
     for(size_t i = 0; i < h->n + 1; i++) {
-        h->range[i] = detector_calibrated(det, i);
+        h->range[i] = detector_calibrated(det, Z, i);
     }
 }
 

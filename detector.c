@@ -10,14 +10,14 @@
 #include "message.h"
 #include "win_compat.h"
 
-extern inline double detector_calibrated(const detector *det, size_t ch);
+extern inline double detector_calibrated(const detector *det, int Z, size_t ch);
 
 calibration *detector_get_calibration(const detector *det, int Z) {
     if(det == NULL)
         return NULL;
-    if(Z == JIBAL_ANY_Z)
+    if(Z == JIBAL_ANY_Z || (unsigned int) Z > det->cal_Z_max)
         return det->calibration;
-    if(Z < 1 || (unsigned int) Z > det->cal_Z_max)
+    if(Z < 1)
         return NULL;
     if(det->calibration_Z[Z]) {
         return det->calibration_Z[Z];

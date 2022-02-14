@@ -218,8 +218,8 @@ void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct r
 
     jabs_message(MSG_INFO, f,  "          low = %12zu\n", roi->low);
     jabs_message(MSG_INFO, f,  "         high = %12zu\n", roi->high);
-    jabs_message(MSG_INFO, f,  "        E_low = %12.3lf keV (low energy edge of bin)\n", detector_calibrated(ws->det, roi->low)/C_KEV);
-    jabs_message(MSG_INFO, f,  "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(ws->det, roi->high+1)/C_KEV);
+    jabs_message(MSG_INFO, f,  "        E_low = %12.3lf keV (low energy edge of bin)\n", detector_calibrated(ws->det, JIBAL_ANY_Z, roi->low)/C_KEV);
+    jabs_message(MSG_INFO, f,  "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(ws->det, JIBAL_ANY_Z, roi->high+1)/C_KEV);
     jabs_message(MSG_INFO, f,  "        n_sim = %12zu\n", n_sim);
     jabs_message(MSG_INFO, f, "          sim  = %12g\n", sim_cts);
     if(exp) {
@@ -518,7 +518,7 @@ int fit(struct fit_data *fit_data) {
         fit_params->func_params_err[i] = c * sqrt(gsl_matrix_get(covar, i, i));
     }
     for(i = 0; i < fit_data->sim->n_det; i++) {
-        spectrum_set_calibration(fit_data_exp(fit_data, i), sim_det(fit_data->sim, i)); /* Update the experimental spectra to final calibration */
+        spectrum_set_calibration(fit_data_exp(fit_data, i), sim_det(fit_data->sim, i), JIBAL_ANY_Z); /* Update the experimental spectra to final calibration (using default calibration) */
     }
     gsl_multifit_nlinear_free(w);
     gsl_matrix_free(covar);
