@@ -255,8 +255,7 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
                 cmd_opt->reaction_filenames[cmd_opt->n_reaction_filenames - 1] = strdup(optarg);
                 break;
             case 'R':
-                sim->det[0]->resolution = jibal_get_val(jibal->units, UNIT_TYPE_ANY, optarg) / C_FWHM;
-                sim->det[0]->resolution *= sim->det[0]->resolution; /* square */
+                calibration_set_param(sim->det[0]->calibration, CALIBRATION_PARAM_RESOLUTION, jibal_get_val(jibal->units, UNIT_TYPE_ANY, optarg));
                 break;
             case 'd':
                 free(sim->det[0]);

@@ -43,8 +43,6 @@ typedef struct detector {
     struct calibration **calibration_Z; /* Array of calibrations for a given Z. calibration_Z[i] NULL means use default calibration for Z == i. Array is dynamically allocated (number of elements: cal_Z_max + 1) as and when required, so this should be NULL when cal_Z_max == 0. */
     size_t cal_Z_max;
     double length; /* For ToF */
-    double resolution; /* Stored as FWHM in relevant SI units. Note that can be e.g. energy or time depending on detector type. */
-    double resolution_variance; /* Calculated based on "resolution" before needed by detector_update(). */
     double theta; /* Polar angle [0, pi] */
     double phi; /* Azimuthal angle [0, 2pi] */
     double solid;
@@ -76,7 +74,7 @@ jibal_config_var *detector_make_vars(detector *det);
 double detector_angle(const detector *det, char direction);
 double detector_theta_deriv(const detector *det, char direction);
 double detector_solid_angle_calc(const detector *det);
-double detector_resolution(const detector *det, const jibal_isotope *isotope, double E);
+double detector_resolution(const detector *det, const jibal_isotope *isotope, double E); /* Isotope is used for Z (Z specific resolution) and for mass (ToF detector) */
 void detector_update(detector *det);
 const char *detector_param_unit(const detector *det); /* return a suitable unit based on detector type, e.g. "keV" when type == DETECTOR_ENERGY. TODO: use this wisely (we can simulate energy spectra with a ToF detector!) */
 double detector_param_unit_factor(const detector *det);

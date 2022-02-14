@@ -469,7 +469,7 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
             value_double = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET);
             break;
         case 'r': /* resolution */
-            value_double = &(det->resolution);
+            value_double = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION);
             break;
         case 's': /* solid */
             value_double = &(det->solid);
@@ -534,11 +534,19 @@ script_command_status script_set_detector_calibration_val(struct script_session 
         case 's': /* slope */
             if(calibration_set_param(c, CALIBRATION_PARAM_SLOPE, value_double)) {
                 jabs_message(MSG_ERROR, stderr, "Can not set calibration slope.\n");
+                return SCRIPT_COMMAND_FAILURE;
             }
             return 1;
         case 'o': /* offset */
             if(calibration_set_param(c, CALIBRATION_PARAM_OFFSET, value_double)) {
-                jabs_message(MSG_ERROR, stderr, "Can not set calibration slope, calibration is not linear.\n");
+                jabs_message(MSG_ERROR, stderr, "Can not set calibration offset.\n");
+                return SCRIPT_COMMAND_FAILURE;
+            }
+            return 1;
+        case 'r': /* resolution */
+            if(calibration_set_param(c, CALIBRATION_PARAM_RESOLUTION, value_double)) {
+                jabs_message(MSG_ERROR, stderr, "Can not set calibration resolution.\n");
+                return SCRIPT_COMMAND_FAILURE;
             }
             return 1;
         default:
@@ -1051,6 +1059,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_calibration->subcommands, script_command_new("linear", "Set the calibration to be linear (default).", 'L', NULL));
     script_command_list_add_command(&c_calibration->subcommands, script_command_new("slope", "Set the slope of a linear calibration.", 's', NULL));
     script_command_list_add_command(&c_calibration->subcommands, script_command_new("offset", "Set the offset of a linear calibration.", 'o', NULL));
+    script_command_list_add_command(&c_calibration->subcommands, script_command_new("resolution", "Set the resolution.", 'r', NULL));
     script_command_list_add_command(&c_calibration->subcommands, script_command_new("poly", "Set the calibration to be a polynomial.", 0, &script_set_detector_calibration_poly));
 
     script_command_list_add_command(&c_detector->subcommands, script_command_new("column", "Set column number (for data input).", 'c', NULL));

@@ -410,7 +410,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
             E_max = E;
         }
     }
-    E_max *= 1.1 + ws->det->resolution*3.0;
+    E_max *= 1.1 + detector_resolution(ws->det, sim->beam_isotope, E_max);
 #ifdef DEBUG
     fprintf(stderr, "E_max of this simulation is %g keV\n", E_max/C_KEV);
 #endif

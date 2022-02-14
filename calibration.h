@@ -18,14 +18,16 @@ static const jibal_option calibration_option[] = {
         {"polynomial", CALIBRATION_POLY},
         {NULL, 0}
 };
-
-#define CALIBRATION_PARAM_OFFSET 0
+#define CALIBRATION_PARAM_RESOLUTION (-1)
+#define CALIBRATION_PARAM_OFFSET 0 /* This is zero, because offset is the first (zero'th) element in parameter arrays. Typically. */
 #define CALIBRATION_PARAM_SLOPE 1
 
 typedef struct calibration {
     calibration_type type;
     double (*f)(const void *, double);
     void *params;
+    double resolution; /* Stored as FWHM in relevant SI units. Note that can be e.g. energy or time depending on detector type. */
+    double resolution_variance; /* Calculated based on "resolution" before needed by detector_update(). */
 } calibration;
 
 typedef struct calibration_params_linear {
@@ -46,10 +48,10 @@ double calibration_linear(const void *params, double x);
 double calibration_poly(const void *params, double x);
 double calibration_none(const void *params, double x);
 inline double calibration_eval(const calibration *c, double x) {return c->f(c->params, x);}
-int calibration_set_param(calibration *c, size_t i, double value);
+int calibration_set_param(calibration *c, int i, double value);
 size_t calibration_get_number_of_params(const calibration *c);
-double calibration_get_param(const calibration *c, size_t i); /* get i'th param in range [0..n-1], get n by  calibration_get_number_of_params()*/
-double *calibration_get_param_ref(const calibration *c, size_t  i);
+double calibration_get_param(const calibration *c, int i); /* get i'th param in range [0..n-1], get n by  calibration_get_number_of_params()*/
+double *calibration_get_param_ref(calibration *c, int i);
 const char *calibration_name(const calibration *c);
 char *calibration_to_string(const calibration *c);
 #endif //CALIB_CALIBRATION_H

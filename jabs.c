@@ -592,7 +592,7 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
                 if(strncmp(token, "calib", 5) == 0) {
                     fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE));
                     fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET));
-                    fit_params_add_parameter(params, &det->resolution);
+                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION));
                     jabs_message(MSG_INFO, stderr, "Added fit parameters (slope, offset, resolution) for detector %zu calibration\n", i_det + 1);
                 }
                 if(strcmp(token, "slope") == 0) {
@@ -604,7 +604,7 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
                     jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu calibration offset\n", i_det + 1);
                 }
                 if(strncmp(token, "reso", 4) == 0) {
-                    fit_params_add_parameter(params, &det->resolution);
+                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION));
                     jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu resolution\n", i_det + 1);
                 }
                 if(strncmp(token, "solid", 5) == 0) {
