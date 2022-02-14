@@ -10,5 +10,5 @@ set xlabel "Energy (keV)"
 set ylabel "Counts"
 
 plot \
-file u 2:4 w lines lc rgbcolor "black",\
-file u 2:3 w histeps lc rgbcolor "blue"
+file u 2:4 w histeps lc rgbcolor "blue",\
+file u 2:3 w lines lc rgbcolor "black",\
