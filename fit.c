@@ -195,12 +195,12 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     return f;
 }
 
-void fit_data_free(fit_data *f) {
-    if(!f)
+void fit_data_free(fit_data *fit) {
+    if(!fit)
         return;
-    fit_params_free(f->fit_params);
-    fit_data_fit_ranges_free(f);
-    free(f);
+    fit_params_free(fit->fit_params);
+    fit_data_fit_ranges_free(fit);
+    free(fit);
 }
 
 void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct roi *roi) {

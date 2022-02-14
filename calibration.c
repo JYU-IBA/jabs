@@ -71,42 +71,44 @@ double calibration_none(const void *params, double x) {
     return x;
 }
 
-int calibration_set_param(calibration *c, calibration_param_type type, double value) {
+int calibration_set_param(calibration *c, size_t i, double value) {
     if(!c || !c->params)
         return EXIT_FAILURE;
-    if(c->type != CALIBRATION_LINEAR)
-        return EXIT_FAILURE;
-    calibration_params_linear *p = (calibration_params_linear *) c->params;
-    switch(type) {
-        case CALIBRATION_PARAM_NONE:
-            break;
-        case CALIBRATION_PARAM_OFFSET:
-            p->offset = value;
-            break;
-        case CALIBRATION_PARAM_SLOPE:
-            p->slope = value;
-            break;
-        default:
+    if(c->type == CALIBRATION_LINEAR) {
+        calibration_params_linear *p = (calibration_params_linear *) c->params;
+        switch(i) {
+            case CALIBRATION_PARAM_OFFSET:
+                p->offset = value;
+                break;
+            case CALIBRATION_PARAM_SLOPE:
+                p->slope = value;
+                break;
+            default:
+                return EXIT_FAILURE;
+        }
+        return EXIT_SUCCESS;
+    }
+    if(c->type == CALIBRATION_POLY) {
+        calibration_params_poly *p = (calibration_params_poly *) c->params;
+        if(i <= p->n) {
+            p->a[i] = value;
+            return EXIT_SUCCESS;
+        } else {
             return EXIT_FAILURE;
+        }
     }
     return EXIT_SUCCESS;
 }
 
-double calibration_get_param(const calibration *c, calibration_param_type type) {
+double calibration_get_param(const calibration *c, size_t i) {
     if(!c || !c->params)
         return 0.0;
-    if(c->type != CALIBRATION_LINEAR)
+    double *val = calibration_get_param_ref(c, i);
+    if(val) {
+        return *val;
+    } else {
         return 0.0;
-    calibration_params_linear *p = (calibration_params_linear *) c->params;
-    switch(type) {
-        case CALIBRATION_PARAM_OFFSET:
-            return p->offset;
-        case CALIBRATION_PARAM_SLOPE:
-            return p->slope;
-        default:
-            break;
     }
-    return 0.0;
 }
 
 size_t calibration_get_number_of_params(const calibration *c) {
@@ -143,19 +145,28 @@ double calibration_get_param_number(const calibration *c, size_t i) {
     return 0.0;
 }
 
-double *calibration_get_param_ref(calibration *c, calibration_param_type type) {
+double *calibration_get_param_ref(const calibration *c, size_t i) {
     if(!c || !c->params)
         return NULL;
-    if(c->type != CALIBRATION_LINEAR)
+    if(c->type == CALIBRATION_LINEAR) {
+        calibration_params_linear *p = (calibration_params_linear *) c->params;
+        switch(i) {
+            case CALIBRATION_PARAM_OFFSET:
+                return &(p->offset);
+            case CALIBRATION_PARAM_SLOPE:
+                return &(p->slope);
+            default:
+                break;
+        }
         return NULL;
-    calibration_params_linear *p = (calibration_params_linear *) c->params;
-    switch(type) {
-        case CALIBRATION_PARAM_OFFSET:
-            return &(p->offset);
-        case CALIBRATION_PARAM_SLOPE:
-            return &(p->slope);
-        default:
-            break;
+    }
+    if(c->type == CALIBRATION_POLY) {
+        calibration_params_poly *p = (calibration_params_poly*) c->params;
+        if(i <= p->n) {
+            return &(p->a[i]);
+        } else {
+            return NULL;
+        }
     }
     return NULL;
 }

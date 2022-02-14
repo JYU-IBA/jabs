@@ -68,7 +68,7 @@ script_command_status script_remove_reaction(struct script_session *s, int argc,
 script_command_status script_reset(struct script_session *s, int argc, char * const *argv);
 script_command_status script_reset_detectors(struct script_session *s, int argc, char * const *argv);
 script_command_status script_reset_experimental(struct script_session *s, int argc, char * const *argv);
-script_command_status script_reset_fit_ranges(struct script_session *s, int argc, char * const *argv);
+script_command_status script_reset_fit(struct script_session *s, int argc, char * const *argv);
 script_command_status script_reset_reactions(struct script_session *s, int argc, char * const *argv);
 script_command_status script_reset_sample(struct script_session *s, int argc, char * const *argv);
 script_command_status script_reset_stopping(struct script_session *s, int argc, char * const *argv);
@@ -90,6 +90,7 @@ script_command_status script_set_detector(struct script_session *s, int argc, ch
 script_command_status script_set_detector_aperture(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_detector_calibration(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_detector_foil(struct script_session *s, int argc, char * const *argv);
+script_command_status script_set_detector_calibration_poly(struct script_session *s, int argc, char *const *argv);
 script_command_status script_set_sample(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_stopping(struct script_session *s, int argc, char * const *argv);
 

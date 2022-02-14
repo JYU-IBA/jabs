@@ -34,7 +34,7 @@ char *detector_calibration_to_string(const detector *det) {
             break;
         case CALIBRATION_POLY:
             for(size_t i = 0; i < calibration_get_number_of_params(c); i++) {
-                asprintf_append(&out, " %g", calibration_get_param_number(c, i));
+                asprintf_append(&out, " %g%s", calibration_get_param(c, i)/C_KEV, "keV");
             }
             break;
         default:

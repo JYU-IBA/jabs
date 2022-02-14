@@ -19,11 +19,8 @@ static const jibal_option calibration_option[] = {
         {NULL, 0}
 };
 
-typedef enum calibration_param_type {
-    CALIBRATION_PARAM_NONE = 0,
-    CALIBRATION_PARAM_OFFSET = 1,
-    CALIBRATION_PARAM_SLOPE = 2
-} calibration_param_type;
+#define CALIBRATION_PARAM_OFFSET 0
+#define CALIBRATION_PARAM_SLOPE 1
 
 typedef struct calibration {
     calibration_type type;
@@ -49,10 +46,9 @@ double calibration_linear(const void *params, double x);
 double calibration_poly(const void *params, double x);
 double calibration_none(const void *params, double x);
 inline double calibration_eval(const calibration *c, double x) {return c->f(c->params, x);}
-int calibration_set_param(calibration *c, calibration_param_type type, double value);
-double calibration_get_param(const calibration *c, calibration_param_type type);
+int calibration_set_param(calibration *c, size_t i, double value);
 size_t calibration_get_number_of_params(const calibration *c);
-double calibration_get_param_number(const calibration *c, size_t i); /* get i'th param in range [0..n-1], get n by  calibration_get_number_of_params()*/
-double *calibration_get_param_ref(calibration *c, calibration_param_type type);
+double calibration_get_param(const calibration *c, size_t i); /* get i'th param in range [0..n-1], get n by  calibration_get_number_of_params()*/
+double *calibration_get_param_ref(const calibration *c, size_t  i);
 const char *calibration_name(const calibration *c);
 #endif //CALIB_CALIBRATION_H

@@ -533,9 +533,9 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
         size_t l = strlen(filename);
         if(l > 4 && strncmp(filename+l-4, ".csv", 4) == 0) { /* For CSV: print header line */
             sep = ','; /* and set the separator! */
-            fprintf(f, "\"Channel\",\"Simulated\"");
+            fprintf(f, "\"Channel\",\"Energy (keV)\",\"Simulated\"");
             if(exp) {
-                fprintf(f, ",\"Experimental\",\"Energy (keV)\"");
+                fprintf(f, ",\"Experimental\"");
             }
             for(size_t j = 0; j < ws->n_reactions; j++) {
                 const reaction *r = ws->reactions[j].r;
@@ -552,10 +552,11 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
             if(i < ws->reactions[j].histo->n)
                 sum += ws->reactions[j].histo->bin[i];
         }
+        fprintf(f,"%lu%c%.3lf%c", i, sep, detector_calibrated(ws->det, i)/C_KEV, sep); /* Channel, energy */
         if(sum == 0.0) {
-            fprintf(f, "%lu%c0", i, sep); /* Tidier output with a clean zero */
+            fprintf(f, "0"); /* Tidier output with a clean zero sum */
         } else {
-            fprintf(f, "%lu%c%e", i, sep, sum);
+            fprintf(f, "%e", sum);
         }
         if(exp) {
             if(i < exp->n) {
@@ -563,7 +564,6 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
             } else {
                 fprintf(f, "%c0", sep);
             }
-            fprintf(f,"%c%.3lf", sep, exp->range[i]/C_KEV);
         }
         for (size_t j = 0; j < ws->n_reactions; j++) {
             if(i >= ws->reactions[j].histo->n || ws->reactions[j].histo->bin[i] == 0.0) {

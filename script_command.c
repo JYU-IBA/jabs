@@ -526,16 +526,12 @@ script_command_status script_set_detector_calibration_val(struct script_session 
     double value_double = jibal_get_val(s->jibal->units, 0, argv[0]);
     switch(val) {
         case 's': /* slope */
-            if(det->calibration->type == CALIBRATION_LINEAR) {
-                calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, value_double);
-            } else {
-                jabs_message(MSG_ERROR, stderr, "Can not set calibration slope, calibration is not linear.\n");
+            if(calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, value_double)) {
+                jabs_message(MSG_ERROR, stderr, "Can not set calibration slope.\n");
             }
             return 1;
         case 'o': /* offset */
-            if(det->calibration->type == CALIBRATION_LINEAR) {
-                calibration_set_param(det->calibration, CALIBRATION_PARAM_OFFSET, value_double);
-            } else {
+            if(calibration_set_param(det->calibration, CALIBRATION_PARAM_OFFSET, value_double)) {
                 jabs_message(MSG_ERROR, stderr, "Can not set calibration slope, calibration is not linear.\n");
             }
             return 1;
@@ -1043,6 +1039,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_calibration->subcommands, script_command_new("linear", "Set the calibration to be linear (default).", 'L', NULL));
     script_command_list_add_command(&c_calibration->subcommands, script_command_new("slope", "Set the slope of a linear calibration.", 's', NULL));
     script_command_list_add_command(&c_calibration->subcommands, script_command_new("offset", "Set the offset of a linear calibration.", 'o', NULL));
+    script_command_list_add_command(&c_calibration->subcommands, script_command_new("poly", "Set the calibration to be a polynomial.", 0, &script_set_detector_calibration_poly));
 
     script_command_list_add_command(&c_detector->subcommands, script_command_new("column", "Set column number (for data input).", 'c', NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("channels", "Set number of channels.", 'h', NULL));
@@ -1143,10 +1140,10 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("detectors", "Reset detectors.", 0, &script_reset_detectors));
     script_command_list_add_command(&c->subcommands, script_command_new("experimental", "Reset experimental spectra.", 0, &script_reset_experimental));
-    script_command_list_add_command(&c->subcommands, script_command_new("fit_ranges", "Reset fit ranges.", 0, &script_reset_fit_ranges));
+    script_command_list_add_command(&c->subcommands, script_command_new("fit", "Reset fit (ranges).", 0, &script_reset_fit));
     script_command_list_add_command(&c->subcommands, script_command_new("reactions", "Reset reactions.", 0, &script_reset_reactions));
     script_command_list_add_command(&c->subcommands, script_command_new("sample", "Reset sample.", 0, &script_reset_sample));
-    script_command_list_add_command(&c->subcommands, script_command_new("sample", "Reset stopping assignments.", 0, &script_reset_stopping));
+    script_command_list_add_command(&c->subcommands, script_command_new("stopping", "Reset stopping assignments.", 0, &script_reset_stopping));
 
     c = script_command_new("fit", "Do a fit.", 0, script_fit);
     script_command_list_add_command(&head, c);
@@ -1357,10 +1354,13 @@ script_command_status script_reset_detectors(script_session *s, int argc, char *
     return 0;
 }
 
-script_command_status script_reset_fit_ranges(script_session *s, int argc, char *const *argv) {
+script_command_status script_reset_fit(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
     fit_data_fit_ranges_free(s->fit);
+    fit_params_free(s->fit->fit_params);
+    s->fit->fit_params = NULL;
+    fit_data_workspaces_free(s->fit);
     return 0;
 }
 
@@ -1591,6 +1591,35 @@ script_command_status script_set_detector_foil(struct script_session *s, int arg
     if(detector_foil_set_from_argv(s->jibal, det, &argc, &argv)) {
         return SCRIPT_COMMAND_FAILURE;
     }
+    return argc_orig - argc;
+}
+
+script_command_status script_set_detector_calibration_poly(struct script_session *s, int argc, char *const *argv) {
+    const int argc_orig = argc;
+    detector *det = sim_det(s->fit->sim, s->i_det_active);
+    if(!det) {
+        jabs_message(MSG_ERROR, stderr, "No detector(s)\n");
+        return SCRIPT_COMMAND_SUCCESS;
+    }
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: set detector calibration poly <n> <p_0> <p_1> ... <p_(n+1)>\nExample: set calibration poly 2 10keV 1.0keV 0.001keV\nThe example sets a second degree (quadratic 3 parameters) polynomial calibration.\nThe first parameter (p_0) is the constant term.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    size_t n = strtoull(argv[0], NULL, 10);
+    argc--;
+    argv++;
+    if(argc < (n + 1)) {
+        jabs_message(MSG_ERROR, stderr, "Not enough parameters for a %zu degree polynomial. Expected %zu.\n", n, n + 1);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    calibration *c = calibration_init_poly(n);
+    for(size_t i = 0; i <= n; i++) {
+        calibration_set_param(c, i, jibal_get_val(s->jibal->units, UNIT_TYPE_ANY, argv[0]));
+        argc--;
+        argv++;
+    }
+    calibration_free(det->calibration);
+    det->calibration = c;
     return argc_orig - argc;
 }
 
