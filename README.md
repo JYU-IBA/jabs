@@ -68,7 +68,8 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Point-by-point and layered sample models
  - Roughness (gamma distribution)
  - Arbitrary geometry, detector and sample tilt can be expressed in arbitrary spherical coordinates
- - Linear detector calibration and constant detector energy resolution
+ - Non-linear detector calibration (polynomial of arbitrary degree) and constant detector energy resolution or timing resolution (for ToF detectors)
+ - Different calibrations are possible for different elements (Z-specific calibration).
  - Multilayer foil in front of detector
  - Reading of experimental data
  - Fitting to experimental spectrum (multidimensional non-linear least squares fitting)
@@ -80,13 +81,11 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Dual scattering model (although it needs improvements before it is usable)
  - Simultaneous multi-detector simulation and fitting.
  - Stopping corrections can be supplied by user (Bragg correction) for a specific layer
-
 ### Not (yet) implemented, but planned
  - Support for more input and output data formats (CSV, IDF, ...)
  - More accurate handling of sharp peaks in cross sections (resonances). The current handling is quite accurate in most cases.
  - Multiple scattering (small angle)
  - Simulation of pile-up and dead time
- - Non-linear detector response and different response for different particles (e.g. alphas, protons)
  - Simulation of time-of-flight spectra
  - Publication quality plotting
 
@@ -96,6 +95,7 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Fitting of spectra from different measurements (different beam, fluence etc for each simulation)
 
 ### Known issues
+ - Detector saving to file and loading from a file is broken and may be unsupported in the future
  - Occasional crashes when fitting, since some corner cases are not handled properly
  - Detector numbering and usability issues with multidetector mode 
  - Point-by-point profiles are not tested (but should work)
@@ -105,6 +105,7 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).
  - Dual scattering is benchmarked against SimNRA and is known to produce different results.
  - Adding detector related fit variables will add those for all detectors 
+ - Fitting of non-linear energy calibration is not possible, only slope and offset of the default (Z-independent) calibration can be fitted.
 
 ## Fitting
 
