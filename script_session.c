@@ -88,26 +88,47 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
     if(*s == '\0') {
         return EXIT_FAILURE;
     }
-    size_t number = strtoul(s, &end, 10);
-    if(end == s) { /* No digits at all! */
-        if(allow_empty) {
-            return EXIT_SUCCESS; /* First argument was not a number, don't change i_det! */
-        } else {
-            return EXIT_FAILURE;
-        }
-    }
-    if(*end == '\0') { /* Entire string was valid */
-        *i_det = number - 1;
-        if(*i_det >= sim->n_det) {
-            jabs_message(MSG_ERROR, stderr, "Detector number %zu is not valid (n_det = %zu).\n", number, sim->n_det);
-            return EXIT_FAILURE;
-        }
-        (*argc)--;
-        (*argv)++;
-        return EXIT_SUCCESS;
-    }
 #ifdef DEBUG
-    fprintf(stderr, "Unknown failure! End points to %p, (== '%c')\n", (void *)end, *end);
+    fprintf(stderr, "Trying to determine if %s is a detector number.\n", s);
 #endif
-    return EXIT_FAILURE;
+    if(strcmp(s, "first") == 0) {
+        if(sim->n_det) {
+            *i_det = 0;
+        } else {
+            jabs_message(MSG_ERROR, stderr, "No detectors.\n");
+            return EXIT_FAILURE;
+        }
+    } else if(strcmp(s, "last") == 0) {
+        if(sim->n_det) {
+            *i_det = sim->n_det - 1;
+        } else {
+            jabs_message(MSG_ERROR, stderr, "No detectors.\n");
+            return EXIT_FAILURE;
+        }
+    } else {
+        size_t number = strtoul(s, &end, 10);
+        if(end == s) { /* No digits at all! */
+            if(allow_empty) {
+                return EXIT_SUCCESS; /* First argument was not a number, don't change i_det! */
+            } else {
+                return EXIT_FAILURE;
+            }
+        }
+        if(*end == '\0') { /* Entire string was valid */
+            *i_det = number - 1;
+            if(*i_det >= sim->n_det) {
+                jabs_message(MSG_ERROR, stderr, "Detector number %zu is not valid (n_det = %zu).\n", number, sim->n_det);
+                return EXIT_FAILURE;
+            }
+        } else {
+#ifdef DEBUG
+            fprintf(stderr, "Unknown failure! End points to %p, (== '%c')\n", (void *)end, *end);
+#endif
+            return EXIT_FAILURE;
+        }
+    }
+    /* Branches that consumed an argument successfully lead here */
+    (*argc)--;
+    (*argv)++;
+    return EXIT_SUCCESS;
 }

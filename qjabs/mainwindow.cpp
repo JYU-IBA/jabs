@@ -118,9 +118,9 @@ int MainWindow::runLine(const QString &line) {
 void MainWindow::plotSession()
 {
     if(session && session->fit && session->fit->sim) {
-        ui->plotSpinBox->setMaximum(session->fit->sim->n_det - 1);
+        ui->plotSpinBox->setMaximum(session->fit->sim->n_det);
         ui->plotSettingsGroupBox->setVisible(session->fit->sim->n_det > 1);
-        plotSpectrum(ui->plotSpinBox->value());
+        plotSpectrum(ui->plotSpinBox->value() - 1);
         if(firstRun) {
             ui->widget->resetZoom();
             firstRun = false;
@@ -169,7 +169,7 @@ void MainWindow::on_action_Run_triggered()
 
 void MainWindow::on_plotSpinBox_valueChanged(int arg1)
 {
-    plotSpectrum(arg1);
+    plotSpectrum(arg1 - 1);
 }
 
 void MainWindow::plotSpectrum(size_t i_det)

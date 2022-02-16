@@ -52,8 +52,11 @@
            </item>
            <item row="0" column="1">
             <widget class="QSpinBox" name="plotSpinBox">
+             <property name="minimum">
+              <number>1</number>
+             </property>
              <property name="maximum">
-              <number>0</number>
+              <number>1</number>
              </property>
             </widget>
            </item>

@@ -187,5 +187,6 @@ char *calibration_to_string(const calibration *c) {
         default:
             break;
     }
+    asprintf_append(&out, " resolution %g%s", calibration_get_param(c, CALIBRATION_PARAM_RESOLUTION)/C_KEV, "keV");
     return out;
 }

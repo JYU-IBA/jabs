@@ -263,6 +263,19 @@ void fit_data_exp_free(struct fit_data *fit_data) {
     fit_data->exp = NULL;
 }
 
+int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename) {
+    gsl_histogram *h = spectrum_read(filename, sim_det(fit->sim, i_det));
+    if(!h) {
+        jabs_message(MSG_ERROR, stderr, "Reading spectrum from file \"%s\" was not successful.\n", filename);
+        return EXIT_FAILURE;
+    }
+    if(fit->exp[i_det]) {
+        gsl_histogram_free(fit->exp[i_det]);
+    }
+    fit->exp[i_det] = h;
+    return EXIT_SUCCESS;
+}
+
 int fit_data_add_det(struct fit_data *fit_data, detector *det) {
     if(!fit_data || !det)
         return EXIT_FAILURE;
@@ -396,7 +409,7 @@ int fit(struct fit_data *fit_data) {
 
     for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
         roi *range = &fit_data->fit_ranges[i];
-        jabs_message(MSG_INFO,  stderr, "Fit range %zu [%lu, %lu]\n", i+1, range->low, range->high);
+        jabs_message(MSG_INFO,  stderr, "Fit range %zu [%lu:%lu]\n", i+1, range->low, range->high);
     }
 
     fdf.f = &fit_function;

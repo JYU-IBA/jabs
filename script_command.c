@@ -1325,24 +1325,29 @@ script_command_status script_load_detector(script_session *s, int argc, char *co
 
 script_command_status script_load_experimental(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
+    const int argc_orig = argc;
     size_t i_det = 0;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
     if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: load experimental [detector] filename\n", argv[0]);
+        jabs_message(MSG_ERROR, stderr, "Usage: load experimental {<detector>} <filename>\nIf no detector number is given, experimental data is loaded for all detectors from the same file.\nUse 'set detector column' to control which columns are read.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    gsl_histogram *h = spectrum_read(argv[0], sim_det(fit->sim, i_det));
-    if(!h) {
-        jabs_message(MSG_ERROR, stderr, "Reading spectrum from file \"%s\" was not successful.\n", argv[0]);
-        return SCRIPT_COMMAND_FAILURE;
+    if(argc != argc_orig) { /* Detector number given */
+        if(fit_data_load_exp(s->fit, i_det, argv[0])) {
+            return SCRIPT_COMMAND_FAILURE;
+        }
+    } else { /* Load all detectors from same file (with multiple columns). TODO: make a better multicolumn data reader that can do this in one pass. */
+        for(i_det = 0; i_det < fit->sim->n_det; i_det++) {
+            if(fit_data_load_exp(s->fit, i_det, argv[0])) {
+                return SCRIPT_COMMAND_FAILURE;
+            }
+        }
     }
-    if(fit->exp[i_det]) {
-        gsl_histogram_free(fit->exp[i_det]);
-    }
-    fit->exp[i_det] = h;
-    return 1; /* Number of arguments */
+    argc--;
+    argv++;
+    return argc_orig - argc; /* Number of arguments */
 }
 
 script_command_status script_load_reaction(script_session *s, int argc, char *const *argv) {
@@ -1511,8 +1516,22 @@ script_command_status script_show_detector(script_session *s, int argc, char *co
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(detector_print(s->jibal, NULL, sim_det(fit->sim, i_det))) {
-        jabs_message(MSG_ERROR, stderr, "No detectors set or other error.\n");
+    if(argc != argc_orig || fit->sim->n_det == 1) { /* Show information on particular detector if a number was given or if we only have one detector. */
+        if(detector_print(s->jibal, NULL, sim_det(fit->sim, i_det))) {
+            jabs_message(MSG_ERROR, stderr, "No detectors set or other error.\n");
+        }
+    } else {
+        jabs_message(MSG_INFO, stderr, "  # | col | theta |  phi  |   type   | calibration\n");
+        for(size_t i = 0; i < fit->sim->n_det; i++) {
+            detector *det = sim_det(fit->sim, i);
+            if(!det)
+                continue;
+            char *calib_str = calibration_to_string(det->calibration);
+            jabs_message(MSG_INFO, stderr, "%3zu | %3zu | %5.1lf | %5.1lf | %8s | %s\n",
+                         i + 1, det->column, det->theta/C_DEG, det->phi/C_DEG, detector_type_name(det), calib_str);
+            free(calib_str);
+        }
+        jabs_message(MSG_INFO, stderr, "Use 'show detector <number>' to get more information on a particular detector.\n");
     }
     return argc_orig - argc; /* Number of arguments */
 }

@@ -74,6 +74,7 @@ void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct r
 gsl_histogram *fit_data_exp(const struct fit_data *fit_data, size_t i_det);
 gsl_histogram *fit_data_sim(const struct fit_data *fit_data, size_t i_det);
 void fit_data_exp_free(struct fit_data *fit_data);
+int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename);
 int fit_data_add_det(struct fit_data *fit_data, detector *det);
 sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det);
 size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);
