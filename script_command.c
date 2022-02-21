@@ -1296,9 +1296,9 @@ script_command_status script_load_sample(script_session *s, int argc, char *cons
         jabs_message(MSG_ERROR, stderr, "Usage: load sample [file]\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    sample_model *sm = sample_model_from_file(fit->jibal, argv[1]);
+    sample_model *sm = sample_model_from_file(fit->jibal, argv[0]);
     if(!sm) {
-        jabs_message(MSG_INFO, stderr, "Sample load from \"%s\" failed.\n", argv[1]);
+        jabs_message(MSG_INFO, stderr, "Sample load from \"%s\" failed.\n", argv[0]);
         return -1;
     }
     sample_model_free(fit->sm);
