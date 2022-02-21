@@ -1307,7 +1307,7 @@ script_command_status script_load_sample(script_session *s, int argc, char *cons
         jabs_message(MSG_WARNING, stderr, "Reactions were reset automatically, since the sample was changed.\n");
         sim_reactions_free(fit->sim);
     }
-    return 0;
+    return 1;
 }
 
 script_command_status script_load_detector(script_session *s, int argc, char *const *argv) {
