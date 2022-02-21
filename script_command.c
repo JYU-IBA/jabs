@@ -1299,7 +1299,7 @@ script_command_status script_load_sample(script_session *s, int argc, char *cons
     sample_model *sm = sample_model_from_file(fit->jibal, argv[0]);
     if(!sm) {
         jabs_message(MSG_INFO, stderr, "Sample load from \"%s\" failed.\n", argv[0]);
-        return -1;
+        return SCRIPT_COMMAND_FAILURE;
     }
     sample_model_free(fit->sm);
     fit->sm = sm;
