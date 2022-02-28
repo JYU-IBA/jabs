@@ -15,7 +15,7 @@ if(WIN32 AND DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   message(STATUS "CMake toolchain file ${CMAKE_TOOLCHAIN_FILE}")
 endif()
 project(jabs
-        VERSION 0.5.1
+        VERSION 0.5.2
         DESCRIPTION "Jaakko's Backscattering Simulator (JaBS)"
         LANGUAGES C
         )
