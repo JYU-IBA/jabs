@@ -256,12 +256,34 @@ script_command_status script_save_sample(script_session *s, int argc, char *cons
     return 1;
 }
 
+script_command_status script_save_calibrations(script_session *s, int argc, char * const *argv) {
+    const int argc_orig = argc;
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: save calibrations <file>\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    FILE *f = fopen_file_or_stream(argv[0], "w");
+    if(!f) {
+        jabs_message(MSG_ERROR, stderr, "Can not open file \"%s\" for writing.\n", argv[0]);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    argc--;
+    for(size_t i = 0; i < s->fit->sim->n_det; i++) {
+        const detector *det = sim_det(s->fit->sim, i);
+        char *calib_str = calibration_to_string(det->calibration);
+        jabs_message(MSG_INFO, f, "set detector %zu calibration %s\n", i+1, calib_str);
+        free(calib_str);
+    }
+    fclose_file_or_stream(f);
+    return argc_orig - argc;
+}
+
 script_command_status script_save_detector(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit_data = s->fit;
     size_t i_det = 0;
     const int argc_orig = argc;
     if(script_get_detector_number(fit_data->sim, TRUE, &argc, &argv, &i_det) || argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: save detector {<detector>} file\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: save detector {<detector>} <file>\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(detector_print(s->jibal, argv[0], sim_det(fit_data->sim, i_det))) {
@@ -1143,6 +1165,7 @@ script_command *script_commands_create(struct script_session *s) {
     c = script_command_new("save", "Save something.", 0, NULL);
     script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("bricks", "Save bricks.", 0, &script_save_bricks));
+    script_command_list_add_command(&c->subcommands, script_command_new("calibrations", "Save detector calibrations.", 0, &script_save_calibrations));
     script_command_list_add_command(&c->subcommands, script_command_new("detector", "Save detector.", 0, &script_save_detector));
     script_command_list_add_command(&c->subcommands, script_command_new("sample", "Save sample.", 0, &script_save_sample));
     script_command_list_add_command(&c->subcommands, script_command_new("spectra", "Save spectra.", 0, &script_save_spectra));
@@ -1526,14 +1549,14 @@ script_command_status script_show_detector(script_session *s, int argc, char *co
             jabs_message(MSG_ERROR, stderr, "No detectors set or other error.\n");
         }
     } else {
-        jabs_message(MSG_INFO, stderr, "  # | col | theta |  phi  |   type   | calibration\n");
+        jabs_message(MSG_INFO, stderr, "  # | col | theta |  phi  |  solid  |   type   | calibration\n");
         for(size_t i = 0; i < fit->sim->n_det; i++) {
             detector *det = sim_det(fit->sim, i);
             if(!det)
                 continue;
             char *calib_str = calibration_to_string(det->calibration);
-            jabs_message(MSG_INFO, stderr, "%3zu | %3zu | %5.1lf | %5.1lf | %8s | %s\n",
-                         i + 1, det->column, det->theta/C_DEG, det->phi/C_DEG, detector_type_name(det), calib_str);
+            jabs_message(MSG_INFO, stderr, "%3zu | %3zu | %5.1lf | %5.1lf | %7.3lf | %8s | %s\n",
+                         i + 1, det->column, det->theta/C_DEG, det->phi/C_DEG, det->solid/C_MSR, detector_type_name(det), calib_str);
             free(calib_str);
         }
         jabs_message(MSG_INFO, stderr, "Use 'show detector <number>' to get more information on a particular detector.\n");

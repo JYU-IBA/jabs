@@ -74,6 +74,7 @@ script_command_status script_reset_sample(struct script_session *s, int argc, ch
 script_command_status script_reset_stopping(struct script_session *s, int argc, char * const *argv);
 script_command_status script_roi(struct script_session *s, int argc, char * const *argv);
 script_command_status script_save_bricks(struct script_session *s, int argc, char * const *argv);
+script_command_status script_save_calibrations(struct script_session *s, int argc, char * const *argv);
 script_command_status script_save_detector(struct script_session *s, int argc, char * const *argv);
 script_command_status script_save_sample(struct script_session *s, int argc, char * const *argv);
 script_command_status script_save_spectra(struct script_session *s, int argc, char * const *argv);
