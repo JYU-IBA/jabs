@@ -443,6 +443,9 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
     double *value_double = NULL;
     size_t *value_size = NULL;
     switch(val) {
+        case 'b': /* beta */
+            value_double = &(det->beta);
+            break;
         case 'c': /* column */
             value_size = &(det->column);
             break;
@@ -1074,6 +1077,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_detector->subcommands, script_command_new("solid", "Set detector solid angle.", 's', NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("theta", "Set detector (scattering) angle.", 'T', NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("length", "Set detector length (for ToF).", 'l', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("beta", "Set exit angle (angle of ion in sample) for this detector.", 'b', NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "Set detector azimuth angle, 0 = IBM, 90 deg = Cornell.", 'p', NULL));
 
     script_command_list_add_command(&c_set->subcommands,script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
@@ -1105,6 +1109,7 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_BOOL,   "nucl_stop_accurate",   &sim->params.nucl_stop_accurate,     NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy", &sim->params.mean_conc_and_energy,   NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "geostragg",            &sim->params.geostragg,              NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",          &sim->params.beta_manual,            NULL},
             {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                                                    NULL}
     };
     c = script_command_list_from_vars_array(vars, 0);

@@ -76,7 +76,12 @@ double exit_angle_delta(const sim_workspace *ws, const char direction) {
 geostragg_vars geostragg_vars_calculate(const sim_workspace *ws, const ion *incident) {
     geostragg_vars g;
     g.scatter_theta = scattering_angle(incident, ws);
-    rotate(ws->det->theta, ws->det->phi, ws->sim->sample_theta, ws->sim->sample_phi, &g.theta_product, &g.phi_product); /* Detector in sample coordinate system */
+    if(ws->params.beta_manual) {
+        g.theta_product = C_PI - ws->det->beta;
+        g.phi_product = 0.0;
+    } else {
+        rotate(ws->det->theta, ws->det->phi, ws->sim->sample_theta, ws->sim->sample_phi, &g.theta_product, &g.phi_product); /* Detector in sample coordinate system */
+    }
 #ifdef DEBUG
     double beta;
     beta = (C_PI - g.theta_product);
@@ -88,6 +93,17 @@ geostragg_vars geostragg_vars_calculate(const sim_workspace *ws, const ion *inci
     geostragg_vars_dir *gds[] = {&g.x, &g.y, NULL};
     for(geostragg_vars_dir **gdp = gds; *gdp; gdp++) {
         geostragg_vars_dir *gd = *gdp;
+        if(!ws->params.geostragg) { /* These variables will actually not be used, but let's set them just in case */
+            gd->delta_beta = 0.0;
+            gd->theta_deriv = 0.0;
+            gd->phi = 0.0;
+            gd->theta_plus = g.scatter_theta;
+            gd->theta_minus = g.scatter_theta;
+            gd->theta_product_plus = g.theta_product;
+            gd->theta_product_minus = g.theta_product;
+            gd->phi_product_plus = g.phi_product;
+            gd->phi_product_minus = g.phi_product;
+        }
         gd->delta_beta = exit_angle_delta(ws, gd->direction);
 #ifdef UNNECESSARY_NUMERICAL_THINGS
         gd->theta_deriv = theta_deriv_beta(ws->det, gd->direction);

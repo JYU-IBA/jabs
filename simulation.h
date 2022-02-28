@@ -25,7 +25,7 @@
 #include "sample.h"
 
 typedef struct {
-    int ds;
+    int ds; /* Dual scattering true/false */
     int ds_steps_azi;
     int ds_steps_polar;
     int n_ds;
@@ -34,10 +34,11 @@ typedef struct {
     int cs_stragg_half_n;
     int cs_n_stragg_steps; /* calculated from cs_stragg_half_n */
     size_t depthsteps_max;
-    int rk4;
-    int nucl_stop_accurate;
-    int mean_conc_and_energy;
-    int geostragg;
+    int rk4; /* Use fourth order Runge-Kutta for energy loss calculation (differential equation with dE/dx). When false, a first-order method is used. */
+    int nucl_stop_accurate; /* Use accurate nuclear stopping equation true/false. When false a faster (poorly approximating) equation is used below the nuclear stopping maximum. */
+    int mean_conc_and_energy; /* Calculation of cross-section concentration product is simplified by calculating cross section at mean energy of a depth step and concentration at mid-bin (only relevant for samples with concentration gradients) */
+    int geostragg; /* Geometric straggling true/false */
+    int beta_manual; /* Don't calculate exit angle based on detector geometry, use something given by user, true/false */
     double stop_step_incident;
     double stop_step_exiting;
     double stop_step_fudge_factor;
@@ -131,7 +132,6 @@ void sim_reaction_reset_bricks(sim_reaction *sim_r);
 double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);
 double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E);
 double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);
-double sim_calculate_exit_angle(const simulation *sim, const detector *det);
 void sim_sort_reactions(const simulation *sim);
 void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident);
 double sim_alpha_angle(const simulation *sim);

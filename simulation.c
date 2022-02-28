@@ -88,6 +88,7 @@ sim_calc_params sim_calc_params_defaults(int ds, int fast) {
     p.cs_frac = 1.0/(1.0*(p.cs_n_steps+1));
     assert(p.cs_stragg_half_n >= 0);
     p.cs_n_stragg_steps = p.cs_stragg_half_n * 2 + 1;
+    p.beta_manual  = FALSE;
     return p;
 }
 
@@ -278,6 +279,15 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         return NULL;
     }
 
+    if(sim->params.beta_manual && sim->params.ds) {
+        jabs_message(MSG_WARNING, stderr,  "Manual exit angle is enabled in addition to dual scattering. This is an unsupported combination. Manual exit angle calculation will be disabled.\n");
+        ws->params.beta_manual  = FALSE;
+    }
+
+    if(sim->params.beta_manual && sim->params.geostragg) {
+        jabs_message(MSG_WARNING, stderr,  "Manual exit angle is enabled in addition to geometric scattering. This is an unsupported combination. Geometric straggling calculation will be disabled.\n");
+        ws->params.geostragg = FALSE;
+    }
     ion_reset(&ws->ion);
     ion_set_isotope(&ws->ion, sim->beam_isotope);
     ws->ion.E = ws->sim->beam_E;
@@ -468,9 +478,14 @@ void simulation_print(FILE *f, const simulation *sim) {
         detector *det = sim->det[i];
         jabs_message(MSG_INFO, f, "DETECTOR %zu (run 'show detector %zu' for other parameters):\n", i + 1, i + 1);
         jabs_message(MSG_INFO, f, "  type = %s\n", detector_type_name(det));
-        jabs_message(MSG_INFO, f, "  theta = %.3lf deg\n", i, det->theta / C_DEG);
-        jabs_message(MSG_INFO, f, "  phi = %.3lf deg\n", i, det->phi / C_DEG);
-        jabs_message(MSG_INFO, f, "  beta = %.3lf deg\n", i, sim_exit_angle(sim, det) / C_DEG);
+        jabs_message(MSG_INFO, f, "  theta = %.3lf deg\n", det->theta / C_DEG);
+        jabs_message(MSG_INFO, f, "  phi = %.3lf deg\n", det->phi / C_DEG);
+        if(sim->params.beta_manual) {
+            jabs_message(MSG_INFO, f, "  beta = %.3lf deg (calculated)\n", sim_exit_angle(sim, det) / C_DEG);
+            jabs_message(MSG_INFO, f, "  beta = %.3lf deg (manual)\n", det->beta / C_DEG);
+        } else {
+            jabs_message(MSG_INFO, f, "  beta = %.3lf deg\n", sim_exit_angle(sim, det) / C_DEG);
+        }
         jabs_message(MSG_INFO, f, "  angle from horizontal = %.3lf deg\n", detector_angle(det, 'x')/C_DEG);
         jabs_message(MSG_INFO, f, "  angle from vertical = %.3lf deg\n", detector_angle(det, 'y')/C_DEG);
         jabs_message(MSG_INFO, f, "  solid angle (given, used) = %.4lf msr\n", i, det->solid/C_MSR);
@@ -606,12 +621,6 @@ double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E)
     return t[lo].sigma+((t[lo+1].sigma-t[lo].sigma)/(t[lo+1].E-t[lo].E))*(E-t[lo].E);
 }
 
-double sim_calculate_exit_angle(const simulation *sim, const detector *det) {
-    double theta, phi;
-    rotate(det->theta, det->phi, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Detector in sample coordinate system, angles are detector in sample system. Note that for Cornell geometry phi = 90.0 deg! */
-    return C_PI - theta;
-}
-
 void sim_sort_reactions(const simulation *sim) {
     qsort(sim->reactions, sim->n_reactions, sizeof(reaction *), &reaction_compare);
 }
@@ -640,7 +649,7 @@ double sim_alpha_angle(const simulation *sim) { /* Returns alpha angle (no sign!
     return theta;
 }
 
-double sim_exit_angle(const simulation *sim, const detector *det) {
+double sim_exit_angle(const simulation *sim, const detector *det) { /* Not actually used by simulation, just a convenience function! */
     double theta, phi;
     rotate(sim->sample_theta, sim->sample_phi, det->theta, det->phi, &theta, &phi);
     return C_PI - theta;
