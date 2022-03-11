@@ -5,7 +5,7 @@ if(WIN32 AND DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     message(STATUS "CMake toolchain file ${CMAKE_TOOLCHAIN_FILE}")
 endif()
 project(qjabs
-    VERSION 0.5.2
+    VERSION 0.5.3
     DESCRIPTION "Jaakko's Backscattering Simulator (JaBS) for Qt"
     LANGUAGES C CXX)
 
