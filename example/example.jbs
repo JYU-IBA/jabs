@@ -7,11 +7,12 @@ set alpha 0
 set alpha 0deg
 set alpha "0 deg"
 
+#Fluence is actually total number of ions, not ions/cm2... this should not be multiplied by detector solid angle (JaBS will do that)
 set fluence 2.0e13
 load exp "experimental.dat"
 
 #sample can be set with one command
-set sample Au 30tfu rough 20tfu n_rough 5 SiO2 6500tfu Si 10000tfu
+set sample Au 30tfu rough 20tfu n_rough 10 SiO2 6500tfu Si 10000tfu
 #or loaded from a file (tabular data)
 #load sample "sample.txt"
 
@@ -20,10 +21,12 @@ load script "detector.jbs"
 #The following line can be uncommented after this script is run. We save the detector calibration at the end of the script.
 #load script "calibration_out.jbs"
 
-add fit range [200:700] [1050:1110]
+add fit range [200:449] [450:700]
+add fit range [1050:1110]
 #Iterations can be limited if there is reason to suspect it won't converge...
 set maxiter 100
-
+#Speed up by setting the minimum energy in the simulation
+set emin 150keV
 simulate
 save spectra "simulated_out.csv"
 
