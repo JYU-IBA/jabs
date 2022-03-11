@@ -61,8 +61,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
             {"step_exiting",  required_argument, NULL, 1  },
             {"sample",        required_argument, NULL, 's'},
             {"sample_out",    required_argument, NULL, 'S'},
-            {"detector",      required_argument, NULL, 'd'},
-            {"detector_out",  required_argument, NULL, 'D'},
             {"slope",         required_argument, NULL, '1'},
             {"offset",        required_argument, NULL, '2'},
             {"compress",      required_argument, NULL, 'c'},
@@ -101,8 +99,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
             "Exiting particle step size.",
             "Sample file.",
             "Sample file (output).",
-            "Detector file.",
-            "Detector file (output).",
             "Slope of energy calibration.",
             "Offset of energy calibration.",
             "Compress channels in spectra by an integer factor.",
@@ -256,14 +252,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
                 break;
             case 'R':
                 calibration_set_param(sim->det[0]->calibration, CALIBRATION_PARAM_RESOLUTION, jibal_get_val(jibal->units, UNIT_TYPE_ANY, optarg));
-                break;
-            case 'd':
-                free(sim->det[0]);
-                sim->det[0] = detector_from_file(jibal, optarg);
-                if(!sim->det[0]) {
-                    fprintf(stderr, "Reading detector from file %s failed.\n", optarg);
-                    exit(EXIT_FAILURE);
-                }
                 break;
             default:
                 usage();

@@ -1,0 +1,20 @@
+#!/usr/bin/env jabs
+#This file shows how to remove and reset reactions. See also the non_rutherford example.
+set sample SiO2 10000tfu
+
+add reactions RBS
+remove reaction 2
+remove reaction RBS 16O
+remove reaction RBS 18O
+show reactions
+
+reset reactions
+show reactions
+
+add reaction RBS 16O
+add reaction RBS 28Si
+show reactions
+
+reset reactions
+add reactions RBS
+show reactions

@@ -1,0 +1,5 @@
+#!/usr/bin/env jabs
+set stopping dpass He Si
+set sample SiO2 5000tfu Si 10000tfu
+simulate
+show stopping

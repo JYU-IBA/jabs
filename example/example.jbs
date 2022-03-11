@@ -15,13 +15,13 @@ set sample Au 30tfu rough 20tfu n_rough 5 SiO2 6500tfu Si 10000tfu
 #or loaded from a file (tabular data)
 #load sample "sample.txt"
 
-set detector slope 1.72keV offset 10keV resolution 10keV
-#commands can be abbreviated in some cases, like 'set detector' -> 'set det'
-set det theta 160deg phi 90deg solid 5msr
-#Detector can also be loaded from a file
-#load det "detector.txt"
+#Scripts can be loaded (run). It is convenient to store detector in a separate script.
+load script "detector.jbs"
+#The following line can be uncommented after this script is run. We save the detector calibration at the end of the script.
+#load script "calibration_out.jbs"
 
 add fit range [200:700] [1050:1110]
+#Iterations can be limited if there is reason to suspect it won't converge...
 set maxiter 100
 
 simulate
@@ -29,7 +29,9 @@ save spectra "simulated_out.csv"
 
 fit calib,fluence,thickness1,thickness2,rough1
 save spectra "out.csv"
-save det "det_out.txt"
+#detector calibration can be saved to a script file. This can be loaded back in.
+save calibration "calibration_out.jbs"
 #fitted sample can be saved (and loaded back in later!)
 save sample "sample_out.txt"
+show detector
 show fit

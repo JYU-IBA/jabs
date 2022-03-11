@@ -1,0 +1,15 @@
+#!/usr/bin/env jabs
+set stop_step_fudge 1.0
+set ion 35Cl
+set energy 8.5MeV
+set geostragg true
+set sample Al2O3 1000tfu Si 10000tfu
+
+set alpha 70deg
+#See how to use a ToF detector from another example
+set det resolution 15keV theta 40deg
+set det aperture rectangle width 14mm height 14mm
+set det distance 95cm solid 0.3msr
+set det theta 40deg
+simulate
+save spectra "erda.csv"

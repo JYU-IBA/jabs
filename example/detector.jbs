@@ -1,0 +1,4 @@
+#!/usr/bin/env jabs
+#This script is intended to be called by another JaBS script. It sets the detector.
+set det theta 160deg phi 90deg solid 5msr
+set detector slope 1.72keV offset 10keV resolution 10keV

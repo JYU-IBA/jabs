@@ -280,22 +280,6 @@ script_command_status script_save_calibrations(script_session *s, int argc, char
     return argc_orig - argc;
 }
 
-script_command_status script_save_detector(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit_data = s->fit;
-    size_t i_det = 0;
-    const int argc_orig = argc;
-    if(script_get_detector_number(fit_data->sim, TRUE, &argc, &argv, &i_det) || argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: save detector {<detector>} <file>\n");
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    if(detector_print(s->jibal, argv[0], sim_det(fit_data->sim, i_det))) {
-        jabs_message(MSG_ERROR, stderr, "Could not write detector %zu to file \"%s\".\n", i_det, argv[0]);
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    argc -= 1;
-    return argc_orig - argc;
-}
-
 script_command_status script_remove_reaction(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
     static const char *remove_reaction_usage = "Usage: remove reaction {<number | <type> <target isotope>}\n";
@@ -1141,7 +1125,6 @@ script_command *script_commands_create(struct script_session *s) {
 
     script_command *c_load = script_command_new("load", "Load something.", 0, NULL);
     script_command_list_add_command(&head, c_load);
-    script_command_list_add_command(&c_load->subcommands, script_command_new("detector", "Load (replace) a detector.", 0, &script_load_detector));
     script_command_list_add_command(&c_load->subcommands, script_command_new("experimental", "Load an experimental spectrum.", 0, &script_load_experimental));
     script_command_list_add_command(&c_load->subcommands, script_command_new("script", "Load (run) a script.", 0, &script_load_script));
     script_command_list_add_command(&c_load->subcommands, script_command_new("sample", "Load a sample.", 0, &script_load_sample));
@@ -1169,7 +1152,6 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("bricks", "Save bricks.", 0, &script_save_bricks));
     script_command_list_add_command(&c->subcommands, script_command_new("calibrations", "Save detector calibrations.", 0, &script_save_calibrations));
-    script_command_list_add_command(&c->subcommands, script_command_new("detector", "Save detector.", 0, &script_save_detector));
     script_command_list_add_command(&c->subcommands, script_command_new("sample", "Save sample.", 0, &script_save_sample));
     script_command_list_add_command(&c->subcommands, script_command_new("spectra", "Save spectra.", 0, &script_save_spectra));
 
@@ -1339,19 +1321,6 @@ script_command_status script_load_sample(script_session *s, int argc, char *cons
         sim_reactions_free(fit->sim);
     }
     return 1;
-}
-
-script_command_status script_load_detector(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
-    size_t i_det = 0;
-    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: load detector [detector] filename\n");
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    return sim_det_set(fit->sim, detector_from_file(fit->jibal, argv[0]), i_det);
 }
 
 script_command_status script_load_experimental(script_session *s, int argc, char *const *argv) {
@@ -1834,14 +1803,16 @@ script_command_status script_add_reactions(script_session *s, int argc, char *co
 script_command_status script_add_detector(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
     if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: add detector {<filename> | default}\n", argv[0]);
+        jabs_message(MSG_ERROR, stderr, "Usage: add detector {default}\n", argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
+    script_set_detector(s, argc - 1, argv + 1);
     detector *det;
     if(strcmp(argv[0], "default") == 0) {
         det = detector_default(NULL);
     } else {
-        det = detector_from_file(fit->jibal, argv[0]);
+        jabs_message(MSG_WARNING, stderr, "Adding other types of detectors except default (add detector default) is currently not supported.\n");
+        return 0; /* No arguments consumed, no error */
     }
     if(fit_data_add_det(fit, det)) {
         return SCRIPT_COMMAND_FAILURE;

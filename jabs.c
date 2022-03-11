@@ -781,7 +781,7 @@ int simulate_with_roughness(sim_workspace *ws) {
             }
 #ifdef DEBUG
             fprintf(stderr, "Gamma roughness diff %g tfu (from %g tfu, index i_range=%zu), probability %.3lf%%)\n", x_diff/C_TFU, ws->sample->ranges[i_range].x/C_TFU, i_range, tpd[i]->p[j].prob*100.0);
-            fprintf(stderr, "Gamma roughness, ranges (%zu):");
+            fprintf(stderr, "Gamma roughness, ranges (%zu):", ws->sample->n_ranges);
             for(i_range = 0; i_range < ws->sample->n_ranges; i_range++) {
                 fprintf(stderr, ", %zu: %g tfu ", i_range, sample_rough->ranges[i_range].x/C_TFU);
             }

@@ -61,8 +61,6 @@ inline double detector_calibrated(const detector *det, int Z, size_t ch) {return
 int detector_set_calibration_Z(const jibal_config *jibal_config, detector *det, calibration *cal, int Z); /* Sets Z specific calibration, (re)allocates space for det->calibration_Z if required. */
 const char *detector_type_name(const detector *det);
 int detector_sanity_check(const detector *det);
-detector *detector_from_file(const jibal *jibal, const char *filename); /* one detector from JIBAL configuration style file */
-detector **detectors_from_file(const jibal *jibal, const char *filename, size_t *n_detectors_out); /* multiple detectors in a table. TODO: work in progress */
 detector *detector_default(detector *det); /* if det is NULL, this returns pointer to a newly allocated det */
 void detector_free(detector *det);
 void detector_calibrations_free(detector *det);

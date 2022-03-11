@@ -1,0 +1,13 @@
+#!/usr/bin/env jabs
+#This example shows various how to set various calibrations (linear, polynomial) and resolution (energy, ToF)
+set det calibration linear slope 2keV offset 1keV
+show det
+set det type tof reso 150ps
+show det
+set det type energy
+set det calibration poly 2 10keV 2keV 0.001keV resolution 20keV
+set det calibration H linear offset 20keV slope 3keV resolution 10keV
+set sample Au 30tfu SiO2 6500tfu Si 20000tfu
+simulate
+show det
+save spectra "calibration.csv"

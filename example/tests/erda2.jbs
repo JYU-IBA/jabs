@@ -1,0 +1,16 @@
+#!/usr/bin/env jabs
+set stop_step_fudge 1.0
+set ion 63Cu
+set energy 13.6MeV
+set geostragg true
+set sample Al 1000tfu
+#Si 10000tfu
+set alpha 70deg
+set det resolution 15keV
+set det slope 2keV
+set det theta 40deg
+set det phi 0deg
+set det aperture rectangle width 10mm height 10mm
+set det distance 0.5m solid 10msr
+simulate
+save spectra "erda2.csv"

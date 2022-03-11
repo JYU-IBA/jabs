@@ -59,7 +59,6 @@ script_command_status script_fit(struct script_session *s, int argc, char * cons
 script_command_status script_help(struct script_session *s, int argc, char * const *argv);
 script_command_status script_help_version(struct script_session *s, int argc, char *const *argv);
 script_command_status script_help_commands(script_session *s, int argc, char *const *argv);
-script_command_status script_load_detector(struct script_session *s, int argc, char *const *argv);
 script_command_status script_load_experimental(struct script_session *s, int argc, char *const *argv);
 script_command_status script_load_reaction(struct script_session *s, int argc, char *const *argv);
 script_command_status script_load_sample(struct script_session *s, int argc, char *const *argv);
@@ -75,7 +74,6 @@ script_command_status script_reset_stopping(struct script_session *s, int argc, 
 script_command_status script_roi(struct script_session *s, int argc, char * const *argv);
 script_command_status script_save_bricks(struct script_session *s, int argc, char * const *argv);
 script_command_status script_save_calibrations(struct script_session *s, int argc, char * const *argv);
-script_command_status script_save_detector(struct script_session *s, int argc, char * const *argv);
 script_command_status script_save_sample(struct script_session *s, int argc, char * const *argv);
 script_command_status script_save_spectra(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_detector(struct script_session *s, int argc, char * const *argv);

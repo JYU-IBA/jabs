@@ -1,0 +1,14 @@
+#!/usr/bin/jabs
+set geostragg true
+#set ds true
+set ion 4He energy 2MeV
+set alpha 70deg
+set fluence 5e13
+set aperture rectangle width 1mm height 3mm
+set det type tof slope 1keV offset 0keV theta 40.6deg
+set det resolution 250ps foil C 150tfu length 623mm 
+set det distance 95cm aperture rectangle width 14mm height 14mm solid 0.2msr
+set sample Au 590tfu SiO2 1000tfu Si 10000tfu
+#add reactions RBS
+simulate
+save spectra "erda_tof.csv"
