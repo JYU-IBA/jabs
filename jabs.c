@@ -624,7 +624,14 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
                 fit_params_add_parameter(params, &sim->channeling_offset);
                 fprintf(stderr, "Added fit parameter for channeling (constant)\n");
             }
-
+            if(strcmp(token, "alpha") == 0) {
+                fit_params_add_parameter(params, &sim->sample_theta);
+                fprintf(stderr, "Added fit parameter for sample tilt angle (alpha)\n");
+            }
+            if(strcmp(token, "energy") == 0) {
+                fit_params_add_parameter(params, &sim->beam_E);
+                fprintf(stderr, "Added fit parameter for beam energy\n");
+            }
         }
         if(sm) {
             if(strncmp(token, "rough", 5) == 0 && strlen(token) > 5) {
