@@ -271,8 +271,10 @@ script_command_status script_save_calibrations(script_session *s, int argc, char
     for(size_t i = 0; i < s->fit->sim->n_det; i++) {
         const detector *det = sim_det(s->fit->sim, i);
         char *calib_str = calibration_to_string(det->calibration);
-        jabs_message(MSG_INFO, f, "set detector %zu calibration %s\n", i+1, calib_str);
+        char *reso_str = detector_resolution_to_string(det, JIBAL_ANY_Z);
+        jabs_message(MSG_INFO, f, "set detector %zu calibration %s resolution %s\n", i+1, calib_str, reso_str);
         free(calib_str);
+        free(reso_str);
     }
     fclose_file_or_stream(f);
     return argc_orig - argc;
@@ -1149,6 +1151,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&head, c_show);
     script_command_list_add_command(&c_show->subcommands, script_command_new("detector", "Show detector.", 0, &script_show_detector));
     script_command_list_add_command(&c_show->subcommands, script_command_new("fit" ,"Show fit." , 0, &script_show_fit));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("reactions","Show reactions." , 0, &script_show_reactions));
     script_command_list_add_command(&c_show->subcommands, script_command_new("reactions","Show reactions." , 0, &script_show_reactions));
     script_command_list_add_command(&c_show->subcommands, script_command_new("sample", "Show sample.", 0, &script_show_sample));
     script_command_list_add_command(&c_show->subcommands, script_command_new("simulation", "Show simulation.", 0, &script_show_simulation));

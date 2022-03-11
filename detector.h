@@ -76,6 +76,7 @@ double detector_angle(const detector *det, char direction);
 double detector_theta_deriv(const detector *det, char direction);
 double detector_solid_angle_calc(const detector *det);
 double detector_resolution(const detector *det, const jibal_isotope *isotope, double E); /* Isotope is used for Z (Z specific resolution) and for mass (ToF detector) */
+char *detector_resolution_to_string(const detector *det, int Z);
 void detector_update(detector *det);
 const char *detector_param_unit(const detector *det); /* return a suitable unit based on detector type, e.g. "keV" when type == DETECTOR_ENERGY. TODO: use this wisely (we can simulate energy spectra with a ToF detector!) */
 double detector_param_unit_factor(const detector *det);

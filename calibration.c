@@ -167,7 +167,7 @@ const char *calibration_name(const calibration *c) {
     return calibration_option[c->type].s;
 }
 
-char *calibration_to_string(const calibration *c) {
+char *calibration_to_string(const calibration *c) { /* Note that this does not include "resolution" although resolution parameter is considered part of a calibration. The reason is that calibrations don't know the type of detector. */
     char *out = NULL;
     asprintf_append(&out, "%s", calibration_name(c));
     if(!c)
@@ -187,6 +187,5 @@ char *calibration_to_string(const calibration *c) {
         default:
             break;
     }
-    asprintf_append(&out, " resolution %g%s", calibration_get_param(c, CALIBRATION_PARAM_RESOLUTION)/C_KEV, "keV"); /* TODO: this is wrong for example ToF detectors */
     return out;
 }

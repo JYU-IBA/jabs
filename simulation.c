@@ -497,7 +497,6 @@ void simulation_print(FILE *f, const simulation *sim) {
             jabs_message(MSG_INFO, f, "  coordinates = (%.3lf, %.3lf, %.3lf) mm\n", v.x * r / C_MM, v.y * r / C_MM, v.z * r / C_MM);
         }
         jabs_message(MSG_INFO, f, "  particle solid angle product = %e sr\n", i, sim->fluence * det->solid);
-
     }
     jabs_message(MSG_INFO, f, "n_reactions = %zu\n", sim->n_reactions);
     jabs_message(MSG_INFO, f, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence*C_E*1.0e6);

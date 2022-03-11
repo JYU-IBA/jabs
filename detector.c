@@ -239,21 +239,23 @@ int detector_print(const jibal *jibal, const char *filename, const detector *det
     char *calib_str = calibration_to_string(det->calibration);
     jabs_message(MSG_INFO, f, "calibration = %s\n", calib_str);
     free(calib_str);
+    char *reso_str = detector_resolution_to_string(det, JIBAL_ANY_Z);
+    jabs_message(MSG_INFO, f, "resolution = %s\n", reso_str);
+
     for(int Z = 0; Z <= (int)det->cal_Z_max; Z++) {
         const calibration *c = detector_get_calibration(det, Z);
         if(det->calibration == c || !c) /* Z calibration is same as default (fallback) or NULL (shouldn't happen) */
             continue;
-        calib_str = calibration_to_string(c);
-        jabs_message(MSG_INFO, f, "calibration(%s) = %s\n", jibal_element_name(jibal->elements, Z), calib_str);
-        free(calib_str);
+        const char *elem_name = jibal_element_name(jibal->elements, Z);
+        char *Z_calib_str = calibration_to_string(c);
+        jabs_message(MSG_INFO, f, "calibration(%s) = %s\n", elem_name, Z_calib_str);
+        free(Z_calib_str);
+        char *Z_reso_str = detector_resolution_to_string(det, Z);
+        jabs_message(MSG_INFO, f, "resolution(%s) = %s\n", elem_name, Z_reso_str);
+        free(Z_reso_str);
     }
-    if(det->type == DETECTOR_ENERGY) {
-        jabs_message(MSG_INFO, f, "resolution = %g keV\n", det->calibration->resolution/C_KEV);
-    } else if(det->type == DETECTOR_TOF) {
+    if(det->type == DETECTOR_TOF) {
         jabs_message(MSG_INFO, f, "length = %g mm\n", det->length/C_MM);
-        jabs_message(MSG_INFO, f, "resolution = %g ps\n", det->calibration->resolution/C_PS);
-    } else if(det->type == DETECTOR_ELECTROSTATIC) {
-        jabs_message(MSG_INFO, f, "resolution = %g\n", det->calibration->resolution);
     }
     jabs_message(MSG_INFO, f, "theta = %g deg\n", det->theta/C_DEG);
     jabs_message(MSG_INFO, f, "phi = %g deg\n", det->phi/C_DEG);
@@ -421,6 +423,14 @@ double detector_resolution(const detector *det, const jibal_isotope *isotope, do
     return 0.0; /* Never reached */
 }
 
+char *detector_resolution_to_string(const detector *det, int Z) {
+    const calibration *c = detector_get_calibration(det, Z);
+    double resolution = calibration_get_param(c, CALIBRATION_PARAM_RESOLUTION);
+    char *out = NULL;
+    asprintf(&out, "%g %s", resolution/detector_param_unit_factor(det), detector_param_unit(det));
+    return out;
+}
+
 void detector_update(detector *det) {
     det->calibration->resolution_variance = pow2(det->calibration->resolution/C_FWHM);
 #ifdef DEBUG
@@ -439,7 +449,7 @@ void detector_update(detector *det) {
 
 }
 
-const char *detector_param_unit(const detector *det) { /* Match these with detector_param_unit_factor() */
+const char *detector_param_unit(const detector *det) { /* Units to match detector type (at the moment for resolution). Match these with detector_param_unit_factor() */
     switch(det->type) {
         case DETECTOR_TOF:
             return "ns";
