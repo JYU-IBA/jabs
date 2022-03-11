@@ -220,13 +220,16 @@ int asprintf_append(char **ret, const char * restrict format, ...) {
     size_t len_input = *ret ? strlen(*ret) : 0;
     len += len_input;
     *ret = realloc(*ret, sizeof(char) * (len + 1));
-    if(ret) {
+    if(*ret) {
         if(len_input == 0) {
             strncpy(*ret, s, len);
         } else {
             strncat(*ret, s, len);
         }
+        (*ret)[len] = '\0'; /* Guarantee termination :) */
+    } else {
+        len = -1; /* Failure code */
     }
-    free(s);
+    free(s); /* Allocated by vasprintf() */
     return len;
 }
