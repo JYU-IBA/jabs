@@ -85,7 +85,7 @@ void MainWindow::addMessage(jabs_msg_level level, const char *msg)
         break;
     }
     ui->msgTextEdit->insertPlainText(msg);
-    repaint();
+    //repaint();
 }
 
 MainWindow::~MainWindow()
