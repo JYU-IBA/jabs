@@ -13,6 +13,7 @@
  */
 
 #include <stdio.h>
+#include "win_compat.h"
 #include "script_generic.h"
 
 script_file *script_file_open(const char *filename);
