@@ -35,7 +35,7 @@ void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) 
         if(r->type == REACTION_FILE) {
             jabs_message(MSG_INFO, f, " Incident = %s, Theta = %g deg, E = [%g keV, %g keV]. Q = %g MeV. Data from file \"%s\".\n", r->incident->name, r->theta/C_DEG, r->cs_table[0].E/C_KEV, r->cs_table[r->n_cs_table-1].E/C_KEV, r->Q/C_MEV, r->filename);
         } else {
-            jabs_message(MSG_INFO, f, " %s cross sections (built-in).", jibal_cs_types[r->cs]);
+            jabs_message(MSG_INFO, f, " %s cross sections (built-in).", jibal_cross_section_name(r->cs));
             if(r->E_max < E_MAX || r->E_min > 0.0) {
                 jabs_message(MSG_INFO, f, " E = [%g keV, %g keV]", r->E_min/C_KEV, r->E_max/C_KEV);
             }

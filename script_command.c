@@ -1135,7 +1135,6 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_show->subcommands, script_command_new("detector", "Show detector.", 0, &script_show_detector));
     script_command_list_add_command(&c_show->subcommands, script_command_new("fit" ,"Show fit." , 0, &script_show_fit));
     script_command_list_add_command(&c_show->subcommands, script_command_new("reactions","Show reactions." , 0, &script_show_reactions));
-    script_command_list_add_command(&c_show->subcommands, script_command_new("reactions","Show reactions." , 0, &script_show_reactions));
     script_command_list_add_command(&c_show->subcommands, script_command_new("sample", "Show sample.", 0, &script_show_sample));
     script_command_list_add_command(&c_show->subcommands, script_command_new("simulation", "Show simulation.", 0, &script_show_simulation));
     script_command_list_add_command(&c_show->subcommands, script_command_new("stopping", "Show stopping (GSTO) assignments.", 0, &script_show_stopping));
