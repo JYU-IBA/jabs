@@ -11,7 +11,7 @@ char *dirname(char *path);
 #include <stdarg.h>
 #define vscprintf _vscprintf
 #include <BaseTsd.h>
-#typedef SSIZE_T ssize_t;
+typedef SSIZE_T ssize_t;
 int asprintf(char **strp, const char *format, ...);
 int vasprintf(char **strp, const char *format, va_list ap);
 #endif
