@@ -20,7 +20,13 @@ Simulates RBS, ERD and NRA spectra rapidly.
 Please see additional notes regarding copyrights of included open source code at the end of this document.
 
 ## Binary packages
-Some ready-to-use [binary packages](http://users.jyu.fi/~jaakjuli/jabs/binaries/) for Windows and macOS may be available.
+Some ready-to-use [binary packages](http://users.jyu.fi/~jaakjuli/jabs/binaries/) for Windows and macOS may be available. The Windows distribution includes two executables: jabs.exe (command line) and qjabs.exe (graphical interface).
+
+See instructions below on how to compile JaBS from sources. Supported platforms are Windows, macOS and Linux.
+
+## Getting started
+
+One [example](example/) showing basic use is provided, along with more complex [test-cases](example/tests/). Try running `help` and `help commands` in the interactive mode.
 
 ## Installation from sources
 
@@ -81,6 +87,8 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Dual scattering model (although it needs improvements before it is usable)
  - Simultaneous multi-detector simulation and fitting.
  - Stopping corrections can be supplied by user (Bragg correction) for a specific layer
+ - Different detector calibration can be given for different particles (different proton number Z)
+
 ### Not (yet) implemented, but planned
  - Support for more input and output data formats (CSV, IDF, ...)
  - More accurate handling of sharp peaks in cross sections (resonances). The current handling is quite accurate in most cases.
@@ -95,16 +103,16 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Fitting of spectra from different measurements (different beam, fluence etc for each simulation)
 
 ### Known issues
- - Detector saving to file and loading from a file is broken and may be unsupported in the future
+ - Help is not very helpful
+ - Saving a detector to a file is not supported. Calibrations can be saved as a script.
  - Occasional crashes when fitting, since some corner cases are not handled properly
  - Detector numbering and usability issues with multidetector mode 
  - Point-by-point profiles are not tested (but should work)
  - Transmission geometry is not supported
  - Ad-hoc channeling correction is the same for all detectors
- - Detector calibration is the same for all particles (issue with NRA and ERD, but not for RBS and EBS)
  - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).
  - Dual scattering is benchmarked against SimNRA and is known to produce different results.
- - Adding detector related fit variables will add those for all detectors 
+ - Adding detector related fit variables will add those for all detectors
  - Fitting of non-linear energy calibration is not possible, only slope and offset of the default (Z-independent) calibration can be fitted.
 
 ## Fitting
