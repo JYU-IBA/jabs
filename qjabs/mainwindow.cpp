@@ -64,7 +64,6 @@ MainWindow::MainWindow(QWidget *parent)
     updateWindowTitle();
     firstRun = true;
     statusBar()->showMessage(QString("JaBS ") + jabs_version() + ", cwd: " +  QDir::currentPath(), 2000);
-
 }
 
 void MainWindow::addMessage(jabs_msg_level level, const char *msg)
@@ -111,6 +110,7 @@ void MainWindow::openFile(const QString &filename)
 
 
 int MainWindow::runLine(const QString &line) {
+    jabs_message(MSG_INFO, stderr, "%s%s\n", PROMPT, qPrintable(line));
     int status = script_execute_command(session, qPrintable(line));
     return status;
 }
@@ -153,7 +153,6 @@ void MainWindow::on_action_Run_triggered()
                 continue;
         if(line.at(0) == '#')
             continue;
-        jabs_message(MSG_INFO, stderr, "%s%s\n", PROMPT, qPrintable(line));
         if(runLine(line) < 0) {
             return; /* or break? */
         }
@@ -354,4 +353,3 @@ void MainWindow::on_commandLineEdit_returnPressed()
     }
     plotSession();
 }
-

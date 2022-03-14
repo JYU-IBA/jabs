@@ -61,7 +61,6 @@ private slots:
     void on_actionAbout_triggered();
 
     void on_commandLineEdit_returnPressed();
-
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);
