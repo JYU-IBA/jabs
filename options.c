@@ -33,7 +33,7 @@ void usage() {
 }
 
 void greeting(int interactive) {
-    fprintf(stderr, "JaBS version %s. Copyright (C) 2021 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
+    fprintf(stderr, "JaBS version %s. Copyright (C) 2021 - 2022 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
     fprintf(stderr, "Compiled using JIBAL %s, current library version %s.\n", JIBAL_VERSION, jibal_version());
     fputs(COPYRIGHT_STRING, stderr);
     if(interactive) {

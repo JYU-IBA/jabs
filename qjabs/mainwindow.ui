@@ -23,11 +23,7 @@
       <widget class="QWidget" name="verticalLayoutWidget">
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
-         <widget class="CodeEditor" name="plainTextEdit">
-          <property name="centerOnScroll">
-           <bool>true</bool>
-          </property>
-         </widget>
+         <widget class="CodeEditor" name="plainTextEdit"/>
         </item>
         <item>
          <widget class="QGroupBox" name="plotSettingsGroupBox">
@@ -99,6 +95,15 @@
           <width>300</width>
           <height>100</height>
          </size>
+        </property>
+        <property name="inputMethodHints">
+         <set>Qt::ImhNone</set>
+        </property>
+        <property name="lineWrapMode">
+         <enum>QTextEdit::NoWrap</enum>
+        </property>
+        <property name="readOnly">
+         <bool>true</bool>
         </property>
        </widget>
        <widget class="QLineEdit" name="commandLineEdit"/>

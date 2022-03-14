@@ -17,8 +17,8 @@ MainWindow::MainWindow(QWidget *parent)
     aboutString = QString("JaBS version ") + jabs_version() + "\n\n"
                        + "Using JIBAL version "+ jibal_version() + ", compiled using version " + JIBAL_VERSION + "\n\n"
                        + "Using Qt version " + qVersion() + ", compiled using version " + QT_VERSION_STR + "\n\n"
-                       + "Copyright 2021 Jaakko Julin <jaakko.julin@jyu.fi>\n\n"
-                       + QString(COPYRIGHT_STRING).simplified()
+                       + "Copyright 2021 - 2022 Jaakko Julin <jaakko.julin@jyu.fi>\n"
+                       + QString(COPYRIGHT_STRING)
                        + "\n";
     ui->setupUi(this);
     ui->plotSettingsGroupBox->setVisible(false); /* Will be made visible if necessary */
@@ -353,3 +353,10 @@ void MainWindow::on_commandLineEdit_returnPressed()
     }
     plotSession();
 }
+
+void MainWindow::on_msgTextEdit_textChanged()
+{
+    ui->msgTextEdit->moveCursor(QTextCursor::End);
+    ui->msgTextEdit->ensureCursorVisible();
+}
+
