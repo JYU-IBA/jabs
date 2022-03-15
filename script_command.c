@@ -689,6 +689,10 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                 if(status < 0 && status != SCRIPT_COMMAND_NOT_FOUND) { /* Command not found is acceptable, we try to find subcommands later. All other errors cause an immediate return. */
                     return status;
                 }
+                if(status == SCRIPT_COMMAND_NOT_FOUND && argc == 0) { /* Command not found, no arguments remain, show an error. */
+                    script_command_not_found(NULL, c);
+                    return status;
+                }
             } else if(c->var) {
 #ifdef DEBUG
                 fprintf(stderr, "Debug: %s is a var.\n", c->name);
@@ -1051,7 +1055,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command *c;
     script_command *c_help = script_command_new("help", "Help.", 0, &script_help);
     script_command_list_add_command(&head, c_help);
-    script_command_list_add_command(&c_help->subcommands, script_command_new("commands", "Help on commands.", 0, &script_help_commands));
+    script_command_list_add_command(&c_help->subcommands, script_command_new("commands", "List of commands.", 0, &script_help_commands));
     script_command_list_add_command(&c_help->subcommands, script_command_new("version", "Help on (show) version.", 0, &script_help_version));
 
 
@@ -1549,7 +1553,7 @@ script_command_status script_show_reactions(script_session *s, int argc, char *c
 script_command_status script_set_ion(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
     if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: set ion [ion]\nExample: set ion 4He\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: set ion <isotope>\nExample: set ion 4He\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     const jibal_isotope *isotope = jibal_isotope_find(fit->jibal->isotopes, argv[0], 0, 0);
@@ -1565,7 +1569,7 @@ script_command_status script_set_aperture(script_session *s, int argc, char *con
     struct fit_data *fit = s->fit;
     const int argc_orig = argc;
     if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: set aperture (type) [width|height|diameter (value)] ...\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: set aperture <type> {width|height|diameter} ...\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     aperture *a = aperture_from_argv(s->jibal, &argc, &argv);
@@ -1599,6 +1603,10 @@ script_command_status script_set_detector(script_session *s, int argc, char *con
 
 script_command_status script_set_detector_aperture(struct script_session *s, int argc, char *const *argv) {
     const int argc_orig = argc;
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: set detector aperture <type> {width|height|diameter} ...\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
     detector *det = sim_det(s->fit->sim, s->i_det_active);
     if(!det) {
         jabs_message(MSG_ERROR, stderr, "No detector(s)\n");
@@ -1675,7 +1683,7 @@ script_command_status script_set_detector_calibration_poly(struct script_session
 script_command_status script_set_sample(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
     if(argc < 2) {
-        jabs_message(MSG_ERROR, stderr, "Usage: set sample [sample]\nExample: set sample TiO2 1000tfu Si 10000tfu\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: set sample <sample description>\nExample: set sample TiO2 1000tfu Si 10000tfu\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     const int argc_orig = argc;
@@ -1859,8 +1867,8 @@ script_command_status script_help(script_session *s, int argc, char *const *argv
             {NULL, NULL}
     };
     if(argc == 0) {
-        jabs_message(MSG_INFO, stderr,
-                     "Type help [topic] for information on a particular topic or \"help help\" for help on help.\n");
+        jabs_message(MSG_INFO, stderr,"Type help [topic] for information on a particular topic or \"help help\" for help on help.\n\n");
+
         return SCRIPT_COMMAND_NOT_FOUND;
     }
 
@@ -1878,7 +1886,7 @@ script_command_status script_help(script_session *s, int argc, char *const *argv
                         jabs_message(MSG_INFO, stderr, "\n");
                     }
                 }
-                jabs_message(MSG_INFO, stderr, "\n");
+                jabs_message(MSG_INFO, stderr, "\nTry also \"help commands\" for a list of possible commands. Try running a command without arguments to get a brief help on usage.");
             }
             jabs_message(MSG_INFO, stderr, "\n");
             break;
@@ -1902,6 +1910,7 @@ script_command_status script_help_version(script_session *s, int argc, char *con
 script_command_status script_help_commands(script_session *s, int argc, char *const *argv) {
     (void) argv;
     if(argc == 0) {
+        jabs_message(MSG_INFO, stderr, "The following commands are available:\n");
         script_print_command_tree(stderr, s->commands);
         return SCRIPT_COMMAND_SUCCESS;
     }
