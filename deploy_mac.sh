@@ -1,7 +1,8 @@
 #!/bin/bash
 build_dir="build-qjabs-Desktop_x86_darwin_generic_mach_o_64bit-Release"
 jibal_install_prefix="/usr/local"
-cd "$build_dir"
+rm -f example.zip
+cd "$build_dir" || exit 1
 make
 echo "datadir = .
 masses_file = masses.dat
@@ -22,3 +23,4 @@ macdeployqt QJaBS.app -dmg
 rm -rf QJaBS.app
 mv QJaBS.dmg ../
 cd ..
+find example|grep -v -e "/\." -e "_out\."|zip example -@
