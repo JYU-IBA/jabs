@@ -1,0 +1,2 @@
+set detector col 2
+load exp "multicol_data.dat"
