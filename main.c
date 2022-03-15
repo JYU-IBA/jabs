@@ -72,7 +72,7 @@ int main(int argc, char * const *argv) {
     fit_data_fit_range_add(fit_data, &range); /* We add just this one range (or none) */
     sim_sanity_check(sim);
     if(cmd_opt->exp_filename) {
-        session->fit->exp[0] = spectrum_read(cmd_opt->exp_filename, sim->det[0]);
+        session->fit->exp[0] = spectrum_read_detector(cmd_opt->exp_filename, sim->det[0]);
         if(!session->fit->exp[0]) {
             fprintf(stderr, "Error! Can not open file \"%s\".\n", cmd_opt->exp_filename);
             return EXIT_FAILURE;

@@ -18,7 +18,7 @@
 #include "detector.h"
 #include "simulation.h"
 
-gsl_histogram *spectrum_read(const char *filename, const detector *det);
+gsl_histogram *spectrum_read_detector(const char *filename, const detector *det);
 void spectrum_set_calibration(gsl_histogram *h, const detector *det, int Z);
 double spectrum_roi(gsl_histogram *h, size_t low, size_t high); /* low and high are both inclusive channel numbers*/
 size_t spectrum_channels_in_range(gsl_histogram *h, size_t low, size_t high);

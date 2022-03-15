@@ -264,7 +264,7 @@ void fit_data_exp_free(struct fit_data *fit_data) {
 }
 
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename) {
-    gsl_histogram *h = spectrum_read(filename, sim_det(fit->sim, i_det));
+    gsl_histogram *h = spectrum_read_detector(filename, sim_det(fit->sim, i_det));
     if(!h) {
         jabs_message(MSG_ERROR, stderr, "Reading spectrum from file \"%s\" was not successful.\n", filename);
         return EXIT_FAILURE;
@@ -365,8 +365,8 @@ void fit_data_print(FILE *f, const struct fit_data *fit_data) {
     jabs_message(MSG_INFO, f, "  i |    low |   high |    exp cts |    sim cts | sim/exp |\n");
     for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
         roi *range = &fit_data->fit_ranges[i];
-        double exp_cts = spectrum_roi(fit_data->exp[range->i_det], range->low, range->high);
-        double sim_cts = fit_data->ws?spectrum_roi(fit_data->ws[range->i_det]->histo_sum, range->low, range->high):0.0;
+        double exp_cts = spectrum_roi(fit_data_exp(fit_data, range->i_det), range->low, range->high);
+        double sim_cts = spectrum_roi(fit_data_sim(fit_data, range->i_det), range->low, range->high);
         if(exp_cts == 0.0) {
             jabs_message(MSG_INFO, f, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf |         |\n", i + 1, range->low, range->high, exp_cts, sim_cts);
         } else {

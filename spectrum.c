@@ -19,8 +19,7 @@
 #include "message.h"
 #include "win_compat.h"
 
-
-gsl_histogram *spectrum_read(const char *filename, const detector *det) {
+gsl_histogram *spectrum_read_detector(const char *filename, const detector *det) {
     if(!det)
         return NULL;
     char *line=NULL;

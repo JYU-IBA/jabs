@@ -346,30 +346,6 @@ script_command_status script_roi(script_session *s, int argc, char *const *argv)
         argv++;
     }
     return argc_orig - argc;
-#if 0
-    if(argc == 3) {
-        size_t i = strtoul(argv[0], NULL, 10);
-        if(i == 0) {
-            jabs_message(MSG_ERROR, stderr, "Detector number must be > 0\n");
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        if(i > s->fit->sim->n_det) {
-            jabs_message(MSG_WARNING, stderr, "Warning: Detector number %zu > %zu.\n", i, s->fit->sim->n_det);
-        }
-        r.i_det = i - 1;
-        argv++;
-        argc--;
-    }
-    if (argc == 2) {
-        r.i_det = 0;
-        r.low = strtoul(argv[0], NULL, 10);
-        r.high = strtoul(argv[1], NULL, 10);
-    } else {
-        jabs_message(MSG_ERROR, stderr, "Usage: roi [det] low high\n");
-    }
-    fit_data_roi_print(stderr, s->fit, &r);
-    return SCRIPT_COMMAND_SUCCESS;
-#endif
 }
 
 script_command_status script_exit(script_session *s, int argc, char *const *argv) {
@@ -1158,6 +1134,10 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c->subcommands, script_command_new("sample", "Save sample.", 0, &script_save_sample));
     script_command_list_add_command(&c->subcommands, script_command_new("spectra", "Save spectra.", 0, &script_save_spectra));
 
+    c = script_command_new("test", "Test something.", 0, NULL);
+    script_command_list_add_command(&head, c);
+    script_command_list_add_command(&c->subcommands, script_command_new("roi", "Test ROI.", 0, &script_test_roi));
+
     c = script_command_new("add", "Add something.", 0, NULL);
     script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("detector", "Add a detector.", 0, &script_add_detector));
@@ -1748,6 +1728,44 @@ script_command_status script_set_stopping(struct script_session *s, int argc, ch
                          first->Z, second->Z, file->name);
             return SCRIPT_COMMAND_FAILURE;
         }
+    }
+    return argc_orig - argc;
+}
+
+script_command_status script_test_roi(struct script_session *s, int argc, char * const *argv) {
+    const struct fit_data *fit = s->fit;
+    const int argc_orig = argc;
+    size_t i_det = 0;
+
+    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(argc < 3) {
+        jabs_message(MSG_ERROR, stderr, "Usage: test roi <range> <sum> <tolerance>\nTests if ROI sum is within relative tolerance.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    sim_workspace *ws = fit_data_ws(s->fit, i_det);
+    if(!ws || !ws->sim) {
+        jabs_message(MSG_ERROR, stderr, "No simulation.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    roi r = {.i_det = i_det};
+    if(fit_set_roi_from_string(&r, argv[0])) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    double sum = strtod(argv[1], NULL);
+    double tolerance = strtod(argv[2], NULL);
+    double sim_cts = spectrum_roi(fit_data_sim(s->fit, r.i_det), r.low, r.high);
+    double exp_cts = spectrum_roi(fit_data_exp(s->fit, r.i_det), r.low, r.high);
+    argc -= 3;
+    argv += 3;
+    double rel_err = fabs(1.0 - sim_cts/exp_cts);
+    jabs_message(MSG_INFO, stderr, "Test of ROI from %zu to %zu. Relative error %e.\n", r.low, r.high, rel_err);
+    if(rel_err < tolerance) {
+        jabs_message(MSG_INFO, stderr, "Test passed.\n");
+    } else {
+        jabs_message(MSG_ERROR, stderr, "Test failed.\n");
+        return SCRIPT_COMMAND_FAILURE;
     }
     return argc_orig - argc;
 }
