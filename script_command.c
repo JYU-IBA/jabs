@@ -1664,7 +1664,7 @@ script_command_status script_set_detector_calibration_poly(struct script_session
 script_command_status script_set_sample(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
     if(argc < 2) {
-        jabs_message(MSG_ERROR, stderr, "Usage: set sample <sample description>\nExample: set sample TiO2 1000tfu Si 10000tfu\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: set sample {nosimplify} <sample description>\nExample: set sample TiO2 1000tfu Si 10000tfu\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     const int argc_orig = argc;

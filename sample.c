@@ -511,6 +511,14 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
     sm->n_materials = 0;
     sm->materials = NULL;
     sm->ranges = NULL;
+    int simplify = TRUE;
+    if((*argc) >= 1) {
+        if(strcmp((*argv)[0], "nosimplify") == 0) {
+            simplify = FALSE;
+            (*argc)--;
+            (*argv)++;
+        }
+    }
     while ((*argc) >= 2) {
         if(sm->n_ranges == n) {
             if(n == 0) {
@@ -567,17 +575,20 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
     for(size_t i = 0; i < sm->n_ranges; i++) {
         *sample_model_conc_bin(sm, i, i) = 1.0;
     }
+    if(simplify) {
 #ifdef DEBUG
-    fprintf(stderr, "Sample model from argv before splitting elements:\n");
-    sample_model_print(NULL, sm);
+        fprintf(stderr, "Sample model from argv before splitting elements:\n");
+        sample_model_print(NULL, sm);
 #endif
-    sample_model *sm2 = sample_model_split_elements(sm);
+        sample_model *sm2 = sample_model_split_elements(sm);
+        sample_model_free(sm);
+        sm = sm2;
 #ifdef DEBUG
-    fprintf(stderr, "Sample model after splitting elements:\n");
-    sample_model_print(NULL, sm2);
+        fprintf(stderr, "Sample model after splitting elements:\n");
+        sample_model_print(NULL, sm2);
 #endif
-    sample_model_free(sm);
-    return sm2;
+    }
+    return sm;
 }
 
 sample_model *sample_model_from_string(const jibal *jibal, const char *str) {
