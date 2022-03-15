@@ -11,4 +11,5 @@ set det distance 95cm aperture rectangle width 14mm height 14mm solid 0.2msr
 set sample Au 590tfu SiO2 1000tfu Si 10000tfu
 #add reactions RBS
 simulate
-save spectra "erda_tof.csv"
+save spectra "erda_tof_out.csv"
+test file [200:2005] "erda_tof_ref.csv" 5e-7

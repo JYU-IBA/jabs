@@ -9,4 +9,4 @@ set det resolution 15keV slope 1keV theta 110deg phi 90deg
 set det aperture circle diameter 10.0mm
 set det distance 10cm solid 10msr
 simulate
-save spectra "cornell2.csv"
+save spectra "cornell2_out.csv"

@@ -31,7 +31,7 @@ simulate
 save spectra "simulated_out.csv"
 
 fit calib,fluence,thickness1,thickness2,rough1
-save spectra "out.csv"
+save spectra "example_out.csv"
 #detector calibration can be saved to a script file. This can be loaded back in.
 save calibration "calibration_out.jbs"
 #fitted sample can be saved (and loaded back in later!)

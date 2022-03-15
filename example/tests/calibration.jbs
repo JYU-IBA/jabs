@@ -10,4 +10,4 @@ set det calibration H linear offset 20keV slope 3keV resolution 10keV
 set sample Au 30tfu SiO2 6500tfu Si 20000tfu
 simulate
 show det
-save spectra "calibration.csv"
+save spectra "calibration_out.csv"

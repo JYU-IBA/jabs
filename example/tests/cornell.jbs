@@ -9,4 +9,4 @@ set det phi 90deg
 set det aperture circle diameter 20mm distance 100mm
 set sample Au 1000tfu Si 20000tfu
 simulate
-save spectra "cornell.csv"
+save spectra "cornell_out.csv"

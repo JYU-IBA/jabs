@@ -12,4 +12,4 @@ set det aperture rectangle width 14mm height 14mm
 set det distance 95cm solid 0.3msr
 set det theta 40deg
 simulate
-save spectra "erda.csv"
+save spectra "erda_out.csv"

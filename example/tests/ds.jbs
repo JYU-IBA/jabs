@@ -8,4 +8,4 @@ set sample Au 1000tfu Si 20000tfu
 add reactions RBS
 #set sample Au 1tfu
 simulate
-save spectra "ds.csv"
+save spectra "ds_out.csv"

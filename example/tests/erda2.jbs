@@ -13,4 +13,4 @@ set det phi 0deg
 set det aperture rectangle width 10mm height 10mm
 set det distance 0.5m solid 10msr
 simulate
-save spectra "erda2.csv"
+save spectra "erda2_out.csv"
