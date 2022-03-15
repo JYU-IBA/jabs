@@ -1184,6 +1184,12 @@ script_command *script_commands_create(struct script_session *s) {
     c = script_command_new("simulate", "Run a simulation.", 0, script_simulate);
     script_command_list_add_command(&head, c);
 
+    script_command *c_split = script_command_new("split", "Split something.", 0, NULL);
+    script_command_list_add_command(&head, c_split);
+    script_command *c_split_sample = script_command_new("sample", "Split something sample related.", 0, NULL);
+    script_command_list_add_command(&c_split->subcommands, c_split_sample);
+    script_command_list_add_command(&c_split_sample->subcommands, script_command_new("elements", "Split materials down to their constituent elements.", 0, script_split_sample_elements));
+
     return script_commands_sort_all(head);
 }
 
@@ -1816,6 +1822,12 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
         return SCRIPT_COMMAND_FAILURE;
     }
     return argc_orig - argc;
+}
+script_command_status script_split_sample_elements(struct  script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    sample_model *sm = fit->sm;
+    fit->sm = sample_model_split_elements(sm);
+    return 0;
 }
 
 script_command_status script_add_reaction(script_session *s, int argc, char *const *argv) {
