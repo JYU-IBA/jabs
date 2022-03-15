@@ -1136,6 +1136,7 @@ script_command *script_commands_create(struct script_session *s) {
 
     c = script_command_new("test", "Test something.", 0, NULL);
     script_command_list_add_command(&head, c);
+    script_command_list_add_command(&c->subcommands, script_command_new("file", "Test simulated spectrum against a reference.", 0, &script_test_file));
     script_command_list_add_command(&c->subcommands, script_command_new("roi", "Test ROI.", 0, &script_test_roi));
 
     c = script_command_new("add", "Add something.", 0, NULL);
@@ -1731,6 +1732,53 @@ script_command_status script_set_stopping(struct script_session *s, int argc, ch
     }
     return argc_orig - argc;
 }
+script_command_status script_test_file(struct script_session *s, int argc, char * const *argv) {
+    const struct fit_data *fit = s->fit;
+    const int argc_orig = argc;
+    size_t i_det = 0;
+    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(argc < 3) {
+        jabs_message(MSG_ERROR, stderr, "Usage: test file <range> <filename> <tolerance>\nTests if simulation is within tolerance to a reference file.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    const gsl_histogram *sim = fit_data_sim(fit, i_det);
+    if(!sim) {
+        jabs_message(MSG_ERROR, stderr, "No simulation.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    const detector *det = sim_det(fit->sim, i_det);
+    roi r = {.i_det = i_det};
+    if(fit_set_roi_from_string(&r, argv[0])) {
+        jabs_message(MSG_ERROR, stderr, "Could not parse range.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    gsl_histogram *h_ref = spectrum_read_detector(argv[1], det);
+    if(!h_ref) {
+        jabs_message(MSG_ERROR, stderr, "Could not read spectrum.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    double tolerance = strtod(argv[2], NULL);
+    double error;
+    argc -= 3;
+    argv += 3;
+    int return_value = argc_orig - argc;
+    if(spectrum_compare(sim, h_ref, r.low, r.high, &error)) { /* Failed, test fails */
+        jabs_message(MSG_ERROR, stderr, "Test failed. Is range valid?\n");
+        return_value = SCRIPT_COMMAND_FAILURE;
+    } else {
+        jabs_message(MSG_INFO, stderr, "Test of simulated spectrum to reference from %zu to %zu. Error %e.\n", r.low, r.high, error);
+        if(error > tolerance) {
+            jabs_message(MSG_ERROR, stderr, "Test failed.\n");
+            return_value = SCRIPT_COMMAND_FAILURE;
+        } else {
+            jabs_message(MSG_ERROR, stderr, "Test passed.\n");
+        }
+    }
+    gsl_histogram_free(h_ref);
+    return return_value;
+}
 
 script_command_status script_test_roi(struct script_session *s, int argc, char * const *argv) {
     const struct fit_data *fit = s->fit;
@@ -1741,7 +1789,7 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
         return SCRIPT_COMMAND_FAILURE;
     }
     if(argc < 3) {
-        jabs_message(MSG_ERROR, stderr, "Usage: test roi <range> <sum> <tolerance>\nTests if ROI sum is within relative tolerance.\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: test roi {<detector>} <range> <sum> <tolerance>\nTests if ROI sum is within relative tolerance.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     sim_workspace *ws = fit_data_ws(s->fit, i_det);
@@ -1751,15 +1799,15 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
     }
     roi r = {.i_det = i_det};
     if(fit_set_roi_from_string(&r, argv[0])) {
+        jabs_message(MSG_ERROR, stderr, "Could not parse range.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     double sum = strtod(argv[1], NULL);
     double tolerance = strtod(argv[2], NULL);
     double sim_cts = spectrum_roi(fit_data_sim(s->fit, r.i_det), r.low, r.high);
-    double exp_cts = spectrum_roi(fit_data_exp(s->fit, r.i_det), r.low, r.high);
     argc -= 3;
     argv += 3;
-    double rel_err = fabs(1.0 - sim_cts/exp_cts);
+    double rel_err = fabs(1.0 - sim_cts/sum);
     jabs_message(MSG_INFO, stderr, "Test of ROI from %zu to %zu. Relative error %e.\n", r.low, r.high, rel_err);
     if(rel_err < tolerance) {
         jabs_message(MSG_INFO, stderr, "Test passed.\n");
