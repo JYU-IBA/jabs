@@ -4,8 +4,9 @@ if(WIN32 AND DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
             CACHE STRING "")
     message(STATUS "CMake toolchain file ${CMAKE_TOOLCHAIN_FILE}")
 endif()
+include(../version.cmake)
 project(qjabs
-    VERSION 0.5.3
+    VERSION "${BUILD_VERSION}"
     DESCRIPTION "Jaakko's Backscattering Simulator (JaBS) for Qt"
     LANGUAGES C CXX)
 
@@ -19,6 +20,8 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_MACOSX_BUNDLE TRUE)
+
+include(../git_watcher_config.cmake)
 
 configure_file(version.h.in version.h @ONLY)
 
@@ -135,6 +138,7 @@ target_link_libraries(qjabs
     PRIVATE GSL::gsl
     PRIVATE "$<$<BOOL:${UNIX}>:m>"
     ${GETOPT_LIBRARY}
+    gitwatcher
     )
 
 set_target_properties(qjabs PROPERTIES

@@ -19,6 +19,7 @@
 #include "simulation.h"
 #include "fit.h"
 #include "options.h"
+#include "git.h"
 #include "jabs.h"
 #include "generic.h"
 #include "script_session.h"
@@ -1981,7 +1982,13 @@ script_command_status script_help_version(script_session *s, int argc, char *con
     (void) argc;
     (void) argv;
     (void) s;
-    jabs_message(MSG_ERROR, stderr, "%s\n", jabs_version());
+    jabs_message(MSG_INFO, stderr, "JaBS version %s.\n", jabs_version());
+    if(git_populated()) {
+        jabs_message(MSG_INFO, stderr, "This version of JaBS is compiled from a git repository (branch %s).\n", git_branch());
+        jabs_message(MSG_INFO, stderr, "Git commit %s dated %s.\n", git_commit_sha1(), git_commit_date());
+    } else {
+        jabs_message(MSG_INFO, stderr, "This version of JaBS is most likely NOT compiled from a git repository (and is therefore an unofficial build).\n");
+    }
     return SCRIPT_COMMAND_SUCCESS;
 }
 

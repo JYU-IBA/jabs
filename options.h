@@ -44,7 +44,8 @@ typedef struct {
 void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,  int *argc, char * const **argv);
 cmdline_options *cmdline_options_init();
 void cmdline_options_free(cmdline_options *cmd_opt);
-const char *jabs_version();
+const char *jabs_version(); /* Returns "git describe" given version, fallback to jabs_version_simple() */
+const char *jabs_version_simple(); /* Returns directly the CMake project version */
 void usage();
 void greeting(int interactive);
 

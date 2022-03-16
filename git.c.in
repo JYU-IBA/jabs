@@ -1,0 +1,34 @@
+#include "git.h"
+
+#ifndef TRUE
+#define TRUE 1
+#endif
+
+#ifndef FALSE
+#define FALSE 0
+#endif
+
+int git_populated() {
+    return @GIT_RETRIEVED_STATE@;
+}
+
+int git_dirty() {
+    return @GIT_IS_DIRTY@;
+}
+
+const char *git_commit_sha1() {
+    return "@GIT_HEAD_SHA1@";
+}
+
+const char *git_commit_date() {
+    return "@GIT_COMMIT_DATE_ISO8601@";
+}
+
+const char *git_describe() {
+    return "@GIT_DESCRIBE@";
+}
+
+const char *git_branch() {
+    return "@GIT_BRANCH@";
+}
+

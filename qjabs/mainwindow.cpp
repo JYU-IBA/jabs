@@ -17,9 +17,7 @@ MainWindow::MainWindow(QWidget *parent)
     aboutString = QString("JaBS version ") + jabs_version() + "\n\n"
                        + "Using JIBAL version "+ jibal_version() + ", compiled using version " + JIBAL_VERSION + "\n\n"
                        + "Using Qt version " + qVersion() + ", compiled using version " + QT_VERSION_STR + "\n\n"
-                       + "Copyright 2021 - 2022 Jaakko Julin <jaakko.julin@jyu.fi>\n"
-                       + QString(COPYRIGHT_STRING)
-                       + "\n";
+                       + "Copyright 2021 - 2022 Jaakko Julin <jaakko.julin@jyu.fi>\n";
     ui->setupUi(this);
     ui->plotSettingsGroupBox->setVisible(false); /* Will be made visible if necessary */
     QIcon icon(":/icons/icon.svg");
@@ -39,6 +37,7 @@ MainWindow::MainWindow(QWidget *parent)
     fixedFont.setPointSize(11);
     ui->msgTextEdit->setFont(fixedFont);
     ui->msgTextEdit->insertPlainText(aboutString);
+    ui->msgTextEdit->insertPlainText(QString(COPYRIGHT_STRING));
     QString config_filename_str;
 #if defined(Q_OS_OSX)
     config_filename_str = QApplication::applicationDirPath() + "/../Resources/jibal.conf";
@@ -243,7 +242,7 @@ void MainWindow::on_action_Quit_triggered()
 void MainWindow::updateWindowTitle()
 {
     bool newfile;
-    QString title = QString("JaBS ") + jabs_version() + " - ";
+    QString title = QString("JaBS ") + jabs_version_simple() + " - ";
     if(filename.isEmpty()) {
         title.append("New file");
         newfile = true;
@@ -343,7 +342,7 @@ void MainWindow::resetAll()
 
 void MainWindow::on_actionAbout_triggered()
 {
-    QMessageBox::about(this, tr("QJaBS"), aboutString);
+    QMessageBox::about(this, tr("QJaBS"), aboutString + "\n" + QString(COPYRIGHT_STRING).simplified());
 }
 
 void MainWindow::on_commandLineEdit_returnPressed()

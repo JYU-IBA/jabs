@@ -39,8 +39,15 @@ double stop_sample(const sim_workspace *ws, const ion *incident, const sample *s
             S1 += c * (jibal_gsto_get_em(ws->gsto, type, incident->Z, sample->isotopes[i_isotope]->Z, em));
         }
     }
-    //assert(S1 > 0.0);
-    return S1 * sample->ranges[depth.i].bragg;
+    switch(type) {
+        case GSTO_STO_ELE:
+        case GSTO_STO_TOT:
+            return S1 * sample->ranges[depth.i].bragg;
+        case GSTO_STO_STRAGG:
+            return S1 * sample->ranges[depth.i].stragg;
+        default:
+            return S1;
+    }
 }
 
 depth next_crossing(const ion *incident, const sample *sample, const depth *d_from) {
