@@ -1,3 +1,4 @@
+#define _GNU_SOURCE /* asprintf on Linux */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
