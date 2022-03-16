@@ -299,7 +299,7 @@ int sample_model_print(const char *filename, const sample_model *sm) {
         return EXIT_FAILURE;
     }
     size_t n_rl = sample_model_number_of_rough_ranges(sm);
-    size_t n_yield_bragg = sample_model_number_of_ranges_with_non_unity_yield_or_bragg(sm);
+    size_t n_layers_corrections = sample_model_number_of_ranges_with_non_unity_corrections(sm);
     switch(sm->type) {
         case SAMPLE_MODEL_NONE:
             jabs_message(MSG_INFO, f, "Sample model is none.\n"); /* Not an error as such. No output (to f) is created. */
@@ -316,23 +316,24 @@ int sample_model_print(const char *filename, const sample_model *sm) {
         jabs_message(MSG_INFO, f, "        rough");
         jabs_message(MSG_INFO, f, " n_rough");
     }
-    if(n_yield_bragg) {
+    if(n_layers_corrections) {
         jabs_message(MSG_INFO, f, "  yield");
         jabs_message(MSG_INFO, f, "  bragg");
+        jabs_message(MSG_INFO, f, "  stragg");
     }
     for (size_t i = 0; i < sm->n_materials; i++) {
         jabs_message(MSG_INFO, f, " %8s", sm->materials[i]->name);
     }
     jabs_message(MSG_INFO, f, "\n");
     for (size_t i = 0; i < sm->n_ranges; i++) {
-        jabs_message(MSG_INFO, f, "%12.3lf", sm->ranges[i].x/C_TFU);
+        const sample_range *r = &(sm->ranges[i]);
+        jabs_message(MSG_INFO, f, "%12.3lf", r->x/C_TFU);
         if(n_rl) {
-            jabs_message(MSG_INFO, f, " %12.3lf", sm->ranges[i].rough.x / C_TFU);
-            jabs_message(MSG_INFO, f, " %7zu", sm->ranges[i].rough.n);
+            jabs_message(MSG_INFO, f, " %12.3lf", r->rough.x / C_TFU);
+            jabs_message(MSG_INFO, f, " %7zu", r->rough.n);
         }
-        if(n_yield_bragg) {
-            jabs_message(MSG_INFO, f, " %5.4lf", sm->ranges[i].yield);
-            jabs_message(MSG_INFO, f, " %5.4lf", sm->ranges[i].bragg);
+        if(n_layers_corrections) {
+            jabs_message(MSG_INFO, f, " %5.4lf %5.4lf %6.4lf", r->yield, r->bragg, r->stragg);
         }
         for (size_t j = 0; j < sm->n_materials; j++) {
             jabs_message(MSG_INFO, f, " %8.4lf", *sample_model_conc_bin(sm, i, j) * 100.0);
@@ -354,12 +355,13 @@ size_t sample_model_number_of_rough_ranges(const sample_model *sm) {
     return n;
 }
 
-size_t sample_model_number_of_ranges_with_non_unity_yield_or_bragg(const sample_model *sm) { /* Used to determine if "yield" and "bragg" fields need to be output by sample_model_print() */
+size_t sample_model_number_of_ranges_with_non_unity_corrections(const sample_model *sm) { /* Used to determine if "yield", "bragg" or "stragg" fields need to be output by sample_model_print() */
     if(!sm)
         return 0;
     size_t n = 0;
     for(size_t i = 0; i < sm->n_ranges; i++) {
-        if(sm->ranges[i].yield != 1.0 || sm->ranges[i].bragg != 1.0 )
+        const sample_range *r = &(sm->ranges[i]);
+        if(r->yield != 1.0 || r->bragg != 1.0 || r->stragg != 1.0)
             n++;
     }
     return n;
@@ -384,7 +386,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
     size_t line_size = 0;
     size_t lineno = 0;
 
-    size_t i_depth = 0, i_rough = 0, i_nrough = 0, i_bragg = 0, i_yield = 0;
+    size_t i_depth = 0, i_rough = 0, i_nrough = 0, i_bragg = 0, i_yield = 0, i_stragg = 0;
 
     int headers = 1;
 
@@ -406,6 +408,8 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                     i_bragg = n;
                 } else if(strncmp(col, "yield", 5) == 0) {
                     i_yield = n;
+                } else if(strncmp(col, "stragg", 5) == 0) {
+                    i_stragg = n;
                 } else if(strncmp(col, "rough", 5) == 0) {
                     i_rough = n;
                 } else if(strncmp(col, "n_rough", 7) == 0) {
@@ -436,6 +440,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 r->x = 0.0;
                 r->yield = 1.0;
                 r->bragg = 1.0;
+                r->stragg = 1.0;
                 r->rough.x = 0.0;
                 r->rough.model = ROUGHNESS_NONE;
                 r->rough.n = 0;
@@ -456,6 +461,8 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 r->bragg = x;
             } else if (n == i_yield) {
                 r->yield = x;
+            } else if (n == i_stragg) {
+                r->stragg = x;
             } else if (n == i_rough) {
                 r->rough.x = x*C_TFU;
             } else if (n == i_nrough) {
@@ -547,7 +554,11 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
         } else if(sm->n_ranges && strcmp((*argv)[0], "bragg") == 0) {
                 sample_range *range = &sm->ranges[sm->n_ranges - 1];
                 range->bragg = strtod((*argv)[1], NULL);
-        } else {
+        } else if(sm->n_ranges && strcmp((*argv)[0], "stragg") == 0) {
+            sample_range *range = &sm->ranges[sm->n_ranges - 1];
+            range->stragg = strtod((*argv)[1], NULL);
+        }
+        else {
             sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, (*argv)[0]);
             if(!sm->materials[sm->n_ranges]) {
 #ifdef DEBUG
@@ -562,6 +573,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             range->x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1]);
             range->bragg = 1.0;
             range->yield = 1.0;
+            range->stragg = 1.0;
             range->rough.x = 0.0;
             range->rough.model = ROUGHNESS_NONE;
             range->rough.n = 0;
@@ -632,6 +644,9 @@ char *sample_model_to_string(const sample_model *sm) {
         }
         if(r->yield != 1.0) {
             asprintf_append(&out, " yield %g", r->yield);
+        }
+        if(r->stragg != 1.0) {
+            asprintf_append(&out, " stragg %g", r->stragg);
         }
     }
     return out;
