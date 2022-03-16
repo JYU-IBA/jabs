@@ -1,8 +1,9 @@
 #!/usr/bin/env gnuplot
+#This is a Gnuplot example of how to plot JaBS CSV output
 set title "JABS Example, 2 MeV 4He, thin Au on SiO2/Si"
 set datafile separator ','
 set key autotitle columnhead
-file='out.csv'
+file='example_out.csv'
 
 set xrange [200:2000]
 
