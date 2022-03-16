@@ -1,6 +1,8 @@
 #!/bin/bash
 build_dir="build-qjabs-Desktop_x86_darwin_generic_mach_o_64bit-Release"
 jibal_install_prefix="/usr/local"
+read version < version
+arch=$(uname -m)
 rm -f example.zip
 cd "$build_dir" || exit 1
 make
@@ -21,6 +23,6 @@ cp "$HOME/.jibal/srim2013.ele" "$HOME/.jibal/yang.stg" "$HOME/.jibal/chu.stg" "$
 mv qjabs.app QJaBS.app
 macdeployqt QJaBS.app -dmg
 rm -rf QJaBS.app
-mv QJaBS.dmg ../
+mv QJaBS.dmg "../QJaBS $version macOS $arch.dmg"
 cd ..
 find example|grep -v -e "/\." -e "_out\."|zip example -@
