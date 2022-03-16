@@ -105,11 +105,9 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Fitting of spectra from different measurements (different beam, fluence etc for each simulation)
 
 ### Known issues
- - Help is not very helpful
  - Saving a detector to a file is not supported. Calibrations can be saved as a script.
  - Occasional crashes when fitting, since some corner cases are not handled properly
  - Detector numbering and usability issues with multidetector mode 
- - Point-by-point profiles are not tested (but should work)
  - Transmission geometry is not supported
  - Ad-hoc channeling correction is the same for all detectors
  - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).

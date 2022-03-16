@@ -1,0 +1,7 @@
+set ion 4He
+set energy 1.6MeV
+set alpha 10deg
+set det theta 165deg
+set det calib linear slope 2keV offset 100keV resolution 10keV
+load sample "point_by_point_profile.txt"
+simulate
