@@ -1,7 +1,7 @@
 #!/bin/bash
 build_dir="build-qjabs-Desktop_x86_darwin_generic_mach_o_64bit-Release"
 jibal_install_prefix="/usr/local"
-read version < version
+read version < version.txt
 arch=$(uname -m)
 rm -f example.zip
 cd "$build_dir" || exit 1

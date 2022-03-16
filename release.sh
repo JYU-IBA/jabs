@@ -1,13 +1,13 @@
 #!/bin/bash
 do_release() {
     git status;
-    new_version=$(awk -F '.' '{printf("%i.%i.%i\n", $1, $2, $3+1)}' < version)
+    new_version=$(awk -F '.' '{printf("%i.%i.%i\n", $1, $2, $3+1)}' < version.txt)
     read -p "New version (^C to cancel, empty for $new_version: " version_given
     if [ ! -z "$version_given" ]; then
         new_version = "$version_given";
     fi
     echo "You have chosen: $new_version"
-    echo "$new_version" > version
+    echo "$new_version" > version.txt
     ./citation.sh
     git add version CITATION.cff
     git commit -m "Version bump to $new_version"

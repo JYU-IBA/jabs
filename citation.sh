@@ -1,7 +1,7 @@
 #!/bin/bash
 #This script will generate CITATION.cff
 today=$(date "+%Y-%m-%d")
-read version < version
+read version < version.txt
 echo "cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 authors:
