@@ -12,6 +12,7 @@ do_release() {
     git commit -m "Version bump to $new_version"
     git tag "v$new_version"
     echo "You can now push (I won't do it)"
+    ./citation.sh
 }
 
 if [ ! -z "$(git status -s)" ]; then
