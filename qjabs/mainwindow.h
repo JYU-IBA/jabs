@@ -68,6 +68,8 @@ private:
     void setFilename(const QString &filename);
     int runLine(const QString &line);
     void plotSession();
+    bool askToSave();
+    void closeEvent(QCloseEvent *event);
     Ui::MainWindow *ui;
     struct jibal *jibal;
     script_session *session;

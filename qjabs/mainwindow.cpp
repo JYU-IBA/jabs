@@ -127,6 +127,40 @@ void MainWindow::plotSession()
     }
 }
 
+bool MainWindow::askToSave()
+{
+    if(needsSaving) {
+        QMessageBox msgBox;
+        msgBox.setText("The file has been modified.");
+        if(filename.isEmpty()) {
+            msgBox.setInformativeText("You haven't saved your changes. Cancel and try again, or discard changes.");
+            msgBox.setStandardButtons(QMessageBox::Discard | QMessageBox::Cancel);
+            msgBox.setDefaultButton(QMessageBox::Cancel);
+        } else {
+            msgBox.setInformativeText("Do you want to save your changes?");
+            msgBox.setStandardButtons(QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+            msgBox.setDefaultButton(QMessageBox::Save);
+        }
+        int ret = msgBox.exec();
+        if(ret == QMessageBox::Cancel) {
+            return false;
+        }
+        if(ret == QMessageBox::Save) {
+            on_action_Save_File_triggered();
+        }
+    }
+    return true;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if(askToSave()) {
+        event->accept();
+    } else {
+        event->ignore();
+    }
+}
+
 void MainWindow::on_action_Run_triggered()
 {
     if(!session) {
