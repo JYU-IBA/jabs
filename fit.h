@@ -40,6 +40,8 @@ struct fit_stats {
     size_t n_iters;
     double cputime_actual;
     double chisq_dof;
+    size_t iter;
+    double rel; /* This is updated as we iterate */
 };
 
 typedef struct roi {
@@ -80,6 +82,7 @@ sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det);
 size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);
 int fit_data_workspaces_init(struct fit_data *fit_data); /* If any workspace initialization fails, this frees allocated memory (function below) and returns non-zero */
 void fit_data_workspaces_free(struct fit_data *fit_data); /* Also sets workspace pointers to NULL */
+const char *gsl_multifit_reason_to_stop(int info); /* GSL multifit driver stopping reason to string */
 int fit(struct fit_data *fit_data);
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 void fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspace *w);

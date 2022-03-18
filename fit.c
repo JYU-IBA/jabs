@@ -45,6 +45,16 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
         gsl_vector_set_all(f, 0.0);
         return GSL_FAILURE;
     }
+    if(fit_data->stats.iter > 0 && fit_data->stats.rel > FIT_FAST_SIMULATION_RELATIVE_THRESHOLD) {
+        sim_calc_params *p = &fit_data->ws[0]->params;
+        p->rk4 = FALSE;
+        p->nucl_stop_accurate = FALSE;
+        p->mean_conc_and_energy = TRUE;
+        p->stop_step_fudge_factor = 2.0;
+#ifdef DEBUG
+        fprintf(stderr, "Fast mode on!\n");
+#endif
+    }
     for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
         start = clock();
         simulate_with_ds(fit_data->ws[i_det]);
@@ -377,6 +387,81 @@ void fit_data_print(FILE *f, const struct fit_data *fit_data) {
     jabs_message(MSG_INFO, f, "\nFit has %zu channels total.\n", fit_data_ranges_calculate_number_of_channels(fit_data));
 }
 
+const char *gsl_multifit_reason_to_stop(int info) {
+    switch(info) {
+        case 1:
+            return "small step size (x)";
+        case 2:
+            return "small gradient (g)";
+        case 3:
+            return "small change in fit function (f)";
+        case GSL_ETOLX:
+            return "step size converged within machine precision (xtol is too small)";
+        case GSL_ETOLG:
+            return "gradient change is smaller than machine precision (gtol is too small)";
+        case GSL_ETOLF:
+            return "change in fit function smaller than machine precision (ftol is too small)";
+        default:
+            return "unknown";
+    }
+}
+
+int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, double epsrel, double *rel) { /* test_delta() copied from GSL convergence.c. rel is output, step size to given tolerance (we return ok when this goes below 1.0) */
+    size_t i;
+    int ok = 1;
+    const size_t n = x->size;
+    for(i = 0; i < n; i++) {
+        double xi = gsl_vector_get(x, i);
+        double dxi = gsl_vector_get(dx, i);
+        double tolerance = epsabs + epsrel * fabs(xi);
+        *rel = fabs(dxi)/tolerance;
+        if(fabs(dxi) < tolerance) {
+            ok = 1;
+        } else {
+            ok = 0;
+            break;
+        }
+    }
+    if(ok)
+        return GSL_SUCCESS;
+    return GSL_CONTINUE;
+}
+
+int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, void (*callback)(const size_t iter, void *params, const gsl_multifit_nlinear_workspace *w),
+                            void *callback_params, int *info, gsl_multifit_nlinear_workspace *w) {
+    int status;
+    size_t iter = 0;
+    struct fit_data *fit_data = (struct fit_data *) callback_params;
+    fit_data->stats.rel = FIT_FAST_SIMULATION_RELATIVE_THRESHOLD;
+    fit_data->stats.iter = 0;
+    if(callback)
+        callback(iter, callback_params, w);
+    do {
+        status = gsl_multifit_nlinear_iterate(w);
+        if(status == GSL_ENOPROG && iter == 0) {
+            *info = status;
+            return GSL_EMAXITER;
+        }
+        ++iter;
+        if(callback)
+            callback(iter, callback_params, w);
+
+        /* test for convergence */
+        fit_data->stats.iter = iter;
+        status = jabs_test_delta(w->dx, w->x, xtol*xtol, xtol, &fit_data->stats.rel);
+    } while(status == GSL_CONTINUE && iter < maxiter);
+
+    if(status == GSL_ETOLF || status == GSL_ETOLX || status == GSL_ETOLG) { /* TODO: remove */
+        *info = status;
+        status = GSL_SUCCESS;
+    }
+    if(iter >= maxiter && status != GSL_SUCCESS)
+        status = GSL_EMAXITER;
+
+    return status;
+}
+
+
 int fit(struct fit_data *fit_data) {
     const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
     gsl_multifit_nlinear_workspace *w;
@@ -482,7 +567,11 @@ int fit(struct fit_data *fit_data) {
     gsl_blas_ddot(f, f, &chisq0);
 
 /* solve the system with a maximum of n_iters_max iterations */
+#ifdef USE_GSL_MULTIFIT_DRIVER
     status = gsl_multifit_nlinear_driver(fit_data->n_iters_max, fit_data->xtol, fit_data->gtol, fit_data->ftol, fit_callback, fit_data, &info, w);
+#else
+    status = jabs_gsl_multifit_nlinear_driver(fit_data->n_iters_max, fit_data->xtol, fit_callback, fit_data, &info, w); /* Simplified */
+#endif
 
 /* compute covariance of best fit parameters */
     J = gsl_multifit_nlinear_jac(w);
@@ -496,7 +585,7 @@ int fit(struct fit_data *fit_data) {
     jabs_message(MSG_INFO, stderr,"function evaluations: %zu\n", fdf.nevalf);
     fit_data->stats.n_evals = fdf.nevalf;
     jabs_message(MSG_INFO, stderr, "Jacobian evaluations: %zu\n", fdf.nevaldf);
-    jabs_message(MSG_INFO, stderr, "reason for stopping: %s\n", (info == 1) ? "small step size" : "small gradient");
+    jabs_message(MSG_INFO, stderr, "reason for stopping: %s\n", gsl_multifit_reason_to_stop(info));
     jabs_message(MSG_INFO, stderr, "initial |f(x)| = %f\n", sqrt(chisq0));
     jabs_message(MSG_INFO, stderr, "final   |f(x)| = %f\n", sqrt(chisq));
     jabs_message(MSG_INFO, stderr, "status = %s\n", gsl_strerror (status));

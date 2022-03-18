@@ -14,6 +14,8 @@
 #include "message.h"
 #include "win_compat.h"
 
+extern inline double normal_pdf_std(double x);
+
 double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
     double em=E/incident->mass;
     double S1 = 0.0;
@@ -160,7 +162,8 @@ double cross_section_straggling(const sim_reaction *sim_r, int n_steps, double E
     for(int i = 0; i < n_steps; i++) {
         double x = w*(i-half_n);
         double E_stragg = E + x * std_dev;
-        double prob = normal_pdf(x, 0.0, 1.0) * w; /* TODO: if this is always a normal distribution and n_steps doesn't change, this function call could be replaced by a lookup table */
+        //double prob = normal_pdf(x, 0.0, 1.0) * w; /* TODO: if this is always a normal distribution and n_steps doesn't change, this function call could be replaced by a lookup table */
+        double prob = normal_pdf_std(x);
         prob_sum += prob;
         cs_sum += prob * sim_r->cross_section(sim_r, E_stragg);
     }
@@ -257,6 +260,18 @@ void foil_traverse(ion *p, const sample *foil, sim_workspace *ws) {
     p->S = ion_foil.S;
 }
 
+double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calculate stop step to take */
+    if(ws->params.stop_step_incident > 0) {
+        return ws->params.stop_step_incident;
+    }
+    //double E_step = ws->params.stop_step_incident == 0.0?ws->params.stop_step_fudge_factor*sqrt(detector_resolution(ws->det, ion1.isotope, ion1.E)+ion1.S):ws->params.stop_step_incident;
+    double broad = sqrt(ion->S);
+    if(broad < ws->params.stop_step_min) {
+        return ws->params.stop_step_min;
+    }
+    return ws->params.stop_step_fudge_factor * broad;
+}
+
 int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
     assert(sample->n_ranges);
     int warnings = 0;
@@ -342,7 +357,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         }
         const double E_front = ion1.E;
         const double S_front = ion1.S;
-        double E_step = ws->params.stop_step_incident == 0.0?ws->params.stop_step_fudge_factor*sqrt(detector_resolution(ws->det, ion1.isotope, ion1.E)+ion1.S):ws->params.stop_step_incident;
+        double E_step = stop_step_calculate(ws, &ion1);
         depth d_after = stop_step(ws, &ion1, sample, d_before, E_step);
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "After:  %g tfu in range %zu\n", d_after.x/C_TFU, d_after.i);

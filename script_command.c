@@ -203,6 +203,7 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
 
 script_command_status script_save_bricks(script_session *s, int argc, char *const *argv) {
     size_t i_det = 0;
+    const int argc_orig = argc;
     struct fit_data *fit = s->fit;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det) || argc != 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: save bricks [detector] file\n");
@@ -214,7 +215,9 @@ script_command_status script_save_bricks(script_session *s, int argc, char *cons
                      i_det + 1, argv[0], fit->sim->n_det);
         return SCRIPT_COMMAND_FAILURE;
     }
-    return SCRIPT_COMMAND_SUCCESS;
+    argc--;
+    argv++;
+    return argc_orig - argc;
 }
 
 script_command_status script_save_spectra(script_session *s, int argc, char *const *argv) {
@@ -1095,6 +1098,7 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT,   "stop_step_incident",   &sim->params.stop_step_incident,     NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "stop_step_exiting",    &sim->params.stop_step_exiting,      NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "stop_step_fudge",      &sim->params.stop_step_fudge_factor, NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_min",        &sim->params.stop_step_min,          NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "nucl_stop_accurate",   &sim->params.nucl_stop_accurate,     NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy", &sim->params.mean_conc_and_energy,   NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "geostragg",            &sim->params.geostragg,              NULL},
@@ -1824,11 +1828,14 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
     }
     return argc_orig - argc;
 }
+
 script_command_status script_split_sample_elements(struct  script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
     struct fit_data *fit = s->fit;
     sample_model *sm = fit->sm;
     fit->sm = sample_model_split_elements(sm);
-    return 0;
+    return SCRIPT_COMMAND_SUCCESS;
 }
 
 script_command_status script_add_reaction(script_session *s, int argc, char *const *argv) {

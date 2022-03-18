@@ -36,9 +36,11 @@
 #define ENERGY_SLOPE (1.0*C_KEV)
 #define STOP_STEP_INCIDENT (0.0*C_KEV) /* Zero is automatic */
 #define STOP_STEP_EXITING (0.0*C_KEV) /* Zero is automatic */
-
 #define STOP_STEP_FUDGE_FACTOR (1.0) /* Factor to automatic incident step size. */
+#define STOP_STEP_MIN (0.0 * C_KEV) /* Minimum stopping step. Zero is automatic. */
+#define STOP_STEP_MIN_FALLBACK (0.5 * C_KEV) /* Fallback for minimum stopping step in case we don't know what to guess. */
 #define SIMULATE_WARNING_LIMIT 10 /* Allowed number of non-critical warnings for each run of simulate() */
+#define FIT_FAST_SIMULATION_RELATIVE_THRESHOLD 10.0
 
 /* Other constants */
 #define DEPTH_TOLERANCE (1.0e-6 * C_TFU)

@@ -72,6 +72,7 @@ sim_calc_params sim_calc_params_defaults(int ds, int fast) {
     p.stop_step_incident = STOP_STEP_INCIDENT;
     p.stop_step_exiting = STOP_STEP_EXITING;
     p.stop_step_fudge_factor = STOP_STEP_FUDGE_FACTOR;
+    p.stop_step_min = STOP_STEP_MIN;
     p.cs_n_steps = CS_CONC_STEPS;
     p.cs_stragg_half_n = CS_STRAGG_HALF_N;
     p.depthsteps_max = 0; /* automatic */
@@ -269,6 +270,16 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->det = det;
     ws->sample = sim->sample;
     ws->params = sim->params;
+    if(ws->params.stop_step_min == 0.0) { /* Automatic, calculate here. */
+        if(det->type == DETECTOR_ENERGY) {
+            ws->params.stop_step_min = sqrt(det->calibration->resolution_variance)/2.0;
+        } else {
+            ws->params.stop_step_min = STOP_STEP_MIN_FALLBACK;
+        }
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Minimum stop step %g keV.\n", ws->params.stop_step_min/C_KEV);
+#endif
     ws->gsto = jibal->gsto;
     ws->isotopes = jibal->isotopes;
     ws->n_reactions = 0; /* Will be incremented later */
