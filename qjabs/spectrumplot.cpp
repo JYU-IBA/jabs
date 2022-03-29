@@ -56,6 +56,7 @@ void SpectrumPlot::drawDataToChart(const QString &name, double *data, int n, con
         }
         graph()->addData(i, data[i]);
     }
+    maxx += 1.0; /* We want to see the right-hand edge of the highest bin, too.*/
     if(maxy > data_ymax)
         data_ymax = maxy;
     if(maxx > xmax)
