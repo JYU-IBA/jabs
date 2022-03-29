@@ -1791,17 +1791,19 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
     const struct fit_data *fit = s->fit;
     const int argc_orig = argc;
     size_t i_det = 0;
+    int exp = FALSE;
 
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(argc < 3) {
-        jabs_message(MSG_ERROR, stderr, "Usage: test roi {<detector>} <range> <sum> <tolerance>\nTests if ROI sum is within relative tolerance.\n");
-        return SCRIPT_COMMAND_FAILURE;
+    if(argc && strncmp(argv[0], "exp", 3) == 0) { /* "exp" argument given, compare against experimental spectrum */
+        exp = TRUE;
+        argc--;
+        argv++;
     }
-    sim_workspace *ws = fit_data_ws(s->fit, i_det);
-    if(!ws || !ws->sim) {
-        jabs_message(MSG_ERROR, stderr, "No simulation.\n");
+
+    if(argc < 3) {
+        jabs_message(MSG_ERROR, stderr, "Usage: test roi {<detector>} {exp} <range> <sum> <tolerance>\nTests if simulated (or experimental) ROI sum is within relative tolerance.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     roi r = {.i_det = i_det};
@@ -1809,13 +1811,18 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
         jabs_message(MSG_ERROR, stderr, "Could not parse range.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    double sum = strtod(argv[1], NULL);
+    double sum_ref = strtod(argv[1], NULL);
     double tolerance = strtod(argv[2], NULL);
-    double sim_cts = spectrum_roi(fit_data_sim(s->fit, r.i_det), r.low, r.high);
+    gsl_histogram *h = exp ? fit_data_exp(fit, i_det):fit_data_sim(fit, i_det);
+    if(!h) {
+        jabs_message(MSG_ERROR, stderr, "No histogram.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    double sum = spectrum_roi(h, r.low, r.high);
     argc -= 3;
     argv += 3;
-    double rel_err = fabs(1.0 - sim_cts/sum);
-    jabs_message(MSG_INFO, stderr, "Test of ROI from %zu to %zu. Relative error %e.\n", r.low, r.high, rel_err);
+    double rel_err = fabs(1.0 - sum/sum_ref);
+    jabs_message(MSG_INFO, stderr, "Test of ROI from %zu to %zu. Sum %g. Relative error %e.\n", r.low, r.high, sum, rel_err);
     if(rel_err < tolerance) {
         jabs_message(MSG_INFO, stderr, "Test passed.\n");
     } else {

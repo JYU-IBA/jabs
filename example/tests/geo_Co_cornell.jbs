@@ -10,5 +10,5 @@ set det aperture circle diameter 8mm distance 100mm
 set sample Co 2000tfu
 add reactions RBS
 simulate
-save spectra "geo_Co_cornell.csv"
+save spectra "geo_Co_cornell_out.csv"
 show det

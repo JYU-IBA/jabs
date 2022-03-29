@@ -1,0 +1,4 @@
+#!/usr/bin/jabs
+#This is a test of reading an unconventional experimental histogram. The number of counts should sum exactly to 1776
+load exp "strange_data.dat"
+test roi exp [50:110] 1776 1e-8

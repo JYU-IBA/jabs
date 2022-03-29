@@ -12,4 +12,4 @@ set sample Co 1000tfu
 #add reactions RBS
 add reactions ERD
 simulate
-save spectra "geo_Co_erd.csv"
+save spectra "geo_Co_erd_out.csv"
