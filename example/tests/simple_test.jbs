@@ -10,5 +10,5 @@ set fluence 1e14
 set det solid 10msr
 set det reso 10keV
 simulate
-save spectra "out.csv"
+save spectra "simple_test_out.csv"
 test roi [1825:1865] 8219.03 5e-5

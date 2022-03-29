@@ -42,6 +42,7 @@ copy "..\..\example\example.jbs" Release\example
 copy "..\..\example\detector.jbs" Release\example
 mkdir Release\example\tests
 copy ..\..\example\tests\*.jbs Release\example\tests\
+copy ..\..\example\tests\*.dat Release\example\tests\
 copy ..\..\example\tests\*_ref.csv Release\example\tests\
 copy ..\..\example\tests\*.r33 Release\example\tests\
 copy ..\..\example\tests\*.txt Release\example\tests\

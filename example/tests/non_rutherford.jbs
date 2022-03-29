@@ -15,4 +15,4 @@ add reaction RBS 16O cs Andersen max "1.769 MeV"
 #The options are as: R33, keV, RTR, Tab, O-16, (alpha, alpha), scattering angle 160
 load reaction "sigmacalc_16O_alpha_alpha_16O_160deg.r33"
 simulate
-save spectra "non_rutherford.csv"
+save spectra "non_rutherford_out.csv"
