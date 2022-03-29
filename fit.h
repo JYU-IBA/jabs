@@ -25,10 +25,18 @@
 #include "detector.h"
 #include "sample.h"
 
+typedef struct fit_variable {
+    double *value; /* Pointer to a value. This is not allocated or free'd by fitting related methods. */
+    double value_orig;
+    double value_final;
+    double err; /* Error estimate will be stored here. */
+    double err_rel;
+    char *name;
+} fit_variable;
+
 typedef struct fit_params {
     size_t n; /* Number of function parameters */
-    double **func_params; /* Function parameters array. Size is n. The contents can be modified. */
-    double *func_params_err; /* Error estimates of parameters after fit. */
+    fit_variable *vars; /* Note that this is NOT an array of pointers. */
 } fit_params;
 
 #include "simulation.h"
@@ -87,7 +95,7 @@ int fit(struct fit_data *fit_data);
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 void fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspace *w);
 fit_params *fit_params_new();
-int fit_params_add_parameter(fit_params *p, double *value);
+int fit_params_add_parameter(fit_params *p, double *var, const char *name);
 void fit_params_free(fit_params *p);
 void fit_stats_print(FILE *f, const struct fit_stats *stats);
 int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range); /* Makes a deep copy */

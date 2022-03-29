@@ -612,46 +612,58 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
                 detector *det = sim->det[i_det];
                 assert(det);
                 if(strncmp(token, "calib", 5) == 0) {
-                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE));
-                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET));
-                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION));
+                    fit_params_add_parameter(params,
+                                             calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE),
+                                             "slope");
+                    fit_params_add_parameter(params,
+                                             calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET),
+                                             "offset");
+                    fit_params_add_parameter(params,
+                                             calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION),
+                                             "resolution");
                     jabs_message(MSG_INFO, stderr, "Added fit parameters (slope, offset, resolution) for detector %zu calibration\n", i_det + 1);
                 }
                 if(strcmp(token, "slope") == 0) {
-                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE));
+                    fit_params_add_parameter(params,
+                                             calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE),
+                                             "slope");
                     jabs_message(MSG_INFO,  stderr, "Added fit parameters for detector %zu calibration slope\n", i_det + 1);
                 }
                 if(strcmp(token, "offset") == 0) {
-                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET));
+                    fit_params_add_parameter(params,
+                                             calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET),
+                                             "offset");
                     jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu calibration offset\n", i_det + 1);
                 }
                 if(strncmp(token, "reso", 4) == 0) {
-                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION));
+                    fit_params_add_parameter(params,
+                                             calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION),
+                                             "resolution");
                     jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu resolution\n", i_det + 1);
                 }
                 if(strncmp(token, "solid", 5) == 0) {
-                    fit_params_add_parameter(params, &det->solid);
+                    fit_params_add_parameter(params, &det->solid, "solid");
                     jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu solid angle\n", i_det + 1);
                 }
             }
             if(strcmp(token, "fluence") == 0) {
-                fit_params_add_parameter(params, &sim->fluence);
+                fit_params_add_parameter(params, &sim->fluence, "fluence");
                 jabs_message(MSG_INFO, stderr, "Added fit parameter for fluence\n");
             }
             if(strcmp(token, "channeling_slope") == 0) {
-                fit_params_add_parameter(params, &sim->channeling_slope);
+                fit_params_add_parameter(params, &sim->channeling_slope, "channeling_slope");
                 jabs_message(MSG_INFO, stderr, "Added fit parameter for channeling (energy slope)\n");
             }
             if(strcmp(token, "channeling") == 0) {
-                fit_params_add_parameter(params, &sim->channeling_offset);
+                fit_params_add_parameter(params, &sim->channeling_offset, "channeling");
                 fprintf(stderr, "Added fit parameter for channeling (constant)\n");
             }
             if(strcmp(token, "alpha") == 0) {
-                fit_params_add_parameter(params, &sim->sample_theta);
+                fit_params_add_parameter(params, &sim->sample_theta, "alpha");
                 fprintf(stderr, "Added fit parameter for sample tilt angle (alpha)\n");
             }
             if(strcmp(token, "energy") == 0) {
-                fit_params_add_parameter(params, &sim->beam_E);
+                fit_params_add_parameter(params, &sim->beam_E, "energy");
                 fprintf(stderr, "Added fit parameter for beam energy\n");
             }
         }
@@ -659,7 +671,7 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
             if(strncmp(token, "rough", 5) == 0 && strlen(token) > 5) {
                 size_t i_layer = strtoul(token + 5, NULL, 10);
                 if(i_layer >= 1 && i_layer <= sm->n_ranges) {
-                    fit_params_add_parameter(params, &sm->ranges[i_layer - 1].rough.x);
+                    fit_params_add_parameter(params, &sm->ranges[i_layer - 1].rough.x, token);
                     jabs_message(MSG_INFO, stderr, "Added fit parameter for roughness of layer %zu\n",  i_layer);
                 } else {
                     jabs_message(MSG_ERROR, stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
@@ -669,7 +681,7 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
             if(strncmp(token, "thickness", 9) == 0 && strlen(token) > 9) {
                 size_t i_layer = strtoul(token + 9, NULL, 10);
                 if(i_layer >= 1 && i_layer <= sm->n_ranges) {
-                    fit_params_add_parameter(params, &sm->ranges[i_layer - 1].x);
+                    fit_params_add_parameter(params, &sm->ranges[i_layer - 1].x, token);
                     jabs_message(MSG_INFO,stderr, "Added fit parameter for thickness of layer %zu\n",  i_layer);
                 } else {
                     jabs_message(MSG_ERROR,stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
@@ -679,7 +691,7 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
             size_t i, j;
             if(sscanf(token, "conc%lu_%lu", &i, &j) == 2) {
                 if(i >= 1 && i <= sm->n_ranges && j >= 1 && j <= sm->n_materials) {
-                    fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, j - 1));
+                    fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, j - 1), token);
                     jabs_message(MSG_INFO, stderr, "Added fit parameter for concentration of %s in layer %zu\n", sm->materials[j - 1]->name, i);
                 } else {
                     jabs_message(MSG_ERROR, stderr, "No element %lu in layer %lu\n", j, i);
@@ -693,7 +705,7 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
                     int found = FALSE;
                     for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
                         if(strcmp(sm->materials[i_mat]->name, material_name) == 0) {
-                            fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, i_mat));
+                            fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, i_mat), token);
                             jabs_message(MSG_INFO,stderr, "Added fit parameter for concentration of %s (material number %zu) in layer %zu\n", sm->materials[i_mat]->name, i_mat + 1, i);
                             found = TRUE;
                             break;
