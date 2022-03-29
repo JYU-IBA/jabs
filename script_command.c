@@ -88,7 +88,7 @@ int script_prepare_sim_or_fit(script_session *s) {
 int script_finish_sim_or_fit(script_session *s) {
     s->end = clock();
     double cputime_total = (((double) (s->end - s->start)) / CLOCKS_PER_SEC);
-    jabs_message(MSG_INFO, stderr, "...finished! Total CPU time: %.3lf s.\n", cputime_total);
+    jabs_message(MSG_INFO, stderr, "\n...finished! Total CPU time: %.3lf s.\n", cputime_total);
 #ifdef CLEAR_GSTO_ASSIGNMENTS_WHEN_FINISHED
     jibal_gsto_assign_clear_all(s->fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
 #endif

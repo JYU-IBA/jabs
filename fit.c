@@ -1,6 +1,6 @@
 /*
  *  Jaakko's Backscattering Simulator (JaBS)
- *  Copyright (C) 2021 Jaakko Julin
+ *  Copyright (C) 2021 - 2022 Jaakko Julin
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,7 +31,9 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
 {
     clock_t start, end;
     struct fit_data *fit_data = (struct fit_data *) params;
-
+#ifdef DEBUG
+    fprintf(stderr, "Fit iteration %zu, fit function evaluation %zu\n", fit_data->stats.iter, fit_data->stats.n_evals_iter);
+#endif
     for(size_t i = 0; i < fit_data->fit_params->n; i++) {
         *(fit_data->fit_params->vars[i].value) = gsl_vector_get(x, i);
     }
@@ -45,22 +47,27 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
         gsl_vector_set_all(f, 0.0);
         return GSL_FAILURE;
     }
-    if(fit_data->stats.iter > 0 && fit_data->stats.rel > FIT_FAST_SIMULATION_RELATIVE_THRESHOLD) {
+    if(fit_data->stats.iter <= 1 || fit_data->stats.rel >= FIT_FAST_SIMULATION_RELATIVE_THRESHOLD) {
+        /* TODO: move this from fit_function to something that runs only once per iteration (so we can't change physics only between iterations, not between function evaluations )
+         * Also make sure that final iteration is performed with fast mode disabled! Currently this is not guaranteed
+         * */
         sim_calc_params *p = &fit_data->ws[0]->params;
-        p->rk4 = FALSE;
+        p->rk4 = FALSE; /* TODO: don't pick and choose, make a method that sets things to be "fast" */
         p->nucl_stop_accurate = FALSE;
         p->mean_conc_and_energy = TRUE;
         p->stop_step_fudge_factor = 2.0;
 #ifdef DEBUG
-        fprintf(stderr, "Fast mode on!\n");
+        fprintf(stderr, "Fast fit mode activated!\n");
 #endif
     }
+
+    start = clock();
     for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
-        start = clock();
         simulate_with_ds(fit_data->ws[i_det]);
-        end = clock();
-        fit_data->stats.cputime_actual += (((double) (end - start)) / CLOCKS_PER_SEC);
     }
+    end = clock();
+    fit_data->stats.cputime_iter += (((double) (end - start)) / CLOCKS_PER_SEC);
+    fit_data->stats.n_evals_iter++;
     size_t i_vec = 0;
     for(size_t i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) {
         if(i_vec >= f->size) {
@@ -107,6 +114,9 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
     gsl_blas_ddot(f, f, &chisq);
     jabs_message(MSG_INFO, stderr, ", chisq/dof = %10.7lf", chisq/fit_data->dof);
 #endif
+    fit_data->stats.n_evals += fit_data->stats.n_evals_iter;
+    fit_data->stats.cputime_cumul += fit_data->stats.cputime_iter;
+    jabs_message(MSG_INFO, stderr, ", eval %3zu, cpu time %7.3lf s, %6.1lf ms per eval", fit_data->stats.n_evals, fit_data->stats.cputime_cumul, 1000.0 * fit_data->stats.cputime_iter / fit_data->stats.n_evals_iter);
 #ifdef FIT_PRINT_PARAMS
     size_t i;
     for(i = 0; i < fit_data->fit_params->n; i++) {
@@ -155,10 +165,14 @@ void fit_params_free(fit_params *p) {
 }
 
 void fit_stats_print(FILE *f, const struct fit_stats *stats) {
-    jabs_message(MSG_INFO, f,"CPU time used for actual simulation: %.3lf s.\n", stats->cputime_actual);
+    jabs_message(MSG_INFO, f,"CPU time used for actual simulation: %.3lf s.\n", stats->cputime_cumul);
     if(stats->n_evals > 0) {
-        jabs_message(MSG_INFO, f, "One simulation: %.3lf ms.\n", 1000.0 * stats->cputime_actual / stats->n_evals);
+        jabs_message(MSG_INFO, f, "One simulation on average: %.3lf ms.\n", 1000.0 * stats->cputime_cumul / stats->n_evals);
     }
+    if(stats->n_evals_iter > 0) {
+        jabs_message(MSG_INFO, f, "One simulation of last iteration: %.3lf ms.\n", stats->cputime_iter, stats->n_evals_iter, 1000.0 * stats->cputime_iter / stats->n_evals_iter);
+    }
+
     if(stats->chisq_dof > 0.0) {
         jabs_message(MSG_INFO, f, "Final chisq/dof = %.7lf\n", stats->chisq_dof);
     }
@@ -405,6 +419,8 @@ const char *gsl_multifit_reason_to_stop(int info) {
             return "gradient change is smaller than machine precision (gtol is too small)";
         case GSL_ETOLF:
             return "change in fit function smaller than machine precision (ftol is too small)";
+        case GSL_ENOPROG:
+            return "fit is not making progress";
         default:
             break;
     }
@@ -438,39 +454,36 @@ int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, do
 
 int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, void (*callback)(const size_t iter, void *params, const gsl_multifit_nlinear_workspace *w),
                             void *callback_params, int *info, gsl_multifit_nlinear_workspace *w) {
-    int status;
-    size_t iter = 0;
+    int status = 0;
+    size_t iter;
     struct fit_data *fit_data = (struct fit_data *) callback_params;
     fit_data->stats.rel = FIT_FAST_SIMULATION_RELATIVE_THRESHOLD;
-    fit_data->stats.iter = 0;
-    if(callback)
-        callback(iter, callback_params, w);
-    do {
-        status = gsl_multifit_nlinear_iterate(w);
-        if(status == GSL_ENOPROG && iter == 0) {
-            *info = status;
-            return GSL_EMAXITER;
+    for(iter = 0; iter <= maxiter; iter++) {
+        if(iter) {
+            fit_data->stats.iter = iter;
+            fit_data->stats.cputime_iter = 0.0;
+            fit_data->stats.n_evals_iter = 0;
+            status = gsl_multifit_nlinear_iterate(w);
+#ifdef DEBUG
+            fprintf(stderr, "Iteration status %i (%s)\n", status, gsl_strerror(status));
+#endif
         }
-        ++iter;
+        if(status == GSL_ENOPROG && iter == 1) {
+            *info = status;
+            return status;
+        }
         if(callback)
             callback(iter, callback_params, w);
-
+       if(iter == 0)
+            continue;
         /* test for convergence */
-        fit_data->stats.iter = iter;
         status = jabs_test_delta(w->dx, w->x, xtol*xtol, xtol, &fit_data->stats.rel);
-        if(status == GSL_SUCCESS) {
-            *info = 1;
+        if(status != GSL_CONTINUE) {
+            *info = status;
+            return status;
         }
-    } while(status == GSL_CONTINUE && iter < maxiter);
-
-    if(status == GSL_ETOLF || status == GSL_ETOLX || status == GSL_ETOLG) { /* TODO: remove */
-        *info = status;
-        status = GSL_SUCCESS;
     }
-    if(iter >= maxiter && status != GSL_SUCCESS)
-        status = GSL_EMAXITER;
-
-    return status;
+    return GSL_EMAXITER;
 }
 
 
@@ -491,7 +504,9 @@ int fit(struct fit_data *fit_data) {
     }
     gsl_multifit_nlinear_fdf fdf;
     fdf.params = fit_data;
-    fit_data->stats.cputime_actual = 0.0;
+    fit_data->stats.cputime_cumul = 0.0;
+    fit_data->stats.cputime_iter = 0.0;
+    fit_data->stats.iter = 0;
     fit_data->stats.n_evals = 0;
     fit_data->stats.n_iters = 0;
     fit_data->stats.chisq_dof = 0.0;
@@ -574,6 +589,7 @@ int fit(struct fit_data *fit_data) {
     w = gsl_multifit_nlinear_alloc (T, &fdf_params, fdf.n, fdf.p);
 
 /* initialize solver with starting point and weights */
+    jabs_message(MSG_INFO, stderr, "Initializing fit\n");
     gsl_multifit_nlinear_winit (x, &wts.vector, &fdf, w);
 
 /* compute initial cost function */
@@ -595,14 +611,15 @@ int fit(struct fit_data *fit_data) {
     gsl_blas_ddot(f, f, &chisq);
     jabs_message(MSG_INFO, stderr,  "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
     jabs_message(MSG_INFO, stderr,  "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
-    fit_data->stats.n_iters = gsl_multifit_nlinear_niter(w);
-    jabs_message(MSG_INFO, stderr,"function evaluations: %zu\n", fdf.nevalf);
-    fit_data->stats.n_evals = fdf.nevalf;
+    jabs_message(MSG_INFO, stderr,"function evaluations: %zu\n", fit_data->stats.n_evals);
+#ifdef DEBUG
+    jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf.nevalf);
+#endif
     jabs_message(MSG_INFO, stderr, "Jacobian evaluations: %zu\n", fdf.nevaldf);
     jabs_message(MSG_INFO, stderr, "reason for stopping: %s\n", gsl_multifit_reason_to_stop(info));
     jabs_message(MSG_INFO, stderr, "initial |f(x)| = %f\n", sqrt(chisq0));
     jabs_message(MSG_INFO, stderr, "final   |f(x)| = %f\n", sqrt(chisq));
-    jabs_message(MSG_INFO, stderr, "status = %s\n", gsl_strerror (status));
+    jabs_message(MSG_INFO, stderr, "status = %s\n", gsl_strerror(status));
     jabs_message(MSG_INFO, stderr, "\nFinal fitted parameters:\n");
 
     double c = GSL_MAX_DBL(1, sqrt(chisq / fit_data->dof));

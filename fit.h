@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 Jaakko Julin
+    Copyright (C) 2021 - 2022 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -46,7 +46,9 @@ typedef struct fit_params {
 struct fit_stats {
     size_t n_evals;
     size_t n_iters;
-    double cputime_actual;
+    size_t n_evals_iter; /* Number of function evaluations per iteration */
+    double cputime_cumul;
+    double cputime_iter;
     double chisq_dof;
     size_t iter;
     double rel; /* This is updated as we iterate */
