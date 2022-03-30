@@ -51,14 +51,11 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
         /* TODO: move this from fit_function to something that runs only once per iteration (so we can't change physics only between iterations, not between function evaluations )
          * Also make sure that final iteration is performed with fast mode disabled! Currently this is not guaranteed
          * */
-        sim_calc_params *p = &fit_data->ws[0]->params;
-        p->rk4 = FALSE; /* TODO: don't pick and choose, make a method that sets things to be "fast" */
-        p->nucl_stop_accurate = FALSE;
-        p->mean_conc_and_energy = TRUE;
-        p->stop_step_fudge_factor = 2.0;
-#ifdef DEBUG
-        fprintf(stderr, "Fast fit mode activated!\n");
-#endif
+        for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
+            sim_workspace *ws = fit_data_ws(fit_data, i_det);
+            sim_calc_params *p = &ws->params;
+            sim_calc_params_fast(p, TRUE);
+        }
     }
 
     start = clock();
@@ -114,6 +111,7 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
     gsl_blas_ddot(f, f, &chisq);
     jabs_message(MSG_INFO, stderr, ", chisq/dof = %10.7lf", chisq/fit_data->dof);
 #endif
+    jabs_message(MSG_INFO, stderr, ", rel %e", fit_data->stats.rel);
     fit_data->stats.n_evals += fit_data->stats.n_evals_iter;
     fit_data->stats.cputime_cumul += fit_data->stats.cputime_iter;
     jabs_message(MSG_INFO, stderr, ", eval %3zu, cpu time %7.3lf s, %6.1lf ms per eval", fit_data->stats.n_evals, fit_data->stats.cputime_cumul, 1000.0 * fit_data->stats.cputime_iter / fit_data->stats.n_evals_iter);
@@ -166,13 +164,6 @@ void fit_params_free(fit_params *p) {
 
 void fit_stats_print(FILE *f, const struct fit_stats *stats) {
     jabs_message(MSG_INFO, f,"CPU time used for actual simulation: %.3lf s.\n", stats->cputime_cumul);
-    if(stats->n_evals > 0) {
-        jabs_message(MSG_INFO, f, "One simulation on average: %.3lf ms.\n", 1000.0 * stats->cputime_cumul / stats->n_evals);
-    }
-    if(stats->n_evals_iter > 0) {
-        jabs_message(MSG_INFO, f, "One simulation of last iteration: %.3lf ms.\n", stats->cputime_iter, stats->n_evals_iter, 1000.0 * stats->cputime_iter / stats->n_evals_iter);
-    }
-
     if(stats->chisq_dof > 0.0) {
         jabs_message(MSG_INFO, f, "Final chisq/dof = %.7lf\n", stats->chisq_dof);
     }
@@ -431,20 +422,22 @@ const char *gsl_multifit_reason_to_stop(int info) {
     }
 }
 
-int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, double epsrel, double *rel) { /* test_delta() copied from GSL convergence.c. rel is output, step size to given tolerance (we return ok when this goes below 1.0) */
-    size_t i;
-    int ok = 1;
-    const size_t n = x->size;
-    for(i = 0; i < n; i++) {
+int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, double epsrel, double *rel_out) { /* test_delta() copied from GSL convergence.c. rel is output, step size to given tolerance (we return ok when this goes below 1.0) */
+    int ok = TRUE;
+    *rel_out = 0.0;
+    for(size_t i = 0; i < x->size; i++) {
         double xi = gsl_vector_get(x, i);
         double dxi = gsl_vector_get(dx, i);
         double tolerance = epsabs + epsrel * fabs(xi);
-        *rel = fabs(dxi)/tolerance;
-        if(fabs(dxi) < tolerance) {
-            ok = 1;
-        } else {
-            ok = 0;
-            break;
+        double rel = fabs(dxi)/tolerance; /* "How many times over the acceptable tolerance are we */
+        if(rel > *rel_out) {
+            *rel_out = rel; /* Store largest value */
+        }
+#ifdef DEBUG
+        fprintf(stderr, "Test delta: i %zu, xi %g, dxi %g, tolerance %g, rel %g\n", i, xi, dxi, tolerance, *rel);
+#endif
+        if(rel >= 1.0) {
+            ok = FALSE;
         }
     }
     if(ok)
@@ -533,7 +526,7 @@ int fit(struct fit_data *fit_data) {
         jabs_message(MSG_ERROR, stderr,"Not enough data (%zu points) for given number of free parameters (%zu)\n", fdf.n, fdf.p);
         return -1;
     } else {
-        jabs_message(MSG_INFO,  stderr, "%zu channels and %zu parameters in fit.\n", fdf.n, fdf.p);
+        jabs_message(MSG_INFO,  stderr, "%zu channels and %zu parameters in fit, %zu degrees of freedom.\n", fdf.n, fdf.p, fdf.n - fdf.p);
     }
     gsl_vector *f;
     gsl_matrix *J;

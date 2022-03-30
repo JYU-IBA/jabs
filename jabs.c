@@ -858,10 +858,7 @@ int simulate_with_ds(sim_workspace *ws) {
     ion ion1 = ws->ion;
     ion ion2 = ion1;
     depth d_before = depth_seek(ws->sample, 0.0);
-    ws->params.rk4 = FALSE; /* This change is not reversed, nor reflected back to sim->params */
-    ws->params.nucl_stop_accurate = FALSE;
-    ws->params.mean_conc_and_energy = TRUE;
-    ws->params.geostragg = FALSE;
+    sim_calc_params_fast(&ws->params, TRUE);
     jabs_message(MSG_ERROR, stderr, "\n");
     const jibal_isotope *incident = ws->sim->beam_isotope;
     while(1) {

@@ -36,7 +36,7 @@ simulation *sim_init(jibal *jibal) {
     sim->n_reactions = 0;
     sim->n_det = 0;
     sim->det = NULL;
-    sim->params = sim_calc_params_defaults(FALSE, FALSE);
+    sim->params = sim_calc_params_defaults();
     sim->rbs = TRUE;
     sim->erd = TRUE;
     sim->cs_rbs =  jibal->config->cs_rbs;
@@ -63,34 +63,57 @@ void sim_free(simulation *sim) {
     free(sim);
 }
 
-sim_calc_params sim_calc_params_defaults(int ds, int fast) {
+sim_calc_params sim_calc_params_defaults() {
     sim_calc_params p;
-    p.ds = ds;
-    p.ds_steps_azi = DUAL_SCATTER_AZI_STEPS;
-    p.ds_steps_polar = DUAL_SCATTER_POLAR_STEPS;
-    p.n_ds = p.ds_steps_azi *  p.ds_steps_polar;
     p.stop_step_incident = STOP_STEP_INCIDENT;
     p.stop_step_exiting = STOP_STEP_EXITING;
     p.stop_step_fudge_factor = STOP_STEP_FUDGE_FACTOR;
     p.stop_step_min = STOP_STEP_MIN;
-    p.cs_n_steps = CS_CONC_STEPS;
-    p.cs_stragg_half_n = CS_STRAGG_HALF_N;
     p.depthsteps_max = 0; /* automatic */
-    if (fast) {
-        p.rk4 = FALSE;
-        p.nucl_stop_accurate = FALSE;
-        p.mean_conc_and_energy = TRUE;
-    } else {
-        p.rk4 = TRUE;
-        p.nucl_stop_accurate = TRUE;
-        p.mean_conc_and_energy = FALSE;
-    }
     p.geostragg = FALSE;
-    p.cs_frac = 1.0/(1.0*(p.cs_n_steps+1));
-    assert(p.cs_stragg_half_n >= 0);
-    p.cs_n_stragg_steps = p.cs_stragg_half_n * 2 + 1;
     p.beta_manual  = FALSE;
+    p.ds = FALSE;
+    p.ds_steps_azi = 0;
+    p.ds_steps_polar = 0;
+    p.rk4 = TRUE;
+    p.nucl_stop_accurate = TRUE;
+    p.mean_conc_and_energy = FALSE;
+    p.cs_stragg_half_n = CS_STRAGG_HALF_N;
+    p.cs_n_steps = CS_CONC_STEPS;
+    sim_calc_params_update(&p);
     return p;
+}
+
+void sim_calc_params_update(sim_calc_params *p) {
+    assert(p->cs_n_steps >= 1);
+    p->cs_frac = 1.0/(1.0*(p->cs_n_steps+1));
+    assert(p.cs_stragg_half_n >= 0);
+    p->cs_n_stragg_steps = p->cs_stragg_half_n * 2 + 1;
+    if(p->ds && p->ds_steps_azi == 0 && p->ds_steps_polar == 0) { /* DS defaults are applied if nothing else is specified */
+        p->ds_steps_azi = DUAL_SCATTER_AZI_STEPS;
+        p->ds_steps_polar = DUAL_SCATTER_POLAR_STEPS;
+    }
+    p->n_ds = p->ds_steps_azi *  p->ds_steps_polar;
+}
+
+void sim_calc_params_ds(sim_calc_params *p, int ds) {
+    if(ds) {
+        p->ds = TRUE;
+    }
+    sim_calc_params_update(p);
+}
+
+void sim_calc_params_fast(sim_calc_params *p, int fast) {
+    if (fast) {
+        p->rk4 = FALSE;
+        p->nucl_stop_accurate = FALSE;
+        p->mean_conc_and_energy = TRUE;
+        p->cs_stragg_half_n = 0; /* Not used if mean_conc_and_energy == TRUE */
+        p->cs_n_steps = 0; /* Not used if mean_conc_and_energy == TRUE */
+        p->stop_step_fudge_factor *= 1.4;
+        p->geostragg = FALSE;
+    }
+    sim_calc_params_update(p);
 }
 
 jibal_cross_section_type sim_cs(const simulation *sim, const reaction_type type) {

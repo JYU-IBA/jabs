@@ -80,6 +80,7 @@ int script_prepare_sim_or_fit(script_session *s) {
     jibal_gsto_print_files(fit->jibal->gsto, TRUE); /* TODO: this don't use jabs_message() */
     jabs_message(MSG_VERBOSE, stderr, "Loading stopping data.\n");
     jibal_gsto_load_all(fit->jibal->gsto);
+    sim_calc_params_update(&fit->sim->params);
     simulation_print(stderr, fit->sim);
     s->start = clock();
     return 0;
@@ -137,9 +138,11 @@ void script_command_not_found(const char *cmd, const script_command *c_parent) {
 }
 
 script_command_status script_simulate(script_session *s, int argc, char *const *argv) {
+    const int argc_orig = argc;
     struct fit_data *fit = s->fit;
-    (void) argc; /* Unused */
-    (void) argv; /* Unused */
+    if(argc > 1) {
+        /* TODO? */
+    }
     if(script_prepare_sim_or_fit(s)) {
         return SCRIPT_COMMAND_FAILURE;
     }
@@ -154,7 +157,7 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
         }
     }
     script_finish_sim_or_fit(s);
-    return SCRIPT_COMMAND_SUCCESS;
+    return argc_orig - argc;
 }
 
 script_command_status script_fit(script_session *s, int argc, char *const *argv) {

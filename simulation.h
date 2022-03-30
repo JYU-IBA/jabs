@@ -110,7 +110,10 @@ typedef struct {
 #include "sample.h"
 simulation *sim_init(jibal *jibal);
 void sim_free(simulation *sim);
-sim_calc_params sim_calc_params_defaults(int ds, int fast);
+sim_calc_params sim_calc_params_defaults();
+void sim_calc_params_update(sim_calc_params *p); /* Computes variables that can be computed from other variables */
+void sim_calc_params_ds(sim_calc_params *p, int ds);
+void sim_calc_params_fast(sim_calc_params *p, int fast);
 jibal_cross_section_type sim_cs(const simulation *sim, reaction_type type);
 int sim_reactions_add_reaction(simulation *sim, reaction *r);
 int sim_reactions_remove_reaction(simulation *sim, size_t i);
