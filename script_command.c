@@ -40,6 +40,7 @@ int script_prepare_sim_or_fit(script_session *s) {
         jabs_message(MSG_ERROR, stderr, "No detector has been defined!\n");
         return -1;
     }
+    sim_sanity_check(fit->sim);
     fit_data_workspaces_free(s->fit);
     sample_free(fit->sim->sample);
 #ifdef DEBUG
@@ -96,8 +97,7 @@ int script_finish_sim_or_fit(script_session *s) {
 
     struct fit_data *fit = s->fit;
 
-    if(fit->sim->n_det ==
-       1) { /* TODO: This is primarily used for command line mode, but multidetector mode could be supported. */
+    if(fit->sim->n_det == 1) { /* TODO: This is primarily used for command line mode, but multidetector mode could be supported. */
         size_t i_det = 0;
         sim_workspace *ws = fit_data_ws(fit, i_det);
         if(ws) {
@@ -188,7 +188,6 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
         return SCRIPT_COMMAND_FAILURE;
     }
     if(fit(fit_data)) {
-        jabs_message(MSG_ERROR, stderr, "Fit failed!\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     script_finish_sim_or_fit(s);

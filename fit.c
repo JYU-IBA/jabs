@@ -45,6 +45,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     if(sim_sanity_check(fit_data->sim) || fit_data_workspaces_init(fit_data)) { /* Either fails: clean up and return */
         fit_data_workspaces_free(fit_data); /* Some workspaces may have already been allocated */
         gsl_vector_set_all(f, 0.0);
+        fit_data->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
     }
     if(fit_data->stats.iter <= 1 || fit_data->stats.rel >= FIT_FAST_SIMULATION_RELATIVE_THRESHOLD) {
@@ -69,12 +70,14 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     for(size_t i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) {
         if(i_vec >= f->size) {
             jabs_message(MSG_ERROR, stderr, "Too many channels in fits for the residuals vector. This shouldn't happen.\n");
+            fit_data->stats.error = FIT_ERROR_IMPOSSIBLE;
             return GSL_FAILURE;
         }
 
         roi *range = &fit_data->fit_ranges[i_range];
         if(range->i_det >= fit_data->sim->n_det) {
             jabs_message(MSG_ERROR, stderr, "Fit range %zu has detector %zu, but we're only supposed to have %zu detectors!\n", i_range+1, range->i_det, fit_data->sim->n_det);
+            fit_data->stats.error = FIT_ERROR_IMPOSSIBLE;
             return GSL_FAILURE;
         }
         sim_workspace *ws = fit_data->ws[range->i_det];
@@ -92,6 +95,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     }
     if(i_vec != f->size) {
         jabs_message(MSG_ERROR, stderr, "Not enough channels in fits for the residuals vector. This shouldn't happen.\n");
+        fit_data->stats.error = FIT_ERROR_IMPOSSIBLE;
         return GSL_FAILURE;
     }
     return GSL_SUCCESS;
@@ -370,6 +374,20 @@ void fit_data_workspaces_free(struct fit_data *fit_data) {
     fit_data->ws = NULL;
 }
 
+struct fit_stats fit_stats_init() {
+    struct fit_stats s;
+    s.n_evals = 0;
+    s.n_iters = 0;
+    s.n_evals_iter = 0;
+    s.cputime_cumul = 0.0;
+    s.cputime_iter = 0.0;
+    s.chisq_dof = 0.0;
+    s.iter = 0;
+    s.rel = 0.0;
+    s.error = FIT_ERROR_NONE;
+    return s;
+}
+
 void fit_data_print(FILE *f, const struct fit_data *fit_data) {
     if(!fit_data) {
         return;
@@ -394,34 +412,6 @@ void fit_data_print(FILE *f, const struct fit_data *fit_data) {
     jabs_message(MSG_INFO, f, "\nFit has %zu channels total.\n", fit_data_ranges_calculate_number_of_channels(fit_data));
 }
 
-const char *gsl_multifit_reason_to_stop(int info) {
-    switch(info) {
-        case 0:
-            return  "success (exact details unknown)";
-        case 1:
-            return "small step size (x)";
-        case 2:
-            return "small gradient (g)";
-        case 3:
-            return "small change in fit function (f)";
-        case GSL_ETOLX:
-            return "step size converged within machine precision (xtol is too small)";
-        case GSL_ETOLG:
-            return "gradient change is smaller than machine precision (gtol is too small)";
-        case GSL_ETOLF:
-            return "change in fit function smaller than machine precision (ftol is too small)";
-        case GSL_ENOPROG:
-            return "fit is not making progress";
-        default:
-            break;
-    }
-    if(info < 0) {
-        return "unspecified error";
-    } else {
-        return "unknown";
-    }
-}
-
 int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, double epsrel, double *rel_out) { /* test_delta() copied from GSL convergence.c. rel is output, step size to given tolerance (we return ok when this goes below 1.0) */
     int ok = TRUE;
     *rel_out = 0.0;
@@ -433,8 +423,8 @@ int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, do
         if(rel > *rel_out) {
             *rel_out = rel; /* Store largest value */
         }
-#ifdef DEBUG
-        fprintf(stderr, "Test delta: i %zu, xi %g, dxi %g, tolerance %g, rel %g\n", i, xi, dxi, tolerance, *rel);
+#ifndef DEBUG
+        fprintf(stderr, "Test delta: i %zu, xi %g, dxi %g, tolerance %g, rel %g\n", i, xi, dxi, tolerance, rel);
 #endif
         if(rel >= 1.0) {
             ok = FALSE;
@@ -461,6 +451,9 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, vo
             fprintf(stderr, "Iteration status %i (%s)\n", status, gsl_strerror(status));
 #endif
         }
+        if(fit_data->stats.error) {
+            return GSL_FAILURE;
+        }
         if(status == GSL_ENOPROG && iter == 1) {
             *info = status;
             return status;
@@ -479,6 +472,48 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, vo
     return GSL_EMAXITER;
 }
 
+void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspace *w, const gsl_multifit_nlinear_fdf *fdf, const gsl_matrix *covar){
+    const fit_params *fit_params = fit->fit_params;
+    jabs_message(MSG_INFO, stderr,  "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
+    jabs_message(MSG_INFO, stderr,  "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
+    jabs_message(MSG_INFO, stderr,"function evaluations: %zu\n", fit->stats.n_evals);
+#ifdef DEBUG
+    jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf.nevalf);
+#endif
+    jabs_message(MSG_INFO, stderr, "Jacobian evaluations: %zu\n", fdf->nevaldf);
+    jabs_message(MSG_INFO, stderr, "reason for stopping: %s\n", gsl_strerror(fit->stats.info));
+    jabs_message(MSG_INFO, stderr, "initial |f(x)| = %f\n", sqrt(fit->stats.chisq0));
+    jabs_message(MSG_INFO, stderr, "final   |f(x)| = %f\n", sqrt(fit->stats.chisq));
+    jabs_message(MSG_INFO, stderr, "\nFinal fitted parameters:\n");
+
+    double c = GSL_MAX_DBL(1, sqrt(fit->stats.chisq_dof));
+    for(size_t i = 0; i < fit_params->n; i++) { /* Update final fitted values to the table (same as used for initial guess) */
+        fit_variable *var = &(fit_params->vars[i]);
+        var->value_final = gsl_vector_get(w->x, i);
+        *(var->value) = var->value_final;
+        var->err = c * sqrt(gsl_matrix_get(covar, i, i));
+        var->err_rel = var->err / var->value_final;
+        jabs_message(MSG_INFO, stderr, "    p[%zu]: %16s = %g +- %g (%.2lf%%), %10.6lf x %g \n", i, var->name,
+                     var->value_final,
+                     var->err,
+                     100.0 * var->err_rel,
+                     var->value_final/var->value_orig,
+                     var->value_orig
+                     );
+    }
+    jabs_message(MSG_INFO, stderr, "\nCorrelation coefficients matrix:\n       | ");
+    for(size_t i = 0; i < fit_params->n; i++) {
+        jabs_message(MSG_INFO, stderr, " %4zu  ", i);
+    }
+    jabs_message(MSG_INFO, stderr, "\n");
+    for(size_t i = 0; i < fit_params->n; i++) {
+        jabs_message(MSG_INFO, stderr, "%6zu | ", i);
+        for (size_t j = 0; j <= i; j++) {
+            jabs_message(MSG_INFO, stderr, " %6.3f", gsl_matrix_get(covar, i, j)/sqrt(gsl_matrix_get(covar, i, i)*gsl_matrix_get(covar, j, j)));
+        }
+        jabs_message(MSG_INFO, stderr, "\n");
+    }
+}
 
 int fit(struct fit_data *fit_data) {
     const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
@@ -497,12 +532,7 @@ int fit(struct fit_data *fit_data) {
     }
     gsl_multifit_nlinear_fdf fdf;
     fdf.params = fit_data;
-    fit_data->stats.cputime_cumul = 0.0;
-    fit_data->stats.cputime_iter = 0.0;
-    fit_data->stats.iter = 0;
-    fit_data->stats.n_evals = 0;
-    fit_data->stats.n_iters = 0;
-    fit_data->stats.chisq_dof = 0.0;
+    fit_data->stats = fit_stats_init();
     if(!fit_data->exp) {
         jabs_message(MSG_ERROR, stderr, "No experimental data, can not fit.\n");
         return EXIT_FAILURE;
@@ -530,9 +560,8 @@ int fit(struct fit_data *fit_data) {
     }
     gsl_vector *f;
     gsl_matrix *J;
-    double chisq, chisq0;
     fit_data->dof = fdf.n - fdf.p;
-    int status, info;
+    int status;
     size_t i, j;
 
     double *weights = malloc(sizeof(double) * fdf.n);
@@ -587,70 +616,55 @@ int fit(struct fit_data *fit_data) {
 
 /* compute initial cost function */
     f = gsl_multifit_nlinear_residual(w);
-    gsl_blas_ddot(f, f, &chisq0);
+    gsl_blas_ddot(f, f, &fit_data->stats.chisq0);
 
 /* solve the system with a maximum of n_iters_max iterations */
 #ifdef USE_GSL_MULTIFIT_DRIVER
-    status = gsl_multifit_nlinear_driver(fit_data->n_iters_max, fit_data->xtol, fit_data->gtol, fit_data->ftol, fit_callback, fit_data, &info, w);
+status = gsl_multifit_nlinear_driver(fit_data->n_iters_max, fit_data->xtol, fit_data->gtol, fit_data->ftol, fit_callback, fit_data, &fit_data->stats.info, w);
 #else
-    status = jabs_gsl_multifit_nlinear_driver(fit_data->n_iters_max, fit_data->xtol, fit_callback, fit_data, &info, w); /* Simplified */
+    status = jabs_gsl_multifit_nlinear_driver(fit_data->n_iters_max, fit_data->xtol, fit_callback, fit_data, &fit_data->stats.info, w); /* Simplified */
+
+    /* TODO (two-phase fit):
+     * 1. store original fit calculation parameters in a temporary variable
+     * 2. set the new params (fast)
+     * 3. run fit (with larger tolerance?)
+     * 4. if the fit is converges, restore original parameters
+     * 5. reset fit (with gsl_multifit_nlinear_winit?)
+     * 6. run the fit again
+     * */
+
 #endif
-
-/* compute covariance of best fit parameters */
-    J = gsl_multifit_nlinear_jac(w);
-    gsl_multifit_nlinear_covar (J, 0.0, covar);
-
-/* compute final cost */
-    gsl_blas_ddot(f, f, &chisq);
-    jabs_message(MSG_INFO, stderr,  "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
-    jabs_message(MSG_INFO, stderr,  "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
-    jabs_message(MSG_INFO, stderr,"function evaluations: %zu\n", fit_data->stats.n_evals);
-#ifdef DEBUG
-    jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf.nevalf);
-#endif
-    jabs_message(MSG_INFO, stderr, "Jacobian evaluations: %zu\n", fdf.nevaldf);
-    jabs_message(MSG_INFO, stderr, "reason for stopping: %s\n", gsl_multifit_reason_to_stop(info));
-    jabs_message(MSG_INFO, stderr, "initial |f(x)| = %f\n", sqrt(chisq0));
-    jabs_message(MSG_INFO, stderr, "final   |f(x)| = %f\n", sqrt(chisq));
-    jabs_message(MSG_INFO, stderr, "status = %s\n", gsl_strerror(status));
-    jabs_message(MSG_INFO, stderr, "\nFinal fitted parameters:\n");
-
-    double c = GSL_MAX_DBL(1, sqrt(chisq / fit_data->dof));
-    for(i = 0; i < fit_params->n; i++) { /* Update final fitted values to the table (same as used for initial guess) */
-        fit_variable *var = &(fit_params->vars[i]);
-        var->value_final = gsl_vector_get(w->x, i);
-        *(var->value) = var->value_final;
-        var->err = c * sqrt(gsl_matrix_get(covar, i, i));
-        var->err_rel = var->err / var->value_final;
-        jabs_message(MSG_INFO, stderr, "    p[%zu]: %16s = %g +- %g (%.2lf%%), %10.6lf x %g \n", i, var->name,
-                var->value_final,
-                var->err,
-                100.0 * var->err_rel,
-                var->value_final/var->value_orig,
-                var->value_orig
-        );
+    if(status == GSL_EMAXITER) {
+        fit_data->stats.error = FIT_ERROR_MAXITER;
     }
-    jabs_message(MSG_INFO, stderr, "\nCorrelation coefficients matrix:\n       | ");
-    for(j = 0; j < fit_params->n; j++) {
-        jabs_message(MSG_INFO, stderr, " %4zu  ", j);
+    if(status == GSL_ENOPROG) {
+        fit_data->stats.error = FIT_ERROR_NO_PROGRESS;
     }
-    jabs_message(MSG_INFO, stderr, "\n");
-    for(i = 0; i < fit_params->n; i++) {
-        jabs_message(MSG_INFO, stderr, "%6zu | ", i);
-        for (j = 0; j <= i; j++) {
-            jabs_message(MSG_INFO, stderr, " %6.3f", gsl_matrix_get(covar, i, j)/sqrt(gsl_matrix_get(covar, i, i)*gsl_matrix_get(covar, j, j)));
+    if(fit_data->stats.error) { /* Revert changes */
+        jabs_message(MSG_ERROR, stderr, "Fit aborted, reason: %s.\n", fit_error_str(fit_data->stats.error));
+        for(i = 0; i < fit_params->n; i++) {
+            *fit_params->vars[i].value = fit_params->vars[i].value_orig;
         }
-        jabs_message(MSG_INFO, stderr, "\n");
-    }
-    fit_data->stats.chisq_dof = chisq / fit_data->dof;
-    for(i = 0; i < fit_data->sim->n_det; i++) {
-        spectrum_set_calibration(fit_data_exp(fit_data, i), sim_det(fit_data->sim, i), JIBAL_ANY_Z); /* Update the experimental spectra to final calibration (using default calibration) */
+    } else { /* Do final calculations when fit was successful */
+        /* compute covariance of best fit parameters */
+        J = gsl_multifit_nlinear_jac(w);
+        gsl_multifit_nlinear_covar (J, 0.0, covar);
+
+        /* compute final cost */
+        gsl_blas_ddot(f, f, &fit_data->stats.chisq);
+        fit_data->stats.chisq_dof = fit_data->stats.chisq / fit_data->dof;
+
+        fit_report_results(fit_data, w, &fdf, covar);
+
+        for(i = 0; i < fit_data->sim->n_det; i++) {
+            spectrum_set_calibration(fit_data_exp(fit_data, i), sim_det(fit_data->sim, i), JIBAL_ANY_Z); /* Update the experimental spectra to final calibration (using default calibration) */
+        }
     }
     gsl_multifit_nlinear_free(w);
     gsl_matrix_free(covar);
     gsl_vector_free(x);
     free(weights);
-    return 0;
+    return fit_data->stats.error;
 }
 
 int fit_set_roi_from_string(roi *r, const char *str) {
@@ -684,4 +698,21 @@ int fit_set_roi_from_string(roi *r, const char *str) {
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
+}
+
+const char *fit_error_str(int error) {
+    switch(error) {
+        case FIT_ERROR_NONE:
+            return "none";
+        case FIT_ERROR_MAXITER:
+            return "maximum number of iterations reached";
+        case FIT_ERROR_NO_PROGRESS:
+            return "iteration is not making progress";
+        case FIT_ERROR_SANITY:
+            return "simulation failed sanity check";
+        case FIT_ERROR_IMPOSSIBLE:
+            return "an impossible thing has happened";
+        default:
+            return "unknown";
+    }
 }

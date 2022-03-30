@@ -198,7 +198,12 @@ void sim_reactions_free(simulation *sim) {
     sim->n_reactions = 0;
 }
 
-int sim_sanity_check(const simulation *sim) {
+int sim_sanity_check(const simulation *sim) { /* This does not guarantee sanity, but it guarantees insanity... Checks should be limited to obvious things. Note that sample and reactions might not be set before this is called. */
+    if(!sim) {
+        jabs_message(MSG_ERROR, stderr,  "No simulation.\n");
+        return -1;
+    }
+
     if(!sim->beam_isotope) {
         jabs_message(MSG_ERROR, stderr,  "No valid isotope given for the beam.\n");
         return -1;

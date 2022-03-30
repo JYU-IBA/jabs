@@ -43,15 +43,25 @@ typedef struct fit_params {
 #include "reaction.h"
 #include "sample.h"
 
+#define FIT_ERROR_NONE 0
+#define FIT_ERROR_MAXITER 1
+#define FIT_ERROR_NO_PROGRESS 2
+#define FIT_ERROR_SANITY 3
+#define FIT_ERROR_IMPOSSIBLE 4
+
 struct fit_stats {
     size_t n_evals;
     size_t n_iters;
     size_t n_evals_iter; /* Number of function evaluations per iteration */
     double cputime_cumul;
     double cputime_iter;
+    double chisq0;
+    double chisq;
     double chisq_dof;
     size_t iter;
     double rel; /* This is updated as we iterate */
+    int error;
+    int info; /* From GSL */
 };
 
 typedef struct roi {
@@ -92,7 +102,7 @@ sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det);
 size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);
 int fit_data_workspaces_init(struct fit_data *fit_data); /* If any workspace initialization fails, this frees allocated memory (function below) and returns non-zero */
 void fit_data_workspaces_free(struct fit_data *fit_data); /* Also sets workspace pointers to NULL */
-const char *gsl_multifit_reason_to_stop(int info); /* GSL multifit driver stopping reason to string */
+struct fit_stats fit_stats_init();
 int fit(struct fit_data *fit_data);
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 void fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspace *w);
@@ -103,4 +113,5 @@ void fit_stats_print(FILE *f, const struct fit_stats *stats);
 int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range); /* Makes a deep copy */
 void fit_data_fit_ranges_free(struct fit_data *fit_data);
 int fit_set_roi_from_string(roi *r, const char *str); /* Parses only low and high from "[low:high]". */
+const char *fit_error_str(int error);
 #endif // JABS_FIT_H
