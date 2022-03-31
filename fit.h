@@ -53,6 +53,9 @@ typedef struct fit_params {
 #define FIT_ERROR_SANITY (-4)
 #define FIT_ERROR_IMPOSSIBLE (-5)
 
+#define FIT_PHASE_FAST 1
+#define FIT_PHASE_SLOW 2
+
 struct fit_stats {
     size_t n_evals;
     size_t n_iters;
@@ -91,6 +94,8 @@ typedef struct fit_data {
     double dof;
     //int lm_accel;
     struct fit_stats stats;
+    int phase_start;
+    int phase_stop; /* Inclusive */
 } fit_data;
 
 

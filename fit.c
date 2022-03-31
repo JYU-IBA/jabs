@@ -201,6 +201,8 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     f->sm = NULL; /* Can be set later. */
     f->ws = NULL; /* Initialized later */
     f->fit_params = fit_params_new();
+    f->phase_start = FIT_PHASE_FAST;
+    f->phase_stop = FIT_PHASE_SLOW;
     return f;
 }
 
@@ -605,16 +607,17 @@ int fit(struct fit_data *fit_data) {
 
     sim_calc_params p_orig = fit_data->sim->params; /* Store original values (will be used in final stage of fitting) */
 
-    for(int phase = 1;  phase <= 2; phase++) { /* Phase 1 is "fast", phase 2 normal. */
+    for(int phase = fit_data->phase_start;  phase <= fit_data->phase_stop; phase++) { /* Phase 1 is "fast", phase 2 normal. */
+        assert(phase >= FIT_PHASE_FAST && phase <= FIT_PHASE_SLOW);
         double xtol = fit_data->xtol;
         double chisq_tol = fit_data->chisq_tol;
         /* initialize solver with starting point and weights */
         fit_data->stats = fit_stats_init();
-        if(phase == 1) {
+        if(phase == FIT_PHASE_FAST) {
             sim_calc_params_fast(&fit_data->sim->params, TRUE); /* Set current parameters to be faster in phase 0. */
             xtol *= FIT_FAST_XTOL_MULTIPLIER;
             chisq_tol = fit_data->chisq_fast_tol;
-        } else if(phase == 2) {
+        } else if(phase == FIT_PHASE_SLOW) {
             fit_data->sim->params = p_orig; /* Restore original parameters in phase 1 */
         }
         for(size_t i = 0; i < fit_params->n; i++) {
