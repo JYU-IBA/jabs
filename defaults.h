@@ -39,6 +39,7 @@
 #define STOP_STEP_FUDGE_FACTOR (1.0) /* Factor to automatic incident step size. */
 #define STOP_STEP_MIN (0.0 * C_KEV) /* Minimum stopping step. Zero is automatic. */
 #define STOP_STEP_MIN_FALLBACK (0.5 * C_KEV) /* Fallback for minimum stopping step in case we don't know what to guess. */
+#define STOP_STEP_ADD (0.2 * C_KEV) /* Default for a value that is added to calculated stop step */
 #define SIMULATE_WARNING_LIMIT 10 /* Allowed number of non-critical warnings for each run of simulate() */
 /* Other constants */
 #define DEPTH_TOLERANCE (1.0e-6 * C_TFU)
@@ -55,6 +56,6 @@
 #define FIT_FAST_XTOL_MULTIPLIER (1.0e3)
 #define FIT_GTOL (1e-7)
 #define FIT_FTOL (1e-7)
-#define FIT_CHISQ_TOL (1e-6)
-#define FIT_FAST_CHISQ_TOL (1e-3)
+#define FIT_CHISQ_TOL (1e-6) /* Relative change in chi squared to stop fitting */
+#define FIT_FAST_CHISQ_TOL (0.2)  /* Relative change in chi squared to stop fitting (fast fitting phase). This can be quite large, as turning on better physics changes the chisq. */
 #endif // JABS_DEFAULTS_H

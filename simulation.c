@@ -69,6 +69,7 @@ sim_calc_params sim_calc_params_defaults() {
     p.stop_step_exiting = STOP_STEP_EXITING;
     p.stop_step_fudge_factor = STOP_STEP_FUDGE_FACTOR;
     p.stop_step_min = STOP_STEP_MIN;
+    p.stop_step_add = STOP_STEP_ADD;
     p.depthsteps_max = 0; /* automatic */
     p.geostragg = FALSE;
     p.beta_manual  = FALSE;

@@ -43,6 +43,7 @@ typedef struct {
     double stop_step_exiting;
     double stop_step_fudge_factor;
     double stop_step_min; /* TODO: automatic */
+    double stop_step_add; /* This is added to stop step */
 } sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
 
 typedef struct {

@@ -269,11 +269,11 @@ double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calcula
         return ws->params.stop_step_incident;
     }
     //double E_step = ws->params.stop_step_incident == 0.0?ws->params.stop_step_fudge_factor*sqrt(detector_resolution(ws->det, ion1.isotope, ion1.E)+ion1.S):ws->params.stop_step_incident;
-    double broad = sqrt(ion->S);
+    double broad = sqrt(ion->S) + ws->params.stop_step_add;
     if(broad < ws->params.stop_step_min) {
         return ws->params.stop_step_min;
     }
-    return ws->params.stop_step_fudge_factor * broad;
+    return ws->params.stop_step_fudge_factor * broad; /* Fudge factor also affects the minimum stop step */
 }
 
 int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
