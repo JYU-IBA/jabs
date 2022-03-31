@@ -242,7 +242,7 @@ void post_scatter_exit(ion *p, const depth depth_start, const sim_workspace *ws,
         if(d.x <= DEPTH_TOLERANCE) {
             break;
         }
-        depth d_after = stop_step(ws, p, sample, d, ws->params.stop_step_exiting == 0.0?(p->E*0.10+sqrt(p->S)+2.0*C_KEV):ws->params.stop_step_exiting); /* TODO: 10% of energy plus straggling plus 2 keV is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
+        depth d_after = stop_step(ws, p, sample, d, ws->params.stop_step_exiting == 0.0?ws->params.stop_step_fudge_factor*(p->E*0.07+sqrt(p->S)+10.0*C_KEV):ws->params.stop_step_exiting); /* TODO: 7% of energy plus straggling plus 10 keV is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
         if(p->E < ws->sim->emin) {
 #ifdef DEBUG_REACTION
             fprintf(stderr,
@@ -268,7 +268,7 @@ void foil_traverse(ion *p, const sample *foil, sim_workspace *ws) {
         if(foil->ranges[foil->n_ranges-1].x - d.x < DEPTH_TOLERANCE) {
             break;
         }
-        depth d_after  = stop_step(ws, &ion_foil, foil, d, ws->params.stop_step_exiting == 0.0?p->E*0.1+sqrt(p->S):ws->params.stop_step_exiting);
+        depth d_after  = stop_step(ws, &ion_foil, foil, d, ws->params.stop_step_exiting == 0.0?ws->params.stop_step_fudge_factor*(p->E*0.05+sqrt(p->S)+1.0*C_KEV):ws->params.stop_step_exiting);
         if(ion_foil.E < ws->sim->emin) {
             break;
         }

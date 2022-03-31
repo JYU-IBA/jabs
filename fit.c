@@ -489,8 +489,8 @@ void fit_report_parameters(const fit_data *fit, const gsl_multifit_nlinear_works
         var->value_final = gsl_vector_get(w->x, i);
         *(var->value) = var->value_final;
         var->err = c * sqrt(gsl_matrix_get(covar, i, i));
-        var->err_rel = var->err / var->value_final;
-        jabs_message(MSG_INFO, stderr, "    p[%zu]: %16s = %g +- %g (%.2lf%%), %10.6lf x %g \n", i, var->name,
+        var->err_rel = fabs(var->err / var->value_final);
+        jabs_message(MSG_INFO, stderr, "    p[%zu]: %16s = %12g +- %12g (%5.1lf%%), %10.6lf x %12g \n", i, var->name,
                      var->value_final,
                      var->err,
                      100.0 * var->err_rel,

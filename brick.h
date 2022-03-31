@@ -19,8 +19,10 @@ typedef struct {
     double S_geo_y; /* Geometric straggling in "height" direction */
     double Q; /* Counts in brick (concentration, cross section, fluence, solid angle etc) */
     double sc; /* Concentration cross-section product. Possibly weighted by straggling and affected by concentration gradients. */
+    double sigma; /* Sum (quadrature) of all broadening. */
 } brick;
 
 void brick_int(double sigma_low, double  sigma_high, double E_low, double E_high, gsl_histogram *h, double Q);
-void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const detector *det,const jibal_isotope *isotope, double scale);
+void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, brick *bricks, size_t n_bricks); /* Sums up all the contributions to sigma (including detector resolution) */
+void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, double scale, double sigmas_cutoff);
 #endif // JABS_BRICK_H

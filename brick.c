@@ -20,13 +20,19 @@ inline double erf_Q(double x) {
     return x < 0.0 ? 1.0-0.5*erfc_fast(-1.0*x/M_SQRT2) : 0.5*erfc_fast(x/M_SQRT2);
 }
 
+extern inline double erf_Q_new(double);
+
+inline double erf_Q_new(double x) { /* Same as above, but without calling erfc_fast(). Saves a multiplication or two. */
+    return x < 0.0 ? 1.0-0.5*exp(0.77428768622*x-0.37825569191*x*x) : 0.5*exp(-0.77428768622*x-0.37825569191*x*x);
+}
+
 #define ERFQ_A (-1.0950081470333/M_SQRT2)
 #define ERFQ_B (-0.75651138383854*0.5)
 #define ERFQ_CUTOFF 5.0 // 5.0 is enough
 
 double erf_Q_optim(double x);
 
-inline double erf_Q_optim(double x) {
+inline double erf_Q_optim(double x) { /* This turned out to be slower than expected */
     return x < (-ERFQ_CUTOFF) ? 1.0 : x > (ERFQ_CUTOFF) ? 0.0 : x < 0.0? 1.0-0.5*exp(-1.0*ERFQ_A*x+ERFQ_B*x*x) : 0.5*exp(ERFQ_A*x+ERFQ_B*x*x);
 }
 
@@ -53,34 +59,30 @@ void erf_Q_test() {
     }
 }
 
-void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const detector *det, const jibal_isotope *isotope, const double scale) {
+void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, brick *bricks, size_t n_bricks) {
+    for(size_t i = 0; i <= n_bricks; i++) {
+        bricks[i].sigma = sqrt(bricks[i].S + detector_resolution(det, isotope, bricks[i].E) +  bricks[i].S_geo_x + bricks[i].S_geo_y);
+    }
+}
+
+void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const double scale, const double sigmas_cutoff) {
     for(size_t i = 1; i <= n_bricks; i++) {
         const brick *b_high = &bricks[i-1];
         const brick *b_low = &bricks[i];
         //double E_diff_brick = b_high->E - b_low->E;
-        double sigma_low = sqrt(b_low->S + detector_resolution(det, isotope, b_low->E) + b_low->S_geo_x + b_low->S_geo_y);
-        double sigma_high = sqrt(b_high->S + detector_resolution(det, isotope, b_high->E) +  b_high->S_geo_x + b_high->S_geo_y);
         //fprintf(stderr, "delta d = %.3lf, E_high = %.3lf, E_low = %.3lf), sigma_low = %.3lf, sigma_high = %.3lf, Q = %.3lf\n", (b_low->d - b_high->d)/C_TFU, b_high->E/C_KEV, b_low->E/C_KEV, sigma_low/C_KEV, sigma_high/C_KEV, b_low->Q);
+        double E_cutoff_low = b_low->E - b_low->sigma * sigmas_cutoff; /* Low energy cutoff (brick) */
+        double E_cutoff_high = b_high->E + b_high->sigma * sigmas_cutoff;
         for(size_t j = 0; j < h->n; j++) {
-            double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
-            double w = h->range[j + 1] - h->range[j];
-            double y;
-#if 0
-            double sigma;
-            if(E <= b_low->E) {
-                sigma = sigma_low;
-            } else if(E >= b_high->E)
-                sigma = sigma_high;
-            else {
-                sigma = sigma_low + (sigma_high-sigma_low)*(E - b_low->E)/E_diff_brick;
-            }
-            y = (erf_Q_optim((b_low->E - E) / sigma) - erf_Q_optim((b_high->E - E) / sigma)) / (E_diff_brick);
-#else
-            y = (erf_Q_optim((b_low->E - E) / sigma_low) - erf_Q_optim((b_high->E - E) / sigma_high)) / (b_high->E - b_low->E);
-#endif
+            if(h->range[j+1] < E_cutoff_low) /* High energy edge of histogram is below cutoff */
+                continue;
+            if(h->range[j] > E_cutoff_high) /* Low energy edge of histogram is above cutoff */
+                break; /* Assumes histograms have increasing energy */
+            const double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
+            const double w = h->range[j + 1] - h->range[j];
+            //const double y = (erf_Q((b_low->E - E) / b_low->sigma) - erf_Q((b_high->E - E) / b_high->sigma)) / (b_high->E - b_low->E);
+            const double y = (erf_Q_new((b_low->E - E) / b_low->sigma) - erf_Q_new((b_high->E - E) / b_high->sigma)) / (b_high->E - b_low->E);
             h->bin[j] += scale * y * w * b_low->Q;
-            //fprintf(stderr, "i=%i, j=%i, w = %.5lf keV, E = %.3lf keV, y=%g\n", i, j, w/C_KEV, E/C_KEV, y);
-            assert(!isnan(y));
         }
     }
 }

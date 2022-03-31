@@ -82,6 +82,7 @@ sim_calc_params sim_calc_params_defaults() {
     p.cs_stragg_half_n = CS_STRAGG_HALF_N;
     p.cs_n_steps = CS_CONC_STEPS;
     p.rough_layer_multiplier = 1.0;
+    p.sigmas_cutoff = SIGMAS_CUTOFF;
     sim_calc_params_update(&p);
     return p;
 }
@@ -115,6 +116,7 @@ void sim_calc_params_fast(sim_calc_params *p, int fast) {
         p->stop_step_fudge_factor *= 1.4;
         p->geostragg = FALSE;
         p->rough_layer_multiplier = 0.5;
+        p->sigmas_cutoff = SIGMAS_FAST_CUTOFF;
     }
     sim_calc_params_update(p);
 }
@@ -567,7 +569,8 @@ void convolute_bricks(sim_workspace *ws) {
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
-        brick_int2(r->histo, r->bricks, r->last_brick, ws->det, r->p.isotope, ws->fluence * ws->det->solid);
+        bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->n_bricks);
+        brick_int2(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params.sigmas_cutoff);
     }
 }
 
