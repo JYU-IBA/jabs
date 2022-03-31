@@ -15,5 +15,5 @@ load reaction "li7pa0n.r33"
 add reactions RBS
 show reactions
 simulate
-save spectra "out.csv"
+save spectra "nra_test_out.csv"
 show det
