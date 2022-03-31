@@ -57,6 +57,6 @@
 #define FIT_FAST_XTOL_MULTIPLIER (1.0e3)
 #define FIT_GTOL (1e-7)
 #define FIT_FTOL (1e-7)
-#define FIT_CHISQ_TOL (1e-6) /* Relative change in chi squared to stop fitting */
-#define FIT_FAST_CHISQ_TOL (0.2)  /* Relative change in chi squared to stop fitting (fast fitting phase). This can be quite large, as turning on better physics changes the chisq. */
+#define FIT_CHISQ_TOL (1e-7) /* Relative change in chi squared to stop fitting */
+#define FIT_FAST_CHISQ_TOL (1e-1)  /* Relative change in chi squared to stop fitting (fast fitting phase). This can be quite large, as turning on better physics changes the chisq. */
 #endif // JABS_DEFAULTS_H

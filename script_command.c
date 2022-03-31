@@ -553,6 +553,34 @@ script_command_status script_set_detector_calibration_val(struct script_session 
     return SCRIPT_COMMAND_FAILURE;
 }
 
+script_command_status script_set_fit_val(struct script_session *s, int val, int argc, char *const *argv) {
+    (void) argv;
+    fit_data *fit = s->fit;
+
+    switch(val) {
+        case 'n': /* normal */
+            fit->phase_start = FIT_PHASE_FAST;
+            fit->phase_stop = FIT_PHASE_SLOW;
+            return 0;
+        case 'f':
+            fit->phase_start = FIT_PHASE_FAST;
+            fit->phase_stop = FIT_PHASE_FAST;
+            return 0;
+        case 's':
+            fit->phase_start = FIT_PHASE_SLOW;
+            fit->phase_stop = FIT_PHASE_SLOW;
+            return 0;
+        default:
+            break;
+    }
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Not enough parameters to set fit values.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+
 script_command_status script_show_var(struct script_session *s, jibal_config_var *var, int argc, char *const *argv) {
     (void) argv;
     (void) argc;
@@ -730,6 +758,7 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                 }
             } else if(!argc) {
                 script_command_not_found(NULL, c); /* No function, no nothing, no arguments. */
+                return SCRIPT_COMMAND_NOT_FOUND;
             }
             if(c->subcommands) {
                 cmds = c->subcommands;
@@ -1079,6 +1108,13 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "Set detector azimuth angle, 0 = IBM, 90 deg = Cornell.", 'p', NULL));
 
     script_command_list_add_command(&c_set->subcommands,script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
+    script_command *c_set_fit = script_command_new("fit", "Set fit related things.", 0, NULL);
+    c_set_fit->f_val = &script_set_fit_val;
+    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("normal", "Normal two-phase fitting.", 'n', NULL));
+    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("slow", "One phase fitting (slow phase only).", 's', NULL));
+    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("fast", "One phase fitting (fast phase only).", 'f', NULL));
+    script_command_list_add_command(&c_set->subcommands, c_set_fit);
+
     script_command_list_add_command(&c_set->subcommands,script_command_new("sample", "Set sample.", 0, &script_set_sample));
     script_command_list_add_command(&c_set->subcommands,script_command_new("stopping", "Set (assign) stopping or straggling.", 0, &script_set_stopping));
     script_command_list_add_command(&c_set->subcommands, script_command_new("variable", "Set a variable.", 0, NULL));

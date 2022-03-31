@@ -44,7 +44,6 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     fit_data_workspaces_free(fit_data);
     if(sim_sanity_check(fit_data->sim) || fit_data_workspaces_init(fit_data)) { /* Either fails: clean up and return */
         fit_data_workspaces_free(fit_data); /* Some workspaces may have already been allocated */
-        gsl_vector_set_all(f, 0.0);
         fit_data->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
     }
