@@ -43,11 +43,15 @@ typedef struct fit_params {
 #include "reaction.h"
 #include "sample.h"
 
-#define FIT_ERROR_NONE 0
-#define FIT_ERROR_MAXITER 1
-#define FIT_ERROR_NO_PROGRESS 2
-#define FIT_ERROR_SANITY 3
-#define FIT_ERROR_IMPOSSIBLE 4
+#define FIT_SUCCESS_CHISQ (2)
+#define FIT_SUCCESS_DELTA (1)
+#define FIT_SUCCESS (0)
+#define FIT_ERROR_NONE (0)
+#define FIT_ERROR_GENERIC (-1)
+#define FIT_ERROR_MAXITER (-2)
+#define FIT_ERROR_NO_PROGRESS (-3)
+#define FIT_ERROR_SANITY (-4)
+#define FIT_ERROR_IMPOSSIBLE (-5)
 
 struct fit_stats {
     size_t n_evals;
@@ -58,10 +62,9 @@ struct fit_stats {
     double chisq0;
     double chisq;
     double chisq_dof;
+    double rcond;
     size_t iter;
-    double rel; /* This is updated as we iterate */
     int error;
-    int info; /* From GSL */
 };
 
 typedef struct roi {
@@ -83,6 +86,8 @@ typedef struct fit_data {
     double xtol;
     double gtol;
     double ftol;
+    double chisq_tol;
+    double chisq_fast_tol;
     double dof;
     //int lm_accel;
     struct fit_stats stats;

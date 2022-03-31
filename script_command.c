@@ -191,7 +191,7 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
     if(script_prepare_sim_or_fit(s)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(fit(fit_data)) {
+    if(fit(fit_data) < 0) {
         return SCRIPT_COMMAND_FAILURE;
     }
     script_finish_sim_or_fit(s);
@@ -1099,6 +1099,8 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",           &fit->xtol,                          NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "gtolerance",           &fit->gtol,                          NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "ftolerance",           &fit->ftol,                          NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",      &fit->chisq_tol,                     NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance", &fit->chisq_fast_tol,                NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "ds",                   &sim->params.ds,                     NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "rk4",                  &sim->params.rk4,                    NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "stop_step_incident",   &sim->params.stop_step_incident,     NULL},

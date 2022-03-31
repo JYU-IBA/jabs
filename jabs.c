@@ -830,7 +830,6 @@ int simulate_with_roughness(sim_workspace *ws) {
             fprintf(stderr, "\n");
 #endif
         }
-        //fprintf(stderr, "\n");
         ws->fluence = p * p_sr;
         ion_set_angle(&ws->ion, 0.0, 0.0);
         ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
@@ -866,7 +865,7 @@ int simulate_with_ds(sim_workspace *ws) {
     ion ion1 = ws->ion;
     ion ion2 = ion1;
     depth d_before = depth_seek(ws->sample, 0.0);
-    sim_calc_params_fast(&ws->params, TRUE);
+    sim_calc_params_fast(&ws->params, TRUE); /* This makes DS faster. Changes to ws->params are not reverted, but they don't affect original sim settings */
     jabs_message(MSG_ERROR, stderr, "\n");
     const jibal_isotope *incident = ws->sim->beam_isotope;
     while(1) {

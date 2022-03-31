@@ -40,8 +40,6 @@
 #define STOP_STEP_MIN (0.0 * C_KEV) /* Minimum stopping step. Zero is automatic. */
 #define STOP_STEP_MIN_FALLBACK (0.5 * C_KEV) /* Fallback for minimum stopping step in case we don't know what to guess. */
 #define SIMULATE_WARNING_LIMIT 10 /* Allowed number of non-critical warnings for each run of simulate() */
-#define FIT_FAST_SIMULATION_RELATIVE_THRESHOLD 100.0
-
 /* Other constants */
 #define DEPTH_TOLERANCE (1.0e-6 * C_TFU)
 #define ROUGH_TOLERANCE (0.1 * C_TFU) /* Roughness below this is equivalent to none */
@@ -54,6 +52,9 @@
 #define DUAL_SCATTER_AZI_STEPS 12
 #define FIT_ITERS_MAX 100
 #define FIT_XTOL (1e-7)
+#define FIT_FAST_XTOL_MULTIPLIER (1.0e3)
 #define FIT_GTOL (1e-7)
 #define FIT_FTOL (1e-7)
+#define FIT_CHISQ_TOL (1e-6)
+#define FIT_FAST_CHISQ_TOL (1e-3)
 #endif // JABS_DEFAULTS_H

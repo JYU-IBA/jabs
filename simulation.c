@@ -85,7 +85,7 @@ sim_calc_params sim_calc_params_defaults() {
 }
 
 void sim_calc_params_update(sim_calc_params *p) {
-    assert(p->cs_n_steps >= 1);
+    assert(p->mean_conc_and_energy || p->cs_n_steps >= 1);
     p->cs_frac = 1.0/(1.0*(p->cs_n_steps+1));
     assert(p->cs_stragg_half_n >= 0);
     p->cs_n_stragg_steps = p->cs_stragg_half_n * 2 + 1;
