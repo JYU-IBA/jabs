@@ -583,6 +583,15 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
         (*argc) -= 2;
         (*argv) += 2;
     }
+
+    if(sm->n_ranges == 0) {
+#ifdef DEBUG
+        fprintf(stderr, "No ranges were parsed.\n");
+#endif
+        sample_model_free(sm);
+        return NULL;
+    }
+
     sm->cbins = calloc(sm->n_ranges * sm->n_ranges, sizeof(double));
     for(size_t i = 0; i < sm->n_ranges; i++) {
         *sample_model_conc_bin(sm, i, i) = 1.0;

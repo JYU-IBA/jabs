@@ -1686,6 +1686,10 @@ script_command_status script_set_sample(script_session *s, int argc, char *const
     }
     const int argc_orig = argc;
     sample_model *sm_new = sample_model_from_argv(fit->jibal, &argc, &argv);
+    if(!sm_new) {
+        jabs_message(MSG_WARNING, stderr, "Setting sample fails.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
     int argc_consumed = argc_orig - argc;
     sample_model_free(fit->sm);
     fit->sm = sm_new;
