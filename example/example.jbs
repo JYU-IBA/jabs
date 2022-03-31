@@ -30,6 +30,8 @@ set emin 150keV
 simulate
 save spectra "simulated_out.csv"
 
+set fit normal
+
 fit calib,fluence,thickness1,thickness2,rough1
 save spectra "example_out.csv"
 #detector calibration can be saved to a script file. This can be loaded back in.

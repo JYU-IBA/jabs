@@ -44,7 +44,6 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     fit_data_workspaces_free(fit_data);
     if(sim_sanity_check(fit_data->sim) || fit_data_workspaces_init(fit_data)) { /* Either fails: clean up and return */
         fit_data_workspaces_free(fit_data); /* Some workspaces may have already been allocated */
-        gsl_vector_set_all(f, 0.0);
         fit_data->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
     }
@@ -56,7 +55,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     fit_data->stats.cputime_iter += (((double) (end - start)) / CLOCKS_PER_SEC);
     fit_data->stats.n_evals_iter++;
     size_t i_vec = 0;
-    for(size_t i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) {
+    for(size_t i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) { /* TODO: actually calculate which spectra we need to simulate when fitting. Calculate emin based on lowest energy in lowest range. */
         if(i_vec >= f->size) {
             jabs_message(MSG_ERROR, stderr, "Too many channels in fits for the residuals vector. This shouldn't happen.\n");
             fit_data->stats.error = FIT_ERROR_IMPOSSIBLE;
