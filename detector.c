@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include <jibal_config.h>
 
@@ -14,20 +15,15 @@
 extern inline double detector_calibrated(const detector *det, int Z, size_t ch);
 
 calibration *detector_get_calibration(const detector *det, int Z) {
-    if(det == NULL)
+    if(det == NULL || Z < JIBAL_ANY_Z)
         return NULL;
-    if(Z == JIBAL_ANY_Z || (unsigned int) Z > det->cal_Z_max) {
+    if(Z == JIBAL_ANY_Z || Z > det->cal_Z_max) {
 #ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Z = %i is either any Z (-1) or larger than %zu. Returning default calibration (%p)\n", Z, det->cal_Z_max, (void *)det->calibration);
+        fprintf(stderr, "Z = %i is either any Z (-1) or larger than %i. Returning default calibration (%p)\n", Z, det->cal_Z_max, (void *)det->calibration);
 #endif
         return det->calibration;
     }
-    if(Z < 1) {
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Z can not be < 1! Returning NULL calibration.\n");
-#endif
-        return NULL;
-    }
+    assert(det->cal_Z_max > 0 && det->calibration);
     if(det->calibration_Z[Z]) {
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "There is a Z-specific calibration (%p)\n", (void *)det->calibration_Z[Z]);
@@ -55,7 +51,7 @@ int detector_set_calibration_Z(const jibal_config *jibal_config, detector *det, 
     if(Z > jibal_config->Z_max) { /* This is not strictly necessary, but makes things easier later on. */
         return EXIT_FAILURE;
     }
-    if((unsigned int) Z > det->cal_Z_max) {
+    if(Z > det->cal_Z_max) {
         det->calibration_Z = realloc(det->calibration_Z, sizeof(calibration *) * (Z+1)); /* Allocate more space */
         if(!det->calibration_Z) {
             det->cal_Z_max = 0;
@@ -66,7 +62,7 @@ int detector_set_calibration_Z(const jibal_config *jibal_config, detector *det, 
         }
         det->cal_Z_max = Z;
 #ifdef DEBUG
-        fprintf(stderr, "More space allocated for detector = %p calibrations. Z_max = %zu.\n", (void *) det, det->cal_Z_max);
+        fprintf(stderr, "More space allocated for detector = %p calibrations. Z_max = %i.\n", (void *) det, det->cal_Z_max);
 #endif
     }
     calibration_free(det->calibration_Z[Z]);
@@ -125,7 +121,7 @@ detector *detector_default(detector *det) {
     det->foil = NULL;
     det->foil_sm = NULL;
     det->calibration = calibration_init_linear();
-    det->cal_Z_max = 0;
+    det->cal_Z_max = -1;
     det->calibration_Z = NULL;
     calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, ENERGY_SLOPE);
     calibration_set_param(det->calibration, CALIBRATION_PARAM_RESOLUTION, DETECTOR_RESOLUTION);
@@ -145,12 +141,12 @@ void detector_free(detector *det) {
 void detector_calibrations_free(detector *det) {
     calibration_free(det->calibration);
     if(det->calibration_Z) {
-        for(size_t Z = 1;  Z <= det->cal_Z_max; Z++) {
+        for(int Z = 0;  Z <= det->cal_Z_max; Z++) {
             calibration_free(det->calibration_Z[Z]);
         }
         free(det->calibration_Z);
     }
-    det->cal_Z_max = 0;
+    det->cal_Z_max = -1;
 }
 
 int detector_print(const jibal *jibal, const char *filename, const detector *det) {
@@ -334,6 +330,9 @@ double detector_solid_angle_calc(const detector *det) {
 
 double detector_resolution(const detector *det, const jibal_isotope *isotope, double E) { /* Returns variance! */
     calibration *c = detector_get_calibration(det, isotope->Z);
+    if(!c) {
+        return 0.0;
+    }
     switch(det->type) {
         case DETECTOR_NONE:
             return 0.0;

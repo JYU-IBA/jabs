@@ -41,7 +41,7 @@ typedef struct detector {
     detector_type type;
     struct calibration *calibration;
     struct calibration **calibration_Z; /* Array of calibrations for a given Z. calibration_Z[i] NULL means use default calibration for Z == i. Array is dynamically allocated (number of elements: cal_Z_max + 1) as and when required, so this should be NULL when cal_Z_max == 0. */
-    size_t cal_Z_max;
+    int cal_Z_max;
     double length; /* For ToF */
     double theta; /* Polar angle [0, pi], usually the same as scattering angle (when DS is disabled) */
     double phi; /* Azimuthal angle [0, 2pi] */
