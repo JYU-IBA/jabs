@@ -765,8 +765,17 @@ int simulate_with_roughness(sim_workspace *ws) {
     double p_sr = ws->sim->fluence;
     size_t n_rl = 0; /* Number of rough layers */
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
-        if(ws->sample->ranges[i].rough.model == ROUGHNESS_GAMMA)
+        sample_range *r = &(ws->sample->ranges[i]);
+        r->rough.n *= ws->params.rough_layer_multiplier;
+        if(r->rough.n > ROUGHNESS_SUBSPECTRA_MAXIMUM) { /* Artificial limit to n */
+            r->rough.n = ROUGHNESS_SUBSPECTRA_MAXIMUM;
+        }
+        if(r->rough.n == 0) {
+            r->rough.model = ROUGHNESS_NONE;
+        }
+        if(r->rough.model == ROUGHNESS_GAMMA) {
             n_rl++;
+        }
     }
 #ifdef DEBUG
     fprintf(stderr, "%zu rough layers\n", n_rl);
@@ -782,12 +791,12 @@ int simulate_with_roughness(sim_workspace *ws) {
     size_t j = 0;
     thick_prob_dist **tpd = malloc(sizeof(thick_prob_dist *) * n_rl);
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
-        if(ws->sample->ranges[i].rough.model == ROUGHNESS_GAMMA) {
+        sample_range *r = &(ws->sample->ranges[i]);
+        if(r->rough.model == ROUGHNESS_GAMMA) {
 #ifdef DEBUG
             fprintf(stderr, "Range %zu is rough (gamma), amount %g tfu, n = %zu spectra\n", i, ws->sample->ranges[i].rough.x/C_TFU, ws->sample->ranges[i].rough.n);
 #endif
-            assert(ws->sample->ranges[i].rough.n > 0 && ws->sample->ranges[i].rough.n < 1000);
-            tpd[j] = thickness_probability_table_gen(ws->sample->ranges[i].x, ws->sample->ranges[i].rough.x, ws->sample->ranges[i].rough.n);
+            tpd[j] = thickness_probability_table_gen(r->x, r->rough.x, r->rough.n);
 #ifdef DEBUG
             fprintf(stderr, "TPD for depth %zu (%.3lf tfu nominal), roughness %.3lf tfu:\n", i, ws->sample->ranges[i].x/C_TFU, ws->sample->ranges[i].rough.x/C_TFU);
             for(size_t i_tpd = 0; i_tpd < tpd[j]->n; i_tpd++) {

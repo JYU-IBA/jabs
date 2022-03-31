@@ -46,6 +46,7 @@
 #define ROUGH_TOLERANCE (0.1 * C_TFU) /* Roughness below this is equivalent to none */
 #define CONC_TOLERANCE (1.0e-7)
 #define GAMMA_ROUGHNESS_STEPS 21
+#define ROUGHNESS_SUBSPECTRA_MAXIMUM 99
 #define CS_CONC_STEPS 3 /* Minimum 1, odd numbers preferred */
 #define CS_STRAGG_HALF_N 3 /* Cross section weighting by straggling, number of steps is this times 2 + 1. Set to zero to disable (aka 1 step). */
 #define DUAL_SCATTER_POLAR_STEPS 15

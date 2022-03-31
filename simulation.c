@@ -81,6 +81,7 @@ sim_calc_params sim_calc_params_defaults() {
     p.mean_conc_and_energy = FALSE;
     p.cs_stragg_half_n = CS_STRAGG_HALF_N;
     p.cs_n_steps = CS_CONC_STEPS;
+    p.rough_layer_multiplier = 1.0;
     sim_calc_params_update(&p);
     return p;
 }
@@ -113,6 +114,7 @@ void sim_calc_params_fast(sim_calc_params *p, int fast) {
         p->cs_n_steps = 0; /* Not used if mean_conc_and_energy == TRUE */
         p->stop_step_fudge_factor *= 1.4;
         p->geostragg = FALSE;
+        p->rough_layer_multiplier = 0.5;
     }
     sim_calc_params_update(p);
 }

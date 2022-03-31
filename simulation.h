@@ -44,6 +44,7 @@ typedef struct {
     double stop_step_fudge_factor;
     double stop_step_min; /* TODO: automatic */
     double stop_step_add; /* This is added to stop step */
+    double rough_layer_multiplier; /* Multiply given (or default) number of subspectra when calculating rough layers. */
 } sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
 
 typedef struct {
