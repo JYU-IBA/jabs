@@ -1832,6 +1832,8 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
     return argc_orig - argc;
 }
 script_command_status script_split_sample_elements(struct  script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
     struct fit_data *fit = s->fit;
     sample_model *sm = fit->sm;
     fit->sm = sample_model_split_elements(sm);

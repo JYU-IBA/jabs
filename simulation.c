@@ -179,6 +179,10 @@ int sim_sanity_check(const simulation *sim) {
         jabs_message(MSG_ERROR, stderr,  "No valid isotope given for the beam.\n");
         return -1;
     }
+    if(sim->beam_isotope->Z == 0) {
+        jabs_message(MSG_ERROR, stderr,  "Neutron beams are not supported.\n");
+        return -1;
+    }
     if (sim->beam_E > 1000.0*C_MEV || sim->beam_E < 10*C_KEV) {
         jabs_message(MSG_ERROR, stderr,  "Hmm...? Check your numbers. Your energy is %.5lf MeV!\n", sim->beam_E);
         return -1;
@@ -420,7 +424,8 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
             E_max = E;
         }
     }
-    E_max *= 1.1 + detector_resolution(ws->det, sim->beam_isotope, E_max);
+    E_max *= 1.1;
+    E_max += detector_resolution(ws->det, sim->beam_isotope, E_max);
 #ifdef DEBUG
     fprintf(stderr, "E_max of this simulation is %g keV\n", E_max/C_KEV);
 #endif

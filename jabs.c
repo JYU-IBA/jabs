@@ -17,6 +17,10 @@
 double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
     double em=E/incident->mass;
     double S1 = 0.0;
+#ifdef NEUTRONS_EXIST
+    if(incident->Z == 0)
+        return 0.0; /* Return something neutron-specific (or whatever) */
+#endif
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
         double c;
         if(sample->no_conc_gradients) {
@@ -477,6 +481,10 @@ int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) { /* Ass
 }
 
 int assign_stopping_Z1_Z2(jibal_gsto *gsto, int Z1, int Z2) {
+    if(Z1 < 1 || Z2 < 1) {
+        jabs_message(MSG_WARNING, stderr, "Assign of stopping for Z1 = %i in Z2 = %i is not possible.\n");
+        return EXIT_SUCCESS; /* Skips, doesn't fail */
+    }
     if(!jibal_gsto_auto_assign(gsto, Z1, Z2)) {
         jabs_message(MSG_ERROR, stderr, "Assign of stopping for Z1 = %i in Z2 = %i fails.\n", Z1, Z2);
         return EXIT_FAILURE;
