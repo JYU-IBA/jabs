@@ -14,6 +14,8 @@
 #include "message.h"
 #include "win_compat.h"
 
+extern inline double normal_pdf_std(double x);
+
 double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
     double em=E/incident->mass;
     double S1 = 0.0;
@@ -164,7 +166,8 @@ double cross_section_straggling(const sim_reaction *sim_r, int n_steps, double E
     for(int i = 0; i < n_steps; i++) {
         double x = w*(i-half_n);
         double E_stragg = E + x * std_dev;
-        double prob = normal_pdf(x, 0.0, 1.0) * w; /* TODO: if this is always a normal distribution and n_steps doesn't change, this function call could be replaced by a lookup table */
+        //double prob = normal_pdf(x, 0.0, 1.0) * w; /* TODO: if this is always a normal distribution and n_steps doesn't change, this function call could be replaced by a lookup table */
+        double prob = normal_pdf_std(x);
         prob_sum += prob;
         cs_sum += prob * sim_r->cross_section(sim_r, E_stragg);
     }
@@ -261,6 +264,18 @@ void foil_traverse(ion *p, const sample *foil, sim_workspace *ws) {
     p->S = ion_foil.S;
 }
 
+double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calculate stop step to take */
+    if(ws->params.stop_step_incident > 0) {
+        return ws->params.stop_step_incident;
+    }
+    //double E_step = ws->params.stop_step_incident == 0.0?ws->params.stop_step_fudge_factor*sqrt(detector_resolution(ws->det, ion1.isotope, ion1.E)+ion1.S):ws->params.stop_step_incident;
+    double broad = sqrt(ion->S) + ws->params.stop_step_add;
+    if(broad < ws->params.stop_step_min) {
+        return ws->params.stop_step_min;
+    }
+    return ws->params.stop_step_fudge_factor * broad; /* Fudge factor also affects the minimum stop step */
+}
+
 int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
     assert(sample->n_ranges);
     int warnings = 0;
@@ -346,7 +361,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         }
         const double E_front = ion1.E;
         const double S_front = ion1.S;
-        double E_step = ws->params.stop_step_incident == 0.0?ws->params.stop_step_fudge_factor*sqrt(detector_resolution(ws->det, ion1.isotope, ion1.E)+ion1.S):ws->params.stop_step_incident;
+        double E_step = stop_step_calculate(ws, &ion1);
         depth d_after = stop_step(ws, &ion1, sample, d_before, E_step);
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "After:  %g tfu in range %zu\n", d_after.x/C_TFU, d_after.i);
@@ -605,46 +620,58 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
                 detector *det = sim->det[i_det];
                 assert(det);
                 if(strncmp(token, "calib", 5) == 0) {
-                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE));
-                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET));
-                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION));
+                    fit_params_add_parameter(params,
+                                             calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE),
+                                             "slope");
+                    fit_params_add_parameter(params,
+                                             calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET),
+                                             "offset");
+                    fit_params_add_parameter(params,
+                                             calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION),
+                                             "resolution");
                     jabs_message(MSG_INFO, stderr, "Added fit parameters (slope, offset, resolution) for detector %zu calibration\n", i_det + 1);
                 }
                 if(strcmp(token, "slope") == 0) {
-                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE));
+                    fit_params_add_parameter(params,
+                                             calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE),
+                                             "slope");
                     jabs_message(MSG_INFO,  stderr, "Added fit parameters for detector %zu calibration slope\n", i_det + 1);
                 }
                 if(strcmp(token, "offset") == 0) {
-                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET));
+                    fit_params_add_parameter(params,
+                                             calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET),
+                                             "offset");
                     jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu calibration offset\n", i_det + 1);
                 }
                 if(strncmp(token, "reso", 4) == 0) {
-                    fit_params_add_parameter(params, calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION));
+                    fit_params_add_parameter(params,
+                                             calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION),
+                                             "resolution");
                     jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu resolution\n", i_det + 1);
                 }
                 if(strncmp(token, "solid", 5) == 0) {
-                    fit_params_add_parameter(params, &det->solid);
+                    fit_params_add_parameter(params, &det->solid, "solid");
                     jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu solid angle\n", i_det + 1);
                 }
             }
             if(strcmp(token, "fluence") == 0) {
-                fit_params_add_parameter(params, &sim->fluence);
+                fit_params_add_parameter(params, &sim->fluence, "fluence");
                 jabs_message(MSG_INFO, stderr, "Added fit parameter for fluence\n");
             }
             if(strcmp(token, "channeling_slope") == 0) {
-                fit_params_add_parameter(params, &sim->channeling_slope);
+                fit_params_add_parameter(params, &sim->channeling_slope, "channeling_slope");
                 jabs_message(MSG_INFO, stderr, "Added fit parameter for channeling (energy slope)\n");
             }
             if(strcmp(token, "channeling") == 0) {
-                fit_params_add_parameter(params, &sim->channeling_offset);
+                fit_params_add_parameter(params, &sim->channeling_offset, "channeling");
                 fprintf(stderr, "Added fit parameter for channeling (constant)\n");
             }
             if(strcmp(token, "alpha") == 0) {
-                fit_params_add_parameter(params, &sim->sample_theta);
+                fit_params_add_parameter(params, &sim->sample_theta, "alpha");
                 fprintf(stderr, "Added fit parameter for sample tilt angle (alpha)\n");
             }
             if(strcmp(token, "energy") == 0) {
-                fit_params_add_parameter(params, &sim->beam_E);
+                fit_params_add_parameter(params, &sim->beam_E, "energy");
                 fprintf(stderr, "Added fit parameter for beam energy\n");
             }
         }
@@ -652,7 +679,7 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
             if(strncmp(token, "rough", 5) == 0 && strlen(token) > 5) {
                 size_t i_layer = strtoul(token + 5, NULL, 10);
                 if(i_layer >= 1 && i_layer <= sm->n_ranges) {
-                    fit_params_add_parameter(params, &sm->ranges[i_layer - 1].rough.x);
+                    fit_params_add_parameter(params, &sm->ranges[i_layer - 1].rough.x, token);
                     jabs_message(MSG_INFO, stderr, "Added fit parameter for roughness of layer %zu\n",  i_layer);
                 } else {
                     jabs_message(MSG_ERROR, stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
@@ -662,7 +689,7 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
             if(strncmp(token, "thickness", 9) == 0 && strlen(token) > 9) {
                 size_t i_layer = strtoul(token + 9, NULL, 10);
                 if(i_layer >= 1 && i_layer <= sm->n_ranges) {
-                    fit_params_add_parameter(params, &sm->ranges[i_layer - 1].x);
+                    fit_params_add_parameter(params, &sm->ranges[i_layer - 1].x, token);
                     jabs_message(MSG_INFO,stderr, "Added fit parameter for thickness of layer %zu\n",  i_layer);
                 } else {
                     jabs_message(MSG_ERROR,stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
@@ -672,7 +699,7 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
             size_t i, j;
             if(sscanf(token, "conc%lu_%lu", &i, &j) == 2) {
                 if(i >= 1 && i <= sm->n_ranges && j >= 1 && j <= sm->n_materials) {
-                    fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, j - 1));
+                    fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, j - 1), token);
                     jabs_message(MSG_INFO, stderr, "Added fit parameter for concentration of %s in layer %zu\n", sm->materials[j - 1]->name, i);
                 } else {
                     jabs_message(MSG_ERROR, stderr, "No element %lu in layer %lu\n", j, i);
@@ -686,7 +713,7 @@ int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, 
                     int found = FALSE;
                     for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
                         if(strcmp(sm->materials[i_mat]->name, material_name) == 0) {
-                            fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, i_mat));
+                            fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, i_mat), token);
                             jabs_message(MSG_INFO,stderr, "Added fit parameter for concentration of %s (material number %zu) in layer %zu\n", sm->materials[i_mat]->name, i_mat + 1, i);
                             found = TRUE;
                             break;
@@ -738,8 +765,17 @@ int simulate_with_roughness(sim_workspace *ws) {
     double p_sr = ws->sim->fluence;
     size_t n_rl = 0; /* Number of rough layers */
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
-        if(ws->sample->ranges[i].rough.model == ROUGHNESS_GAMMA)
+        sample_range *r = &(ws->sample->ranges[i]);
+        r->rough.n *= ws->params.rough_layer_multiplier;
+        if(r->rough.n > ROUGHNESS_SUBSPECTRA_MAXIMUM) { /* Artificial limit to n */
+            r->rough.n = ROUGHNESS_SUBSPECTRA_MAXIMUM;
+        }
+        if(r->rough.n == 0) {
+            r->rough.model = ROUGHNESS_NONE;
+        }
+        if(r->rough.model == ROUGHNESS_GAMMA) {
             n_rl++;
+        }
     }
 #ifdef DEBUG
     fprintf(stderr, "%zu rough layers\n", n_rl);
@@ -755,12 +791,12 @@ int simulate_with_roughness(sim_workspace *ws) {
     size_t j = 0;
     thick_prob_dist **tpd = malloc(sizeof(thick_prob_dist *) * n_rl);
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
-        if(ws->sample->ranges[i].rough.model == ROUGHNESS_GAMMA) {
+        sample_range *r = &(ws->sample->ranges[i]);
+        if(r->rough.model == ROUGHNESS_GAMMA) {
 #ifdef DEBUG
             fprintf(stderr, "Range %zu is rough (gamma), amount %g tfu, n = %zu spectra\n", i, ws->sample->ranges[i].rough.x/C_TFU, ws->sample->ranges[i].rough.n);
 #endif
-            assert(ws->sample->ranges[i].rough.n > 0 && ws->sample->ranges[i].rough.n < 1000);
-            tpd[j] = thickness_probability_table_gen(ws->sample->ranges[i].x, ws->sample->ranges[i].rough.x, ws->sample->ranges[i].rough.n);
+            tpd[j] = thickness_probability_table_gen(r->x, r->rough.x, r->rough.n);
 #ifdef DEBUG
             fprintf(stderr, "TPD for depth %zu (%.3lf tfu nominal), roughness %.3lf tfu:\n", i, ws->sample->ranges[i].x/C_TFU, ws->sample->ranges[i].rough.x/C_TFU);
             for(size_t i_tpd = 0; i_tpd < tpd[j]->n; i_tpd++) {
@@ -803,7 +839,6 @@ int simulate_with_roughness(sim_workspace *ws) {
             fprintf(stderr, "\n");
 #endif
         }
-        //fprintf(stderr, "\n");
         ws->fluence = p * p_sr;
         ion_set_angle(&ws->ion, 0.0, 0.0);
         ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
@@ -839,10 +874,7 @@ int simulate_with_ds(sim_workspace *ws) {
     ion ion1 = ws->ion;
     ion ion2 = ion1;
     depth d_before = depth_seek(ws->sample, 0.0);
-    ws->params.rk4 = FALSE; /* This change is not reversed, nor reflected back to sim->params */
-    ws->params.nucl_stop_accurate = FALSE;
-    ws->params.mean_conc_and_energy = TRUE;
-    ws->params.geostragg = FALSE;
+    sim_calc_params_fast(&ws->params, TRUE); /* This makes DS faster. Changes to ws->params are not reverted, but they don't affect original sim settings */
     jabs_message(MSG_ERROR, stderr, "\n");
     const jibal_isotope *incident = ws->sim->beam_isotope;
     while(1) {

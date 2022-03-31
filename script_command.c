@@ -40,6 +40,10 @@ int script_prepare_sim_or_fit(script_session *s) {
         jabs_message(MSG_ERROR, stderr, "No detector has been defined!\n");
         return -1;
     }
+    if(sim_sanity_check(fit->sim)) {
+        jabs_message(MSG_ERROR, stderr, "Simulation failed sanity check.\n");
+        return -1;
+    }
     fit_data_workspaces_free(s->fit);
     sample_free(fit->sim->sample);
 #ifdef DEBUG
@@ -80,6 +84,7 @@ int script_prepare_sim_or_fit(script_session *s) {
     jibal_gsto_print_files(fit->jibal->gsto, TRUE); /* TODO: this don't use jabs_message() */
     jabs_message(MSG_VERBOSE, stderr, "Loading stopping data.\n");
     jibal_gsto_load_all(fit->jibal->gsto);
+    sim_calc_params_update(&fit->sim->params);
     simulation_print(stderr, fit->sim);
     s->start = clock();
     return 0;
@@ -88,15 +93,14 @@ int script_prepare_sim_or_fit(script_session *s) {
 int script_finish_sim_or_fit(script_session *s) {
     s->end = clock();
     double cputime_total = (((double) (s->end - s->start)) / CLOCKS_PER_SEC);
-    jabs_message(MSG_INFO, stderr, "...finished! Total CPU time: %.3lf s.\n", cputime_total);
+    jabs_message(MSG_INFO, stderr, "\n...finished! Total CPU time: %.3lf s.\n", cputime_total);
 #ifdef CLEAR_GSTO_ASSIGNMENTS_WHEN_FINISHED
     jibal_gsto_assign_clear_all(s->fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
 #endif
 
     struct fit_data *fit = s->fit;
 
-    if(fit->sim->n_det ==
-       1) { /* TODO: This is primarily used for command line mode, but multidetector mode could be supported. */
+    if(fit->sim->n_det == 1) { /* TODO: This is primarily used for command line mode, but multidetector mode could be supported. */
         size_t i_det = 0;
         sim_workspace *ws = fit_data_ws(fit, i_det);
         if(ws) {
@@ -137,9 +141,12 @@ void script_command_not_found(const char *cmd, const script_command *c_parent) {
 }
 
 script_command_status script_simulate(script_session *s, int argc, char *const *argv) {
+    const int argc_orig = argc;
+    (void) argv;
     struct fit_data *fit = s->fit;
-    (void) argc; /* Unused */
-    (void) argv; /* Unused */
+    if(argc > 1) {
+        /* TODO? */
+    }
     if(script_prepare_sim_or_fit(s)) {
         return SCRIPT_COMMAND_FAILURE;
     }
@@ -154,7 +161,7 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
         }
     }
     script_finish_sim_or_fit(s);
-    return SCRIPT_COMMAND_SUCCESS;
+    return argc_orig - argc;
 }
 
 script_command_status script_fit(script_session *s, int argc, char *const *argv) {
@@ -184,8 +191,7 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
     if(script_prepare_sim_or_fit(s)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(fit(fit_data)) {
-        jabs_message(MSG_ERROR, stderr, "Fit failed!\n");
+    if(fit(fit_data) < 0) {
         return SCRIPT_COMMAND_FAILURE;
     }
     script_finish_sim_or_fit(s);
@@ -203,6 +209,7 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
 
 script_command_status script_save_bricks(script_session *s, int argc, char *const *argv) {
     size_t i_det = 0;
+    const int argc_orig = argc;
     struct fit_data *fit = s->fit;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det) || argc != 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: save bricks [detector] file\n");
@@ -214,7 +221,9 @@ script_command_status script_save_bricks(script_session *s, int argc, char *cons
                      i_det + 1, argv[0], fit->sim->n_det);
         return SCRIPT_COMMAND_FAILURE;
     }
-    return SCRIPT_COMMAND_SUCCESS;
+    argc--;
+    argv++;
+    return argc_orig - argc;
 }
 
 script_command_status script_save_spectra(script_session *s, int argc, char *const *argv) {
@@ -544,6 +553,34 @@ script_command_status script_set_detector_calibration_val(struct script_session 
     return SCRIPT_COMMAND_FAILURE;
 }
 
+script_command_status script_set_fit_val(struct script_session *s, int val, int argc, char *const *argv) {
+    (void) argv;
+    fit_data *fit = s->fit;
+
+    switch(val) {
+        case 'n': /* normal */
+            fit->phase_start = FIT_PHASE_FAST;
+            fit->phase_stop = FIT_PHASE_SLOW;
+            return 0;
+        case 'f':
+            fit->phase_start = FIT_PHASE_FAST;
+            fit->phase_stop = FIT_PHASE_FAST;
+            return 0;
+        case 's':
+            fit->phase_start = FIT_PHASE_SLOW;
+            fit->phase_stop = FIT_PHASE_SLOW;
+            return 0;
+        default:
+            break;
+    }
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Not enough parameters to set fit values.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+
 script_command_status script_show_var(struct script_session *s, jibal_config_var *var, int argc, char *const *argv) {
     (void) argv;
     (void) argc;
@@ -721,6 +758,7 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                 }
             } else if(!argc) {
                 script_command_not_found(NULL, c); /* No function, no nothing, no arguments. */
+                return SCRIPT_COMMAND_NOT_FOUND;
             }
             if(c->subcommands) {
                 cmds = c->subcommands;
@@ -1070,6 +1108,13 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "Set detector azimuth angle, 0 = IBM, 90 deg = Cornell.", 'p', NULL));
 
     script_command_list_add_command(&c_set->subcommands,script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
+    script_command *c_set_fit = script_command_new("fit", "Set fit related things.", 0, NULL);
+    c_set_fit->f_val = &script_set_fit_val;
+    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("normal", "Normal two-phase fitting.", 'n', NULL));
+    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("slow", "One phase fitting (slow phase only).", 's', NULL));
+    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("fast", "One phase fitting (fast phase only).", 'f', NULL));
+    script_command_list_add_command(&c_set->subcommands, c_set_fit);
+
     script_command_list_add_command(&c_set->subcommands,script_command_new("sample", "Set sample.", 0, &script_set_sample));
     script_command_list_add_command(&c_set->subcommands,script_command_new("stopping", "Set (assign) stopping or straggling.", 0, &script_set_stopping));
     script_command_list_add_command(&c_set->subcommands, script_command_new("variable", "Set a variable.", 0, NULL));
@@ -1090,11 +1135,15 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",           &fit->xtol,                          NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "gtolerance",           &fit->gtol,                          NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "ftolerance",           &fit->ftol,                          NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",      &fit->chisq_tol,                     NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance", &fit->chisq_fast_tol,                NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "ds",                   &sim->params.ds,                     NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "rk4",                  &sim->params.rk4,                    NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "stop_step_incident",   &sim->params.stop_step_incident,     NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "stop_step_exiting",    &sim->params.stop_step_exiting,      NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "stop_step_fudge",      &sim->params.stop_step_fudge_factor, NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_min",        &sim->params.stop_step_min,          NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_add",        &sim->params.stop_step_add,         NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "nucl_stop_accurate",   &sim->params.nucl_stop_accurate,     NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy", &sim->params.mean_conc_and_energy,   NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "geostragg",            &sim->params.geostragg,              NULL},
@@ -1676,6 +1725,10 @@ script_command_status script_set_sample(script_session *s, int argc, char *const
     }
     const int argc_orig = argc;
     sample_model *sm_new = sample_model_from_argv(fit->jibal, &argc, &argv);
+    if(!sm_new) {
+        jabs_message(MSG_WARNING, stderr, "Setting sample fails.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
     int argc_consumed = argc_orig - argc;
     sample_model_free(fit->sm);
     fit->sm = sm_new;
@@ -1831,13 +1884,14 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
     }
     return argc_orig - argc;
 }
+
 script_command_status script_split_sample_elements(struct  script_session *s, int argc, char * const *argv) {
     (void) argc;
     (void) argv;
     struct fit_data *fit = s->fit;
     sample_model *sm = fit->sm;
     fit->sm = sample_model_split_elements(sm);
-    return 0;
+    return SCRIPT_COMMAND_SUCCESS;
 }
 
 script_command_status script_add_reaction(script_session *s, int argc, char *const *argv) {

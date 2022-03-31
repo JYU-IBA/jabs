@@ -42,6 +42,9 @@ typedef struct {
     double stop_step_incident;
     double stop_step_exiting;
     double stop_step_fudge_factor;
+    double stop_step_min; /* TODO: automatic */
+    double stop_step_add; /* This is added to stop step */
+    double rough_layer_multiplier; /* Multiply given (or default) number of subspectra when calculating rough layers. */
 } sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
 
 typedef struct {
@@ -109,7 +112,10 @@ typedef struct {
 #include "sample.h"
 simulation *sim_init(jibal *jibal);
 void sim_free(simulation *sim);
-sim_calc_params sim_calc_params_defaults(int ds, int fast);
+sim_calc_params sim_calc_params_defaults();
+void sim_calc_params_update(sim_calc_params *p); /* Computes variables that can be computed from other variables */
+void sim_calc_params_ds(sim_calc_params *p, int ds);
+void sim_calc_params_fast(sim_calc_params *p, int fast);
 jibal_cross_section_type sim_cs(const simulation *sim, reaction_type type);
 int sim_reactions_add_reaction(simulation *sim, reaction *r);
 int sim_reactions_remove_reaction(simulation *sim, size_t i);
