@@ -40,7 +40,10 @@ int script_prepare_sim_or_fit(script_session *s) {
         jabs_message(MSG_ERROR, stderr, "No detector has been defined!\n");
         return -1;
     }
-    sim_sanity_check(fit->sim);
+    if(sim_sanity_check(fit->sim)) {
+        jabs_message(MSG_ERROR, stderr, "Simulation failed sanity check.\n");
+        return -1;
+    }
     fit_data_workspaces_free(s->fit);
     sample_free(fit->sim->sample);
 #ifdef DEBUG
@@ -139,6 +142,7 @@ void script_command_not_found(const char *cmd, const script_command *c_parent) {
 
 script_command_status script_simulate(script_session *s, int argc, char *const *argv) {
     const int argc_orig = argc;
+    (void) argv;
     struct fit_data *fit = s->fit;
     if(argc > 1) {
         /* TODO? */

@@ -478,7 +478,7 @@ void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspac
     jabs_message(MSG_INFO, stderr,  "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
     jabs_message(MSG_INFO, stderr,"function evaluations: %zu\n", fit->stats.n_evals);
 #ifdef DEBUG
-    jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf.nevalf);
+    jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf->nevalf);
 #endif
     jabs_message(MSG_INFO, stderr, "Jacobian evaluations: %zu\n", fdf->nevaldf);
     jabs_message(MSG_INFO, stderr, "reason for stopping: %s\n", gsl_strerror(fit->stats.info));
@@ -562,7 +562,6 @@ int fit(struct fit_data *fit_data) {
     gsl_matrix *J;
     fit_data->dof = fdf.n - fdf.p;
     int status;
-    size_t i, j;
 
     double *weights = malloc(sizeof(double) * fdf.n);
     if(!weights)
@@ -583,7 +582,7 @@ int fit(struct fit_data *fit_data) {
             free(weights);
             return 1;
         }
-        for(i = range->low; i <= range->high && i < det->channels; i++) {
+        for(size_t i = range->low; i <= range->high && i < det->channels; i++) {
             if(exp->bin[i] > 1.0) {
                 weights[i_w] = 1.0 / (exp->bin[i]);
             } else {
@@ -599,7 +598,7 @@ int fit(struct fit_data *fit_data) {
 
     gsl_matrix *covar = gsl_matrix_alloc (fit_params->n, fit_params->n);
     gsl_vector *x = gsl_vector_alloc(fit_params->n);
-    for(i = 0; i < fit_params->n; i++) {
+    for(size_t i = 0; i < fit_params->n; i++) {
         fit_params->vars[i].err = 0.0;
         fit_params->vars[i].value_orig = *fit_params->vars[i].value;
         gsl_vector_set(x, i, fit_params->vars[i].value_orig); /* Initial values of fitted parameters from function parameter array */
@@ -642,7 +641,7 @@ status = gsl_multifit_nlinear_driver(fit_data->n_iters_max, fit_data->xtol, fit_
     }
     if(fit_data->stats.error) { /* Revert changes */
         jabs_message(MSG_ERROR, stderr, "Fit aborted, reason: %s.\n", fit_error_str(fit_data->stats.error));
-        for(i = 0; i < fit_params->n; i++) {
+        for(size_t i = 0; i < fit_params->n; i++) {
             *fit_params->vars[i].value = fit_params->vars[i].value_orig;
         }
     } else { /* Do final calculations when fit was successful */
@@ -656,7 +655,7 @@ status = gsl_multifit_nlinear_driver(fit_data->n_iters_max, fit_data->xtol, fit_
 
         fit_report_results(fit_data, w, &fdf, covar);
 
-        for(i = 0; i < fit_data->sim->n_det; i++) {
+        for(size_t i = 0; i < fit_data->sim->n_det; i++) {
             spectrum_set_calibration(fit_data_exp(fit_data, i), sim_det(fit_data->sim, i), JIBAL_ANY_Z); /* Update the experimental spectra to final calibration (using default calibration) */
         }
     }
