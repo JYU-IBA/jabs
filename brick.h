@@ -23,6 +23,6 @@ typedef struct {
 } brick;
 
 void brick_int(double sigma_low, double  sigma_high, double E_low, double E_high, gsl_histogram *h, double Q);
-void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, brick *bricks, size_t n_bricks); /* Sums up all the contributions to sigma (including detector resolution) */
-void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, double scale, double sigmas_cutoff);
+void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, brick *bricks, size_t last_brick); /* Sums up all the contributions to sigma (including detector resolution) */
+void brick_int2(gsl_histogram *h, const brick *bricks, size_t last_brick, double scale, double sigmas_cutoff);
 #endif // JABS_BRICK_H

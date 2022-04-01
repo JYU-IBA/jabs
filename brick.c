@@ -59,14 +59,14 @@ void erf_Q_test() {
     }
 }
 
-void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, brick *bricks, size_t n_bricks) {
-    for(size_t i = 0; i <= n_bricks; i++) {
+void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, brick *bricks, size_t last_brick) {
+    for(size_t i = 0; i <= last_brick; i++) {
         bricks[i].sigma = sqrt(bricks[i].S + detector_resolution(det, isotope, bricks[i].E) +  bricks[i].S_geo_x + bricks[i].S_geo_y);
     }
 }
 
-void brick_int2(gsl_histogram *h, const brick *bricks, size_t n_bricks, const double scale, const double sigmas_cutoff) {
-    for(size_t i = 1; i <= n_bricks; i++) {
+void brick_int2(gsl_histogram *h, const brick *bricks, size_t last_brick, const double scale, const double sigmas_cutoff) {
+    for(size_t i = 1; i <= last_brick; i++) {
         const brick *b_high = &bricks[i-1];
         const brick *b_low = &bricks[i];
         //double E_diff_brick = b_high->E - b_low->E;

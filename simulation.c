@@ -569,7 +569,7 @@ void convolute_bricks(sim_workspace *ws) {
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
-        bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->n_bricks);
+        bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
         brick_int2(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params.sigmas_cutoff);
     }
 }
