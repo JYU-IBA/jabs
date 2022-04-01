@@ -237,8 +237,10 @@ void MainWindow::plotSpectrum(size_t i_det)
                 continue;
             if(r->n_bricks > 0 && r->histo->n > 0) {
                 if(histo) {
-                    // TODO: check binning
-                    gsl_histogram_add(histo, r->histo);
+                    for(size_t i = 0; i < histo->n && i < r->histo->n; i++) {
+                        /* ignores different ranges in GSL histograms */
+                        histo->bin[i] += r->histo->bin[i];
+                    }
                 } else {
                     histo = gsl_histogram_clone(r->histo);
                 }
