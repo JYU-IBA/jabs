@@ -518,6 +518,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
     sm->n_materials = 0;
     sm->materials = NULL;
     sm->ranges = NULL;
+    sm->cbins = NULL;
     int simplify = TRUE;
     if((*argc) >= 1) {
         if(strcmp((*argv)[0], "nosimplify") == 0) {
