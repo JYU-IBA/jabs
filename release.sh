@@ -4,7 +4,7 @@ do_release() {
     new_version=$(awk -F '.' '{printf("%i.%i.%i\n", $1, $2, $3+1)}' < version.txt)
     read -p "New version (^C to cancel, empty for $new_version: " version_given
     if [ ! -z "$version_given" ]; then
-        new_version = "$version_given";
+        new_version="$version_given";
     fi
     echo "You have chosen: $new_version"
     echo "$new_version" > version.txt
