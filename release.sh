@@ -24,7 +24,7 @@ fi
 
 echo "Change version number, commit and tag the repository."
 echo -n "Current version is: "
-cat version
+cat version.txt
 read -p "Do you wish to continue? " reply
 case $reply in 
     [Yy]* ) do_release;;
