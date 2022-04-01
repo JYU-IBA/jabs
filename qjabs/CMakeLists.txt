@@ -25,7 +25,7 @@ include(../git_watcher_config.cmake)
 
 configure_file(version.h.in version.h @ONLY)
 
-find_package(Qt6 COMPONENTS Widgets REQUIRED PrintSupport REQUIRED)
+find_package(Qt6 COMPONENTS Widgets REQUIRED PrintSupport REQUIRED Svg REQUIRED)
 
 if(${QT_VERSION_MAJOR} NOT EQUAL 6)
     message("Qt major version is ${QT_VERSION_MAJOR}. This program is only for Qt6.")
@@ -134,6 +134,7 @@ target_include_directories(qjabs
 target_link_libraries(qjabs
     PRIVATE Qt6::Widgets
     PRIVATE Qt6::PrintSupport
+    PRIVATE Qt6::Svg
     PRIVATE jibal
     PRIVATE GSL::gsl
     PRIVATE "$<$<BOOL:${UNIX}>:m>"
