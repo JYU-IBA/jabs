@@ -9,7 +9,7 @@ do_release() {
     echo "You have chosen: $new_version"
     echo "$new_version" > version.txt
     ./citation.sh
-    git add version CITATION.cff
+    git add version.txt CITATION.cff
     git commit -m "Version bump to $new_version"
     git tag "v$new_version"
     echo "You can now push (I won't do it)"
