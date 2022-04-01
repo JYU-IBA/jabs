@@ -63,7 +63,7 @@ sample *sample_alloc(size_t n_isotopes, size_t n_ranges) {
     s->n_isotopes = n_isotopes;
     s->isotopes = calloc(n_isotopes, sizeof(jibal_isotope *));
     s->cbins = calloc( n_ranges * n_isotopes, sizeof(double));
-    s->ranges = malloc(n_ranges*sizeof(struct sample_range));
+    s->ranges = calloc(n_ranges, sizeof(struct sample_range));
     return s;
 }
 
@@ -670,6 +670,9 @@ sample *sample_copy(const sample *s_in) {
     memcpy(s_out->isotopes, s_in->isotopes, sizeof(jibal_isotope *) * s_out->n_isotopes);
     memcpy(s_out->ranges, s_in->ranges, sizeof (struct sample_range) * s_out->n_ranges);
     memcpy(s_out->cbins, s_in->cbins, sizeof (double) * s_out->n_isotopes * s_out->n_ranges);
+#ifdef DEBUG
+        fprintf(stderr, "Made a sample copy with %zu ranges and %zu isotopes.\n", s_out->n_ranges, s_out->n_isotopes);
+#endif
     return s_out;
 }
 
