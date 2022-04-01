@@ -16,6 +16,7 @@
 #include <string.h>
 #ifdef WIN32
 #include <io.h>
+#include "win_compat.h"
 #else
 #include <unistd.h>
 #endif
