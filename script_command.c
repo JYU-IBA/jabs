@@ -1163,6 +1163,7 @@ script_command *script_commands_create(struct script_session *s) {
 
     script_command *c_show = script_command_new("show", "Show information on things.", 0, NULL);
     script_command_list_add_command(&head, c_show);
+    script_command_list_add_command(&c_show->subcommands, script_command_new("aperture", "Show aperture.", 0, &script_show_aperture));
     script_command_list_add_command(&c_show->subcommands, script_command_new("detector", "Show detector.", 0, &script_show_detector));
     script_command_list_add_command(&c_show->subcommands, script_command_new("fit" ,"Show fit." , 0, &script_show_fit));
     script_command_list_add_command(&c_show->subcommands, script_command_new("reactions","Show reactions." , 0, &script_show_reactions));
@@ -1550,6 +1551,16 @@ script_command_status script_show_fit(script_session *s, int argc, char *const *
     return 0;
 }
 
+script_command_status script_show_aperture(struct script_session *s, int argc, char * const *argv) {
+    struct fit_data *fit = s->fit;
+    const int argc_orig = argc;
+    char *aperture_str = aperture_to_string(s->fit->sim->beam_aperture);
+    jabs_message(MSG_INFO, stderr, "aperture %s\n", aperture_str);
+    free(aperture_str);
+    return argc_orig - argc;
+}
+
+
 script_command_status script_show_detector(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
     size_t i_det = 0;
@@ -1610,18 +1621,26 @@ script_command_status script_set_aperture(script_session *s, int argc, char *con
         jabs_message(MSG_ERROR, stderr, "Usage: set aperture <type> {width|height|diameter} ...\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    aperture *a = aperture_from_argv(s->jibal, &argc, &argv);
-    if(!a) {
+    fit->sim->beam_aperture = aperture_set_from_argv(s->jibal, fit->sim->beam_aperture, &argc, &argv);
+    if(!fit->sim->beam_aperture) {
         jabs_message(MSG_ERROR, stderr, "Aperture could not be parsed.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(argc) {
-        aperture_free(a);
-        jabs_message(MSG_ERROR, stderr, "Unexpected extra arguments (%i), starting with %s\n", argc, argv[0]);
+        jabs_message(MSG_ERROR, stderr, "Unexpected extra arguments (%i), starting with %s.\n", argc, argv[0]);
+        if(fit->sim->beam_aperture->type == APERTURE_NONE) {
+            jabs_message(MSG_INFO, stderr, "Aperture type not defined. Allowed types:");
+            for(const jibal_option *o = aperture_option; o->s; o++) {
+                jabs_message(MSG_INFO, stderr, " %s", o->s);
+            }
+            jabs_message(MSG_INFO, stderr, "\n");
+        } else {
+            jabs_message(MSG_ERROR, stderr, "Aperture type was %s. Aperture removed.\n", aperture_name(fit->sim->beam_aperture));
+        }
+        aperture_free(fit->sim->beam_aperture);
+        fit->sim->beam_aperture = NULL;
         return SCRIPT_COMMAND_FAILURE;
     }
-    aperture_free(fit->sim->beam_aperture);
-    fit->sim->beam_aperture = a;
     return argc_orig - argc;
 }
 

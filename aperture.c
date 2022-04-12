@@ -54,39 +54,33 @@ double aperture_width_shape_product(const aperture *a, const char direction) {
     return 0.0;
 }
 
-aperture *aperture_from_argv(const jibal *jibal, int * const argc, char * const ** const argv) {
+aperture *aperture_set_from_argv(const jibal *jibal, aperture *a, int * const argc, char * const ** const argv) {
     int found = 0;
     if(*argc < 1) {
-        return NULL;
+        return a;
+    }
+    if(!a) {
+        a = aperture_default();
     }
     char *str = (*argv[0]);
     size_t len = strlen(str);
-    aperture_type type = APERTURE_NONE;
     for(const jibal_option *o = aperture_option; o->s; o++) { /* look for a matching aperture_option keyword (circle, rectangle) */
         if(strncmp(o->s, str, len) == 0) {
-            type = o->val;
             (*argv)++;
             (*argc)--;
-            found++;
+            a->type = o->val;
+            break;
         }
     }
-
-    if(found != 1) {
-        return NULL;
-    }
-
-    aperture *a = aperture_default();
-    a->type = type;
-
     while((*argc) >= 1) {
         str = (*argv)[0];
         if((*argc) >= 2) {
             double *val = NULL;
-            if(type == APERTURE_RECTANGLE && strcmp(str, "width") == 0) {
+            if(a->type == APERTURE_RECTANGLE && strcmp(str, "width") == 0) {
                 val = &(a->width);
-            } else if(type == APERTURE_RECTANGLE && strcmp(str, "height") == 0) {
+            } else if(a->type == APERTURE_RECTANGLE && strcmp(str, "height") == 0) {
                 val = &(a->height);
-            } else if(type == APERTURE_CIRCLE && strncmp(str, "dia", 3) == 0) { /* Diameter can be abbreviated */
+            } else if(a->type == APERTURE_CIRCLE && strncmp(str, "dia", 3) == 0) { /* Diameter can be abbreviated */
                 val = &(a->diameter);
             }
             if(val) {
@@ -109,7 +103,7 @@ aperture *aperture_from_string(const jibal *jibal, const char *str) {
     char **argv_orig = string_to_argv(str, &argc_orig);
     char **argv = argv_orig;
     int argc = argc_orig;
-    aperture *a = aperture_from_argv(jibal, &argc, (char *const **) &argv);
+    aperture *a = aperture_set_from_argv(jibal, NULL, &argc, (char *const **) &argv);
     argv_free(argv_orig, argc_orig);
     return a;
 }
