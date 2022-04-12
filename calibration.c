@@ -121,7 +121,7 @@ double calibration_get_param(const calibration *c, int i) {
     }
 }
 
-size_t calibration_get_number_of_params(const calibration *c) {
+size_t calibration_get_number_of_params(const calibration *c) { /* Number does not include "resolution" parameter! */
     if(c->type == CALIBRATION_LINEAR) {
         return 2;
     }
@@ -159,6 +159,18 @@ double *calibration_get_param_ref(calibration *c, int i) {
         }
     }
     return NULL;
+}
+
+int calibration_copy_params(calibration *dst, calibration *src) {
+    if(!src || !dst)
+        return EXIT_FAILURE;
+    size_t n_dst = calibration_get_number_of_params(dst);
+    size_t n_src = calibration_get_number_of_params(src);
+    size_t n = n_dst < n_src ? n_dst : n_src;
+    for(int i = CALIBRATION_PARAM_RESOLUTION; i < (int)n; i++) { /* Loop includes resolution. Note that the parameters are copied over as-is. This works with linear and poly, but maybe not with others. */
+        calibration_set_param(dst, i , calibration_get_param(src, i));
+    }
+    return EXIT_SUCCESS;
 }
 
 const char *calibration_name(const calibration *c) {

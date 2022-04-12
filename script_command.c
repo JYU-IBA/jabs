@@ -507,7 +507,7 @@ script_command_status script_set_detector_calibration_val(struct script_session 
     switch(val) { /* Handle cases where we don't expect (consume) arguments */
         case 'L': /* linear */
             c = calibration_init_linear();
-            calibration_set_param(c, CALIBRATION_PARAM_SLOPE, ENERGY_SLOPE);
+            calibration_copy_params(c, detector_get_calibration(det, s->Z_active)); /* Copy parameters from old calibration, as much as possible */
             if(detector_set_calibration_Z(s->jibal->config, det, c, s->Z_active)) {
                 jabs_message(MSG_ERROR, stderr, "Could not set linear calibration (element = %s).\n",
                              jibal_element_name(s->jibal->elements, s->Z_active));
@@ -1709,7 +1709,8 @@ script_command_status script_set_detector_calibration_poly(struct script_session
         return SCRIPT_COMMAND_FAILURE;
     }
     calibration *c = calibration_init_poly(n);
-    for(size_t i = 0; i <= n; i++) {
+    calibration_copy_params(c, detector_get_calibration(det, s->Z_active)); /* This, de facto, only copies resolution from old calibration, since the rest are overwritten very soon. */
+    for(int i = 0; i <= n; i++) {
         calibration_set_param(c, i, jibal_get_val(s->jibal->units, UNIT_TYPE_ANY, argv[0]));
         argc--;
         argv++;

@@ -66,6 +66,7 @@ int calibration_set_param(calibration *c, int i, double value);
 size_t calibration_get_number_of_params(const calibration *c);
 double calibration_get_param(const calibration *c, int i); /* get i'th param in range [0..n-1], get n by  calibration_get_number_of_params()*/
 double *calibration_get_param_ref(calibration *c, int i);
+int calibration_copy_params(calibration *dst, calibration *src); /* Copies parameters from src to dst. Calibration types may be different (e.g. linear or poly), we'll do our best. */
 const char *calibration_name(const calibration *c);
 char *calibration_to_string(const calibration *c);
 #endif //CALIB_CALIBRATION_H
