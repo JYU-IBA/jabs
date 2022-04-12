@@ -23,7 +23,7 @@
 #include "options.h"
 #include "git.h"
 
-#define USAGE_STRING "Usage: jabs [-E <energy>] <material1> <thickness1> [<material2> <thickness2> ...]\n\nExample: jabs -E 2MeV --alpha=10deg --theta=170deg --out=spectrum.csv sample Au 500tfu SiO2 1000tfu Si 10000tfu\n"
+#define USAGE_STRING "Usage: jabs [OPTION [<argument>]] [OPTION2 ...] ... [<FILE> [<FILE2>] ...] | sample <material1> <thickness1> [<material2> <thickness2> ...]]\n\nRun without arguments or \"-i\" to use JaBS interactively, give a sample or script file(s) otherwise.\n\nExample: jabs -E 2MeV --alpha=10deg --theta=170deg --out=spectrum.csv sample Au 500tfu SiO2 1000tfu Si 10000tfu\nExample: jabs example.jbs\n"
 
 const char *jabs_version() {
     if(git_populated()) {
@@ -90,7 +90,7 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
     static const char *help_texts[] = {
             "Print this message.",
             "Print version number.",
-            "Interactive mode.",
+            "Interactive mode. If script file(s) are given, they will be run first.",
             "Increase or give verbosity level.",
             "Output to file instead of standard output. For CSV use .csv suffix.",
             "Incident ion (without charge state), e.g. 4He",
