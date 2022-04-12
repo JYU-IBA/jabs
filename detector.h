@@ -68,10 +68,7 @@ int detector_print(const jibal *jibal, const char *filename, const detector *det
 int detector_aperture_set_from_argv(const jibal *jibal, detector *det, int *argc, char * const **argv);
 int detector_foil_set_from_argv(const jibal *jibal, detector *det, int *argc, char * const **argv);
 int detector_update_foil(detector *det);
-int detector_set_var(const jibal *jibal, detector *det, const char *var_str, const char *val_str);
-jibal_config_var *detector_make_vars(detector *det);
 double detector_angle(const detector *det, char direction);
-double detector_theta_deriv(const detector *det, char direction);
 double detector_solid_angle_calc(const detector *det);
 double detector_resolution(const detector *det, const jibal_isotope *isotope, double E); /* Isotope is used for Z (Z specific resolution) and for mass (ToF detector) */
 char *detector_resolution_to_string(const detector *det, int Z);

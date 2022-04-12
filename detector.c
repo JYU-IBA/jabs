@@ -233,80 +233,12 @@ int detector_update_foil(detector *det) {
     return 0;
 }
 
-int detector_set_var(const jibal *jibal, detector *det, const char *var_str, const char *val_str) {
-    if(!jibal || !det || !var_str || !val_str)
-        return EXIT_FAILURE;
-    jibal_config_var *vars = detector_make_vars(det);
-    if(!vars)
-        return EXIT_FAILURE;
-    int found = FALSE;
-    int error = FALSE;
-    for(jibal_config_var *var = vars; var->type != JIBAL_CONFIG_VAR_NONE; var++) {
-        if(strcmp(var_str, var->name) == 0) {
-            jibal_config_var_set(jibal->units, var, val_str, NULL);
-            found = TRUE;
-            break;
-        }
-    }
-    free(vars);
-    if(found && !error) {
-        return EXIT_SUCCESS;
-    } else {
-        return EXIT_FAILURE;
-    }
-}
-
-jibal_config_var *detector_make_vars(detector *det) {
-    if(!det)
-        return NULL;
-    jibal_config_var vars[] = {
-            {JIBAL_CONFIG_VAR_OPTION, "type",       &det->type,          detector_option},
-            {JIBAL_CONFIG_VAR_UNIT,   "length",     &det->length,            NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "theta",      &det->theta,             NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "phi",        &det->phi,               NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "solid",      &det->solid,             NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "distance",   &det->distance,          NULL},
-            {JIBAL_CONFIG_VAR_INT,    "column",     &det->column,            NULL},
-            {JIBAL_CONFIG_VAR_INT,    "channels",   &det->channels,          NULL},
-            {JIBAL_CONFIG_VAR_INT,    "compress",   &det->compress,          NULL},
-            {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                              NULL}
-    };
-    int n_vars;
-    for(n_vars = 0; vars[n_vars].type != 0; n_vars++);
-    size_t var_size = sizeof(jibal_config_var)*(n_vars + 1); /* +1 because the null termination didn't count */
-    jibal_config_var *vars_out = malloc(var_size);
-    if(vars_out) {
-        memcpy(vars_out, vars, var_size); /* Note that this does not make a deep copy */
-    }
-    return vars_out;
-}
-
 double detector_angle(const detector *det, const char direction) { /* Gives detector angle (to an axis, see angle_tilt()) */
     double angle = C_PI - angle_tilt(det->theta, det->phi, direction); /* The pi is here because our detector angles are defined oddly */
     angle = fmod(angle, C_2PI);
     if(angle > C_PI)
         angle -= C_2PI;
     return angle;
-}
-
-double detector_theta_deriv(const detector *det, const char direction) { /* We don't need to use this. Probably doesn't work when det->theta = 180 deg TODO: remove. */
-    static const double delta = 0.001*C_DEG;
-    double theta, phi;
-
-    theta = delta;
-    if(direction == 'x') {
-        phi = 0.0;
-    } else if(direction == 'y') {
-        phi = C_PI_2;
-    } else {
-        return 0.0;
-    }
-    rotate(theta, phi, det->theta, det->phi, &theta, &phi);
-    double result = (theta - det->theta)/delta;
-#ifdef DEBUG
-    fprintf(stderr, "(%.7lf deg - %.7lf deg)/(%g deg) = %g\n", theta/C_DEG, det->theta/C_DEG, delta/C_DEG, result);
-#endif
-    return result; /* TODO: sign of result? */
 }
 
 double detector_solid_angle_calc(const detector *det) {
