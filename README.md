@@ -2,9 +2,9 @@
 
 [![DOI](https://zenodo.org/badge/414092526.svg)](https://zenodo.org/badge/latestdoi/414092526)
 
-Simulates RBS, ERD and NRA spectra rapidly.
+Simulates and fits RBS, EBS, ERD and NRA spectra rapidly.
     
-    Copyright (C) 2021 Jaakko Julin
+    Copyright (C) 2021 - 2022 Jaakko Julin
     
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -56,7 +56,9 @@ This is the preferred way of using JaBS. Some command line options (see below) c
 
 Launch JaBS in interactive mode simply by running `jabs` or `jabs --interactive`. Scripts (i.e. files with commands identical to interactive mode input) can be given as command line parameters e.g. `jabs script.jbs`, piped in `jabs < script.jbs` or run using the interactive mode. Filename from command line must not be `sample` (reserved keyword for giving the sample on the command line, see below).
 
-The interactive mode should be self-explanatory and an internal help is provided. Please see [the example script](example/example.jbs) to get started.
+The interactive mode should be self-explanatory and an internal help is provided. Please see [the example script](example/example.jbs) to get started. Note that scripts are executed in the directory where the file is located, when opened in the GUI, but in the current working directory by the command-line program. This affects loading and saving filenames.
+
+The scripting language is not a programming language, there is no flow control, new variables can not be introducted etc. This may change in the future.
 
 ## Command line usage
 
@@ -70,7 +72,8 @@ Detector and sample can be read from files. The file formats are simple and huma
 
 ## Features
 ### Implemented
- - Basic RBS spectrum simulation with atomic data, cross sections, electronic stopping and straggling given by [JIBAL](https://github.com/JYU-IBA/jibal)
+ - Basic RBS spectrum simulation with Rutherford and Andersen cross-sections.
+ - Atomic data, electronic stopping and straggling given by [JIBAL](https://github.com/JYU-IBA/jibal).
  - Automatic recoil spectra when working in forward angles (ERDA)
  - Arbitrary cross sections and reactions from R33 files. Both EBS (Q-value is zero) as well as p-p NRA are implemented. 
  - Point-by-point and layered sample models
@@ -79,17 +82,19 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Non-linear detector calibration (polynomial of arbitrary degree) and constant detector energy resolution or timing resolution (for ToF detectors)
  - Different calibrations are possible for different elements (Z-specific calibration).
  - Multilayer foil in front of detector
- - Reading of experimental data
+ - Reading of experimental data, integer factor compress
  - Fitting to experimental spectrum (multidimensional non-linear least squares fitting)
  - Linear ad-hoc substrate channeling correction
  - Faster (less accurate) mode
  - User defined "molecules" i.e. elements with fixed concentration ratios (e.g. you can fit C in SiO2 without changing Si/O ratio)
  - Weighting of cross-sections by straggling 
  - Kinematic (geometric) broadening due to finite detector size and beam spot
- - Dual scattering model (although it needs improvements before it is usable)
+ - Dual scattering model (although it is not guaranteed to be accurate)
  - Simultaneous multi-detector simulation and fitting.
- - Stopping corrections can be supplied by user (Bragg correction) for a specific layer
+ - Stopping corrections can be supplied by user (Bragg correction) for a specific layer as well as similar corrections for straggling and yield
  - Different detector calibration can be given for different particles (different proton number Z)
+ - Two-phase fitting, where faster physics model is used in the beginning and more accurate (user configurable) model is turned on after the first phase is starting to converge. User can skip the faster fitting phase.
+ - Testing of areal sum (counts) and residuals. Some test cases are run by the developer to check sanity and accuracy of simulations for every new release.
 
 ### Not (yet) implemented, but planned
  - Support for more input and output data formats (CSV, IDF, ...)
@@ -99,11 +104,11 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Simulation of time-of-flight spectra
  - Publication quality plotting
 
-### Distant future
+### Distant future, if ever
  - Parallel processing of independent simulations
  - Advanced fitting algorithms
  - Fitting of spectra from different measurements (different beam, fluence etc for each simulation)
-
+ - Turing completeness of the scripting language
 ### Known issues
  - Saving a detector to a file is not supported. Calibrations can be saved as a script.
  - Occasional crashes when fitting, since some corner cases are not handled properly
@@ -119,16 +124,22 @@ Detector and sample can be read from files. The file formats are simple and huma
 
 There is a fitting feature, activated with the `--fit` or `-F` option or `fit` script command. The multidimensional nonlinear least-squares fitting is based on [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html). The accuracy and sanity of fits must be evaluated by the user.
 
-The user can give only a single range to fit from the command line. This is specified with `--fit_low` and `--fit_high`.
+The user can give only a single range to fit from the command line. This is specified with `--fit_low` and `--fit_high`. It is recommended to use scripts when fitting, as then an arbitrary number of fit ranges can be specified.
 
 Use `--fit_vars` to give a comma separate list of variables to fit. Currently supported detector related variables are `slope,offset,resolution`
-`calib` which is equivalent to the previous triplet and `solid`. Currently adding fit variables will add all them for each detector.
+`calib` which is equivalent to the previous triplet and `solid`. Currently adding fit variables will add all them for each detector. 
 
 Beam `fluence` can be fitted. Don't try to combine this with `solid` for all detectors.
 
 Layer thickness can be also fitted using variable `thicknessN` where `N` is number of a layer, numbering starts from 1 (surface). Roughness can be fitted similarly to thickness, use `roughN`. Concentrations can be fitted using `concN_I`, where `N` is the layer and `I` the element.
 
 Example: `jabs --fit_vars=calib,fluence,thickness1 --fit_low=250 ...`
+
+Interactive/script example:
+
+    jabs> add fit_range [500:900] [1000:1200] 
+    jabs> fit calib,fluence,thickness1
+
 
 ## Open source licenses
 
