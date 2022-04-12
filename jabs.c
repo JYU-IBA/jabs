@@ -920,7 +920,7 @@ int simulate_with_ds(sim_workspace *ws) {
         double E_back = ion1.E;
         const double E_mean = (E_front + E_back) / 2.0;
 
-        jabs_message(MSG_ERROR, stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x/C_TFU, d_after.x/C_TFU, E_front/C_KEV, E_back/C_KEV, fluence);
+        jabs_message(MSG_VERBOSE, stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x/C_TFU, d_after.x/C_TFU, E_front/C_KEV, E_back/C_KEV, fluence);
         double p_sum = 0.0;
         for(int i_polar = 0; i_polar < ws->params.ds_steps_polar; i_polar++) {
             const double ds_polar_min = 20.0*C_DEG;
