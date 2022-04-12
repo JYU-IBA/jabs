@@ -203,7 +203,7 @@ char *calibration_to_string(const calibration *c) { /* Note that this does not i
     return out;
 }
 
-char *calibration_param_name(calibration_type type, int i) {
+char *calibration_param_name(calibration_type type, calibration_param_type i) {
     char *s = NULL;
     switch(i) {
         case CALIBRATION_PARAM_RESOLUTION:
@@ -217,6 +217,8 @@ char *calibration_param_name(calibration_type type, int i) {
             break;
         case CALIBRATION_PARAM_QUAD:
             s = "quad";
+            break;
+        default:
             break;
     }
     if(s) {

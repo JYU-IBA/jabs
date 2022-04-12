@@ -702,40 +702,75 @@ int fit_params_add_sim(fit_params *params, const char *token, simulation *sim) {
 int fit_params_add_detector(fit_params *params, const char *token, simulation *sim, size_t i_det) {
     detector *det = sim->det[i_det];
     assert(det);
-    if(strncmp(token, "calib", 5) == 0) {
+    char *det_name = NULL;
+    if(sim->n_det > 1) {
+        asprintf(&det_name, "det%zu_", i_det); /* Detector fit parameters are given a prefix if multiple detectors are present */
+    } else {
+        det_name = strdup("");
+    }
+    int status = EXIT_SUCCESS;
+    const char *param_name = NULL;
+    const char *unit = NULL;
+    double unit_factor = 1.0;
+    double *value = NULL;
+    if(strcmp(token, "slope") == 0) {
+        param_name = "slope";
+        unit = "keV";
+        unit_factor = C_KEV;
+        value = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE);
+    } else if(strcmp(token, "offset") == 0) {
+        param_name = "offset";
+        unit = "keV";
+        unit_factor = C_KEV;
+        value = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET);
+    } else if(strncmp(token, "reso", 4) == 0) {
+        param_name = "reso";
+        unit = detector_param_unit(det);
+        unit_factor = detector_param_unit_factor(det);
+        value = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION);
+    } else if(strncmp(token, "solid", 5) == 0) {
+        param_name = "solid";
+        unit = "msr";
+        unit_factor = C_MSR;
+        value = &det->solid;
+
+    } else if(strncmp(token, "theta", 5) == 0) {
+        param_name = "theta";
+        unit = "deg";
+        unit_factor = C_DEG;
+        value = &det->theta;
+    }
+    if(param_name) {
+        char *s = NULL;
+        asprintf(&s, "%s%s", det_name, param_name);
+        status = fit_params_add_parameter(params, value, param_name, unit, unit_factor);
+        if(status == EXIT_SUCCESS) {
+            jabs_message(MSG_INFO, stderr, "Added fit parameter %s for detector %zu.\n", param_name, i_det + 1);
+        }
+        free(s);
+    }
+    if(strncmp(token, "calib", 5) == 0) { /* "calib" is a bit different, since it can represent multiple fit parameters */
         calibration *c = detector_get_calibration(det, JIBAL_ANY_Z);
         assert(c);
         size_t n = calibration_get_number_of_params(c);
         for(int i = CALIBRATION_PARAM_RESOLUTION; i < (int)n; i++) {
-            char *param_name = calibration_param_name(c->type, i);
-            fit_params_add_parameter(params, calibration_get_param_ref(c, i), param_name, "keV", C_KEV);
-            free(param_name);
+            char *s = NULL;
+            char *calib_param_name =  calibration_param_name(c->type, i);
+            asprintf(&s, "%s%s", det_name, param_name);
+            free(calib_param_name);
+            status = fit_params_add_parameter(params, calibration_get_param_ref(c, i), s, "keV", C_KEV);
+            free(s);
+            if(status) {
+                jabs_message(MSG_ERROR, stderr, "Could not add calibration parameter (i == %i).\n", i);
+                break;
+            }
         }
-        jabs_message(MSG_INFO, stderr, "Added fit parameters (%zu + resolution) for detector %zu calibration\n", n, i_det + 1);
+        if(status == EXIT_SUCCESS) {
+            jabs_message(MSG_INFO, stderr, "Added fit parameters (%zu + resolution) for detector %zu calibration\n", n, i_det + 1);
+        }
     }
-    if(strcmp(token, "slope") == 0) {
-        fit_params_add_parameter(params,
-                                 calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE),
-                                 "slope", "keV", C_KEV); /* TODO: adding parameters can fail */
-        jabs_message(MSG_INFO,  stderr, "Added fit parameters for detector %zu calibration slope\n", i_det + 1);
-    }
-    if(strcmp(token, "offset") == 0) {
-        fit_params_add_parameter(params,
-                                 calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET),
-                                 "offset", "keV", C_KEV);
-        jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu calibration offset\n", i_det + 1);
-    }
-    if(strncmp(token, "reso", 4) == 0) {
-        fit_params_add_parameter(params,
-                                 calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION),
-                                 "resolution", detector_param_unit(det), detector_param_unit_factor(det));
-        jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu resolution\n", i_det + 1);
-    }
-    if(strncmp(token, "solid", 5) == 0) {
-        fit_params_add_parameter(params, &det->solid, "solid", "msr", C_MSR);
-        jabs_message(MSG_INFO, stderr, "Added fit parameters for detector %zu solid angle\n", i_det + 1);
-    }
-    return EXIT_SUCCESS; /* TODO: success? */
+    free(det_name);
+    return EXIT_FAILURE;
 }
 
 int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, const char *fit_vars) {

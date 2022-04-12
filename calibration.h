@@ -32,10 +32,13 @@ static const jibal_option calibration_option[] = {
         {"polynomial", CALIBRATION_POLY},
         {NULL, 0}
 };
-#define CALIBRATION_PARAM_RESOLUTION (-1)
-#define CALIBRATION_PARAM_OFFSET 0 /* This is zero, because offset is the first (zero'th) element in parameter arrays. Typically. */
-#define CALIBRATION_PARAM_SLOPE 1
-#define CALIBRATION_PARAM_QUAD 2
+
+typedef enum calibration_param_type {
+    CALIBRATION_PARAM_RESOLUTION = -1,
+    CALIBRATION_PARAM_OFFSET = 0,
+    CALIBRATION_PARAM_SLOPE = 1,
+    CALIBRATION_PARAM_QUAD = 2 /* Higher order terms etc are possible */
+} calibration_param_type;
 
 typedef struct calibration {
     calibration_type type;
@@ -70,5 +73,5 @@ double *calibration_get_param_ref(calibration *c, int i);
 int calibration_copy_params(calibration *dst, calibration *src); /* Copies parameters from src to dst. Calibration types may be different (e.g. linear or poly), we'll do our best. */
 const char *calibration_name(const calibration *c);
 char *calibration_to_string(const calibration *c);
-char *calibration_param_name(calibration_type type, int i); /* Name of i'th param (e.g. "slope"). Returns a string that can be free'd */
+char *calibration_param_name(calibration_type type, calibration_param_type i); /* Name of i'th param (e.g. "slope"). Returns a string that can be free'd */
 #endif //CALIB_CALIBRATION_H
