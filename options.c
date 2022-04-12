@@ -83,7 +83,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
             {"depthsteps",    required_argument, NULL, '8'},
             {"norbs",         no_argument,       NULL, '#'},
             {"noerd",         no_argument,       NULL, '9'},
-            {"isotopes",      no_argument,       NULL, 0},
             {"channeling",    required_argument, NULL, 'C'},
             {"channeling_slope",    required_argument, NULL, 3},
             {NULL, 0,                NULL,   0}
@@ -121,7 +120,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
             "Maximum number of depth steps",
             "Don't make an RBS spectrum",
             "Don't make an ERD spectrum (ERD automatically turns on forward angles)",
-            "Print isotopes (in concentration table)",
             "Ad-hoc substrate channeling yield correction (constant)",
             "Ad-hoc substrate channeling yield correction (energy slope 1/keV)",
             NULL
@@ -133,10 +131,7 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
             break;
         switch (c) {
             case 0:
-                if(strcmp(long_options[option_index].name, "isotopes") == 0) {
-                    cmd_opt->print_isotopes = TRUE;
-                }
-                else if(strcmp(long_options[option_index].name, "ds") == 0) {
+                if(strcmp(long_options[option_index].name, "ds") == 0) {
                     cmd_opt->ds = TRUE;
                 }
                 break;
