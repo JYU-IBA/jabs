@@ -2069,7 +2069,7 @@ script_command_status script_help_version(script_session *s, int argc, char *con
     (void) s;
     jabs_message(MSG_INFO, stderr, "JaBS version %s.\n", jabs_version());
     if(git_populated()) {
-        jabs_message(MSG_INFO, stderr, "This version of JaBS is compiled from a git repository (branch %s).\n", git_branch());
+        jabs_message(MSG_INFO, stderr, "This version of JaBS is compiled from a git repository (branch %s%s).\n", git_branch(),  git_dirty()?", dirty":"");
         jabs_message(MSG_INFO, stderr, "Git commit %s dated %s.\n", git_commit_sha1(), git_commit_date());
     }
     return SCRIPT_COMMAND_SUCCESS;
