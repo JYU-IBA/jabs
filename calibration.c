@@ -1,3 +1,4 @@
+#include "string.h"
 #include <jibal_units.h>
 #include "generic.h"
 #include "calibration.h"
@@ -200,4 +201,27 @@ char *calibration_to_string(const calibration *c) { /* Note that this does not i
             break;
     }
     return out;
+}
+
+char *calibration_param_name(calibration_type type, int i) {
+    char *s = NULL;
+    switch(i) {
+        case CALIBRATION_PARAM_RESOLUTION:
+            s = "resolution";
+            break;
+        case CALIBRATION_PARAM_OFFSET:
+            s = "offset";
+            break;
+        case CALIBRATION_PARAM_SLOPE:
+            s = "slope";
+            break;
+        case CALIBRATION_PARAM_QUAD:
+            s = "quad";
+            break;
+    }
+    if(s) {
+        return strdup(s);
+    }
+    asprintf(&s, "calib_p%i", i);
+    return s;
 }

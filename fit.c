@@ -120,7 +120,7 @@ fit_params *fit_params_new() {
     p->vars = NULL;
     return p;
 }
-int fit_params_add_parameter(fit_params *p, double *value, const char *name) {
+int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor) {
     if(!value || !name) {
 #ifdef DEBUG
         fprintf(stderr, "Didn't add a fit parameter since a NULL pointer was passed. Value = %p, name = %p (%s).\n", (void *)value, (void *)name, name);
@@ -140,6 +140,11 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name) {
     fit_variable *var = &(p->vars[p->n - 1]);
     var->value = value;
     var->name = strdup(name);
+    var->unit = unit;
+    var->unit_factor = unit_factor;
+#ifdef DEBUG
+    fprintf(stderr, "Fit parameter %s added successfully (total %zu).\n", var->name, p->n);
+#endif
     return EXIT_SUCCESS;
 }
 void fit_params_free(fit_params *p) {
@@ -490,12 +495,12 @@ void fit_report_parameters(const fit_data *fit, const gsl_multifit_nlinear_works
         *(var->value) = var->value_final;
         var->err = c * sqrt(gsl_matrix_get(covar, i, i));
         var->err_rel = fabs(var->err / var->value_final);
-        jabs_message(MSG_INFO, stderr, "    p[%zu]: %16s = %12g +- %12g (%5.1lf%%), %10.6lf x %12g \n", i, var->name,
-                     var->value_final,
-                     var->err,
+        jabs_message(MSG_INFO, stderr, "    p[%zu]: %16s (%3s) = %12g +- %12g (%5.1lf%%), %12g x %10.6lf \n", i, var->name, var->unit,
+                     var->value_final/var->unit_factor,
+                     var->err/var->unit_factor,
                      100.0 * var->err_rel,
-                     var->value_final/var->value_orig,
-                     var->value_orig
+                     var->value_orig/var->unit_factor,
+                     var->value_final/var->value_orig
         );
     }
     jabs_message(MSG_INFO, stderr, "\nCorrelation coefficients matrix:\n       | ");

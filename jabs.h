@@ -36,6 +36,9 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim);
 int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2); /* Assigns stopping and straggling (GSTO) for given Z2. Goes through all possible Z1s (beam and reaction products). */
 int assign_stopping_Z1_Z2(jibal_gsto *gsto, int Z1, int Z2);
 int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histogram *exp);
+int fit_params_add_sm(fit_params *params, const char *token, const sample_model *sm);
+int fit_params_add_sim(fit_params *params, const char *token, simulation *sim);
+int fit_params_add_detector(fit_params *params, const char *token, simulation *sim, size_t i_det); /* Used by fit_params_add_sim(), not to be called by others. */
 int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, const char *fit_vars); /* fit_vars is a comma separated list of variables to fit */
 void fit_params_clear(fit_params *params);
 int print_bricks(const char *filename, const sim_workspace *ws);

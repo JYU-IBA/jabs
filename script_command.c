@@ -180,6 +180,7 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
         jabs_message(MSG_ERROR, stderr, "No parameters for fit.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
+    jabs_message(MSG_INFO, stderr, "%zu fit parameters.\n", fit_data->fit_params->n);
     if(!fit_data->exp) { /* TODO: not enough to check this */
         jabs_message(MSG_ERROR, stderr, "No experimental spectrum set.\n");
         return SCRIPT_COMMAND_FAILURE;
