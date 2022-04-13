@@ -619,10 +619,12 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
     return EXIT_SUCCESS;
 }
 
-fit_params *fit_params_all(simulation *sim, const sample_model *sm) {
+fit_params *fit_params_all(fit_data *fit) {
+    simulation *sim = fit->sim;
+    sample_model *sm = fit->sm;
     if(!sim)
         return NULL;
-    size_t param_name_max_len = 64; /* TODO: Laziness... longest parameter name must be calculated or this needs to be allocated a bit more dynamically */
+    size_t param_name_max_len = 256; /* Laziness. We use a fixed size temporary string. snprintf is used, so no overflows should occur, but very long names may be truncated. */
     char *param_name = malloc(sizeof(char) * param_name_max_len);
     fit_params *params = fit_params_new();
     fit_params_add_parameter(params, &sim->fluence, "fluence", "", 1.0);
@@ -632,23 +634,31 @@ fit_params *fit_params_all(simulation *sim, const sample_model *sm) {
     fit_params_add_parameter(params, &sim->beam_E, "energy", "keV", C_KEV);
     for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
         detector *det = sim_det(sim, i_det);
-        calibration *c = detector_get_calibration(det, JIBAL_ANY_Z);
-        assert(c);
-        size_t n = calibration_get_number_of_params(c);
         char *det_name = NULL;
-        if(asprintf(&det_name, "det%zu_", i_det) < 0) { /* Detector fit parameters are given a prefix if multiple detectors are present */
+        if(asprintf(&det_name, "det%zu_", i_det) < 0) {
             return NULL;
         }
-
         snprintf(param_name, param_name_max_len, "%ssolid", det_name);
-        fit_params_add_parameter(params, &det->solid,param_name, "msr", C_MSR);
+        fit_params_add_parameter(params, &det->solid, param_name, "msr", C_MSR);
 
-        for(int i = CALIBRATION_PARAM_RESOLUTION; i < (int)n; i++) {
-            char *calib_param_name =  calibration_param_name(c->type, i);
-            snprintf(param_name, param_name_max_len, "%scalib_%s", det_name, calib_param_name);
-            free(calib_param_name);
-            fit_params_add_parameter(params, calibration_get_param_ref(c, i), param_name, "keV", C_KEV);
+        for(int Z = JIBAL_ANY_Z; Z <= det->cal_Z_max; Z++) {
+            calibration *c = detector_get_calibration(det, Z);
+            if(Z != JIBAL_ANY_Z && c == det->calibration) /* No Z-specific calibration */
+                continue;
+            assert(c);
+            size_t n = calibration_get_number_of_params(c);
+            for(int i = CALIBRATION_PARAM_RESOLUTION; i < (int) n; i++) {
+                char *calib_param_name = calibration_param_name(c->type, i);
+                snprintf(param_name, param_name_max_len, "%scalib%s%s_%s",
+                         det_name,
+                         (Z == JIBAL_ANY_Z)?"":"_",
+                         (Z == JIBAL_ANY_Z)?"":jibal_element_name(fit->jibal->elements, Z),
+                         calib_param_name);
+                free(calib_param_name);
+                fit_params_add_parameter(params, calibration_get_param_ref(c, i), param_name, "keV", C_KEV);
+            }
         }
+        free(det_name);
     }
     if(sm) {
         for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {

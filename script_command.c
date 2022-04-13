@@ -193,7 +193,7 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
     }
     fit_params_free(fit_data->fit_params);
 
-    fit_params *p_all = fit_params_all(fit_data->sim, fit_data->sm);
+    fit_params *p_all = fit_params_all(fit_data);
     if(foo(p_all, argv[0])) {
         jabs_message(MSG_ERROR, stderr, "Error in adding fit parameters.\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -1585,7 +1585,7 @@ script_command_status script_show_fitvar(script_session *s, int argc, char *cons
     (void) argc;
     (void) argv;
     const int argc_orig = argc;
-    fit_params *p_all = fit_params_all(s->fit->sim, s->fit->sm);
+    fit_params *p_all = fit_params_all(s->fit);
     char *pattern = NULL;
     if(argc > 0) {
         pattern = argv[0];

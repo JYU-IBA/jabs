@@ -111,13 +111,10 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Turing completeness of the scripting language
 ### Known issues
  - Saving a detector to a file is not supported. Calibrations can be saved as a script.
- - Occasional crashes when fitting, since some corner cases are not handled properly
- - Detector numbering and usability issues with multidetector mode 
  - Transmission geometry is not supported
  - Ad-hoc channeling correction is the same for all detectors
  - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).
- - Dual scattering is benchmarked against SimNRA and is known to produce different results.
- - Fitting of non-linear energy calibration is not possible, only slope and offset of the default (Z-independent) calibration can be fitted.
+ - Dual scattering is benchmarked against SimNRA and is known to produce somewhat different results.
 
 ## Fitting
 
