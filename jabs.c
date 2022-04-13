@@ -12,6 +12,10 @@
 
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <math.h>
@@ -704,7 +708,9 @@ int fit_params_add_detector(fit_params *params, const char *token, simulation *s
     assert(det);
     char *det_name = NULL;
     if(sim->n_det > 1) {
-        asprintf(&det_name, "det%zu_", i_det); /* Detector fit parameters are given a prefix if multiple detectors are present */
+        if(asprintf(&det_name, "det%zu_", i_det) < 0) { /* Detector fit parameters are given a prefix if multiple detectors are present */
+            return EXIT_FAILURE;
+        }
     } else {
         det_name = strdup("");
     }

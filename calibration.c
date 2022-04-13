@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <stdio.h>
 #include "string.h"
 #include <jibal_units.h>
 #include "generic.h"
@@ -224,6 +228,8 @@ char *calibration_param_name(calibration_type type, calibration_param_type i) {
     if(s) {
         return strdup(s);
     }
-    asprintf(&s, "calib_p%i", i);
+    if(asprintf(&s, "calib_p%i", i) < 0) {
+        return NULL;
+    }
     return s;
 }
