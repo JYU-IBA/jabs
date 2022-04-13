@@ -635,7 +635,7 @@ fit_params *fit_params_all(fit_data *fit) {
     for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
         detector *det = sim_det(sim, i_det);
         char *det_name = NULL;
-        if(asprintf(&det_name, "det%zu_", i_det) < 0) {
+        if(asprintf(&det_name, "det%zu_", i_det + 1) < 0) {
             return NULL;
         }
         snprintf(param_name, param_name_max_len, "%ssolid", det_name);
