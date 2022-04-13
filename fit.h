@@ -34,11 +34,14 @@ typedef struct fit_variable {
     char *name;
     const char *unit;
     double unit_factor;
+    int active; /* Set to FALSE by default, if this variable is to be used it should be set to TRUE */
+    size_t i_v; /* Index in fit */
 } fit_variable;
 
 typedef struct fit_params {
     size_t n; /* Number of function parameters */
-    fit_variable *vars; /* Note that this is NOT an array of pointers. */
+    size_t n_active; /* Recalculated by fit_params_update() */
+    fit_variable *vars; /* Note that this is NOT an array of pointers. It has n elements. */
 } fit_params;
 
 #include "simulation.h"
@@ -120,6 +123,7 @@ void fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspac
 fit_params *fit_params_new();
 int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor); /* Pointer to parameter to be fitted (value) is accessed during fitting (read, write). No guarantees that it stays accessible after the fit is over and user decides to change something! */
 void fit_params_free(fit_params *p);
+void fit_params_update(fit_params *p);
 void fit_stats_print(FILE *f, const struct fit_stats *stats);
 int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range); /* Makes a deep copy */
 void fit_data_fit_ranges_free(struct fit_data *fit_data);

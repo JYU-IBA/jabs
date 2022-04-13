@@ -117,29 +117,21 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Ad-hoc channeling correction is the same for all detectors
  - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).
  - Dual scattering is benchmarked against SimNRA and is known to produce different results.
- - Adding detector related fit variables will add those for all detectors
  - Fitting of non-linear energy calibration is not possible, only slope and offset of the default (Z-independent) calibration can be fitted.
 
 ## Fitting
 
 There is a fitting feature, activated with the `--fit` or `-F` option or `fit` script command. The multidimensional nonlinear least-squares fitting is based on [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html). The accuracy and sanity of fits must be evaluated by the user.
 
-The user can give only a single range to fit from the command line. This is specified with `--fit_low` and `--fit_high`. It is recommended to use scripts when fitting, as then an arbitrary number of fit ranges can be specified.
-
-Use `--fit_vars` to give a comma separate list of variables to fit. Currently supported detector related variables are `slope,offset,resolution`
-`calib` which is equivalent to the previous triplet and `solid`. Currently adding fit variables will add all them for each detector. 
-
-Beam `fluence` can be fitted. Don't try to combine this with `solid` for all detectors.
-
-Layer thickness can be also fitted using variable `thicknessN` where `N` is number of a layer, numbering starts from 1 (surface). Roughness can be fitted similarly to thickness, use `roughN`. Concentrations can be fitted using `concN_I`, where `N` is the layer and `I` the element.
-
-Example: `jabs --fit_vars=calib,fluence,thickness1 --fit_low=250 ...`
+The command line interface for fitting is currently undocumented and may be removed in the future.
 
 Interactive/script example:
 
     jabs> add fit_range [500:900] [1000:1200] 
-    jabs> fit calib,fluence,thickness1
+    jabs> fit *calib*,fluence,thickness1
+    jabs> show fit
 
+Use `show fitvar` to see a list of variables that can be fitted. This list changes when the sample and detector(s) change. Using `*` or `?` wildcards is possible, the example above will add all calibration parameters of all detectors.
 
 ## Open source licenses
 

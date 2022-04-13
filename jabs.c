@@ -619,197 +619,55 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
     return EXIT_SUCCESS;
 }
 
-int fit_params_add_sm(fit_params *params, const char *token, const sample_model *sm) {
-
-        if(strncmp(token, "rough", 5) == 0 && strlen(token) > 5) {
-            size_t i_layer = strtoul(token + 5, NULL, 10);
-            if(i_layer >= 1 && i_layer <= sm->n_ranges) {
-                fit_params_add_parameter(params, &sm->ranges[i_layer - 1].rough.x, token, "tfu", C_TFU);
-                jabs_message(MSG_INFO, stderr, "Added fit parameter for roughness of layer %zu\n",  i_layer);
-            } else {
-                jabs_message(MSG_ERROR, stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
-                return EXIT_FAILURE;
-            }
-        }
-        if(strncmp(token, "thickness", 9) == 0 && strlen(token) > 9) {
-            size_t i_layer = strtoul(token + 9, NULL, 10);
-            if(i_layer >= 1 && i_layer <= sm->n_ranges) {
-                fit_params_add_parameter(params, &sm->ranges[i_layer - 1].x, token, "tfu", C_TFU);
-                jabs_message(MSG_INFO,stderr, "Added fit parameter for thickness of layer %zu\n",  i_layer);
-            } else {
-                jabs_message(MSG_ERROR,stderr, "No layer %zu (parsed from \"%s\")\n", i_layer, token);
-                return EXIT_FAILURE;
-            }
-        }
-        size_t i, j;
-        if(sscanf(token, "conc%lu_%lu", &i, &j) == 2) {
-            if(i >= 1 && i <= sm->n_ranges && j >= 1 && j <= sm->n_materials) {
-                fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, j - 1), token, "%", C_PERCENT);
-                jabs_message(MSG_INFO, stderr, "Added fit parameter for concentration of %s in layer %zu\n", sm->materials[j - 1]->name, i);
-            } else {
-                jabs_message(MSG_ERROR, stderr, "No element %lu in layer %lu\n", j, i);
-                return EXIT_FAILURE;
-            }
-        } else if(sscanf(token, "conc%lu_", &i) == 1) {
-            if(i >= 1 && i <= sm->n_ranges) {
-                const char *material_name;
-                for(material_name = token; *material_name != '_'; material_name++);
-                material_name++;
-                int found = FALSE;
-                for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
-                    if(strcmp(sm->materials[i_mat]->name, material_name) == 0) {
-                        fit_params_add_parameter(params, sample_model_conc_bin(sm, i - 1, i_mat), token, "%", C_PERCENT);
-                        jabs_message(MSG_INFO,stderr, "Added fit parameter for concentration of %s (material number %zu) in layer %zu\n", sm->materials[i_mat]->name, i_mat + 1, i);
-                        found = TRUE;
-                        break;
-                    }
-                }
-                if(!found) {
-                    jabs_message(MSG_ERROR, stderr, "No material %s\n", material_name);
-                    return EXIT_FAILURE;
-                }
-            } else {
-                jabs_message(MSG_ERROR, stderr, "No layer %lu\n", i);
-                return EXIT_FAILURE;
-            }
-        }
-    return EXIT_SUCCESS;
-}
-
-int fit_params_add_sim(fit_params *params, const char *token, simulation *sim) {
-    for(size_t i_det = 0; i_det < sim->n_det; i_det++) { /* TODO: this adds parameters of all detectors, make this controllable for an individual detector */
-        fit_params_add_detector(params, token, sim, i_det);
-    }
-    if(strcmp(token, "fluence") == 0) {
-        fit_params_add_parameter(params, &sim->fluence, "fluence", "", 1.0);
-        jabs_message(MSG_INFO, stderr, "Added fit parameter for fluence\n");
-    }
-    if(strcmp(token, "channeling_slope") == 0) {
-        fit_params_add_parameter(params, &sim->channeling_slope, "channeling_slope", "1/keV", 1/C_KEV);
-        jabs_message(MSG_INFO, stderr, "Added fit parameter for channeling (energy slope)\n");
-    }
-    if(strcmp(token, "channeling") == 0) {
-        fit_params_add_parameter(params, &sim->channeling_offset, "channeling", "", 1.0);
-        fprintf(stderr, "Added fit parameter for channeling (constant)\n");
-    }
-    if(strcmp(token, "alpha") == 0) {
-        fit_params_add_parameter(params, &sim->sample_theta, "alpha", "deg", C_DEG);
-        fprintf(stderr, "Added fit parameter for sample tilt angle (alpha)\n");
-    }
-    if(strcmp(token, "energy") == 0) {
-        fit_params_add_parameter(params, &sim->beam_E, "energy", "keV", C_KEV);
-        fprintf(stderr, "Added fit parameter for beam energy\n");
-    }
-    return EXIT_SUCCESS; /* TODO: success? */
-}
-
-int fit_params_add_detector(fit_params *params, const char *token, simulation *sim, size_t i_det) {
-    detector *det = sim->det[i_det];
-    assert(det);
-    char *det_name = NULL;
-    if(sim->n_det > 1) {
-        if(asprintf(&det_name, "det%zu_", i_det) < 0) { /* Detector fit parameters are given a prefix if multiple detectors are present */
-            return EXIT_FAILURE;
-        }
-    } else {
-        det_name = strdup("");
-    }
-    int status = EXIT_SUCCESS;
-    const char *param_name = NULL;
-    const char *unit = NULL;
-    double unit_factor = 1.0;
-    double *value = NULL;
-    if(strcmp(token, "slope") == 0) {
-        param_name = "slope";
-        unit = "keV";
-        unit_factor = C_KEV;
-        value = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE);
-    } else if(strcmp(token, "offset") == 0) {
-        param_name = "offset";
-        unit = "keV";
-        unit_factor = C_KEV;
-        value = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET);
-    } else if(strncmp(token, "reso", 4) == 0) {
-        param_name = "reso";
-        unit = detector_param_unit(det);
-        unit_factor = detector_param_unit_factor(det);
-        value = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION);
-    } else if(strncmp(token, "solid", 5) == 0) {
-        param_name = "solid";
-        unit = "msr";
-        unit_factor = C_MSR;
-        value = &det->solid;
-
-    } else if(strncmp(token, "theta", 5) == 0) {
-        param_name = "theta";
-        unit = "deg";
-        unit_factor = C_DEG;
-        value = &det->theta;
-    }
-    if(param_name) {
-        char *s = NULL;
-        if(asprintf(&s, "%s%s", det_name, param_name) < 0) {
-            return EXIT_FAILURE;
-        }
-        status = fit_params_add_parameter(params, value, param_name, unit, unit_factor);
-        if(status == EXIT_SUCCESS) {
-            jabs_message(MSG_INFO, stderr, "Added fit parameter %s for detector %zu.\n", param_name, i_det + 1);
-        }
-        free(s);
-    }
-    if(strncmp(token, "calib", 5) == 0) { /* "calib" is a bit different, since it can represent multiple fit parameters */
+fit_params *fit_params_all(simulation *sim, const sample_model *sm) {
+    if(!sim)
+        return NULL;
+    size_t param_name_max_len = 64; /* TODO: Laziness... longest parameter name must be calculated or this needs to be allocated a bit more dynamically */
+    char *param_name = malloc(sizeof(char) * param_name_max_len);
+    fit_params *params = fit_params_new();
+    fit_params_add_parameter(params, &sim->fluence, "fluence", "", 1.0);
+    fit_params_add_parameter(params, &sim->channeling_offset, "channeling", "", 1.0);
+    fit_params_add_parameter(params, &sim->channeling_slope, "channeling_slope", "1/keV", 1.0/C_KEV);
+    fit_params_add_parameter(params, &sim->sample_theta, "alpha", "deg", C_DEG);
+    fit_params_add_parameter(params, &sim->beam_E, "energy", "keV", C_KEV);
+    for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
+        detector *det = sim_det(sim, i_det);
         calibration *c = detector_get_calibration(det, JIBAL_ANY_Z);
         assert(c);
         size_t n = calibration_get_number_of_params(c);
+        char *det_name = NULL;
+        if(asprintf(&det_name, "det%zu_", i_det) < 0) { /* Detector fit parameters are given a prefix if multiple detectors are present */
+            return NULL;
+        }
+
+        snprintf(param_name, param_name_max_len, "%ssolid", det_name);
+        fit_params_add_parameter(params, &det->solid,param_name, "msr", C_MSR);
+
         for(int i = CALIBRATION_PARAM_RESOLUTION; i < (int)n; i++) {
-            char *s = NULL;
             char *calib_param_name =  calibration_param_name(c->type, i);
-            asprintf(&s, "%s%s", det_name, param_name);
+            snprintf(param_name, param_name_max_len, "%scalib_%s", det_name, calib_param_name);
             free(calib_param_name);
-            status = fit_params_add_parameter(params, calibration_get_param_ref(c, i), s, "keV", C_KEV);
-            free(s);
-            if(status) {
-                jabs_message(MSG_ERROR, stderr, "Could not add calibration parameter (i == %i).\n", i);
-                break;
-            }
-        }
-        if(status == EXIT_SUCCESS) {
-            jabs_message(MSG_INFO, stderr, "Added fit parameters (%zu + resolution) for detector %zu calibration\n", n, i_det + 1);
+            fit_params_add_parameter(params, calibration_get_param_ref(c, i), param_name, "keV", C_KEV);
         }
     }
-    free(det_name);
-    return EXIT_FAILURE;
-}
-
-int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, const char *fit_vars) {
-#ifdef DEBUG
-    fprintf(stderr, "fitvars = %s\n", fit_vars);
-#endif
-    int status = EXIT_SUCCESS;
-    if(!fit_vars)
-        return EXIT_FAILURE;
-    char *token, *s, *s_orig;
-    s_orig = s = strdup(fit_vars);
-    assert(s != NULL);
-    while ((token = strsep_with_quotes(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
-#ifdef DEBUG
-        fprintf(stderr, "Thing to fit: \"%s\". Sim pointer is %p, sample model pointer is %p. Number of params is %zu.\n", token, (void *)sim, (void *)sm, params->n);
-#endif
-        if(sim) {
-            if(fit_params_add_sim(params, token, sim)) {
-                status = EXIT_FAILURE;
+    if(sm) {
+        for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
+            sample_range *r = &(sm->ranges[i_range]);
+            snprintf(param_name, param_name_max_len, "thickness%zu", i_range + 1);
+            fit_params_add_parameter(params, &(r->x), param_name, "tfu", C_TFU);
+            if(sm->ranges->rough.model != ROUGHNESS_NONE) {
+                snprintf(param_name, param_name_max_len, "rough%zu", i_range + 1);
+                fit_params_add_parameter(params, &(r->rough.x), param_name, "tfu", C_TFU);
             }
-        }
-        if(sm) {
-            if(fit_params_add_sm(params, token, sm)) {
-                status = EXIT_FAILURE;
+            for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+                snprintf(param_name, param_name_max_len, "conc%zu_%s", i_range + 1, sm->materials[i_mat]->name);
+                fit_params_add_parameter(params, sample_model_conc_bin(sm, i_range, i_mat), param_name, "%", C_PERCENT);
             }
         }
     }
-    free(s_orig);
-    return status;
+    free(param_name);
+    return params;
 }
-
 
 int print_bricks(const char *filename, const sim_workspace *ws) {
     FILE *f = fopen_file_or_stream(filename, "w");
@@ -1013,4 +871,68 @@ int simulate_with_ds(sim_workspace *ws) {
     }
     sim_workspace_calculate_sum_spectra(ws);
     return EXIT_SUCCESS;
+}
+
+const fittable_param *fittable_param_find(const fittable_param *params, const char *s) {
+    const fittable_param *p_found = NULL;
+    size_t len = strlen(s);
+    for(const fittable_param *p = params; p->name != NULL; p++) {
+        if(strncmp(p->name, s, len) == 0) {
+            if(p_found) { /* We have already found a candidate, this means "s" is ambiguous */
+                return NULL;
+            }
+            p_found = p;
+        }
+    }
+    return p_found;
+}
+
+void fit_params_print(const fit_params *params, int active, const char *pattern) { /* Prints current values of all possible fit variables matching pattern. Pattern can be NULL too. */
+    if(!params)
+        return;
+    if(params->n) {
+        if(pattern) {
+            jabs_message(MSG_INFO, stderr, "All possible fit variables matching pattern \"%s\":\n", pattern);
+        } else {
+            jabs_message(MSG_INFO, stderr, "All possible fit variables (use 'show fitvar <pattern>' to see variables matching pattern, wildcards are '*' and '?'):\n");
+        }
+    } else {
+        jabs_message(MSG_INFO, stderr, "No fit variables.\n");
+    }
+    for(size_t i = 0; i < params->n; i++) {
+        const fit_variable *var = &params->vars[i];
+        if(active && !var->active)
+            continue;
+        if(pattern && !is_match(var->name, pattern))
+            continue;
+        jabs_message(MSG_INFO, stderr, "%s %24s = %g %s\n", var->active ? "X" : " ", var->name, *(var->value) / var->unit_factor, var->unit);
+    }
+}
+
+void fit_params_print_final(const fit_params *params) { /* Prints final values of active fit variables. */
+    if(!params)
+        return;
+    if(params->n_active) {
+        jabs_message(MSG_INFO, stderr, "Active fit variables (%zu/%zu):\n", params->n_active, params->n);
+    } else {
+        jabs_message(MSG_INFO, stderr, "No active fit variables of total %zu.\n", params->n);
+    }
+    for(size_t i = 0; i < params->n; i++) {
+        const fit_variable *var = &params->vars[i];
+        if(!var->active)
+            continue;
+        jabs_message(MSG_INFO, stderr, "%24s(%s) = %g +- %g (%.1lf%%)\n", var->name, var->unit, var->value_final/var->unit_factor, var->err/var->unit_factor, var->err/var->value_final*100.0);
+    }
+}
+
+size_t fit_params_enable(fit_params *params, const char *s, int enable) {
+    size_t n_match = 0;
+    for(size_t i = 0; i < params->n; i++) {
+        fit_variable *var = &params->vars[i];
+        if(is_match(var->name, s)) {
+            var->active = enable;
+            n_match++;
+        }
+    }
+    return n_match;
 }

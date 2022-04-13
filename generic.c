@@ -233,3 +233,64 @@ int asprintf_append(char **ret, const char * restrict format, ...) {
     free(s); /* Allocated by vasprintf() */
     return len;
 }
+
+int is_match(const char* candidate, const char* pattern) {
+    int wildcard = 0;
+    const char *last_pattern_start = 0;
+    const char *last_line_start = 0;
+    do
+    {
+        if (*pattern == *candidate)
+        {
+            if(wildcard == 1)
+                last_line_start = candidate + 1;
+            candidate++;
+            pattern++;
+            wildcard = 0;
+        } else if (*pattern == '?') {
+            if(*(candidate) == '\0') // the line is ended but char was expected
+                return 0;
+            if(wildcard == 1)
+                last_line_start = candidate + 1;
+            candidate++;
+            pattern++;
+            wildcard = 0;
+        } else if (*pattern == '*') {
+            if (*(pattern+1) == '\0') {
+                return 1;
+            }
+            last_pattern_start = pattern;
+            wildcard = 1;
+            pattern++;
+        } else if (wildcard) {
+            if (*candidate == *pattern) {
+                wildcard = 0;
+                candidate++;
+                pattern++;
+                last_line_start = candidate + 1 ;
+            } else {
+                candidate++;
+            }
+        } else {
+            if ((*pattern) == '\0' && (*candidate) == '\0')  // end of mask
+                return 1; // if the line also ends here then the pattern match
+            else
+            {
+                if (last_pattern_start != 0) {// try to restart the mask on the rest
+                    pattern = last_pattern_start;
+                    candidate = last_line_start;
+                    last_line_start = 0;
+                } else {
+                    return 0;
+                }
+            }
+        }
+    } while (*candidate);
+
+    if (*pattern == '\0') {
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}

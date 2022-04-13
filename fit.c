@@ -34,8 +34,12 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
 #ifdef DEBUG
     fprintf(stderr, "Fit iteration %zu, fit function evaluation %zu\n", fit_data->stats.iter, fit_data->stats.n_evals_iter);
 #endif
+
     for(size_t i = 0; i < fit_data->fit_params->n; i++) {
-        *(fit_data->fit_params->vars[i].value) = gsl_vector_get(x, i);
+        fit_variable *var = &fit_data->fit_params->vars[i];
+        if(var->active) {
+            *(var->value) = gsl_vector_get(x, var->i_v);
+        }
     }
 
     sample_free(fit_data->sim->sample);
@@ -117,6 +121,7 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
 fit_params *fit_params_new() {
     fit_params *p = malloc(sizeof(fit_params));
     p->n = 0;
+    p->n_active = 0;
     p->vars = NULL;
     return p;
 }
@@ -132,7 +137,7 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
 #ifdef DEBUG
             fprintf(stderr, "Didn't add fit parameter %s that points to value %p since it already exists.\n", name, (void *)value);
 #endif
-            return EXIT_SUCCESS; /* Parameter already exists, don't add. */
+            return EXIT_SUCCESS; /* Parameter already exists, don't add. */ /* TODO: maybe this requirement could be relaxed? */
         }
     }
     p->n++;
@@ -142,6 +147,7 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
     var->name = strdup(name);
     var->unit = unit;
     var->unit_factor = unit_factor;
+    var->active = FALSE;
 #ifdef DEBUG
     fprintf(stderr, "Fit parameter %s added successfully (total %zu).\n", var->name, p->n);
 #endif
@@ -155,6 +161,23 @@ void fit_params_free(fit_params *p) {
     }
     free(p->vars);
     free(p);
+}
+
+void fit_params_update(fit_params *p) {
+    if(!p)
+        return;
+
+    /* TODO: check if some ACTIVE parameters are duplicates. We don't care about inactive ones. */
+
+    p->n_active = 0;
+    for(size_t i = 0; i < p->n; i++) {
+        if(p->vars[i].active) {
+            p->vars[i].i_v = p->n_active;
+            p->n_active++;
+        } else {
+            p->vars[i].i_v = p->n; /* Intentionally invalid index */
+        }
+    }
 }
 
 void fit_stats_print(FILE *f, const struct fit_stats *stats) {
@@ -204,7 +227,7 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     f->exp = calloc(sim->n_det, sizeof(gsl_histogram *)); /* Allocating based on initial number of detectors. */
     f->sm = NULL; /* Can be set later. */
     f->ws = NULL; /* Initialized later */
-    f->fit_params = fit_params_new();
+    f->fit_params = NULL; /* Holds fit parameters AFTER a fit. */
     f->phase_start = FIT_PHASE_FAST;
     f->phase_stop = FIT_PHASE_SLOW;
     return f;
@@ -491,11 +514,14 @@ void fit_report_parameters(const fit_data *fit, const gsl_multifit_nlinear_works
     double c = GSL_MAX_DBL(1, sqrt(fit->stats.chisq_dof));
     for(size_t i = 0; i < fit_params->n; i++) { /* Update final fitted values to the table (same as used for initial guess) */
         fit_variable *var = &(fit_params->vars[i]);
-        var->value_final = gsl_vector_get(w->x, i);
+        if(!var->active)
+            continue;
+        assert(var->i_v < fit_params->n_active);
+        var->value_final = gsl_vector_get(w->x, var->i_v);
         *(var->value) = var->value_final;
-        var->err = c * sqrt(gsl_matrix_get(covar, i, i));
+        var->err = c * sqrt(gsl_matrix_get(covar, var->i_v, var->i_v));
         var->err_rel = fabs(var->err / var->value_final);
-        jabs_message(MSG_INFO, stderr, "    p[%zu]: %16s (%3s) = %12g +- %12g (%5.1lf%%), %12g x %10.6lf \n", i, var->name, var->unit,
+        jabs_message(MSG_INFO, stderr, "    p[%zu]: %24s (%3s) = %12g +- %12g (%5.1lf%%), %12g x %10.6lf \n", var->i_v, var->name, var->unit,
                      var->value_final/var->unit_factor,
                      var->err/var->unit_factor,
                      100.0 * var->err_rel,
@@ -504,11 +530,11 @@ void fit_report_parameters(const fit_data *fit, const gsl_multifit_nlinear_works
         );
     }
     jabs_message(MSG_INFO, stderr, "\nCorrelation coefficients matrix:\n       | ");
-    for(size_t i = 0; i < fit_params->n; i++) {
+    for(size_t i = 0; i < fit_params->n_active; i++) {
         jabs_message(MSG_INFO, stderr, " %4zu  ", i);
     }
     jabs_message(MSG_INFO, stderr, "\n");
-    for(size_t i = 0; i < fit_params->n; i++) {
+    for(size_t i = 0; i < fit_params->n_active; i++) {
         jabs_message(MSG_INFO, stderr, "%6zu | ", i);
         for (size_t j = 0; j <= i; j++) {
             jabs_message(MSG_INFO, stderr, " %6.3f", gsl_matrix_get(covar, i, j)/sqrt(gsl_matrix_get(covar, i, i)*gsl_matrix_get(covar, j, j)));
@@ -524,7 +550,7 @@ int fit(struct fit_data *fit_data) {
     fdf_params.trs = gsl_multifit_nlinear_trs_lm;
     fdf_params.solver = gsl_multifit_nlinear_solver_svd; /* Robust? */
     struct fit_params *fit_params = fit_data->fit_params;
-    if(!fit_params || fit_params->n == 0) {
+    if(!fit_params || fit_params->n_active == 0) {
         jabs_message(MSG_ERROR, stderr, "No parameters to fit.\n");
         return EXIT_FAILURE;
     }
@@ -552,7 +578,7 @@ int fit(struct fit_data *fit_data) {
     fdf.df = NULL; /* Jacobian, with NULL using finite difference. TODO: this could be implemented */
     fdf.fvv = NULL; /* No geodesic acceleration */
     fdf.n = fit_data_ranges_calculate_number_of_channels(fit_data);
-    fdf.p = fit_params->n;
+    fdf.p = fit_params->n_active;
     if(fdf.n < fdf.p) {
         jabs_message(MSG_ERROR, stderr,"Not enough data (%zu points) for given number of free parameters (%zu)\n", fdf.n, fdf.p);
         return -1;
@@ -597,11 +623,12 @@ int fit(struct fit_data *fit_data) {
 #endif
     assert(i_w == fdf.n);
 
-    gsl_matrix *covar = gsl_matrix_alloc (fit_params->n, fit_params->n);
-    gsl_vector *x = gsl_vector_alloc(fit_params->n);
-    for(size_t i = 0; i < fit_params->n; i++) {
-        fit_params->vars[i].err = 0.0;
-        fit_params->vars[i].value_orig = *fit_params->vars[i].value;
+    gsl_matrix *covar = gsl_matrix_alloc (fit_params->n_active, fit_params->n_active);
+    gsl_vector *x = gsl_vector_alloc(fit_params->n_active);
+    for(size_t i = 0; i < fit_params->n; i++) { /* Update all (including inactives) */
+        fit_variable *var = &(fit_params->vars[i]);
+        var->err = 0.0;
+        var->value_orig = *(var->value);
     }
 
     gsl_vector_view wts = gsl_vector_view_array(weights, i_w);
@@ -624,8 +651,11 @@ int fit(struct fit_data *fit_data) {
         } else if(phase == FIT_PHASE_SLOW) {
             fit_data->sim->params = p_orig; /* Restore original parameters in phase 1 */
         }
-        for(size_t i = 0; i < fit_params->n; i++) {
-            gsl_vector_set(x, i, *fit_params->vars[i].value); /* Start phase from initial or fitted (previous phase) results */
+        for(size_t i = 0; i < fit_params->n; i++) { /* Set active variables to vector */
+            fit_variable *var = &(fit_params->vars[i]);
+            if(var->active) {
+                gsl_vector_set(x, var->i_v,*(var->value)); /* Start phase from initial or fitted (previous phase) results */
+            }
         }
         jabs_message(MSG_INFO, stderr, "\nInitializing fit phase %i. Xtol = %e, chisq_tol %e\n", phase, xtol, chisq_tol);
         gsl_multifit_nlinear_winit (x, &wts.vector, &fdf, w);
@@ -646,7 +676,8 @@ int fit(struct fit_data *fit_data) {
 
     if(fit_data->stats.error < 0) { /* Revert changes on error */
         for(size_t i = 0; i < fit_params->n; i++) {
-            *fit_params->vars[i].value = fit_params->vars[i].value_orig;
+            fit_variable *var = &(fit_params->vars[i]);
+            *(var->value) = var->value_orig;
         }
     } else { /* Do final calculations when fit was successful */
         /* compute covariance of best fit parameters */

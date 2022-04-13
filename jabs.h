@@ -21,6 +21,13 @@
 #include "sample.h"
 #include "reaction.h"
 
+typedef struct fittable_param {
+    const char *name;
+    const char *unit;
+    double unit_factor;
+    double *value;
+} fittable_param;
+
 inline double normal_pdf_std(double x) {
     return 0.398942280401432703 * exp(-0.5*x*x);
 }
@@ -36,13 +43,14 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim);
 int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2); /* Assigns stopping and straggling (GSTO) for given Z2. Goes through all possible Z1s (beam and reaction products). */
 int assign_stopping_Z1_Z2(jibal_gsto *gsto, int Z1, int Z2);
 int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histogram *exp);
-int fit_params_add_sm(fit_params *params, const char *token, const sample_model *sm);
-int fit_params_add_sim(fit_params *params, const char *token, simulation *sim);
-int fit_params_add_detector(fit_params *params, const char *token, simulation *sim, size_t i_det); /* Used by fit_params_add_sim(), not to be called by others. */
-int fit_params_add(simulation *sim, const sample_model *sm, fit_params *params, const char *fit_vars); /* fit_vars is a comma separated list of variables to fit */
-void fit_params_clear(fit_params *params);
 int print_bricks(const char *filename, const sim_workspace *ws);
 int simulate_with_ds(sim_workspace *ws);
 void ds(sim_workspace *ws); /* TODO: the DS routine is more pseudocode at this stage... */
 double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back);
+const fittable_param *fittable_param_find(const fittable_param *params, const char *s);
+
+fit_params *fit_params_all(simulation *sim, const sample_model *sm);
+void fit_params_print(const fit_params *params, int active, const char *pattern); /* if active is TRUE print only active variables. pattern can be NULL to bypass matching. */
+void fit_params_print_final(const fit_params *params);
+size_t fit_params_enable(fit_params *params, const char *s, int enable); /* Enable/disable one or more variables matching pattern s. Returns number of matches. */
 #endif // JABS_JABS_H
