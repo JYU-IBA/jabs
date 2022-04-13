@@ -748,7 +748,9 @@ int fit_params_add_detector(fit_params *params, const char *token, simulation *s
     }
     if(param_name) {
         char *s = NULL;
-        asprintf(&s, "%s%s", det_name, param_name);
+        if(asprintf(&s, "%s%s", det_name, param_name) < 0) {
+            return EXIT_FAILURE;
+        }
         status = fit_params_add_parameter(params, value, param_name, unit, unit_factor);
         if(status == EXIT_SUCCESS) {
             jabs_message(MSG_INFO, stderr, "Added fit parameter %s for detector %zu.\n", param_name, i_det + 1);
