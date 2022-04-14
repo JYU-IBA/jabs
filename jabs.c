@@ -665,11 +665,13 @@ fit_params *fit_params_all(fit_data *fit) {
             sample_range *r = &(sm->ranges[i_range]);
             snprintf(param_name, param_name_max_len, "thickness%zu", i_range + 1);
             fit_params_add_parameter(params, &(r->x), param_name, "tfu", C_TFU);
-            if(sm->ranges->rough.model != ROUGHNESS_NONE) {
+            if(r->rough.model != ROUGHNESS_NONE) {
                 snprintf(param_name, param_name_max_len, "rough%zu", i_range + 1);
                 fit_params_add_parameter(params, &(r->rough.x), param_name, "tfu", C_TFU);
             }
             for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+                if(*sample_model_conc_bin(sm, i_range, i_mat) < CONC_TOLERANCE) /* Don't add fit variables for negative, zero or very low concentrations. */
+                    continue;
                 snprintf(param_name, param_name_max_len, "conc%zu_%s", i_range + 1, sm->materials[i_mat]->name);
                 fit_params_add_parameter(params, sample_model_conc_bin(sm, i_range, i_mat), param_name, "%", C_PERCENT);
             }

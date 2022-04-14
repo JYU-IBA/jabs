@@ -43,7 +43,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     }
 
     sample_free(fit_data->sim->sample);
-    sample_model_renormalize(fit_data->sm); /* TODO: only necessary if sample concentrations are fitted */
+    sample_model_renormalize(fit_data->sm); /* TODO: not necessary, if sample_from_sample_model() does the renormalization. Also consider fit uncertainties when renormalizing! */
     fit_data->sim->sample = sample_from_sample_model(fit_data->sm);
     fit_data_workspaces_free(fit_data);
     if(sim_sanity_check(fit_data->sim) || fit_data_workspaces_init(fit_data)) { /* Either fails: clean up and return */

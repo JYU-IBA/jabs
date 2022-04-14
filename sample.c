@@ -181,7 +181,7 @@ sample_model *sample_model_to_point_by_point(const sample_model *sm) { /* Conver
     return sm_out;
 }
 
-sample *sample_from_sample_model(const sample_model *sm) {
+sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize concentrations! */
     if(!sm)
         return NULL;
 #ifdef DEBUG
