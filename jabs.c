@@ -920,7 +920,7 @@ void fit_params_print_final(const fit_params *params) { /* Prints final values o
         if(!var->active)
             continue;
         //jabs_message(MSG_INFO, stderr, "%24s(%3s) = %12g +- %12g (%.1lf%%)\n", var->name, var->unit, var->value_final/var->unit_factor, var->err/var->unit_factor, var->err/var->value_final*100.0);
-        jabs_message(MSG_INFO, stderr, "    p[%zu]: %24s (%3s) = %12g +- %12g (%5.1lf%%), %12g x %10.6lf \n", var->i_v, var->name, var->unit,
+        jabs_message(MSG_INFO, stderr, "%3zu | %24s (%3s) = %11.6g +- %9.4g (%5.1lf%%), %12.6g x %6.4lf\n", var->i_v + 1, var->name, var->unit,
                      var->value_final/var->unit_factor,
                      var->err/var->unit_factor,
                      100.0 * var->err_rel,

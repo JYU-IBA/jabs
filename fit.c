@@ -34,23 +34,31 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
 #ifdef DEBUG
     fprintf(stderr, "Fit iteration %zu, fit function evaluation %zu\n", fit_data->stats.iter, fit_data->stats.n_evals_iter);
 #endif
-
+    sample_free(fit_data->sim->sample);
+    fit_data->sim->sample = NULL;
+    fit_data_workspaces_free(fit_data);
     for(size_t i = 0; i < fit_data->fit_params->n; i++) {
         fit_variable *var = &fit_data->fit_params->vars[i];
         if(var->active) {
             *(var->value) = gsl_vector_get(x, var->i_v);
         }
     }
-
-    sample_free(fit_data->sim->sample);
+    if(sample_model_sanity_check(fit_data->sm)) {
+        fit_data->stats.error = FIT_ERROR_SANITY;
+        return GSL_FAILURE;
+    }
+    if(sim_sanity_check(fit_data->sim)) {
+        fit_data->stats.error = FIT_ERROR_SANITY;
+        return GSL_FAILURE;
+    }
     fit_data->sim->sample = sample_from_sample_model(fit_data->sm);
     sample_renormalize(fit_data->sim->sample);
-    fit_data_workspaces_free(fit_data);
-    if(sim_sanity_check(fit_data->sim) || fit_data_workspaces_init(fit_data)) { /* Either fails: clean up and return */
+    if(fit_data_workspaces_init(fit_data)) {
         fit_data_workspaces_free(fit_data); /* Some workspaces may have already been allocated */
         fit_data->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
     }
+
     start = clock();
     for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
         simulate_with_ds(fit_data->ws[i_det]);
@@ -99,23 +107,14 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
 
     /* compute reciprocal condition number of J(x) */
     gsl_multifit_nlinear_rcond(&fit_data->stats.rcond, w);
-
-    jabs_message(MSG_INFO, stderr, "iter %2zu: cond(J) = %12.6e, |f(x)| = %14.8e", iter, 1.0 / fit_data->stats.rcond, gsl_blas_dnrm2(f));
-#ifndef NO_CHISQ
     gsl_blas_ddot(f, f, &fit_data->stats.chisq);
     fit_data->stats.chisq_dof = fit_data->stats.chisq/fit_data->dof;
-    jabs_message(MSG_INFO, stderr, ", chisq/dof = %10.7lf", fit_data->stats.chisq_dof);
-#endif
     fit_data->stats.n_evals += fit_data->stats.n_evals_iter;
     fit_data->stats.cputime_cumul += fit_data->stats.cputime_iter;
-    jabs_message(MSG_INFO, stderr, ", eval %3zu, cpu time %7.3lf s, %6.1lf ms per eval", fit_data->stats.n_evals, fit_data->stats.cputime_cumul, 1000.0 * fit_data->stats.cputime_iter / fit_data->stats.n_evals_iter);
-#ifdef FIT_PRINT_PARAMS
-    size_t i;
-    for(i = 0; i < fit_data->fit_params->n; i++) {
-        fprintf(stderr, ", prob[%zu] = %12.6e", i, gsl_vector_get(w->x, i));
-    }
-#endif
-    jabs_message(MSG_INFO, stderr, "\n");
+    jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %4zu | %13.3lf | %12.1lf |\n",
+                 iter, 1.0 / fit_data->stats.rcond, gsl_blas_dnrm2(f),
+                 fit_data->stats.chisq_dof, fit_data->stats.n_evals, fit_data->stats.cputime_cumul,
+                 1000.0 * fit_data->stats.cputime_iter / fit_data->stats.n_evals_iter);
 }
 
 fit_params *fit_params_new() {
@@ -457,6 +456,7 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
     size_t iter;
     struct fit_data *fit_data = (struct fit_data *) callback_params;
     double chisq_dof_old;
+    jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | eval | cpu cumul (s) | cpu/eval (ms)|\n");
     for(iter = 0; iter <= maxiter; iter++) {
         if(iter) {
             chisq_dof_old = fit_data->stats.chisq_dof;
@@ -523,7 +523,7 @@ void fit_parameters_update(const fit_data *fit, const gsl_multifit_nlinear_works
     }
 }
 
-void fit_parameters_update_changed(const fit_data *fit, const gsl_multifit_nlinear_workspace *w, const gsl_matrix *covar) {
+void fit_parameters_update_changed(const fit_data *fit) {
     const fit_params *fit_params = fit->fit_params;
     for(size_t i = 0; i < fit_params->n; i++) {
         fit_variable *var = &(fit_params->vars[i]);
@@ -541,11 +541,11 @@ void fit_parameters_update_changed(const fit_data *fit, const gsl_multifit_nline
 void fit_covar_print(const gsl_matrix *covar) {
     jabs_message(MSG_INFO, stderr, "\nCorrelation coefficients matrix:\n       | ");
     for(size_t i = 0; i < covar->size1; i++) {
-        jabs_message(MSG_INFO, stderr, " %4zu  ", i);
+        jabs_message(MSG_INFO, stderr, " %4zu  ", i + 1);
     }
     jabs_message(MSG_INFO, stderr, "\n");
     for(size_t i = 0; i < covar->size1; i++) {
-        jabs_message(MSG_INFO, stderr, "%6zu | ", i);
+        jabs_message(MSG_INFO, stderr, "%6zu | ", i + 1);
         for (size_t j = 0; j <= i && j < covar->size2; j++) {
             jabs_message(MSG_INFO, stderr, " %6.3f", gsl_matrix_get(covar, i, j)/sqrt(gsl_matrix_get(covar, i, i)*gsl_matrix_get(covar, j, j)));
         }
@@ -700,7 +700,7 @@ int fit(struct fit_data *fit_data) {
 
         fit_parameters_update(fit_data, w, covar);
         sample_model_renormalize(fit_data->sm);
-        fit_parameters_update_changed(fit_data, w, covar); /* sample_model_renormalize() can and will change concentration values, this will recompute error (assuming relative error stays the same) */
+        fit_parameters_update_changed(fit_data); /* sample_model_renormalize() can and will change concentration values, this will recompute error (assuming relative error stays the same) */
         fit_params_print_final(fit_params);
         fit_covar_print(covar);
 

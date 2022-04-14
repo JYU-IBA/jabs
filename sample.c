@@ -80,6 +80,29 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
     return sm;
 }
 
+int sample_model_sanity_check(const sample_model *sm) {
+    for(size_t i = 0; i < sm->n_ranges; i++) {
+        if(sm->type == SAMPLE_MODEL_LAYERED) {
+            if(sm->ranges[i].x < 0.0) {
+                jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (layer %zu thickness negative).\n", i + 1);
+                return EXIT_FAILURE;
+            }
+        } else if(sm->type == SAMPLE_MODEL_POINT_BY_POINT) {
+            if(i && sm->ranges[i].x < sm->ranges[i-1].x) {
+                jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (non-monotonous range at %zu).\n", i + 1);
+                return EXIT_FAILURE;
+            }
+        }
+        for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+            if(*(sample_model_conc_bin(sm, i, i_mat)) < 0.0) {
+                jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative concentration of %s (%zu) in layer/range %zu).   \n", sm->materials[i_mat]->name, i_mat + 1, i + 1);
+                return EXIT_FAILURE;
+            }
+        }
+    }
+    return EXIT_SUCCESS;
+}
+
 void sample_model_renormalize(sample_model *sm) {
 #ifdef SAMPLE_MODEL_RENORM_MATERIALS
     /* This step should be unnecessary, unless materials are modified after they are created. */
