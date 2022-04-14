@@ -110,6 +110,22 @@ void sample_model_renormalize(sample_model *sm) {
     }
 }
 
+void sample_renormalize(sample *sample) {
+    for(size_t i = 0; i < sample->n_ranges; i++) {
+        double sum = 0.0;
+        for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
+            if(*(sample_conc_bin(sample, i, i_isotope)) < 0.0)
+                *(sample_conc_bin(sample, i, i_isotope)) = 0.0;
+            sum += *(sample_conc_bin(sample, i, i_isotope));
+        }
+        if(sum == 0.0)
+            continue;
+        for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
+            *(sample_conc_bin(sample, i, i_isotope)) /= sum;
+        }
+    }
+}
+
 sample_model *sample_model_split_elements(const sample_model *sm) {
     if(!sm)
         return NULL;
@@ -476,16 +492,9 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
         headers = 0;
     }
 
-    for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Normalize concs and set defaults for roughness*/
-        double sum = 0.0;
-        for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
-            sum += *(sample_model_conc_bin(sm, i_range, i_mat));
-        }
-        if(sum == 0.0)
-            continue;
-        for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
-            *(sample_model_conc_bin(sm, i_range, i_mat)) /= sum;
-        }
+    sample_model_renormalize(sm);
+
+    for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Set defaults for roughness*/
         sample_range *r = &sm->ranges[i_range];
         if(r->rough.x > 0.1*C_TFU) {
             r->rough.model = ROUGHNESS_GAMMA; /* TODO: other models */

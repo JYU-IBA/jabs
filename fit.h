@@ -118,6 +118,9 @@ int fit_data_workspaces_init(struct fit_data *fit_data); /* If any workspace ini
 void fit_data_workspaces_free(struct fit_data *fit_data); /* Also sets workspace pointers to NULL */
 struct fit_stats fit_stats_init();
 int fit(struct fit_data *fit_data);
+void fit_covar_print(const gsl_matrix *covar);
+void fit_parameters_update(const fit_data *fit, const gsl_multifit_nlinear_workspace *w, const gsl_matrix *covar); /* Updates values in fit_params, computes errors */
+void fit_parameters_update_changed(const fit_data *fit, const gsl_multifit_nlinear_workspace *w, const gsl_matrix *covar); /* Checks if values have changed since fit_parameters_update(), computes new error */
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 void fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspace *w);
 fit_params *fit_params_new();
