@@ -80,6 +80,29 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
     return sm;
 }
 
+int sample_model_sanity_check(const sample_model *sm) {
+    for(size_t i = 0; i < sm->n_ranges; i++) {
+        if(sm->type == SAMPLE_MODEL_LAYERED) {
+            if(sm->ranges[i].x < 0.0) {
+                jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (layer %zu thickness negative).\n", i + 1);
+                return EXIT_FAILURE;
+            }
+        } else if(sm->type == SAMPLE_MODEL_POINT_BY_POINT) {
+            if(i && sm->ranges[i].x < sm->ranges[i-1].x) {
+                jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (non-monotonous range at %zu).\n", i + 1);
+                return EXIT_FAILURE;
+            }
+        }
+        for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+            if(*(sample_model_conc_bin(sm, i, i_mat)) < 0.0) {
+                jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative concentration of %s (%zu) in layer/range %zu).   \n", sm->materials[i_mat]->name, i_mat + 1, i + 1);
+                return EXIT_FAILURE;
+            }
+        }
+    }
+    return EXIT_SUCCESS;
+}
+
 void sample_model_renormalize(sample_model *sm) {
 #ifdef SAMPLE_MODEL_RENORM_MATERIALS
     /* This step should be unnecessary, unless materials are modified after they are created. */
@@ -106,6 +129,22 @@ void sample_model_renormalize(sample_model *sm) {
             continue;
         for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
             *(sample_model_conc_bin(sm, i, i_mat)) /= sum;
+        }
+    }
+}
+
+void sample_renormalize(sample *sample) {
+    for(size_t i = 0; i < sample->n_ranges; i++) {
+        double sum = 0.0;
+        for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
+            if(*(sample_conc_bin(sample, i, i_isotope)) < 0.0)
+                *(sample_conc_bin(sample, i, i_isotope)) = 0.0;
+            sum += *(sample_conc_bin(sample, i, i_isotope));
+        }
+        if(sum == 0.0)
+            continue;
+        for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
+            *(sample_conc_bin(sample, i, i_isotope)) /= sum;
         }
     }
 }
@@ -476,16 +515,9 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
         headers = 0;
     }
 
-    for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Normalize concs and set defaults for roughness*/
-        double sum = 0.0;
-        for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
-            sum += *(sample_model_conc_bin(sm, i_range, i_mat));
-        }
-        if(sum == 0.0)
-            continue;
-        for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
-            *(sample_model_conc_bin(sm, i_range, i_mat)) /= sum;
-        }
+    sample_model_renormalize(sm);
+
+    for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Set defaults for roughness*/
         sample_range *r = &sm->ranges[i_range];
         if(r->rough.x > 0.1*C_TFU) {
             r->rough.model = ROUGHNESS_GAMMA; /* TODO: other models */

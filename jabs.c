@@ -663,7 +663,7 @@ fit_params *fit_params_all(fit_data *fit) {
     if(sm) {
         for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
             sample_range *r = &(sm->ranges[i_range]);
-            snprintf(param_name, param_name_max_len, "thickness%zu", i_range + 1);
+            snprintf(param_name, param_name_max_len, "thick%zu", i_range + 1);
             fit_params_add_parameter(params, &(r->x), param_name, "tfu", C_TFU);
             if(r->rough.model != ROUGHNESS_NONE) {
                 snprintf(param_name, param_name_max_len, "rough%zu", i_range + 1);
@@ -911,15 +911,22 @@ void fit_params_print_final(const fit_params *params) { /* Prints final values o
     if(!params)
         return;
     if(params->n_active) {
-        jabs_message(MSG_INFO, stderr, "Active fit variables (%zu/%zu):\n", params->n_active, params->n);
+        jabs_message(MSG_INFO, stderr, "Final fit variables (%zu/%zu):\n", params->n_active, params->n);
     } else {
-        jabs_message(MSG_INFO, stderr, "No active fit variables of total %zu.\n", params->n);
+        jabs_message(MSG_INFO, stderr, "No fitted variables of total %zu.\n", params->n);
     }
     for(size_t i = 0; i < params->n; i++) {
         const fit_variable *var = &params->vars[i];
         if(!var->active)
             continue;
-        jabs_message(MSG_INFO, stderr, "%24s(%s) = %g +- %g (%.1lf%%)\n", var->name, var->unit, var->value_final/var->unit_factor, var->err/var->unit_factor, var->err/var->value_final*100.0);
+        //jabs_message(MSG_INFO, stderr, "%24s(%3s) = %12g +- %12g (%.1lf%%)\n", var->name, var->unit, var->value_final/var->unit_factor, var->err/var->unit_factor, var->err/var->value_final*100.0);
+        jabs_message(MSG_INFO, stderr, "%3zu | %24s (%3s) = %11.6g +- %9.4g (%5.1lf%%), %12.6g x %6.4lf\n", var->i_v + 1, var->name, var->unit,
+                     var->value_final/var->unit_factor,
+                     var->err/var->unit_factor,
+                     100.0 * var->err_rel,
+                     var->value_orig/var->unit_factor,
+                     var->value_final/var->value_orig
+        );
     }
 }
 

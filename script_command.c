@@ -1598,9 +1598,10 @@ script_command_status script_show_fitvar(script_session *s, int argc, char *cons
 }
 
 script_command_status script_show_aperture(struct script_session *s, int argc, char * const *argv) {
+    (void) argv;
     struct fit_data *fit = s->fit;
     const int argc_orig = argc;
-    char *aperture_str = aperture_to_string(s->fit->sim->beam_aperture);
+    char *aperture_str = aperture_to_string(fit->sim->beam_aperture);
     jabs_message(MSG_INFO, stderr, "aperture %s\n", aperture_str);
     free(aperture_str);
     return argc_orig - argc;
@@ -1775,7 +1776,7 @@ script_command_status script_set_detector_calibration_poly(struct script_session
     }
     calibration *c = calibration_init_poly(n);
     calibration_copy_params(c, detector_get_calibration(det, s->Z_active)); /* This, de facto, only copies resolution from old calibration, since the rest are overwritten very soon. */
-    for(int i = 0; i <= n; i++) {
+    for(int i = 0; i <= (int)n; i++) {
         calibration_set_param(c, i, jibal_get_val(s->jibal->units, UNIT_TYPE_ANY, argv[0]));
         argc--;
         argv++;

@@ -59,7 +59,9 @@ typedef struct sample_model {
 } sample_model;
 
 sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges);
+int sample_model_sanity_check(const sample_model *sm);
 void sample_model_renormalize(sample_model *sm);
+void sample_renormalize(sample *sample);
 sample_model *sample_model_split_elements(const struct sample_model *sm);
 sample_model *sample_model_from_file(const jibal *jibal, const char *filename);
 sample_model *sample_model_from_argv(const jibal *jibal, int *argc, char * const **argv);
