@@ -885,20 +885,6 @@ int simulate_with_ds(sim_workspace *ws) {
     return EXIT_SUCCESS;
 }
 
-const fittable_param *fittable_param_find(const fittable_param *params, const char *s) {
-    const fittable_param *p_found = NULL;
-    size_t len = strlen(s);
-    for(const fittable_param *p = params; p->name != NULL; p++) {
-        if(strncmp(p->name, s, len) == 0) {
-            if(p_found) { /* We have already found a candidate, this means "s" is ambiguous */
-                return NULL;
-            }
-            p_found = p;
-        }
-    }
-    return p_found;
-}
-
 void fit_params_print(const fit_params *params, int active, const char *pattern) { /* Prints current values of all possible fit variables matching pattern. Pattern can be NULL too. */
     if(!params)
         return;
