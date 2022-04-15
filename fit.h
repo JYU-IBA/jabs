@@ -29,8 +29,9 @@ typedef struct fit_variable {
     double *value; /* Pointer to a value. This is not allocated or free'd by fitting related methods. */
     double value_orig;
     double value_final;
-    double err; /* Error estimate will be stored here. */
-    double err_rel;
+    double err; /* Error estimate of fit will be stored here. */
+    double err_rel; /* Relative error */
+    double sigmas; /* Change, relative to error */
     char *name;
     const char *unit;
     double unit_factor;

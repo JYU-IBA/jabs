@@ -222,8 +222,10 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
         return SCRIPT_COMMAND_FAILURE;
     }
     script_finish_sim_or_fit(s);
+#ifdef PRINT_SIM_AFTER_FIT
     jabs_message(MSG_INFO, stderr, "\nFinal parameters:\n");
     simulation_print(stderr, fit_data->sim);
+#endif
     jabs_message(MSG_INFO, stderr, "\nFinal profile:\n");
     sample_print(NULL, fit_data->sim->sample, FALSE);
     sample_areal_densities_print(stderr, fit_data->sim->sample, FALSE);

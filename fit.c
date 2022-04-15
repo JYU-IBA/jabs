@@ -415,16 +415,17 @@ void fit_data_print(FILE *f, const struct fit_data *fit_data) {
         return;
     }
     jabs_message(MSG_INFO, f, "%zu fit ranges:\n", fit_data->n_fit_ranges);
-    jabs_message(MSG_INFO, f, "  i |    low |   high |    exp cts |    sim cts | sim/exp |\n");
+    jabs_message(MSG_INFO, f, "  i |    low |   high |    exp cts |    sim cts | sim/exp |  sigmas |\n");
     for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
         roi *range = &fit_data->fit_ranges[i];
         double exp_cts = spectrum_roi(fit_data_exp(fit_data, range->i_det), range->low, range->high);
         double sim_cts = spectrum_roi(fit_data_sim(fit_data, range->i_det), range->low, range->high);
         if(exp_cts == 0.0) {
-            jabs_message(MSG_INFO, f, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf |         |\n", i + 1, range->low, range->high, exp_cts, sim_cts);
+            jabs_message(MSG_INFO, f, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf |         |         |\n", i + 1, range->low, range->high, exp_cts, sim_cts);
         } else {
             double ratio = sim_cts/exp_cts;
-            jabs_message(MSG_INFO, f, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf | %7.5lf |\n", i + 1, range->low, range->high, exp_cts, sim_cts, ratio);
+            double sigmas = (sim_cts-exp_cts)/sqrt(exp_cts);
+            jabs_message(MSG_INFO, f, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf | %7.5lf | %7.2lf |\n", i + 1, range->low, range->high, exp_cts, sim_cts, ratio, sigmas);
         }
     }
     jabs_message(MSG_INFO, f, "\nFit has %zu channels total.\n", fit_data_ranges_calculate_number_of_channels(fit_data));
@@ -520,6 +521,7 @@ void fit_parameters_update(const fit_data *fit, const gsl_multifit_nlinear_works
         *(var->value) = var->value_final;
         var->err = c * sqrt(gsl_matrix_get(covar, var->i_v, var->i_v));
         var->err_rel = fabs(var->err / var->value_final);
+        var->sigmas =  fabs(var->value_final - var->value_orig) / var->value_orig / var->err_rel;
     }
 }
 
