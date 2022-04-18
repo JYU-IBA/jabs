@@ -916,7 +916,7 @@ void fit_params_print_final(const fit_params *params) { /* Prints final values o
         jabs_message(MSG_INFO, stderr, "No fitted variables of total %zu.\n", params->n);
         return;
     }
-    jabs_message(MSG_INFO, stderr, "  i |                 variable |  unit |       value |     error | rel % |  orig. value | multipl. | sigmas |\n");
+    jabs_message(MSG_INFO, stderr, "  i |                 variable |  unit |       value |     error | rel %% |  orig. value | multipl. | sigmas |\n");
     for(size_t i = 0; i < params->n; i++) {
         const fit_variable *var = &params->vars[i];
         if(!var->active)
