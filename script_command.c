@@ -1961,6 +1961,7 @@ script_command_status script_split_sample_elements(struct  script_session *s, in
     struct fit_data *fit = s->fit;
     sample_model *sm = fit->sm;
     fit->sm = sample_model_split_elements(sm);
+    sample_model_free(sm);
     return SCRIPT_COMMAND_SUCCESS;
 }
 
