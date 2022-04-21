@@ -5,16 +5,19 @@ REM Qt6 must be installed too
 set QT6_DIR=C:\Qt\6.1.2
 REM And vcpkg
 set VCPKG_DIR=C:\vcpkg
+REM Try to remove CMakeCache.txt files if your configuration (e.g. compiler) changes or you want to do a fresh build
+
 mkdir build
 cd build
-del CMakeCache.txt
+REM del CMakeCache.txt
 cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_TOOLCHAIN_FILE="%VCPKG_DIR%\scripts\buildsystems\vcpkg.cmake" ../
 cmake --build . --target ALL_BUILD --config Release
 cd ..
+
 cd qjabs
 mkdir build
 cd build
-del CMakeCache.txt
+REM del CMakeCache.txt
 cmake -DCMAKE_PREFIX_PATH="%QT6_DIR%\msvc2019_64\lib\cmake" -G "Visual Studio 16 2019" -A x64 -DCMAKE_TOOLCHAIN_FILE="%VCPKG_DIR%\scripts\buildsystems\vcpkg.cmake" ../
 cmake --build . --target ALL_BUILD --config Release
 REM Windeployqt will handle most dlls and other Qt dependencies
@@ -46,3 +49,5 @@ copy ..\..\example\tests\*.dat Release\example\tests\
 copy ..\..\example\tests\*_ref.csv Release\example\tests\
 copy ..\..\example\tests\*.r33 Release\example\tests\
 copy ..\..\example\tests\*.txt Release\example\tests\
+cd ..
+cd ..
