@@ -108,10 +108,10 @@ set_source_files_properties(${app_icon_macos} PROPERTIES
        MACOSX_PACKAGE_LOCATION "Resources")
 
 if (WIN32)
-#   set(app_icon_resource_windows "${CMAKE_CURRENT_SOURCE_DIR}/icon.rc")
-#    qt_add_executable(qjabs ${PROJECT_SOURCES} ${app_icon_resource_windows})
-    qt_add_executable(qjabs
+   set(app_icon_resource_windows "${CMAKE_CURRENT_SOURCE_DIR}/icon.rc")
+   qt_add_executable(qjabs
         ${PROJECT_SOURCES}
+	${app_icon_resource_windows}
     )
 elseif(APPLE)
    qt_add_executable(qjabs
