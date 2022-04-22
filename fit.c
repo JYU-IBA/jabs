@@ -34,9 +34,6 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
 #ifdef DEBUG
     fprintf(stderr, "Fit iteration %zu, fit function evaluation %zu\n", fit_data->stats.iter, fit_data->stats.n_evals_iter);
 #endif
-    sample_free(fit_data->sim->sample);
-    fit_data->sim->sample = NULL;
-    fit_data_workspaces_free(fit_data);
     size_t i_v_active = fit_data->stats.iter_call - 1; /* Which variable is being varied by the fit algorithm in this particular call inside an iteration (compared to first call (== 0)) */
     fit_variable *var_active = fit_data->stats.iter_call ? &fit_data->fit_params->vars[i_v_active] : NULL;
     fit_data->stats.iter_call++;
@@ -59,12 +56,26 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
 #ifdef DEBUG
     fprintf(stderr, "\n");
 #endif
+
+
     if(var_active && var_active->value == &fit_data->sim->fluence) {
+        double scale = *(var_active->value) / var_active->value_iter;
 #ifdef DEBUG
-        fprintf(stderr, "Varying fluence (iter %zu, call %zu).\n", fit_data->stats.iter, fit_data->stats.iter_call);
-        /* TODO: make code here that reuses stored histograms if only the fluence changes */
+        fprintf(stderr, "Varying fluence (iter %zu, call %zu) by %12.10lf.\n", fit_data->stats.iter, fit_data->stats.iter_call, scale);
 #endif
+        for(size_t i = 0; i < fit_data->n_ws; i++) {
+            sim_workspace *ws = fit_data_ws(fit_data, i);
+            sim_workspace_histograms_scale(ws, scale);
+            sim_workspace_calculate_sum_spectra(ws);
+        }
+        fit_set_residuals(fit_data, f);
+        fit_data->stats.n_evals_iter++;
+        return GSL_SUCCESS;
     }
+
+    sample_free(fit_data->sim->sample);
+    fit_data->sim->sample = NULL;
+    fit_data_workspaces_free(fit_data);
 
     if(sample_model_sanity_check(fit_data->sm)) {
         fit_data->stats.error = FIT_ERROR_SANITY;
@@ -83,7 +94,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
         return GSL_FAILURE;
     }
 
-#if 0
+#if 0 /* If and when this is enabled, make sure to calculate one complete spectrum with original emin at the end of fit */
     for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) { /* Sets the lowest energy in each simulation according to fit ranges */
         double emin = fit_emin(fit_data, i_det);
         sim_workspace *ws = fit_data_ws(fit_data, i_det);
@@ -110,20 +121,24 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
         }
         fit_data->n_histo_sum = fit_data->n_ws;
     }
+    fit_data->stats.error = fit_set_residuals(fit_data, f);
+    if(fit_data->stats.error)
+        return GSL_FAILURE;
+    return GSL_SUCCESS;
+}
 
+int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f) {
     size_t i_vec = 0;
     for(size_t i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) { /* TODO: actually calculate which spectra we need to simulate when fitting. Calculate emin based on lowest energy in lowest range. */
         if(i_vec >= f->size) {
             jabs_message(MSG_ERROR, stderr, "Too many channels in fits for the residuals vector. This shouldn't happen.\n");
-            fit_data->stats.error = FIT_ERROR_IMPOSSIBLE;
-            return GSL_FAILURE;
+             return FIT_ERROR_IMPOSSIBLE;
         }
 
         roi *range = &fit_data->fit_ranges[i_range];
         if(range->i_det >= fit_data->sim->n_det) {
             jabs_message(MSG_ERROR, stderr, "Fit range %zu has detector %zu, but we're only supposed to have %zu detectors!\n", i_range+1, range->i_det, fit_data->sim->n_det);
-            fit_data->stats.error = FIT_ERROR_IMPOSSIBLE;
-            return GSL_FAILURE;
+            return FIT_ERROR_IMPOSSIBLE;
         }
         sim_workspace *ws = fit_data->ws[range->i_det];
         assert(ws);
@@ -140,10 +155,9 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     }
     if(i_vec != f->size) {
         jabs_message(MSG_ERROR, stderr, "Not enough channels in fits for the residuals vector. This shouldn't happen.\n");
-        fit_data->stats.error = FIT_ERROR_IMPOSSIBLE;
-        return GSL_FAILURE;
+        return FIT_ERROR_IMPOSSIBLE;
     }
-    return GSL_SUCCESS;
+    return FIT_ERROR_NONE;
 }
 
 void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_workspace *w) {
