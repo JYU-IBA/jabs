@@ -37,12 +37,35 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     sample_free(fit_data->sim->sample);
     fit_data->sim->sample = NULL;
     fit_data_workspaces_free(fit_data);
+    size_t i_v_active = fit_data->stats.iter_call - 1; /* Which variable is being varied by the fit algorithm in this particular call inside an iteration (compared to first call (== 0)) */
+    fit_variable *var_active = fit_data->stats.iter_call ? &fit_data->fit_params->vars[i_v_active] : NULL;
+    fit_data->stats.iter_call++;
+#ifdef DEBUG
+    fprintf(stderr, "Iter %zu (call %zu)\n", fit_data->stats.iter, fit_data->stats.iter_call);
+#endif
+
     for(size_t i = 0; i < fit_data->fit_params->n; i++) {
         fit_variable *var = &fit_data->fit_params->vars[i];
         if(var->active) {
             *(var->value) = gsl_vector_get(x, var->i_v);
+            if(fit_data->stats.iter_call == 1) { /* Store the value of fit parameters at the first function evaluation */
+                var->value_iter = *(var->value);
+            }
+#ifdef DEBUG
+            fprintf(stderr, "  %zu %12.10lf %12.10lf %s\n", var->i_v, *(var->value)/var->value_orig, *(var->value)/var->value_iter, var->i_v == i_v_active ? "THIS ONE":"");
+#endif
         }
     }
+#ifdef DEBUG
+    fprintf(stderr, "\n");
+#endif
+    if(var_active && var_active->value == &fit_data->sim->fluence) {
+#ifdef DEBUG
+        fprintf(stderr, "Varying fluence (iter %zu, call %zu).\n", fit_data->stats.iter, fit_data->stats.iter_call);
+        /* TODO: make code here that reuses stored histograms if only the fluence changes */
+#endif
+    }
+
     if(sample_model_sanity_check(fit_data->sm)) {
         fit_data->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
@@ -53,6 +76,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     }
     fit_data->sim->sample = sample_from_sample_model(fit_data->sm);
     sample_renormalize(fit_data->sim->sample);
+
     if(fit_data_workspaces_init(fit_data)) {
         fit_data_workspaces_free(fit_data); /* Some workspaces may have already been allocated */
         fit_data->stats.error = FIT_ERROR_SANITY;
@@ -70,12 +94,23 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
 #endif
 
     start = clock();
-    for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
+    for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
         simulate_with_ds(fit_data->ws[i_det]);
     }
     end = clock();
     fit_data->stats.cputime_iter += (((double) (end - start)) / CLOCKS_PER_SEC);
     fit_data->stats.n_evals_iter++;
+
+    if(fit_data->stats.iter_call == 1) { /* First call of iter, store sum histograms to fit_data */
+        fit_data_histo_sum_free(fit_data);
+        fit_data->histo_sum_iter = calloc(fit_data->n_ws, sizeof(gsl_histogram *));
+        for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
+            sim_workspace *ws = fit_data_ws(fit_data, i_det);
+            fit_data->histo_sum_iter[i_det] = gsl_histogram_clone(ws->histo_sum);
+        }
+        fit_data->n_histo_sum = fit_data->n_ws;
+    }
+
     size_t i_vec = 0;
     for(size_t i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) { /* TODO: actually calculate which spectra we need to simulate when fitting. Calculate emin based on lowest energy in lowest range. */
         if(i_vec >= f->size) {
@@ -236,9 +271,11 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     f->exp = calloc(sim->n_det, sizeof(gsl_histogram *)); /* Allocating based on initial number of detectors. */
     f->sm = NULL; /* Can be set later. */
     f->ws = NULL; /* Initialized later */
+    f->n_ws = 0; /* Number of allocated workspaces, initially same as number of detectors. */
     f->fit_params = NULL; /* Holds fit parameters AFTER a fit. */
     f->phase_start = FIT_PHASE_FAST;
     f->phase_stop = FIT_PHASE_SLOW;
+    f->histo_sum_iter = NULL; /* Initialized later */
     return f;
 }
 
@@ -247,6 +284,7 @@ void fit_data_free(fit_data *fit) {
         return;
     fit_params_free(fit->fit_params);
     fit_data_fit_ranges_free(fit);
+    fit_data_histo_sum_free(fit);
     free(fit);
 }
 
@@ -323,6 +361,19 @@ int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename) 
     return EXIT_SUCCESS;
 }
 
+void fit_data_histo_sum_free(struct fit_data *fit_data) {
+    if(!fit_data->histo_sum_iter)
+        return;
+    for(size_t i = 0; i < fit_data->n_histo_sum; i++) {
+        if(fit_data->histo_sum_iter[i]) {
+            gsl_histogram_free(fit_data->histo_sum_iter[i]);
+        }
+    }
+    free(fit_data->histo_sum_iter);
+    fit_data->histo_sum_iter = NULL;
+    fit_data->n_histo_sum = 0;
+}
+
 int fit_data_add_det(struct fit_data *fit_data, detector *det) {
     if(!fit_data || !det)
         return EXIT_FAILURE;
@@ -337,7 +388,7 @@ int fit_data_add_det(struct fit_data *fit_data, detector *det) {
 sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det) {
     if(!fit_data || !fit_data->ws)
         return NULL;
-    if(i_det >= fit_data->sim->n_det)
+    if(i_det >= fit_data->n_ws)
         return NULL;
     return fit_data->ws[i_det];
 }
@@ -363,11 +414,11 @@ size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_d
 int fit_data_workspaces_init(struct fit_data *fit_data) {
     int status = EXIT_SUCCESS;
     fit_data_workspaces_free(fit_data);
-    size_t n = fit_data->sim->n_det;
-    fit_data->ws = calloc(n, sizeof(sim_workspace *));
+    fit_data->n_ws = fit_data->sim->n_det;
+    fit_data->ws = calloc(fit_data->n_ws, sizeof(sim_workspace *));
     if(!fit_data->ws)
         return EXIT_FAILURE;
-    for(size_t i = 0; i < n; i++) {
+    for(size_t i = 0; i < fit_data->n_ws; i++) {
         detector *det = sim_det(fit_data->sim, i);
         if(detector_sanity_check(det)) {
             jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!\n", i);
@@ -392,12 +443,13 @@ void fit_data_workspaces_free(struct fit_data *fit_data) {
     if(!fit_data->ws) {
         return;
     }
-    for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
+    for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
         sim_workspace_free(fit_data->ws[i_det]);
         fit_data->ws[i_det] = NULL;
     }
     free(fit_data->ws);
     fit_data->ws = NULL;
+    fit_data->n_ws = 0;
 }
 
 struct fit_stats fit_stats_init() {
@@ -469,6 +521,7 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
     double chisq_dof_old;
     jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | eval | cpu cumul (s) | cpu/eval (ms)|\n");
     for(iter = 0; iter <= maxiter; iter++) {
+        fit_data->stats.iter_call = 0;
         if(iter) {
             chisq_dof_old = fit_data->stats.chisq_dof;
             fit_data->stats.iter = iter;
@@ -659,7 +712,6 @@ int fit(struct fit_data *fit_data) {
     w = gsl_multifit_nlinear_alloc (T, &fdf_params, fdf.n, fdf.p);
 
     sim_calc_params p_orig = fit_data->sim->params; /* Store original values (will be used in final stage of fitting) */
-
     for(int phase = fit_data->phase_start;  phase <= fit_data->phase_stop; phase++) { /* Phase 1 is "fast", phase 2 normal. */
         assert(phase >= FIT_PHASE_FAST && phase <= FIT_PHASE_SLOW);
         double xtol = fit_data->xtol;
@@ -716,7 +768,7 @@ int fit(struct fit_data *fit_data) {
         fit_params_print_final(fit_params);
         fit_covar_print(covar);
 
-        for(size_t i = 0; i < fit_data->sim->n_det; i++) {
+        for(size_t i = 0; i < fit_data->n_ws; i++) {
             spectrum_set_calibration(fit_data_exp(fit_data, i), sim_det(fit_data->sim, i), JIBAL_ANY_Z); /* Update the experimental spectra to final calibration (using default calibration) */
         }
     }

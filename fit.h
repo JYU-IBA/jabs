@@ -29,6 +29,7 @@ typedef struct fit_variable {
     double *value; /* Pointer to a value. This is not allocated or free'd by fitting related methods. */
     double value_orig;
     double value_final;
+    double value_iter;
     double err; /* Error estimate of fit will be stored here. */
     double err_rel; /* Relative error */
     double sigmas; /* Change, relative to error */
@@ -73,6 +74,7 @@ struct fit_stats {
     double chisq_dof;
     double rcond;
     size_t iter;
+    size_t iter_call;
     int error;
 };
 
@@ -88,7 +90,8 @@ typedef struct fit_data {
     const jibal *jibal; /* This shouldn't be here, but it is the only place I can think of */
     sample_model *sm;
     fit_params *fit_params; /* Allocated with fit_data_new() and freed by fit_data_free() */
-    sim_workspace **ws; /* Allocated and leaked by fitting function! An array of sim->n_det */
+    sim_workspace **ws; /* Allocated and leaked by fitting function! An array of n_ws. */
+    size_t n_ws;
     struct roi *fit_ranges; /* Array of fit_range, size n_fit_ranges, freed by fit_data_free() */
     size_t n_fit_ranges;
     size_t n_iters_max; /* Maximum number of iterations, in each fit phase */
@@ -101,6 +104,8 @@ typedef struct fit_data {
     struct fit_stats stats; /* Fit statistics, updated as we iterate */
     int phase_start; /* Fit phase to start from (see FIT_PHASE -defines) */
     int phase_stop; /* Inclusive */
+    gsl_histogram **histo_sum_iter; /* Array of histograms, updates every iter. */
+    size_t n_histo_sum;
 } fit_data;
 
 
@@ -112,6 +117,7 @@ gsl_histogram *fit_data_exp(const struct fit_data *fit_data, size_t i_det);
 gsl_histogram *fit_data_sim(const struct fit_data *fit_data, size_t i_det);
 void fit_data_exp_free(struct fit_data *fit_data);
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename);
+void fit_data_histo_sum_free(struct fit_data *fit_data);
 int fit_data_add_det(struct fit_data *fit_data, detector *det);
 sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det);
 size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);

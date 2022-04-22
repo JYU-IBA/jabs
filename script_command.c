@@ -1459,6 +1459,7 @@ script_command_status script_reset_fit(script_session *s, int argc, char *const 
     fit_params_free(s->fit->fit_params);
     s->fit->fit_params = NULL;
     fit_data_workspaces_free(s->fit);
+    fit_data_histo_sum_free(s->fit);
     return 0;
 }
 
