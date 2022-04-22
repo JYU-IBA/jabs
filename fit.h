@@ -132,5 +132,6 @@ void fit_stats_print(FILE *f, const struct fit_stats *stats);
 int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range); /* Makes a deep copy */
 void fit_data_fit_ranges_free(struct fit_data *fit_data);
 int fit_set_roi_from_string(roi *r, const char *str); /* Parses only low and high from "[low:high]". */
+double fit_emin(struct fit_data *fit, size_t i_det); /* Returns lowest energy of fit ranges for detector i_det. Detectors, calibrations and fit ranges must be set before calling. */
 const char *fit_error_str(int error);
 #endif // JABS_FIT_H

@@ -59,6 +59,16 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
         return GSL_FAILURE;
     }
 
+#if 0
+    for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) { /* Sets the lowest energy in each simulation according to fit ranges */
+        double emin = fit_emin(fit_data, i_det);
+        sim_workspace *ws = fit_data_ws(fit_data, i_det);
+        if(emin > ws->emin) { /* Only increase the emin, never reduce it. */
+            ws->emin = emin;
+        }
+    }
+#endif
+
     start = clock();
     for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
         simulate_with_ds(fit_data->ws[i_det]);
@@ -748,6 +758,26 @@ int fit_set_roi_from_string(roi *r, const char *str) {
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
+}
+
+double fit_emin(struct fit_data *fit, size_t i_det) {
+    double emin = fit->sim->beam_E;
+    for(size_t i_range = 0; i_range < fit->n_fit_ranges; i_range++) {
+        const roi *r = &(fit->fit_ranges[i_range]);
+        if(r->i_det != i_det)
+            continue;
+        const detector *det = sim_det(fit->sim, i_det);
+        for(int Z = JIBAL_ANY_Z; Z <= det->cal_Z_max; Z++) {
+            double E = detector_calibrated(det, Z, r->low); /* TODO: assumes calibration is increasing monotonously. Is it guaranteed in all cases? */
+            E -= 3.0*det->calibration->resolution; /* TODO: bad approximation. */
+            E *= 0.95;
+            E -= 10.0*C_KEV;
+            if(E < emin) {
+                emin = E;
+            }
+        }
+    }
+    return emin;
 }
 
 const char *fit_error_str(int error) {

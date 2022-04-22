@@ -107,6 +107,7 @@ typedef struct {
     sim_reaction *reactions;
     const jibal_isotope *isotopes;
     sim_calc_params params;
+    double emin;
 } sim_workspace;
 
 

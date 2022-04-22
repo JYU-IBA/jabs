@@ -303,6 +303,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     }
     sim_workspace *ws = malloc(sizeof(sim_workspace));
     ws->sim = sim;
+    ws->emin = sim->emin;
     ws->fluence = sim->fluence;
     ws->det = det;
     ws->sample = sim->sample;
