@@ -553,8 +553,20 @@ void simulation_print(FILE *f, const simulation *sim) {
         jabs_message(MSG_INFO, f, "substrate channeling yield correction slope = %g / keV (%e)\n", sim->channeling_slope/(1.0/C_KEV), sim->channeling_slope);
     }
 }
+void sim_workspace_histograms_reset(sim_workspace *ws) {
+    for(size_t i = 0; i < ws->n_reactions; i++) {
+        sim_reaction *r = &ws->reactions[i];
+        if(!r)
+            continue;
+#ifdef DEBUG_VERBOSE
+        fprintf(stderr, "Reaction %i:\n", i);
+#endif
+        gsl_histogram_reset(r->histo);
+    }
+}
 
-void convolute_bricks(sim_workspace *ws) {
+
+void sim_workspace_histograms_calculate(sim_workspace *ws) {
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
         if(!r)
@@ -563,7 +575,19 @@ void convolute_bricks(sim_workspace *ws) {
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
         bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
-        brick_int2(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params.sigmas_cutoff);
+        bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params.sigmas_cutoff);
+    }
+}
+
+void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
+    for(size_t i = 0; i < ws->n_reactions; i++) {
+        sim_reaction *r = &ws->reactions[i];
+        if(!r)
+            continue;
+#ifdef DEBUG_VERBOSE
+        fprintf(stderr, "Reaction %i:\n", i);
+#endif
+        gsl_histogram_scale(r->histo, scale);
     }
 }
 

@@ -65,7 +65,7 @@ void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, b
     }
 }
 
-void brick_int2(gsl_histogram *h, const brick *bricks, size_t last_brick, const double scale, const double sigmas_cutoff) {
+void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, const double scale, const double sigmas_cutoff) {
     for(size_t i = 1; i <= last_brick; i++) {
         const brick *b_high = &bricks[i-1];
         const brick *b_low = &bricks[i];
@@ -84,50 +84,5 @@ void brick_int2(gsl_histogram *h, const brick *bricks, size_t last_brick, const 
             const double y = (erf_Q_new((b_low->E - E) / b_low->sigma) - erf_Q_new((b_high->E - E) / b_high->sigma)) / (b_high->E - b_low->E);
             h->bin[j] += scale * y * w * b_low->Q;
         }
-    }
-}
-
-void brick_int(double sigma_low, double sigma_high, double E_low, double E_high, gsl_histogram *h, double Q) { /* Energy spectrum h, integrate over rectangular brick convoluted with a gaussian */
-#ifdef OPTIMIZE_BRICK
-    size_t lo;
-    size_t hi;
-    gsl_histogram_find(h, E_low, &lo);
-    gsl_histogram_find(h, E_high, &hi);
-
-#ifdef SMART
-    double foo = (E_high-E_low)/(3.0); /* TODO: smart choice */
-    int n = ceil(foo*5);
-
-    if(n < 50)
-        n = 50;
-#else
-    int n = 50; /* TODO: stupid choice */
-#endif
-
-    if(lo > n)
-        lo -= n;
-    else
-        lo = 0;
-    if(hi > h->n-n-1)
-        hi = h->n;
-    else
-        hi += n;
-    for(size_t i = lo; i <= hi; i++) {
-#else
-        for(size_t i = 0; i < h->n; i++) {
-#endif
-        double w = h->range[i+1] - h->range[i];
-        double E = (h->range[i] + h->range[i+1])/2.0; /* Approximate gaussian at center bin */
-#ifdef ERF_Q_FROM_GSL
-        double y = (gsl_sf_erf_Q((E_low-E)/sigma)-gsl_sf_erf_Q((E_high-E)/sigma))/(E_high-E_low);
-#else
-#ifdef SIGMA_MEAN
-        double sigma = (sigma_low+sigma_high)/2.0;
-        double y = (erf_Q((E_low-E)/sigma)-erf_Q((E_high-E)/sigma))/(E_high-E_low);
-#else
-        double y = (erf_Q_optim((E_low-E)/sigma_low)-erf_Q_optim((E_high-E)/sigma_high))/(E_high-E_low);
-#endif
-#endif
-        h->bin[i] += y*w*Q;
     }
 }

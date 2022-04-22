@@ -483,7 +483,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             break;
         }
     }
-    convolute_bricks(ws);
+    sim_workspace_histograms_calculate(ws);
     return EXIT_SUCCESS;
 }
 
