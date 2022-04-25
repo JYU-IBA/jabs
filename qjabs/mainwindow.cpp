@@ -14,7 +14,7 @@ int fit_iter_callback(fit_stats stats);
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow),
-      maxRecentFiles(5)
+      maxRecentFiles(5), fitDialog(NULL)
 {
     aboutString = QString("JaBS version ") + jabs_version() + "\n\n"
                        + "Using JIBAL version "+ jibal_version() + ", compiled using version " + JIBAL_VERSION + "\n\n"
@@ -129,9 +129,9 @@ int MainWindow::runLine(const QString &line) {
     return status;
 }
 
-void MainWindow::plotSession()
+void MainWindow::plotSession(bool error)
 {
-    if(session && session->fit && session->fit->sim && session->fit->n_ws && session->fit->stats.error >= 0) {
+    if(session && session->fit && session->fit->sim && session->fit->n_ws && !error) {
         ui->plotSpinBox->setMaximum(session->fit->n_ws);
         ui->plotSettingsGroupBox->setVisible(session->fit->n_ws > 1);
         plotSpectrum(ui->plotSpinBox->value() - 1);
@@ -189,6 +189,15 @@ void MainWindow::enableRun(bool enabled)
     ui->action_Save_File->setEnabled(enabled && needsSaving);
 }
 
+void MainWindow::closeFitDialog()
+{
+    if(fitDialog) {
+        fitDialog->close();
+        delete fitDialog;
+        fitDialog = NULL;
+    }
+}
+
 int MainWindow::fitCallback(fit_stats stats)
 {
     QCoreApplication::processEvents();
@@ -198,7 +207,7 @@ int MainWindow::fitCallback(fit_stats stats)
     }
     fitDialog->updateStats(stats);
     if(fitDialog->isPlotWhileFitting()) {
-        plotSession();
+        plotSession(stats.error < 0);
     }
     return fitDialog->isAborted();
 }
@@ -209,7 +218,6 @@ void MainWindow::on_action_Run_triggered()
         return;
     }
     enableRun(false);
-    fitDialog = NULL;
     if(firstRun) {
         resetAll();
     } else {
@@ -242,14 +250,11 @@ void MainWindow::on_action_Run_triggered()
             }
         }
         QCoreApplication::processEvents();
-        if(fitDialog) {
-            fitDialog->close();
-            delete fitDialog;
-            fitDialog = NULL;
-        }
+        closeFitDialog(); /* if fit dialog was opened (by callback resulting in running this line), close it immediately*/
     }
+    closeFitDialog();
     enableRun(true);
-    plotSession();
+    plotSession(error);
 }
 
 
@@ -449,10 +454,11 @@ void MainWindow::on_actionAbout_triggered()
 
 void MainWindow::on_commandLineEdit_returnPressed()
 {
-    if(runLine(ui->commandLineEdit->text()) == SCRIPT_COMMAND_SUCCESS) {
+    int status = runLine(ui->commandLineEdit->text());
+    if(status == SCRIPT_COMMAND_SUCCESS) {
             ui->commandLineEdit->clear();
     }
-    plotSession();
+    plotSession(status < 0);
 }
 
 void MainWindow::on_msgTextEdit_textChanged()

@@ -73,10 +73,11 @@ private:
     void updateWindowTitle();
     void setFilename(const QString &filename);
     int runLine(const QString &line);
-    void plotSession();
+    void plotSession(bool error = false);
     bool askToSave();
     void closeEvent(QCloseEvent *event);
     void enableRun(bool enabled);
+    void closeFitDialog();
     Ui::MainWindow *ui;
     FitDialog *fitDialog;
     struct jibal *jibal;
