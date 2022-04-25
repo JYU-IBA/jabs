@@ -160,7 +160,7 @@ int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f) {
     return FIT_ERROR_NONE;
 }
 
-void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_workspace *w) {
+int fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_workspace *w) {
     gsl_vector *f = gsl_multifit_nlinear_residual(w);
     struct fit_data *fit_data = (struct fit_data *)params;
 
@@ -175,7 +175,9 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
                  fit_data->stats.chisq_dof, fit_data->stats.n_evals, fit_data->stats.cputime_cumul,
                  1000.0 * fit_data->stats.cputime_iter / fit_data->stats.n_evals_iter);
     if(fit_data->fit_iter_callback) {
-        fit_data->fit_iter_callback(fit_data->stats);
+        return fit_data->fit_iter_callback(fit_data->stats);
+    } else {
+        return 0;
     }
 }
 
@@ -531,11 +533,9 @@ int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, do
     return GSL_CONTINUE;
 }
 
-int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, const double chisq_tol, void (*callback)(const size_t iter, void *params, const gsl_multifit_nlinear_workspace *w),
-                            void *callback_params, gsl_multifit_nlinear_workspace *w) {
+int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, const double chisq_tol, struct fit_data *fit_data, gsl_multifit_nlinear_workspace *w) {
     int status = 0;
     size_t iter;
-    struct fit_data *fit_data = (struct fit_data *) callback_params;
     double chisq_dof_old;
     jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | eval | cpu cumul (s) | cpu/eval (ms)|\n");
     for(iter = 0; iter <= maxiter; iter++) {
@@ -556,8 +556,9 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
         if(status == GSL_ENOPROG && iter == 1) {
             return FIT_ERROR_NO_PROGRESS;
         }
-        if(callback)
-            callback(iter, callback_params, w);
+        if(fit_callback(iter, fit_data, w)) {
+            return FIT_ERROR_ABORTED;
+        }
        if(iter == 0)
             continue;
         /* test for convergence */
@@ -736,6 +737,7 @@ int fit(struct fit_data *fit_data) {
         double chisq_tol = fit_data->chisq_tol;
         /* initialize solver with starting point and weights */
         fit_data->stats = fit_stats_init();
+        fit_data->stats.phase = phase;
         if(phase == FIT_PHASE_FAST) {
             sim_calc_params_fast(&fit_data->sim->params, TRUE); /* Set current parameters to be faster in phase 0. */
             xtol *= FIT_FAST_XTOL_MULTIPLIER;
@@ -756,7 +758,7 @@ int fit(struct fit_data *fit_data) {
         f = gsl_multifit_nlinear_residual(w);
         gsl_blas_ddot(f, f, &fit_data->stats.chisq0);
 
-        status = jabs_gsl_multifit_nlinear_driver(fit_data->n_iters_max, xtol, chisq_tol, fit_callback, fit_data, w); /* Fit */
+        status = jabs_gsl_multifit_nlinear_driver(fit_data->n_iters_max, xtol, chisq_tol, fit_data, w); /* Fit */
         fit_data->stats.error = status;
         if(status < 0) {
             jabs_message(MSG_ERROR, stderr, "Fit aborted in phase %i, reason: %s.\n", phase, fit_error_str(fit_data->stats.error));
@@ -868,6 +870,8 @@ const char *fit_error_str(int error) {
             return "simulation failed sanity check";
         case FIT_ERROR_IMPOSSIBLE:
             return "an impossible thing has happened";
+        case FIT_ERROR_ABORTED:
+            return "user requested abort";
         default:
             return "unknown";
     }

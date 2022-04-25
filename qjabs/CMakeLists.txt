@@ -88,18 +88,13 @@ set(PROJECT_SOURCES
         ../calibration.c
         ../calibration.h
        main.cpp
-       mainwindow.cpp
-       mainwindow.h
-       mainwindow.ui
-       qcustomplot.cpp
-       qcustomplot.h
-       spectrumplot.cpp
-       spectrumplot.h
+       mainwindow.cpp mainwindow.h mainwindow.ui
+       fitdialog.cpp fitdialog.h fitdialog.ui
+       qcustomplot.cpp qcustomplot.h
+       spectrumplot.cpp spectrumplot.h
+       codeeditor.cpp codeeditor.h
+       highlighter.cpp highlighter.h
        icons.qrc
-       codeeditor.cpp
-       codeeditor.h
-       highlighter.cpp
-       highlighter.h
 )
 
 set(MACOSX_BUNDLE_ICON_FILE icon.icns)

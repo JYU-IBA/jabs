@@ -8,7 +8,7 @@ extern "C" {
 #include "script.h"
 #include "script_session.h"
 #include "script_command.h"
-void fit_iter_callback(fit_stats stats);
+int fit_iter_callback(fit_stats stats);
 }
 
 MainWindow::MainWindow(QWidget *parent)
@@ -173,9 +173,18 @@ void MainWindow::enableRun(bool enabled)
     ui->action_Save_File->setEnabled(enabled);
 }
 
-void MainWindow::fitCallback(fit_stats stats)
+int MainWindow::fitCallback(fit_stats stats)
 {
     QCoreApplication::processEvents();
+    if(!fitDialog) {
+        fitDialog = new FitDialog();
+        fitDialog->show();
+    }
+    fitDialog->updateStats(stats);
+    if(fitDialog->isPlotWhileFitting()) {
+        plotSession();
+    }
+    return fitDialog->isAborted();
 }
 
 void MainWindow::on_action_Run_triggered()
@@ -184,6 +193,7 @@ void MainWindow::on_action_Run_triggered()
         return;
     }
     enableRun(false);
+    fitDialog = NULL;
     if(firstRun) {
         resetAll();
     } else {
@@ -194,7 +204,8 @@ void MainWindow::on_action_Run_triggered()
     QString text = ui->plainTextEdit->toPlainText();
     QTextStream stream = QTextStream(&text, QIODevice::ReadOnly);
     size_t lineno = 0;
-    while(!stream.atEnd()) { /* TODO: this needs a loop to process script files. Loading script files has currently no effect (other than files getting opened) since the execution of session->files is not implemented! */
+    bool error = false;
+    while(!stream.atEnd() && !error) { /* TODO: this needs a loop to process script files. Loading script files has currently no effect (other than files getting opened) since the execution of session->files is not implemented! */
         QString line = stream.readLine();
         lineno++;
 #ifdef DEBUG
@@ -205,17 +216,25 @@ void MainWindow::on_action_Run_triggered()
         if(line.at(0) == '#')
             continue;
         if(runLine(line) < 0) {
-            return; /* or break? */
+            error = true;
+            break;
         }
         if(session->file_depth > 0) {
             if(script_process(session) < 0) {
-                return;
+                error = true;
+                break;
             }
         }
         QCoreApplication::processEvents();
     }
+    if(fitDialog) {
+        fitDialog->close();
+        delete fitDialog;
+    }
     enableRun(true);
-    plotSession();
+    if(!error) {
+        plotSession();
+    }
 }
 
 

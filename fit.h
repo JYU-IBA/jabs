@@ -59,11 +59,13 @@ typedef struct fit_params {
 #define FIT_ERROR_NO_PROGRESS (-3)
 #define FIT_ERROR_SANITY (-4)
 #define FIT_ERROR_IMPOSSIBLE (-5)
+#define FIT_ERROR_ABORTED (-6)
 
 #define FIT_PHASE_FAST 1
 #define FIT_PHASE_SLOW 2
 
 struct fit_stats {
+    int phase;
     size_t n_evals;
     size_t n_evals_iter; /* Number of function evaluations per iteration */
     double cputime_cumul;
@@ -105,7 +107,7 @@ typedef struct fit_data {
     int phase_stop; /* Inclusive */
     gsl_histogram **histo_sum_iter; /* Array of histograms, updates every iter. */
     size_t n_histo_sum;
-    void (*fit_iter_callback)(struct fit_stats stats);
+    int (*fit_iter_callback)(struct fit_stats stats);
 } fit_data;
 
 
@@ -130,7 +132,7 @@ void fit_parameters_update(const fit_data *fit, const gsl_multifit_nlinear_works
 void fit_parameters_update_changed(const fit_data *fit); /* Checks if values have changed since fit_parameters_update(), computes new error */
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f);
-void fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspace *w);
+int fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspace *w);
 fit_params *fit_params_new();
 int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor); /* Pointer to parameter to be fitted (value) is accessed during fitting (read, write). No guarantees that it stays accessible after the fit is over and user decides to change something! */
 void fit_params_free(fit_params *p);

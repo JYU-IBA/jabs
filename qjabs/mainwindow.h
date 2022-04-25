@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include "highlighter.h"
+#include "fitdialog.h"
 
 extern "C" {
 #include <jibal_units.h>
@@ -30,7 +31,7 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     void addMessage(jabs_msg_level level, const char *msg);
-    void fitCallback(fit_stats stats);
+    int fitCallback(fit_stats stats);
     ~MainWindow();
 
 public slots:
@@ -73,6 +74,7 @@ private:
     void closeEvent(QCloseEvent *event);
     void enableRun(bool enabled);
     Ui::MainWindow *ui;
+    FitDialog *fitDialog;
     struct jibal *jibal;
     script_session *session;
     Highlighter *highlighter;
