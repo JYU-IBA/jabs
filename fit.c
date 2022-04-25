@@ -165,6 +165,7 @@ void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear
     /* compute reciprocal condition number of J(x) */
     gsl_multifit_nlinear_rcond(&fit_data->stats.rcond, w);
     gsl_blas_ddot(f, f, &fit_data->stats.chisq);
+    fit_data->stats.norm = gsl_blas_dnrm2(f);
     fit_data->stats.chisq_dof = fit_data->stats.chisq/fit_data->dof;
     fit_data->stats.n_evals += fit_data->stats.n_evals_iter;
     fit_data->stats.cputime_cumul += fit_data->stats.cputime_iter;
