@@ -15,6 +15,7 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -35,7 +36,7 @@
 extern inline double normal_pdf_std(double x);
 
 double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
-    double em=E/incident->mass;
+    double em = E / incident->mass;
     double S1 = 0.0;
 #ifdef NEUTRONS_EXIST
     if(incident->Z == 0)
@@ -50,15 +51,15 @@ double stop_sample(const sim_workspace *ws, const ion *incident, const sample *s
         }
         if(c < CONC_TOLERANCE)
             continue;
-        if (type == GSTO_STO_TOT) {
+        if(type == GSTO_STO_TOT) {
             S1 += c * (
                     jibal_gsto_get_em(ws->gsto, GSTO_STO_ELE, incident->Z, sample->isotopes[i_isotope]->Z, em)
                     #ifdef NUCLEAR_STOPPING_FROM_JIBAL
                     +jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, sample->isotopes[i_isotope]->Z, sample->isotopes[i_isotope]->mass)
                     #else
                     + ion_nuclear_stop(incident, sample->isotopes[i_isotope], ws->isotopes, ws->params.nucl_stop_accurate)
-                    #endif
-                    );
+#endif
+            );
         } else {
             S1 += c * (jibal_gsto_get_em(ws->gsto, type, incident->Z, sample->isotopes[i_isotope]->Z, em));
         }
@@ -114,13 +115,14 @@ depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, de
     /* k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
     E = incident->E;
     k1 = stop_sample(ws, incident, sample, ws->stopping_type, depth, E);
-    if(k1 < 0.001*C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
+    if(k1 < 0.001 * C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
 #ifdef DEBUG_STOP_STEP
         fprintf(stderr, "stop_step returns no progress, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)\n", k1/C_EV_TFU, depth.x/C_TFU, E/C_KEV);
 #endif
         return depth;
     }
-    double h_max = h_max_perp * incident->inverse_cosine_theta; /*  we can take bigger steps since we are going sideways. Note that inverse_cosine_theta can be negative and in this case h_max should also be negative so h_max is always positive! */
+    double h_max = h_max_perp *
+                   incident->inverse_cosine_theta; /*  we can take bigger steps since we are going sideways. Note that inverse_cosine_theta can be negative and in this case h_max should also be negative so h_max is always positive! */
     assert(h_max >= 0.0);
     double h = (step / k1); /* (energy) step should always be positive, as well as k1, so depth step h (not perpendicular, but "real" depth) is always positive  */
     assert(h > 0.0);
@@ -129,14 +131,14 @@ depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, de
     halfdepth.i = depth.i;
     if(h >= h_max) { /* Depth step would take us beyond a depth range. We stop exactly on the boundary */
         h = h_max;
-        halfdepth.x = depth.x + h_max_perp/2.0;
+        halfdepth.x = depth.x + h_max_perp / 2.0;
         fulldepth = depth_next;
-        if(h < 0.001*C_TFU) {
+        if(h < 0.001 * C_TFU) {
             return fulldepth;
         }
     } else {
-        double h_perp = h*incident->cosine_theta; /* x + h_perp is the actual perpendicular depth */
-        halfdepth.x = depth.x + h_perp/2.0;
+        double h_perp = h * incident->cosine_theta; /* x + h_perp is the actual perpendicular depth */
+        halfdepth.x = depth.x + h_perp / 2.0;
         fulldepth.i = depth.i;
         fulldepth.x = depth.x + h_perp;
     }
@@ -151,7 +153,7 @@ depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, de
         stop = k1;
     }
     assert(stop > 0.0);
-    dE =  -1.0* h * stop; /* Energy change in thickness "h". It is always negative! */
+    dE = -1.0 * h * stop; /* Energy change in thickness "h". It is always negative! */
 #ifndef STATISTICAL_STRAGGLING
     double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, fulldepth, E + dE) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
 #ifdef DEBUG
@@ -176,13 +178,13 @@ double normal_pdf(double x, double mean, double sigma) {
 double cross_section_straggling(const sim_reaction *sim_r, int n_steps, double E, double S) {
     static const double sigmas = 2.0; /* TODO: what is enough or too much? */
     const double std_dev = sqrt(S);
-    const int half_n = n_steps/2;
-    const double w = sigmas/(half_n);
+    const int half_n = n_steps / 2;
+    const double w = sigmas / (half_n);
     double cs_sum = 0.0;
     double prob_sum = 0.0;
     //static const double inv_sqrt_2pi = 0.398942280401432703;
     for(int i = 0; i < n_steps; i++) {
-        double x = w*(i-half_n);
+        double x = w * (i - half_n);
         double E_stragg = E + x * std_dev;
         //double prob = normal_pdf(x, 0.0, 1.0) * w; /* TODO: if this is always a normal distribution and n_steps doesn't change, this function call could be replaced by a lookup table */
         double prob = normal_pdf_std(x);
@@ -199,9 +201,11 @@ double cross_section_straggling(const sim_reaction *sim_r, int n_steps, double E
 }
 
 
-double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
-   if(ws->params.mean_conc_and_energy) { /* This if-branch is slightly faster (maybe) and also serves as a testing branch, since it is a lot easier to understand... */
-        const depth d_halfdepth = {.x = (d_before->x + d_after->x)/2.0, .i = d_after->i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
+double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after,
+                                           double S_front, double S_back) {
+    if(ws->params.mean_conc_and_energy) { /* This if-branch is slightly faster (maybe) and also serves as a testing branch, since it is a lot easier to understand... */
+        const depth d_halfdepth = {.x = (d_before->x + d_after->x) /
+                                        2.0, .i = d_after->i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         double c = get_conc(sample, d_halfdepth, sim_r->i_isotope);
         if(c < ABUNDANCE_THRESHOLD)
             return 0.0;
@@ -232,8 +236,8 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
             }
             sum += sigma * c;
         }
-       return sample->ranges[d.i].yield * sum/(ws->params.cs_n_steps*1.0);
-   }
+        return sample->ranges[d.i].yield * sum / (ws->params.cs_n_steps * 1.0);
+    }
     return 0.0;
 }
 
@@ -246,7 +250,8 @@ void post_scatter_exit(ion *p, const depth depth_start, const sim_workspace *ws,
         if(d.x <= DEPTH_TOLERANCE) {
             break;
         }
-        depth d_after = stop_step(ws, p, sample, d, ws->params.stop_step_exiting == 0.0?ws->params.stop_step_fudge_factor*(p->E*0.07+sqrt(p->S)+10.0*C_KEV):ws->params.stop_step_exiting); /* TODO: 7% of energy plus straggling plus 10 keV is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
+        depth d_after = stop_step(ws, p, sample, d, ws->params.stop_step_exiting == 0.0 ? ws->params.stop_step_fudge_factor * (p->E * 0.07 + sqrt(p->S) + 10.0 * C_KEV)
+                                                                                        : ws->params.stop_step_exiting); /* TODO: 7% of energy plus straggling plus 10 keV is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
         if(p->E < ws->emin) {
 #ifdef DEBUG_REACTION
             fprintf(stderr,
@@ -269,10 +274,11 @@ void foil_traverse(ion *p, const sample *foil, sim_workspace *ws) {
     size_t i = 0;
     while(1) {
         i++;
-        if(foil->ranges[foil->n_ranges-1].x - d.x < DEPTH_TOLERANCE) {
+        if(foil->ranges[foil->n_ranges - 1].x - d.x < DEPTH_TOLERANCE) {
             break;
         }
-        depth d_after  = stop_step(ws, &ion_foil, foil, d, ws->params.stop_step_exiting == 0.0?ws->params.stop_step_fudge_factor*(p->E*0.05+sqrt(p->S)+1.0*C_KEV):ws->params.stop_step_exiting);
+        depth d_after = stop_step(ws, &ion_foil, foil, d,
+                                  ws->params.stop_step_exiting == 0.0 ? ws->params.stop_step_fudge_factor * (p->E * 0.05 + sqrt(p->S) + 1.0 * C_KEV) : ws->params.stop_step_exiting);
         if(ion_foil.E < ws->emin) {
             break;
         }
@@ -294,15 +300,17 @@ double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calcula
     return ws->params.stop_step_fudge_factor * broad; /* Fudge factor also affects the minimum stop step */
 }
 
-int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
+int simulate(const ion *incident, const depth depth_start, sim_workspace *ws,
+             const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
     assert(sample->n_ranges);
     int warnings = 0;
-    double thickness = sample->ranges[sample->n_ranges-1].x;
+    double thickness = sample->ranges[sample->n_ranges - 1].x;
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
     geostragg_vars g = geostragg_vars_calculate(ws, incident);
-    if(g.theta_product < 90.0*C_DEG) {
-        jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", g.theta_product/C_DEG, g.phi_product/C_DEG);
+    if(g.theta_product < 90.0 * C_DEG) {
+        jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", g.theta_product / C_DEG,
+                     g.phi_product / C_DEG);
         return EXIT_FAILURE;
     }
 #ifdef DEBUG
@@ -354,7 +362,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         ion_print(stderr, &r->p);
 #endif
     }
-    i_depth=1;
+    i_depth = 1;
     if(fabs(ion1.cosine_theta) < 1e-6) {
 #ifdef DEBUG
         fprintf(stderr, "Ion was going sideways in the sample, we nudged it a little.\n");
@@ -369,9 +377,9 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         }
         if(d_before.x >= thickness) /* We're in too deep. */
             break;
-        if(ion1.inverse_cosine_theta < 0.0 && d_before.x < 0.001*C_TFU) /* We're coming out of the sample and about to exit */
+        if(ion1.inverse_cosine_theta < 0.0 && d_before.x < 0.001 * C_TFU) /* We're coming out of the sample and about to exit */
             break;
-        if (ion1.E < ws->emin) {
+        if(ion1.E < ws->emin) {
 #ifdef DEBUG
             fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %lu.\n", ion1.E/C_KEV, ws->sim->emin/C_KEV, d_before.x/C_TFU, d_before.i);
 #endif
@@ -388,12 +396,14 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         /* DEPTH BIN [x, x+d_diff) */
         const double E_back = ion1.E;
         const double S_back = ion1.S;
-        if(fabs(d_diff) < 0.001*C_TFU && E_front-E_back < 0.001*C_KEV) {
-            jabs_message(MSG_WARNING, stderr, "Warning: no or very little progress was made (E step (goal) %g keV, E from %g keV to E = %g keV, depth = %g tfu, d_diff = %g tfu), check stopping or step size.\n", E_step/C_KEV, E_front/C_KEV , E_back/C_KEV, d_before.x/C_TFU, d_diff/C_TFU);
+        if(fabs(d_diff) < 0.001 * C_TFU && E_front - E_back < 0.001 * C_KEV) {
+            jabs_message(MSG_WARNING, stderr,
+                         "Warning: no or very little progress was made (E step (goal) %g keV, E from %g keV to E = %g keV, depth = %g tfu, d_diff = %g tfu), check stopping or step size.\n",
+                         E_step / C_KEV, E_front / C_KEV, E_back / C_KEV, d_before.x / C_TFU, d_diff / C_TFU);
             //sample_print(stderr, sample, FALSE);
             //d_before.x += incident->inverse_cosine_theta*0.0001*C_TFU;
             d_before = d_after;
-            d_before.x += 0.002*C_TFU;
+            d_before.x += 0.002 * C_TFU;
             warnings++;
             continue;
         }
@@ -407,7 +417,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
                         E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ion1.S) / C_KEV);
 #endif
         int all_stop = 1; /* Do we have any reactions left (or are we too deep in the sample) */
-        for (size_t i = 0; i < ws->n_reactions; i++) {
+        for(size_t i = 0; i < ws->n_reactions; i++) {
             sim_reaction *r = &ws->reactions[i];
             if(r->stop)
                 continue;
@@ -446,19 +456,20 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             foil_traverse(&r->p, ws->det->foil, ws);
             b->E = r->p.E;
             b->S = r->p.S;
-            #ifdef DEBUG
+#ifdef DEBUG
             fprintf(stderr, "Reaction %2zu depth from %8.3lf tfu to %8.3lf tfu, E = %8.3lf keV, Straggling: eloss %7.3lf keV, geo %7.3lf keV\n", i, d_before.x/C_TFU, d_after.x/C_TFU, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo_x+b->S_geo_y)/C_KEV);
-            #endif
-            if (r->p.E < ws->emin) {
+#endif
+            if(r->p.E < ws->emin) {
                 r->stop = TRUE;
                 b->Q = 0.0;
                 continue;
             }
-            double sigma_conc = cross_section_concentration_product(ws, sample, r, E_front, E_back, &d_before, &d_after, S_front, S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
+            double sigma_conc = cross_section_concentration_product(ws, sample, r, E_front, E_back, &d_before, &d_after, S_front,
+                                                                    S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
             b->thick = d_diff;
             if(sigma_conc > 0.0) {
                 if(d_after.i == sample->n_ranges - 2) {
-                    sigma_conc *= ws->sim->channeling_offset + ws->sim->channeling_slope * (E_front + E_back)/2.0;
+                    sigma_conc *= ws->sim->channeling_offset + ws->sim->channeling_slope * (E_front + E_back) / 2.0;
                 }
                 b->Q = ion1.inverse_cosine_theta * sigma_conc * d_diff;
                 b->sc = sigma_conc;
@@ -579,7 +590,7 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
         return EXIT_FAILURE;
     if(filename) {
         size_t l = strlen(filename);
-        if(l > 4 && strncmp(filename+l-4, ".csv", 4) == 0) { /* For CSV: print header line */
+        if(l > 4 && strncmp(filename + l - 4, ".csv", 4) == 0) { /* For CSV: print header line */
             sep = ','; /* and set the separator! */
             fprintf(f, "\"Channel\",\"Energy (keV)\",\"Simulated\"");
             if(exp) {
@@ -593,7 +604,8 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
         }
     }
     for(size_t i = 0; i < ws->n_channels; i++) {
-        fprintf(f,"%lu%c%.3lf%c", i, sep, detector_calibrated(ws->det, JIBAL_ANY_Z, i)/C_KEV, sep); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
+        fprintf(f, "%lu%c%.3lf%c", i, sep, detector_calibrated(ws->det, JIBAL_ANY_Z, i) / C_KEV,
+                sep); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
         if(ws->histo_sum->bin[i] == 0.0) {
             fprintf(f, "0"); /* Tidier output with a clean zero sum */
         } else {
@@ -606,9 +618,9 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
                 fprintf(f, "%c0", sep);
             }
         }
-        for (size_t j = 0; j < ws->n_reactions; j++) {
+        for(size_t j = 0; j < ws->n_reactions; j++) {
             if(i >= ws->reactions[j].histo->n || ws->reactions[j].histo->bin[i] == 0.0) {
-                fprintf(f,"%c0", sep);
+                fprintf(f, "%c0", sep);
             } else {
                 fprintf(f, "%c%e", sep, ws->reactions[j].histo->bin[i]);
             }
@@ -629,7 +641,7 @@ fit_params *fit_params_all(fit_data *fit) {
     fit_params *params = fit_params_new();
     fit_params_add_parameter(params, &sim->fluence, "fluence", "", 1.0);
     fit_params_add_parameter(params, &sim->channeling_offset, "channeling", "", 1.0);
-    fit_params_add_parameter(params, &sim->channeling_slope, "channeling_slope", "1/keV", 1.0/C_KEV);
+    fit_params_add_parameter(params, &sim->channeling_slope, "channeling_slope", "1/keV", 1.0 / C_KEV);
     fit_params_add_parameter(params, &sim->sample_theta, "alpha", "deg", C_DEG);
     fit_params_add_parameter(params, &sim->beam_E, "energy", "keV", C_KEV);
     for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
@@ -651,8 +663,8 @@ fit_params *fit_params_all(fit_data *fit) {
                 char *calib_param_name = calibration_param_name(c->type, i);
                 snprintf(param_name, param_name_max_len, "%scalib%s%s_%s",
                          det_name,
-                         (Z == JIBAL_ANY_Z)?"":"_",
-                         (Z == JIBAL_ANY_Z)?"":jibal_element_name(fit->jibal->elements, Z),
+                         (Z == JIBAL_ANY_Z) ? "" : "_",
+                         (Z == JIBAL_ANY_Z) ? "" : jibal_element_name(fit->jibal->elements, Z),
                          calib_param_name);
                 free(calib_param_name);
                 fit_params_add_parameter(params, calibration_get_param_ref(c, i), param_name, "keV", C_KEV);
@@ -692,18 +704,17 @@ int print_bricks(const char *filename, const sim_workspace *ws) {
         for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
             fprintf(f, "%2lu %4lu %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %8e\n",
-                    i, j, b->d.x/C_TFU, b->thick/C_TFU,
-                    b->E_0/C_KEV, C_FWHM * sqrt(b->S_0)/C_KEV,
-                    b->E_r/C_KEV, C_FWHM * sqrt(b->S_r)/C_KEV,
-                    b->E/C_KEV, C_FWHM * sqrt(b->S)/C_KEV,
-                    C_FWHM * sqrt(b->S_geo_x+b->S_geo_y)/C_KEV, b->sc/C_MB_SR, b->Q * ws->fluence * ws->det->solid);
+                    i, j, b->d.x / C_TFU, b->thick / C_TFU,
+                    b->E_0 / C_KEV, C_FWHM * sqrt(b->S_0) / C_KEV,
+                    b->E_r / C_KEV, C_FWHM * sqrt(b->S_r) / C_KEV,
+                    b->E / C_KEV, C_FWHM * sqrt(b->S) / C_KEV,
+                    C_FWHM * sqrt(b->S_geo_x + b->S_geo_y) / C_KEV, b->sc / C_MB_SR, b->Q * ws->fluence * ws->det->solid);
         }
         fprintf(f, "\n\n");
     }
     fclose_file_or_stream(f);
     return EXIT_SUCCESS;
 }
-
 
 
 int simulate_with_roughness(sim_workspace *ws) {
@@ -727,9 +738,9 @@ int simulate_with_roughness(sim_workspace *ws) {
     fprintf(stderr, "%zu rough layers\n", n_rl);
 #endif
     if(!n_rl) {
-        ion_set_angle(&ws->ion, 0.0*C_DEG, 0.0);
+        ion_set_angle(&ws->ion, 0.0 * C_DEG, 0.0);
         ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
-        return simulate(&ws->ion, depth_seek(ws->sample, 0.0*C_TFU), ws, ws->sample);
+        return simulate(&ws->ion, depth_seek(ws->sample, 0.0 * C_TFU), ws, ws->sample);
     }
     struct sample *sample_rough = sample_copy(ws->sample);
     size_t *index = malloc(sizeof(size_t) * n_rl);
@@ -751,13 +762,13 @@ int simulate_with_roughness(sim_workspace *ws) {
 #endif
             index[j] = i;
             if(j)
-                modulos[j] = modulos[j-1] *  tpd[j-1]->n;
+                modulos[j] = modulos[j - 1] * tpd[j - 1]->n;
             else
                 modulos[j] = 1;
             j++;
         }
     }
-    size_t iter_total = modulos[n_rl-1] * tpd[n_rl-1]->n;
+    size_t iter_total = modulos[n_rl - 1] * tpd[n_rl - 1]->n;
     for(size_t i_iter = 0; i_iter < iter_total; i_iter++) {
 #ifdef DEBUG
         fprintf(stderr, "Gamma roughness step %zu/%zu\n", i_iter+1, iter_total);
@@ -827,18 +838,20 @@ int simulate_with_ds(sim_workspace *ws) {
         double E_front = ion1.E;
         if(E_front < ws->emin)
             break;
-        depth d_after = stop_step(ws, &ion1, ws->sample, d_before, ws->params.stop_step_fudge_factor*sqrt(detector_resolution(ws->det, ion1.isotope, ion1.E)+ion1.S)); /* TODO: step? */
+        depth d_after = stop_step(ws, &ion1, ws->sample, d_before, ws->params.stop_step_fudge_factor * sqrt(detector_resolution(ws->det, ion1.isotope, ion1.E) + ion1.S)); /* TODO: step? */
         double thick_step = depth_diff(d_before, d_after);
-        const depth d_halfdepth = {.x = (d_before.x + d_after.x)/2.0, .i = d_after.i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
+        const depth d_halfdepth = {.x = (d_before.x + d_after.x) /
+                                        2.0, .i = d_after.i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         double E_back = ion1.E;
         const double E_mean = (E_front + E_back) / 2.0;
 
-        jabs_message(MSG_VERBOSE, stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x/C_TFU, d_after.x/C_TFU, E_front/C_KEV, E_back/C_KEV, fluence);
+        jabs_message(MSG_VERBOSE, stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x / C_TFU, d_after.x / C_TFU, E_front / C_KEV,
+                     E_back / C_KEV, fluence);
         double p_sum = 0.0;
         for(int i_polar = 0; i_polar < ws->params.ds_steps_polar; i_polar++) {
-            const double ds_polar_min = 20.0*C_DEG;
-            const double ds_polar_max = 180.0*C_DEG;
-            double ds_polar_step = (ds_polar_max-ds_polar_min)/(ws->params.ds_steps_polar*1.0);
+            const double ds_polar_min = 20.0 * C_DEG;
+            const double ds_polar_max = 180.0 * C_DEG;
+            double ds_polar_step = (ds_polar_max - ds_polar_min) / (ws->params.ds_steps_polar * 1.0);
             double ds_polar = ds_polar_min + i_polar * ds_polar_step;
             double cs_sum = 0.0;
             for(size_t i = 0; i < ws->sample->n_isotopes; i++) {
@@ -851,8 +864,8 @@ int simulate_with_ds(sim_workspace *ws) {
                 }
                 double cs = 0.0;
                 for(int polar_substep = 0; polar_substep < DUAL_SCATTER_POLAR_SUBSTEPS; polar_substep++) {
-                    double ds_polar_sub = ds_polar_step*(1.0*(polar_substep-(DUAL_SCATTER_POLAR_SUBSTEPS/2))/(DUAL_SCATTER_POLAR_SUBSTEPS*1.0)) + ds_polar;
-                    cs += jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar_sub)/(DUAL_SCATTER_POLAR_SUBSTEPS*1.0);
+                    double ds_polar_sub = ds_polar_step * (1.0 * (polar_substep - (DUAL_SCATTER_POLAR_SUBSTEPS / 2)) / (DUAL_SCATTER_POLAR_SUBSTEPS * 1.0)) + ds_polar;
+                    cs += jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar_sub) / (DUAL_SCATTER_POLAR_SUBSTEPS * 1.0);
                 }
                 cs_sum += c * cs;
             }
@@ -869,7 +882,7 @@ int simulate_with_ds(sim_workspace *ws) {
                     fprintf(stderr, "DS polar %.3lf, azi %.3lf, scatter %.3lf\n", ds_polar/C_DEG, ds_azi/C_DEG, scattering_angle(&ion2, ws)/C_DEG);
                 }
 #endif
-                if(scattering_angle(&ion2, ws) > 19.99999*C_DEG) {
+                if(scattering_angle(&ion2, ws) > 19.99999 * C_DEG) {
                     if(simulate(&ion2, d_halfdepth, ws, ws->sample)) {
                         return EXIT_FAILURE;
                     }
@@ -877,7 +890,7 @@ int simulate_with_ds(sim_workspace *ws) {
             }
         }
         fluence -= p_sum * fluence;
-        if(ws->sample->ranges[ws->sample->n_ranges-1].x - d_after.x < 0.01*C_TFU)
+        if(ws->sample->ranges[ws->sample->n_ranges - 1].x - d_after.x < 0.01 * C_TFU)
             break;
         d_before = d_after;
     }
@@ -923,11 +936,11 @@ void fit_params_print_final(const fit_params *params) { /* Prints final values o
             continue;
         //jabs_message(MSG_INFO, stderr, "%24s(%3s) = %12g +- %12g (%.1lf%%)\n", var->name, var->unit, var->value_final/var->unit_factor, var->err/var->unit_factor, var->err/var->value_final*100.0);
         jabs_message(MSG_INFO, stderr, "%3zu | %24s | %5s | %11.6g | %9.4g | %5.1lf | %12.6g | %8.4lf | %6.1lf |\n", var->i_v + 1, var->name, var->unit,
-                     var->value_final/var->unit_factor,
-                     var->err/var->unit_factor,
+                     var->value_final / var->unit_factor,
+                     var->err / var->unit_factor,
                      100.0 * var->err_rel,
-                     var->value_orig/var->unit_factor,
-                     var->value_final/var->value_orig,
+                     var->value_orig / var->unit_factor,
+                     var->value_final / var->value_orig,
                      var->sigmas
         );
     }
