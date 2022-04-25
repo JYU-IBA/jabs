@@ -74,6 +74,7 @@ struct fit_stats {
     double chisq;
     double chisq_dof;
     double rcond;
+    double norm;
     size_t iter;
     size_t iter_call;
     int error;
@@ -132,7 +133,8 @@ void fit_parameters_update(const fit_data *fit, const gsl_multifit_nlinear_works
 void fit_parameters_update_changed(const fit_data *fit); /* Checks if values have changed since fit_parameters_update(), computes new error */
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f);
-int fit_callback(size_t iter, void *params, const gsl_multifit_nlinear_workspace *w);
+void fit_iter_stats_update(struct fit_data *params, const gsl_multifit_nlinear_workspace *w);
+void fit_iter_stats_print(const struct fit_stats *stats);
 fit_params *fit_params_new();
 int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor); /* Pointer to parameter to be fitted (value) is accessed during fitting (read, write). No guarantees that it stays accessible after the fit is over and user decides to change something! */
 void fit_params_free(fit_params *p);

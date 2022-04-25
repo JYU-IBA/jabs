@@ -160,25 +160,21 @@ int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f) {
     return FIT_ERROR_NONE;
 }
 
-int fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_workspace *w) {
+void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear_workspace *w) {
     gsl_vector *f = gsl_multifit_nlinear_residual(w);
-    struct fit_data *fit_data = (struct fit_data *)params;
-
     /* compute reciprocal condition number of J(x) */
     gsl_multifit_nlinear_rcond(&fit_data->stats.rcond, w);
     gsl_blas_ddot(f, f, &fit_data->stats.chisq);
     fit_data->stats.chisq_dof = fit_data->stats.chisq/fit_data->dof;
     fit_data->stats.n_evals += fit_data->stats.n_evals_iter;
     fit_data->stats.cputime_cumul += fit_data->stats.cputime_iter;
+}
+
+void fit_iter_stats_print(const struct fit_stats *stats) {
     jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %4zu | %13.3lf | %12.1lf |\n",
-                 iter, 1.0 / fit_data->stats.rcond, gsl_blas_dnrm2(f),
-                 fit_data->stats.chisq_dof, fit_data->stats.n_evals, fit_data->stats.cputime_cumul,
-                 1000.0 * fit_data->stats.cputime_iter / fit_data->stats.n_evals_iter);
-    if(fit_data->fit_iter_callback) {
-        return fit_data->fit_iter_callback(fit_data->stats);
-    } else {
-        return 0;
-    }
+    stats->iter, 1.0 / stats->rcond, stats->norm,
+    stats->chisq_dof, stats->n_evals, stats->cputime_cumul,
+    1000.0 * stats->cputime_iter / stats->n_evals_iter);
 }
 
 fit_params *fit_params_new() {
@@ -540,9 +536,9 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
     jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | eval | cpu cumul (s) | cpu/eval (ms)|\n");
     for(iter = 0; iter <= maxiter; iter++) {
         fit_data->stats.iter_call = 0;
+        fit_data->stats.iter = iter;
         if(iter) {
             chisq_dof_old = fit_data->stats.chisq_dof;
-            fit_data->stats.iter = iter;
             fit_data->stats.cputime_iter = 0.0;
             fit_data->stats.n_evals_iter = 0;
             status = gsl_multifit_nlinear_iterate(w);
@@ -556,9 +552,14 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
         if(status == GSL_ENOPROG && iter == 1) {
             return FIT_ERROR_NO_PROGRESS;
         }
-        if(fit_callback(iter, fit_data, w)) {
-            return FIT_ERROR_ABORTED;
+        fit_iter_stats_update(fit_data, w);
+        fit_iter_stats_print(&fit_data->stats);
+        if(fit_data->fit_iter_callback) {
+            if(fit_data->fit_iter_callback(fit_data->stats)) {
+                return FIT_ERROR_ABORTED;
+            }
         }
+
        if(iter == 0)
             continue;
         /* test for convergence */
