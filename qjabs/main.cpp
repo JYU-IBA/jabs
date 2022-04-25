@@ -43,6 +43,10 @@ int main(int argc, char *argv[])
     setlocale(LC_NUMERIC,"C");
     QJaBSApplication a(argc, argv);
     setlocale(LC_NUMERIC,"C");  /* This should force C part of JaBS to use "." as a decimal separator even when locale says it is ",". */
+    QCoreApplication::setOrganizationName("University of Jyväskylä");
+    QCoreApplication::setOrganizationDomain("jyu.fi");
+    QCoreApplication::setApplicationName("JaBS");
+    QCoreApplication::setApplicationVersion(jabs_version());
     MainWindow w;
     mainWindow = &w;
     a.setMainWindow(&w);

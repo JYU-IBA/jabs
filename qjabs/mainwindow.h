@@ -65,6 +65,10 @@ private slots:
     void on_commandLineEdit_returnPressed();
     void on_msgTextEdit_textChanged();
 
+    void updateRecentFileActions();
+
+    void openRecentFile();
+
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);
@@ -84,5 +88,7 @@ private:
     bool needsSaving;
     bool firstRun;
     QString aboutString;
+    int maxRecentFiles;
+    QAction *recentFileActs; /* array */
 };
 #endif // MAINWINDOW_H

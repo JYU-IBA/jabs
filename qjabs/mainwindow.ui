@@ -118,16 +118,22 @@
      <x>0</x>
      <y>0</y>
      <width>915</width>
-     <height>21</height>
+     <height>24</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu_File">
     <property name="title">
      <string>&amp;File</string>
     </property>
+    <widget class="QMenu" name="menuRecent_Files">
+     <property name="title">
+      <string>Recent Files</string>
+     </property>
+    </widget>
     <addaction name="action_Run"/>
     <addaction name="action_New_File"/>
     <addaction name="action_Open_File"/>
+    <addaction name="menuRecent_Files"/>
     <addaction name="action_Save_File"/>
     <addaction name="action_Save_File_as"/>
     <addaction name="separator"/>
@@ -213,6 +219,11 @@
   <action name="actionAbout">
    <property name="text">
     <string>About</string>
+   </property>
+  </action>
+  <action name="actionsd">
+   <property name="text">
+    <string>sd</string>
    </property>
   </action>
  </widget>

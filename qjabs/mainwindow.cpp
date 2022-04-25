@@ -13,7 +13,8 @@ int fit_iter_callback(fit_stats stats);
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
-    , ui(new Ui::MainWindow)
+    , ui(new Ui::MainWindow),
+      maxRecentFiles(5)
 {
     aboutString = QString("JaBS version ") + jabs_version() + "\n\n"
                        + "Using JIBAL version "+ jibal_version() + ", compiled using version " + JIBAL_VERSION + "\n\n"
@@ -65,6 +66,16 @@ MainWindow::MainWindow(QWidget *parent)
     updateWindowTitle();
     firstRun = true;
     statusBar()->showMessage(QString("JaBS ") + jabs_version() + ", cwd: " +  QDir::currentPath(), 2000);
+    recentFileActs = new QAction[maxRecentFiles];
+    updateRecentFileActions();
+    for(int i = 0; i < maxRecentFiles; i++) {
+        QMenu *m = ui->menuRecent_Files;
+        QAction *a = &recentFileActs[i];
+        if(m)
+            m->addAction(a);
+        connect(a, &QAction::triggered, this, &MainWindow::openRecentFile);
+    }
+
 }
 
 void MainWindow::addMessage(jabs_msg_level level, const char *msg)
@@ -92,6 +103,7 @@ MainWindow::~MainWindow()
 {
     script_session_free(session);
     jibal_free(jibal);
+    delete [] recentFileActs;
     delete highlighter;
     delete ui;
 }
@@ -346,6 +358,15 @@ void MainWindow::setFilename(const QString &filename)
     if(!QDir::setCurrent(fi.absolutePath())) {
         qDebug() << "Can't set the current working directory!";
     }
+    QSettings settings;
+    QStringList files = settings.value("recentFileList").toStringList();
+    files.removeAll(filename);
+    files.prepend(filename);
+    while (files.size() > maxRecentFiles)
+        files.removeLast();
+
+    settings.setValue("recentFileList", files);
+    updateRecentFileActions();
 }
 
 
@@ -434,5 +455,32 @@ void MainWindow::on_msgTextEdit_textChanged()
 {
     ui->msgTextEdit->moveCursor(QTextCursor::End);
     ui->msgTextEdit->ensureCursorVisible();
+}
+
+void MainWindow::updateRecentFileActions()
+{
+    QSettings settings;
+    QStringList files = settings.value("recentFileList").toStringList();
+
+    int numRecentFiles = qMin(files.size(), maxRecentFiles);
+
+    for(int i = 0; i < numRecentFiles; ++i) {
+        QString text = QFileInfo(files[i]).fileName();
+        recentFileActs[i].setText(text);
+        recentFileActs[i].setData(files[i]);
+        recentFileActs[i].setVisible(true);
+    }
+    for(int j = numRecentFiles; j < maxRecentFiles; ++j)
+        recentFileActs[j].setVisible(false);
+}
+
+void MainWindow::openRecentFile()
+{
+    if(!askToSave()) {
+        return;
+    }
+    QAction *action = qobject_cast<QAction *>(sender());
+    if(action)
+        openFile(action->data().toString());
 }
 
