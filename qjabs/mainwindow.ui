@@ -190,7 +190,7 @@
   </action>
   <action name="action_Quit">
    <property name="text">
-    <string>Quit</string>
+    <string>&amp;Quit</string>
    </property>
    <property name="toolTip">
     <string>Quit the program</string>
@@ -202,12 +202,12 @@
      <normaloff>:/icons/content-save.svg</normaloff>:/icons/content-save.svg</iconset>
    </property>
    <property name="text">
-    <string>Save File</string>
+    <string>&amp;Save File</string>
    </property>
   </action>
   <action name="action_Save_File_as">
    <property name="text">
-    <string>Save File as...</string>
+    <string>Save File &amp;as...</string>
    </property>
   </action>
   <action name="actionAbout">
