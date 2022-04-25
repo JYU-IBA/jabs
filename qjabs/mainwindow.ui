@@ -221,11 +221,6 @@
     <string>About</string>
    </property>
   </action>
-  <action name="actionsd">
-   <property name="text">
-    <string>sd</string>
-   </property>
-  </action>
  </widget>
  <customwidgets>
   <customwidget>
