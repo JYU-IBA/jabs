@@ -739,6 +739,12 @@ int fit(struct fit_data *fit_data) {
         /* initialize solver with starting point and weights */
         fit_data->stats = fit_stats_init();
         fit_data->stats.phase = phase;
+        if(fit_data->fit_iter_callback) { /* First call to callback quickly (before most initialization) */
+            if(fit_data->fit_iter_callback(fit_data->stats)) {
+                fit_data->stats.error = FIT_ERROR_ABORTED;
+                break;
+            }
+        }
         if(phase == FIT_PHASE_FAST) {
             sim_calc_params_fast(&fit_data->sim->params, TRUE); /* Set current parameters to be faster in phase 0. */
             xtol *= FIT_FAST_XTOL_MULTIPLIER;

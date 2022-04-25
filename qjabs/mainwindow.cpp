@@ -75,6 +75,7 @@ MainWindow::MainWindow(QWidget *parent)
             m->addAction(a);
         connect(a, &QAction::triggered, this, &MainWindow::openRecentFile);
     }
+    ui->menuRecent_Files->setToolTipsVisible(true);
 
 }
 
@@ -238,10 +239,11 @@ void MainWindow::on_action_Run_triggered()
             }
         }
         QCoreApplication::processEvents();
-    }
-    if(fitDialog) {
-        fitDialog->close();
-        delete fitDialog;
+        if(fitDialog) {
+            fitDialog->close();
+            delete fitDialog;
+            fitDialog = NULL;
+        }
     }
     enableRun(true);
     if(!error) {
