@@ -24,7 +24,6 @@ MainWindow::MainWindow(QWidget *parent)
     ui->plotSettingsGroupBox->setVisible(false); /* Will be made visible if necessary */
     QIcon icon(":/icons/icon.svg");
     QApplication::setWindowIcon(icon);
-    QApplication::setApplicationName("QJaBS");
     setWindowIcon(icon);
     originalPath = QDir::currentPath();
     ui->splitter->setSizes(QList<int>() << 1 << 3 << 1);
