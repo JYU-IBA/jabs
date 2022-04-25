@@ -27,8 +27,7 @@
 #include "spectrum.h"
 #include "message.h"
 
-int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
-{
+int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     clock_t start, end;
     struct fit_data *fit_data = (struct fit_data *) params;
 #ifdef DEBUG
@@ -129,15 +128,16 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
 
 int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f) {
     size_t i_vec = 0;
-    for(size_t i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) { /* TODO: actually calculate which spectra we need to simulate when fitting. Calculate emin based on lowest energy in lowest range. */
+    for(size_t i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) {
+        /* TODO: actually calculate which spectra we need to simulate when fitting. Calculate emin based on lowest energy in lowest range. */
         if(i_vec >= f->size) {
             jabs_message(MSG_ERROR, stderr, "Too many channels in fits for the residuals vector. This shouldn't happen.\n");
-             return FIT_ERROR_IMPOSSIBLE;
+            return FIT_ERROR_IMPOSSIBLE;
         }
 
         roi *range = &fit_data->fit_ranges[i_range];
         if(range->i_det >= fit_data->sim->n_det) {
-            jabs_message(MSG_ERROR, stderr, "Fit range %zu has detector %zu, but we're only supposed to have %zu detectors!\n", i_range+1, range->i_det, fit_data->sim->n_det);
+            jabs_message(MSG_ERROR, stderr, "Fit range %zu has detector %zu, but we're only supposed to have %zu detectors!\n", i_range + 1, range->i_det, fit_data->sim->n_det);
             return FIT_ERROR_IMPOSSIBLE;
         }
         sim_workspace *ws = fit_data->ws[range->i_det];
@@ -166,16 +166,16 @@ void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear
     gsl_multifit_nlinear_rcond(&fit_data->stats.rcond, w);
     gsl_blas_ddot(f, f, &fit_data->stats.chisq);
     fit_data->stats.norm = gsl_blas_dnrm2(f);
-    fit_data->stats.chisq_dof = fit_data->stats.chisq/fit_data->dof;
+    fit_data->stats.chisq_dof = fit_data->stats.chisq / fit_data->dof;
     fit_data->stats.n_evals += fit_data->stats.n_evals_iter;
     fit_data->stats.cputime_cumul += fit_data->stats.cputime_iter;
 }
 
 void fit_iter_stats_print(const struct fit_stats *stats) {
     jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %4zu | %13.3lf | %12.1lf |\n",
-    stats->iter, 1.0 / stats->rcond, stats->norm,
-    stats->chisq_dof, stats->n_evals, stats->cputime_cumul,
-    1000.0 * stats->cputime_iter / stats->n_evals_iter);
+                 stats->iter, 1.0 / stats->rcond, stats->norm,
+                 stats->chisq_dof, stats->n_evals, stats->cputime_cumul,
+                 1000.0 * stats->cputime_iter / stats->n_evals_iter);
 }
 
 fit_params *fit_params_new() {
@@ -185,6 +185,7 @@ fit_params *fit_params_new() {
     p->vars = NULL;
     return p;
 }
+
 int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor) {
     if(!value || !name) {
 #ifdef DEBUG
@@ -213,6 +214,7 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
 #endif
     return EXIT_SUCCESS;
 }
+
 void fit_params_free(fit_params *p) {
     if(!p)
         return;
@@ -318,11 +320,11 @@ void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct r
     double exp_cts = spectrum_roi(exp, roi->low, roi->high);
     double sim_cts = spectrum_roi(ws->histo_sum, roi->low, roi->high);
 
-    jabs_message(MSG_INFO, f,  "          low = %12zu\n", roi->low);
-    jabs_message(MSG_INFO, f,  "         high = %12zu\n", roi->high);
-    jabs_message(MSG_INFO, f,  "        E_low = %12.3lf keV (low energy edge of bin)\n", detector_calibrated(ws->det, JIBAL_ANY_Z, roi->low)/C_KEV);
-    jabs_message(MSG_INFO, f,  "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(ws->det, JIBAL_ANY_Z, roi->high+1)/C_KEV);
-    jabs_message(MSG_INFO, f,  "        n_sim = %12zu\n", n_sim);
+    jabs_message(MSG_INFO, f, "          low = %12zu\n", roi->low);
+    jabs_message(MSG_INFO, f, "         high = %12zu\n", roi->high);
+    jabs_message(MSG_INFO, f, "        E_low = %12.3lf keV (low energy edge of bin)\n", detector_calibrated(ws->det, JIBAL_ANY_Z, roi->low) / C_KEV);
+    jabs_message(MSG_INFO, f, "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(ws->det, JIBAL_ANY_Z, roi->high + 1) / C_KEV);
+    jabs_message(MSG_INFO, f, "        n_sim = %12zu\n", n_sim);
     jabs_message(MSG_INFO, f, "          sim  = %12g\n", sim_cts);
     if(exp) {
         jabs_message(MSG_INFO, f, "        n_exp = %12zu\n", n_exp);
@@ -502,8 +504,8 @@ void fit_data_print(FILE *f, const struct fit_data *fit_data) {
         if(exp_cts == 0.0) {
             jabs_message(MSG_INFO, f, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf |         |         |\n", i + 1, range->low, range->high, exp_cts, sim_cts);
         } else {
-            double ratio = sim_cts/exp_cts;
-            double sigmas = (sim_cts-exp_cts)/sqrt(exp_cts);
+            double ratio = sim_cts / exp_cts;
+            double sigmas = (sim_cts - exp_cts) / sqrt(exp_cts);
             jabs_message(MSG_INFO, f, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf | %7.5lf | %7.2lf |\n", i + 1, range->low, range->high, exp_cts, sim_cts, ratio, sigmas);
         }
     }
@@ -516,7 +518,7 @@ int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, do
         double xi = gsl_vector_get(x, i);
         double dxi = gsl_vector_get(dx, i);
         double tolerance = epsabs + epsrel * fabs(xi);
-        double rel = fabs(dxi)/tolerance; /* "How many times over the acceptable tolerance are we */
+        double rel = fabs(dxi) / tolerance; /* "How many times over the acceptable tolerance are we */
 #ifdef DEBUG
         fprintf(stderr, "Test delta: i %zu, xi %g, dxi %g, tolerance %g, rel %g\n", i, xi, dxi, tolerance, rel);
 #endif
@@ -561,14 +563,14 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
             }
         }
 
-       if(iter == 0)
+        if(iter == 0)
             continue;
         /* test for convergence */
-        status = jabs_test_delta(w->dx, w->x, xtol*xtol, xtol);
+        status = jabs_test_delta(w->dx, w->x, xtol * xtol, xtol);
         if(status == GSL_SUCCESS) {
             return FIT_SUCCESS_DELTA;
         }
-        double chisq_change = 1.0 - fit_data->stats.chisq_dof/chisq_dof_old;
+        double chisq_change = 1.0 - fit_data->stats.chisq_dof / chisq_dof_old;
         if(fit_data->stats.chisq_dof > chisq_dof_old) {
             jabs_message(MSG_WARNING, stderr, "Chisq increased, this probably shouldn't happen.\n");
         }
@@ -579,10 +581,10 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
     return FIT_ERROR_MAXITER;
 }
 
-void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspace *w, const gsl_multifit_nlinear_fdf *fdf){
-    jabs_message(MSG_INFO, stderr,  "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
-    jabs_message(MSG_INFO, stderr,  "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
-    jabs_message(MSG_INFO, stderr,"function evaluations: %zu\n", fit->stats.n_evals);
+void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspace *w, const gsl_multifit_nlinear_fdf *fdf) {
+    jabs_message(MSG_INFO, stderr, "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
+    jabs_message(MSG_INFO, stderr, "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
+    jabs_message(MSG_INFO, stderr, "function evaluations: %zu\n", fit->stats.n_evals);
 #ifdef DEBUG
     jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf->nevalf);
 #endif
@@ -605,7 +607,7 @@ void fit_parameters_update(const fit_data *fit, const gsl_multifit_nlinear_works
         *(var->value) = var->value_final;
         var->err = c * sqrt(gsl_matrix_get(covar, var->i_v, var->i_v));
         var->err_rel = fabs(var->err / var->value_final);
-        var->sigmas =  fabs(var->value_final - var->value_orig) / var->value_orig / var->err_rel;
+        var->sigmas = fabs(var->value_final - var->value_orig) / var->value_orig / var->err_rel;
     }
 }
 
@@ -616,7 +618,7 @@ void fit_parameters_update_changed(const fit_data *fit) {
         if(!var->active)
             continue;
         if(*(var->value) != var->value_final) { /* Values changed by something (renormalization) */
-            double scale = *(var->value)/var->value_final;
+            double scale = *(var->value) / var->value_final;
             var->value_final = (*var->value);
             var->err *= scale;
             /* var->err_rel stays the same */
@@ -632,8 +634,8 @@ void fit_covar_print(const gsl_matrix *covar) {
     jabs_message(MSG_INFO, stderr, "\n");
     for(size_t i = 0; i < covar->size1; i++) {
         jabs_message(MSG_INFO, stderr, "%6zu | ", i + 1);
-        for (size_t j = 0; j <= i && j < covar->size2; j++) {
-            jabs_message(MSG_INFO, stderr, " %6.3f", gsl_matrix_get(covar, i, j)/sqrt(gsl_matrix_get(covar, i, i)*gsl_matrix_get(covar, j, j)));
+        for(size_t j = 0; j <= i && j < covar->size2; j++) {
+            jabs_message(MSG_INFO, stderr, " %6.3f", gsl_matrix_get(covar, i, j) / sqrt(gsl_matrix_get(covar, i, i) * gsl_matrix_get(covar, j, j)));
         }
         jabs_message(MSG_INFO, stderr, "\n");
     }
@@ -651,7 +653,7 @@ int fit(struct fit_data *fit_data) {
         return EXIT_FAILURE;
     }
     if(!fit_data->exp) {
-        jabs_message(MSG_ERROR, stderr,  "No experimental spectrum to fit.\n");
+        jabs_message(MSG_ERROR, stderr, "No experimental spectrum to fit.\n");
         return EXIT_FAILURE;
     }
     gsl_multifit_nlinear_fdf fdf;
@@ -667,7 +669,7 @@ int fit(struct fit_data *fit_data) {
 
     for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
         roi *range = &fit_data->fit_ranges[i];
-        jabs_message(MSG_INFO,  stderr, "Fit range %zu [%lu:%lu]\n", i+1, range->low, range->high);
+        jabs_message(MSG_INFO, stderr, "Fit range %zu [%lu:%lu]\n", i + 1, range->low, range->high);
     }
 
     fdf.f = &fit_function;
@@ -676,10 +678,10 @@ int fit(struct fit_data *fit_data) {
     fdf.n = fit_data_ranges_calculate_number_of_channels(fit_data);
     fdf.p = fit_params->n_active;
     if(fdf.n < fdf.p) {
-        jabs_message(MSG_ERROR, stderr,"Not enough data (%zu points) for given number of free parameters (%zu)\n", fdf.n, fdf.p);
+        jabs_message(MSG_ERROR, stderr, "Not enough data (%zu points) for given number of free parameters (%zu)\n", fdf.n, fdf.p);
         return -1;
     } else {
-        jabs_message(MSG_INFO,  stderr, "%zu channels and %zu parameters in fit, %zu degrees of freedom.\n", fdf.n, fdf.p, fdf.n - fdf.p);
+        jabs_message(MSG_INFO, stderr, "%zu channels and %zu parameters in fit, %zu degrees of freedom.\n", fdf.n, fdf.p, fdf.n - fdf.p);
     }
     gsl_vector *f;
     gsl_matrix *J;
@@ -690,7 +692,7 @@ int fit(struct fit_data *fit_data) {
     if(!weights)
         return 1;
     size_t i_w = 0;
-    for(size_t  i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) {
+    for(size_t i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) {
         roi *range = &fit_data->fit_ranges[i_range];
         assert(range);
         detector *det = sim_det(fit_data->sim, range->i_det);
@@ -701,7 +703,7 @@ int fit(struct fit_data *fit_data) {
             return 1;
         }
         if(!exp) {
-            jabs_message(MSG_ERROR, stderr,  "Experimental spectrum for detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
+            jabs_message(MSG_ERROR, stderr, "Experimental spectrum for detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
             free(weights);
             return 1;
         }
@@ -719,7 +721,7 @@ int fit(struct fit_data *fit_data) {
 #endif
     assert(i_w == fdf.n);
 
-    gsl_matrix *covar = gsl_matrix_alloc (fit_params->n_active, fit_params->n_active);
+    gsl_matrix *covar = gsl_matrix_alloc(fit_params->n_active, fit_params->n_active);
     gsl_vector *x = gsl_vector_alloc(fit_params->n_active);
     for(size_t i = 0; i < fit_params->n; i++) { /* Update all (including inactives) */
         fit_variable *var = &(fit_params->vars[i]);
@@ -730,10 +732,10 @@ int fit(struct fit_data *fit_data) {
     gsl_vector_view wts = gsl_vector_view_array(weights, i_w);
 
     /* allocate workspace with default parameters */
-    w = gsl_multifit_nlinear_alloc (T, &fdf_params, fdf.n, fdf.p);
+    w = gsl_multifit_nlinear_alloc(T, &fdf_params, fdf.n, fdf.p);
 
     sim_calc_params p_orig = fit_data->sim->params; /* Store original values (will be used in final stage of fitting) */
-    for(int phase = fit_data->phase_start;  phase <= fit_data->phase_stop; phase++) { /* Phase 1 is "fast", phase 2 normal. */
+    for(int phase = fit_data->phase_start; phase <= fit_data->phase_stop; phase++) { /* Phase 1 is "fast", phase 2 normal. */
         assert(phase >= FIT_PHASE_FAST && phase <= FIT_PHASE_SLOW);
         double xtol = fit_data->xtol;
         double chisq_tol = fit_data->chisq_tol;
@@ -756,11 +758,11 @@ int fit(struct fit_data *fit_data) {
         for(size_t i = 0; i < fit_params->n; i++) { /* Set active variables to vector */
             fit_variable *var = &(fit_params->vars[i]);
             if(var->active) {
-                gsl_vector_set(x, var->i_v,*(var->value)); /* Start phase from initial or fitted (previous phase) results */
+                gsl_vector_set(x, var->i_v, *(var->value)); /* Start phase from initial or fitted (previous phase) results */
             }
         }
         jabs_message(MSG_INFO, stderr, "\nInitializing fit phase %i. Xtol = %e, chisq_tol %e\n", phase, xtol, chisq_tol);
-        gsl_multifit_nlinear_winit (x, &wts.vector, &fdf, w);
+        gsl_multifit_nlinear_winit(x, &wts.vector, &fdf, w);
 
         /* compute initial cost function */
         f = gsl_multifit_nlinear_residual(w);
@@ -772,7 +774,7 @@ int fit(struct fit_data *fit_data) {
             jabs_message(MSG_ERROR, stderr, "Fit aborted in phase %i, reason: %s.\n", phase, fit_error_str(fit_data->stats.error));
             break;
         }
-        jabs_message(MSG_INFO, stderr,"Phase %i finished. CPU time used for actual simulation so far: %.3lf s.\n", phase, fit_data->stats.cputime_cumul);
+        jabs_message(MSG_INFO, stderr, "Phase %i finished. CPU time used for actual simulation so far: %.3lf s.\n", phase, fit_data->stats.cputime_cumul);
         fit_report_results(fit_data, w, &fdf);
     }
 
@@ -784,7 +786,7 @@ int fit(struct fit_data *fit_data) {
     } else { /* Do final calculations when fit was successful */
         /* compute covariance of best fit parameters */
         J = gsl_multifit_nlinear_jac(w);
-        gsl_multifit_nlinear_covar (J, 0.0, covar);
+        gsl_multifit_nlinear_covar(J, 0.0, covar);
 
         /* compute final cost */
         gsl_blas_ddot(f, f, &fit_data->stats.chisq);
@@ -822,14 +824,14 @@ int fit_set_roi_from_string(roi *r, const char *str) {
     r->low = strtoull(str, &end, 10);
     str = end;
     if(*str != ':') {
-        jabs_message(MSG_ERROR, stderr,"Can not parse range from \"%s\". Is ':' missing?\n", str_orig);
+        jabs_message(MSG_ERROR, stderr, "Can not parse range from \"%s\". Is ':' missing?\n", str_orig);
         return EXIT_FAILURE;
     }
     str++; /* Skipping ':' */
     r->high = strtoull(str, &end, 10);
     str = end;
     if(*str != ']') {
-        jabs_message(MSG_ERROR, stderr,"Can not parse range from \"%s\". Is ']' missing near \"%s\"?\n", str_orig, str);
+        jabs_message(MSG_ERROR, stderr, "Can not parse range from \"%s\". Is ']' missing near \"%s\"?\n", str_orig, str);
         return EXIT_FAILURE;
     }
     str++;
@@ -849,9 +851,9 @@ double fit_emin(struct fit_data *fit, size_t i_det) {
         const detector *det = sim_det(fit->sim, i_det);
         for(int Z = JIBAL_ANY_Z; Z <= det->cal_Z_max; Z++) {
             double E = detector_calibrated(det, Z, r->low); /* TODO: assumes calibration is increasing monotonously. Is it guaranteed in all cases? */
-            E -= 3.0*det->calibration->resolution; /* TODO: bad approximation. */
+            E -= 3.0 * det->calibration->resolution; /* TODO: bad approximation. */
             E *= 0.95;
-            E -= 10.0*C_KEV;
+            E -= 10.0 * C_KEV;
             if(E < emin) {
                 emin = E;
             }

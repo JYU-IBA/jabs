@@ -60,7 +60,8 @@ int script_prepare_sim_or_fit(script_session *s) {
         jabs_message(MSG_WARNING, stderr,
                      "No reactions, adding some automatically. Please be aware there are commands called \"reset reactions\" and \"add reactions\".\n");
         if(fit->sim->rbs) {
-            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim, REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
+            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim, REACTION_RBS));
+            /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
         }
         if(sim_do_we_need_erd(fit->sim)) {
             sim_reactions_add_auto(fit->sim, fit->sm, REACTION_ERD, sim_cs(fit->sim, REACTION_ERD));
@@ -77,7 +78,9 @@ int script_prepare_sim_or_fit(script_session *s) {
     reactions_print(stderr, fit->sim->reactions, fit->sim->n_reactions);
 
     if(assign_stopping(fit->jibal->gsto, fit->sim)) {
-        jabs_message(MSG_ERROR, stderr,"Could not assign stopping or straggling. Failure. Provide more data, check that JIBAL Z2_max is sufficiently large (currently %i) or disable unwanted reactions (e.g. ERD).\n", s->jibal->config->Z_max);
+        jabs_message(MSG_ERROR, stderr,
+                     "Could not assign stopping or straggling. Failure. Provide more data, check that JIBAL Z2_max is sufficiently large (currently %i) or disable unwanted reactions (e.g. ERD).\n",
+                     s->jibal->config->Z_max);
         return -1;
     }
     script_show_stopping(s, 0, NULL);
@@ -173,7 +176,7 @@ int foo(fit_params *params, const char *fit_vars) {
         return EXIT_FAILURE;
     char *token, *s, *s_orig;
     s_orig = s = strdup(fit_vars);
-    while ((token = strsep_with_quotes(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
+    while((token = strsep_with_quotes(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
         if(fit_params_enable(params, token, TRUE) == 0) {
             jabs_message(MSG_ERROR, stderr, "No matches for %s. See 'show fit variables' for a list of possible fit variables.\n", token);
             status = EXIT_FAILURE;
@@ -295,7 +298,7 @@ script_command_status script_save_sample(script_session *s, int argc, char *cons
     return 1;
 }
 
-script_command_status script_save_calibrations(script_session *s, int argc, char * const *argv) {
+script_command_status script_save_calibrations(script_session *s, int argc, char *const *argv) {
     const int argc_orig = argc;
     if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: save calibrations <file>\n");
@@ -311,7 +314,7 @@ script_command_status script_save_calibrations(script_session *s, int argc, char
         const detector *det = sim_det(s->fit->sim, i);
         char *calib_str = calibration_to_string(det->calibration);
         char *reso_str = detector_resolution_to_string(det, JIBAL_ANY_Z);
-        jabs_message(MSG_INFO, f, "set detector %zu calibration %s resolution %s\n", i+1, calib_str, reso_str);
+        jabs_message(MSG_INFO, f, "set detector %zu calibration %s resolution %s\n", i + 1, calib_str, reso_str);
         free(calib_str);
         free(reso_str);
     }
@@ -542,7 +545,7 @@ script_command_status script_set_detector_calibration_val(struct script_session 
                              jibal_element_name(s->jibal->elements, s->Z_active));
                 return SCRIPT_COMMAND_FAILURE;
             }
-           return 0;
+            return 0;
         default:
             break;
     }
@@ -866,7 +869,7 @@ const char *script_command_status_to_string(script_command_status status) {
     return "unknown";
 }
 
-script_command *script_command_new(const char *name, const char *help_text, int val, script_command_status (*f)(struct script_session *, int, char * const *)) {
+script_command *script_command_new(const char *name, const char *help_text, int val, script_command_status (*f)(struct script_session *, int, char *const *)) {
     if(!name)
         return NULL;
     script_command *c = malloc(sizeof(script_command));
@@ -883,7 +886,7 @@ script_command *script_command_new(const char *name, const char *help_text, int 
     return c;
 }
 
-int script_command_set_function(script_command *c, script_command_status (*f)(struct script_session *, int, char * const *)) {
+int script_command_set_function(script_command *c, script_command_status (*f)(struct script_session *, int, char *const *)) {
     if(!c)
         return EXIT_FAILURE;
     c->f = f;
@@ -974,13 +977,13 @@ script_command *script_command_list_merge(script_command *left, script_command *
             tmp->next = NULL;
         }
     }
-    while (left != NULL) {
+    while(left != NULL) {
         result = script_command_list_append(result, left);
         tmp = left;
         left = left->next;
         tmp->next = NULL;
     }
-    while (right != NULL) {
+    while(right != NULL) {
         result = script_command_list_append(result, right);
         tmp = right;
         right = right->next;
@@ -993,7 +996,7 @@ script_command *script_command_list_merge_sort(script_command *head) {
     if(!head)
         return NULL;
     script_command *a[SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE];
-    memset(a, 0, sizeof(script_command *)*SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE);
+    memset(a, 0, sizeof(script_command *) * SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE);
     script_command *result;
     script_command *next;
     result = head;
@@ -1136,7 +1139,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_detector->subcommands, script_command_new("beta", "Set exit angle (angle of ion in sample) for this detector.", 'b', NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "Set detector azimuth angle, 0 = IBM, 90 deg = Cornell.", 'p', NULL));
 
-    script_command_list_add_command(&c_set->subcommands,script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
+    script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
     script_command *c_set_fit = script_command_new("fit", "Set fit related things.", 0, NULL);
     c_set_fit->f_val = &script_set_fit_val;
     script_command_list_add_command(&c_set_fit->subcommands, script_command_new("normal", "Normal two-phase fitting.", 'n', NULL));
@@ -1144,8 +1147,8 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_set_fit->subcommands, script_command_new("fast", "One phase fitting (fast phase only).", 'f', NULL));
     script_command_list_add_command(&c_set->subcommands, c_set_fit);
 
-    script_command_list_add_command(&c_set->subcommands,script_command_new("sample", "Set sample.", 0, &script_set_sample));
-    script_command_list_add_command(&c_set->subcommands,script_command_new("stopping", "Set (assign) stopping or straggling.", 0, &script_set_stopping));
+    script_command_list_add_command(&c_set->subcommands, script_command_new("sample", "Set sample.", 0, &script_set_sample));
+    script_command_list_add_command(&c_set->subcommands, script_command_new("stopping", "Set (assign) stopping or straggling.", 0, &script_set_stopping));
     script_command_list_add_command(&c_set->subcommands, script_command_new("variable", "Set a variable.", 0, NULL));
 
     const jibal_config_var vars[] = {
@@ -1188,24 +1191,24 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_load->subcommands, script_command_new("experimental", "Load an experimental spectrum.", 0, &script_load_experimental));
     script_command_list_add_command(&c_load->subcommands, script_command_new("script", "Load (run) a script.", 0, &script_load_script));
     script_command_list_add_command(&c_load->subcommands, script_command_new("sample", "Load a sample.", 0, &script_load_sample));
-    script_command_list_add_command(&c_load->subcommands, script_command_new("reaction",  "Load a reaction from R33 file.", 0, &script_load_reaction));
+    script_command_list_add_command(&c_load->subcommands, script_command_new("reaction", "Load a reaction from R33 file.", 0, &script_load_reaction));
 
     script_command *c_show = script_command_new("show", "Show information on things.", 0, NULL);
     script_command_list_add_command(&head, c_show);
     script_command_list_add_command(&c_show->subcommands, script_command_new("aperture", "Show aperture.", 0, &script_show_aperture));
     script_command_list_add_command(&c_show->subcommands, script_command_new("detector", "Show detector.", 0, &script_show_detector));
 
-    script_command *c_fit = script_command_new("fit" ,"Show fit results." , 0, &script_show_fit);
+    script_command *c_fit = script_command_new("fit", "Show fit results.", 0, &script_show_fit);
     script_command_list_add_command(&c_show->subcommands, c_fit);
-    script_command_list_add_command(&c_fit->subcommands, script_command_new("variables" ,"Show possible fit variables." , 0, &script_show_fit_variables));
-    script_command_list_add_command(&c_fit->subcommands, script_command_new("ranges" ,"Show fit ranges." , 0, &script_show_fit_ranges));
+    script_command_list_add_command(&c_fit->subcommands, script_command_new("variables", "Show possible fit variables.", 0, &script_show_fit_variables));
+    script_command_list_add_command(&c_fit->subcommands, script_command_new("ranges", "Show fit ranges.", 0, &script_show_fit_ranges));
 
-    script_command_list_add_command(&c_show->subcommands, script_command_new("reactions","Show reactions." , 0, &script_show_reactions));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("reactions", "Show reactions.", 0, &script_show_reactions));
     script_command_list_add_command(&c_show->subcommands, script_command_new("sample", "Show sample.", 0, &script_show_sample));
     script_command_list_add_command(&c_show->subcommands, script_command_new("simulation", "Show simulation.", 0, &script_show_simulation));
     script_command_list_add_command(&c_show->subcommands, script_command_new("stopping", "Show stopping (GSTO) assignments.", 0, &script_show_stopping));
 
-    script_command *c_show_variable = script_command_new("variable" , "Show variable.", 0, NULL);
+    script_command *c_show_variable = script_command_new("variable", "Show variable.", 0, NULL);
     c_show_variable->f_var = script_show_var;
     script_command_list_add_command(&c_show->subcommands, c_show_variable);
     c = script_command_list_from_vars_array(vars, 0);
@@ -1407,7 +1410,8 @@ script_command_status script_load_experimental(script_session *s, int argc, char
         return SCRIPT_COMMAND_FAILURE;
     }
     if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: load experimental {<detector>} <filename>\nIf no detector number is given, experimental data is loaded for all detectors from the same file.\nUse 'set detector column' to control which columns are read.\n");
+        jabs_message(MSG_ERROR, stderr,
+                     "Usage: load experimental {<detector>} <filename>\nIf no detector number is given, experimental data is loaded for all detectors from the same file.\nUse 'set detector column' to control which columns are read.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(argc != argc_orig) { /* Detector number given */
@@ -1642,7 +1646,7 @@ script_command_status script_show_detector(script_session *s, int argc, char *co
                 continue;
             char *calib_str = calibration_to_string(det->calibration);
             jabs_message(MSG_INFO, stderr, "%3zu | %3zu | %5.1lf | %5.1lf | %7.3lf | %8s | %s\n",
-                         i + 1, det->column, det->theta/C_DEG, det->phi/C_DEG, det->solid/C_MSR, detector_type_name(det), calib_str);
+                         i + 1, det->column, det->theta / C_DEG, det->phi / C_DEG, det->solid / C_MSR, detector_type_name(det), calib_str);
             free(calib_str);
         }
         jabs_message(MSG_INFO, stderr, "Use 'show detector <number>' to get more information on a particular detector.\n");
@@ -1779,19 +1783,20 @@ script_command_status script_set_detector_calibration_poly(struct script_session
         return SCRIPT_COMMAND_SUCCESS;
     }
     if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: set detector calibration poly <n> <p_0> <p_1> ... <p_(n+1)>\nExample: set calibration poly 2 10keV 1.0keV 0.001keV\nThe example sets a second degree (quadratic 3 parameters) polynomial calibration.\nThe first parameter (p_0) is the constant term.\n");
+        jabs_message(MSG_ERROR, stderr,
+                     "Usage: set detector calibration poly <n> <p_0> <p_1> ... <p_(n+1)>\nExample: set calibration poly 2 10keV 1.0keV 0.001keV\nThe example sets a second degree (quadratic 3 parameters) polynomial calibration.\nThe first parameter (p_0) is the constant term.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     size_t n = strtoull(argv[0], NULL, 10);
     argc--;
     argv++;
-    if(argc < (int)(n + 1)) {
+    if(argc < (int) (n + 1)) {
         jabs_message(MSG_ERROR, stderr, "Not enough parameters for a %zu degree polynomial. Expected %zu.\n", n, n + 1);
         return SCRIPT_COMMAND_FAILURE;
     }
     calibration *c = calibration_init_poly(n);
     calibration_copy_params(c, detector_get_calibration(det, s->Z_active)); /* This, de facto, only copies resolution from old calibration, since the rest are overwritten very soon. */
-    for(int i = 0; i <= (int)n; i++) {
+    for(int i = 0; i <= (int) n; i++) {
         calibration_set_param(c, i, jibal_get_val(s->jibal->units, UNIT_TYPE_ANY, argv[0]));
         argc--;
         argv++;
@@ -1875,7 +1880,8 @@ script_command_status script_set_stopping(struct script_session *s, int argc, ch
     }
     return argc_orig - argc;
 }
-script_command_status script_test_file(struct script_session *s, int argc, char * const *argv) {
+
+script_command_status script_test_file(struct script_session *s, int argc, char *const *argv) {
     const struct fit_data *fit = s->fit;
     const int argc_orig = argc;
     size_t i_det = 0;
@@ -1923,7 +1929,7 @@ script_command_status script_test_file(struct script_session *s, int argc, char 
     return return_value;
 }
 
-script_command_status script_test_roi(struct script_session *s, int argc, char * const *argv) {
+script_command_status script_test_roi(struct script_session *s, int argc, char *const *argv) {
     const struct fit_data *fit = s->fit;
     const int argc_orig = argc;
     size_t i_det = 0;
@@ -1949,7 +1955,7 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
     }
     double sum_ref = strtod(argv[1], NULL);
     double tolerance = strtod(argv[2], NULL);
-    gsl_histogram *h = exp ? fit_data_exp(fit, i_det):fit_data_sim(fit, i_det);
+    gsl_histogram *h = exp ? fit_data_exp(fit, i_det) : fit_data_sim(fit, i_det);
     if(!h) {
         jabs_message(MSG_ERROR, stderr, "No histogram.\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -1957,7 +1963,7 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
     double sum = spectrum_roi(h, r.low, r.high);
     argc -= 3;
     argv += 3;
-    double rel_err = fabs(1.0 - sum/sum_ref);
+    double rel_err = fabs(1.0 - sum / sum_ref);
     jabs_message(MSG_INFO, stderr, "Test of ROI from %zu to %zu. Sum %g. Relative error %e.\n", r.low, r.high, sum, rel_err);
     if(rel_err < tolerance) {
         jabs_message(MSG_INFO, stderr, "Test passed.\n");
@@ -1968,7 +1974,7 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
     return argc_orig - argc;
 }
 
-script_command_status script_split_sample_elements(struct  script_session *s, int argc, char * const *argv) {
+script_command_status script_split_sample_elements(struct script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
     struct fit_data *fit = s->fit;
@@ -2024,7 +2030,8 @@ script_command_status script_add_reactions(script_session *s, int argc, char *co
         return 1;
     }
     if(fit->sim->rbs) {
-        sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim,REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
+        sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS,
+                               sim_cs(fit->sim, REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
     }
 
     if(sim_do_we_need_erd(fit->sim)) {
@@ -2093,7 +2100,7 @@ script_command_status script_help(script_session *s, int argc, char *const *argv
             {NULL, NULL}
     };
     if(argc == 0) {
-        jabs_message(MSG_INFO, stderr,"Type help [topic] for information on a particular topic or \"help help\" for help on help.\n\n");
+        jabs_message(MSG_INFO, stderr, "Type help [topic] for information on a particular topic or \"help help\" for help on help.\n\n");
 
         return SCRIPT_COMMAND_NOT_FOUND;
     }
@@ -2131,7 +2138,7 @@ script_command_status script_help_version(script_session *s, int argc, char *con
     (void) s;
     jabs_message(MSG_INFO, stderr, "JaBS version %s.\n", jabs_version());
     if(git_populated()) {
-        jabs_message(MSG_INFO, stderr, "This version of JaBS is compiled from a git repository (branch %s%s).\n", git_branch(),  git_dirty()?", dirty":"");
+        jabs_message(MSG_INFO, stderr, "This version of JaBS is compiled from a git repository (branch %s%s).\n", git_branch(), git_dirty() ? ", dirty" : "");
         jabs_message(MSG_INFO, stderr, "Git commit %s dated %s.\n", git_commit_sha1(), git_commit_date());
     }
     return SCRIPT_COMMAND_SUCCESS;
