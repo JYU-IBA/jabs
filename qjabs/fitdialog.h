@@ -2,6 +2,7 @@
 #define FITDIALOG_H
 
 #include <QDialog>
+#include <QSettings>
 extern "C" {
 #include "fit.h"
 }
@@ -30,6 +31,7 @@ private slots:
 private slots:
 
 private:
+    QSettings settings;
     Ui::FitDialog *ui;
     bool abort;
     bool plot;

@@ -6,6 +6,7 @@ FitDialog::FitDialog(QWidget *parent) :
     ui(new Ui::FitDialog), abort(false), plot(false)
 {
     ui->setupUi(this);
+    ui->plotCheckBox->setChecked(settings.value("plotWhileFitting", QVariant(false)).toBool());
 }
 
 bool FitDialog::isAborted()
@@ -39,5 +40,6 @@ void FitDialog::on_buttonBox_rejected()
 void FitDialog::on_plotCheckBox_stateChanged(int arg1)
 {
     plot = (arg1 == Qt::Checked);
+    settings.setValue("plotWhileFitting", plot);
 }
 
