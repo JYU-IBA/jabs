@@ -467,10 +467,12 @@ void MainWindow::updateRecentFileActions()
     int numRecentFiles = qMin(files.size(), maxRecentFiles);
 
     for(int i = 0; i < numRecentFiles; ++i) {
+        QAction *a = &recentFileActs[i];
         QString text = QFileInfo(files[i]).fileName();
-        recentFileActs[i].setText(text);
-        recentFileActs[i].setData(files[i]);
-        recentFileActs[i].setVisible(true);
+        a->setText(text);
+        a->setData(files[i]);
+        a->setVisible(true);
+        a->setToolTip(files[i]);
     }
     for(int j = numRecentFiles; j < maxRecentFiles; ++j)
         recentFileActs[j].setVisible(false);
