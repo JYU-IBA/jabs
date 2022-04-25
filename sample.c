@@ -82,13 +82,14 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
 
 int sample_model_sanity_check(const sample_model *sm) {
     for(size_t i = 0; i < sm->n_ranges; i++) {
+        const sample_range *r = &sm->ranges[i];
         if(sm->type == SAMPLE_MODEL_LAYERED) {
-            if(sm->ranges[i].x < 0.0) {
+            if(r->x < 0.0) {
                 jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (layer %zu thickness negative).\n", i + 1);
                 return EXIT_FAILURE;
             }
         } else if(sm->type == SAMPLE_MODEL_POINT_BY_POINT) {
-            if(i && sm->ranges[i].x < sm->ranges[i-1].x) {
+            if(i && r->x < sm->ranges[i-1].x) {
                 jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (non-monotonous range at %zu).\n", i + 1);
                 return EXIT_FAILURE;
             }
@@ -98,6 +99,10 @@ int sample_model_sanity_check(const sample_model *sm) {
                 jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative concentration of %s (%zu) in layer/range %zu).   \n", sm->materials[i_mat]->name, i_mat + 1, i + 1);
                 return EXIT_FAILURE;
             }
+        }
+        if(r->rough.x < 0.0) {
+            jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative roughness range at %zu).\n", i + 1);
+            return EXIT_FAILURE;
         }
     }
     return EXIT_SUCCESS;
