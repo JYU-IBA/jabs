@@ -71,6 +71,7 @@ private:
     void plotSession();
     bool askToSave();
     void closeEvent(QCloseEvent *event);
+    void enableRun(bool enabled);
     Ui::MainWindow *ui;
     struct jibal *jibal;
     script_session *session;

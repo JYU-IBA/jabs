@@ -163,6 +163,16 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 }
 
+void MainWindow::enableRun(bool enabled)
+{
+    ui->action_Run->setEnabled(enabled);
+    ui->commandLineEdit->setEnabled(enabled);
+    ui->action_New_File->setEnabled(enabled);
+    ui->action_Open_File->setEnabled(enabled);
+    ui->action_Save_File->setEnabled(enabled);
+    ui->action_Save_File->setEnabled(enabled);
+}
+
 void MainWindow::fitCallback(fit_stats stats)
 {
     QCoreApplication::processEvents();
@@ -173,6 +183,7 @@ void MainWindow::on_action_Run_triggered()
     if(!session) {
         return;
     }
+    enableRun(false);
     if(firstRun) {
         resetAll();
     } else {
@@ -203,6 +214,7 @@ void MainWindow::on_action_Run_triggered()
         }
         QCoreApplication::processEvents();
     }
+    enableRun(true);
     plotSession();
 }
 
