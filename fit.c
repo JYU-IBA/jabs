@@ -35,7 +35,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector * f)
     fprintf(stderr, "Fit iteration %zu, fit function evaluation %zu\n", fit_data->stats.iter, fit_data->stats.n_evals_iter);
 #endif
     size_t i_v_active = fit_data->stats.iter_call - 1; /* Which variable is being varied by the fit algorithm in this particular call inside an iteration (compared to first call (== 0)) */
-    fit_variable *var_active = fit_data->stats.iter_call ? &fit_data->fit_params->vars[i_v_active] : NULL;
+    fit_variable *var_active = fit_data->stats.iter_call && i_v_active < fit_data->fit_params->n_active ? &fit_data->fit_params->vars[i_v_active] : NULL;
     fit_data->stats.iter_call++;
 #ifdef DEBUG
     fprintf(stderr, "Iter %zu (call %zu)\n", fit_data->stats.iter, fit_data->stats.iter_call);
@@ -174,6 +174,9 @@ void fit_callback(const size_t iter, void *params, const gsl_multifit_nlinear_wo
                  iter, 1.0 / fit_data->stats.rcond, gsl_blas_dnrm2(f),
                  fit_data->stats.chisq_dof, fit_data->stats.n_evals, fit_data->stats.cputime_cumul,
                  1000.0 * fit_data->stats.cputime_iter / fit_data->stats.n_evals_iter);
+    if(fit_data->fit_iter_callback) {
+        fit_data->fit_iter_callback(fit_data->stats);
+    }
 }
 
 fit_params *fit_params_new() {
@@ -290,6 +293,7 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     f->phase_start = FIT_PHASE_FAST;
     f->phase_stop = FIT_PHASE_SLOW;
     f->histo_sum_iter = NULL; /* Initialized later */
+    f->fit_iter_callback = NULL; /* Optional */
     return f;
 }
 
@@ -469,7 +473,6 @@ void fit_data_workspaces_free(struct fit_data *fit_data) {
 struct fit_stats fit_stats_init() {
     struct fit_stats s;
     s.n_evals = 0;
-    s.n_iters = 0;
     s.n_evals_iter = 0;
     s.cputime_cumul = 0.0;
     s.cputime_iter = 0.0;
@@ -478,6 +481,7 @@ struct fit_stats fit_stats_init() {
     s.chisq_dof = 0.0;
     s.rcond = 0.0;
     s.iter = 0;
+    s.iter_call = 0;
     s.error = FIT_ERROR_NONE;
     return s;
 }

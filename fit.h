@@ -65,7 +65,6 @@ typedef struct fit_params {
 
 struct fit_stats {
     size_t n_evals;
-    size_t n_iters;
     size_t n_evals_iter; /* Number of function evaluations per iteration */
     double cputime_cumul;
     double cputime_iter;
@@ -106,6 +105,7 @@ typedef struct fit_data {
     int phase_stop; /* Inclusive */
     gsl_histogram **histo_sum_iter; /* Array of histograms, updates every iter. */
     size_t n_histo_sum;
+    void (*fit_iter_callback)(struct fit_stats stats);
 } fit_data;
 
 

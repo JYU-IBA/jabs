@@ -9,6 +9,7 @@ extern "C" {
 #include <stdio.h>
 #include "message.h"
 #include "win_compat.h"
+void fit_iter_callback(fit_stats stats);
 }
 
 
@@ -65,4 +66,9 @@ void jabs_message(jabs_msg_level level, FILE *f, const char * format, ...) {
         vfprintf(f, format, argp);
     }
     va_end(argp);
+}
+
+void fit_iter_callback(fit_stats stats) {
+    fprintf(stderr, "Foo\n");
+    mainWindow->fitCallback(stats);
 }

@@ -8,6 +8,7 @@ extern "C" {
 #include "script.h"
 #include "script_session.h"
 #include "script_command.h"
+void fit_iter_callback(fit_stats stats);
 }
 
 MainWindow::MainWindow(QWidget *parent)
@@ -49,6 +50,7 @@ MainWindow::MainWindow(QWidget *parent)
     }
     ui->msgTextEdit->insertPlainText(jibal_status_string(jibal));
     session = script_session_init(jibal, NULL);
+    session->fit->fit_iter_callback = &fit_iter_callback;
     ui->action_Run->setShortcutContext(Qt::ApplicationShortcut);
     highlighter = new Highlighter(ui->plainTextEdit->document());
     highlighter->setSession(session);
@@ -161,6 +163,11 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 }
 
+void MainWindow::fitCallback(fit_stats stats)
+{
+    QCoreApplication::processEvents();
+}
+
 void MainWindow::on_action_Run_triggered()
 {
     if(!session) {
@@ -194,6 +201,7 @@ void MainWindow::on_action_Run_triggered()
                 return;
             }
         }
+        QCoreApplication::processEvents();
     }
     plotSession();
 }
