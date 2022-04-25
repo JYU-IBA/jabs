@@ -80,7 +80,9 @@ script_command_status script_save_spectra(struct script_session *s, int argc, ch
 script_command_status script_show_aperture(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_detector(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_fit(struct script_session *s, int argc, char * const *argv);
-script_command_status script_show_fitvar(struct script_session *s, int argc, char * const *argv);
+script_command_status script_show_fit(struct script_session *s, int argc, char * const *argv);
+script_command_status script_show_fit_variables(struct script_session *s, int argc, char * const *argv);
+script_command_status script_show_fit_ranges(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_reactions(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_sample(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_simulation(struct script_session *s, int argc, char * const *argv);

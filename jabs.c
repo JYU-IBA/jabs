@@ -892,7 +892,7 @@ void fit_params_print(const fit_params *params, int active, const char *pattern)
         if(pattern) {
             jabs_message(MSG_INFO, stderr, "All possible fit variables matching pattern \"%s\":\n", pattern);
         } else {
-            jabs_message(MSG_INFO, stderr, "All possible fit variables (use 'show fitvar <pattern>' to see variables matching pattern, wildcards are '*' and '?'):\n");
+            jabs_message(MSG_INFO, stderr, "All possible fit variables (use 'show fit variables <pattern>' to see variables matching pattern, wildcards are '*' and '?'):\n");
         }
     } else {
         jabs_message(MSG_INFO, stderr, "No fit variables.\n");

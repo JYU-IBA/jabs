@@ -175,7 +175,7 @@ int foo(fit_params *params, const char *fit_vars) {
     s_orig = s = strdup(fit_vars);
     while ((token = strsep_with_quotes(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
         if(fit_params_enable(params, token, TRUE) == 0) {
-            jabs_message(MSG_ERROR, stderr, "No matches for %s. See 'show fitvar' for a list of possible fit variables.\n", token);
+            jabs_message(MSG_ERROR, stderr, "No matches for %s. See 'show fit variables' for a list of possible fit variables.\n", token);
             status = EXIT_FAILURE;
         }
         if(status == EXIT_FAILURE)
@@ -188,7 +188,7 @@ int foo(fit_params *params, const char *fit_vars) {
 script_command_status script_fit(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit_data = s->fit;
     if(argc != 1) {
-        fprintf(stderr, "Usage: fit [fitvar1,fitvar2,...]\n. See 'show fitvar' for a list of possible fit variables.");
+        fprintf(stderr, "Usage: fit [fitvar1,fitvar2,...]\nSee 'show fit variables' for a list of possible fit variables.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     fit_params_free(fit_data->fit_params);
@@ -1194,8 +1194,12 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&head, c_show);
     script_command_list_add_command(&c_show->subcommands, script_command_new("aperture", "Show aperture.", 0, &script_show_aperture));
     script_command_list_add_command(&c_show->subcommands, script_command_new("detector", "Show detector.", 0, &script_show_detector));
-    script_command_list_add_command(&c_show->subcommands, script_command_new("fit" ,"Show fit." , 0, &script_show_fit));
-    script_command_list_add_command(&c_show->subcommands, script_command_new("fitvar" ,"Show possible fit variables." , 0, &script_show_fitvar));
+
+    script_command *c_fit = script_command_new("fit" ,"Show fit results." , 0, &script_show_fit);
+    script_command_list_add_command(&c_show->subcommands, c_fit);
+    script_command_list_add_command(&c_fit->subcommands, script_command_new("variables" ,"Show possible fit variables." , 0, &script_show_fit_variables));
+    script_command_list_add_command(&c_fit->subcommands, script_command_new("ranges" ,"Show fit ranges." , 0, &script_show_fit_ranges));
+
     script_command_list_add_command(&c_show->subcommands, script_command_new("reactions","Show reactions." , 0, &script_show_reactions));
     script_command_list_add_command(&c_show->subcommands, script_command_new("sample", "Show sample.", 0, &script_show_sample));
     script_command_list_add_command(&c_show->subcommands, script_command_new("simulation", "Show simulation.", 0, &script_show_simulation));
@@ -1576,17 +1580,18 @@ script_command_status script_show_stopping(script_session *s, int argc, char *co
 }
 
 script_command_status script_show_fit(script_session *s, int argc, char *const *argv) {
-    (void) argc;
     (void) argv;
-    fit_data_print(stderr, s->fit);
-    jabs_message(MSG_INFO, stderr, "\n");
-    fit_params_print_final(s->fit->fit_params);
+    if(argc == 0) {
+        if(!s->fit->fit_params || s->fit->fit_params->n_active == 0) {
+            jabs_message(MSG_INFO, stderr, "No fit results to show.\n");
+        } else {
+            fit_params_print_final(s->fit->fit_params);
+        }
+    }
     return 0;
 }
 
-script_command_status script_show_fitvar(script_session *s, int argc, char *const *argv) {
-    (void) argc;
-    (void) argv;
+script_command_status script_show_fit_variables(script_session *s, int argc, char *const *argv) {
     const int argc_orig = argc;
     fit_params *p_all = fit_params_all(s->fit);
     char *pattern = NULL;
@@ -1600,7 +1605,14 @@ script_command_status script_show_fitvar(script_session *s, int argc, char *cons
     return argc_orig - argc;
 }
 
-script_command_status script_show_aperture(struct script_session *s, int argc, char * const *argv) {
+script_command_status script_show_fit_ranges(script_session *s, int argc, char *const *argv) {
+    (void) argc;
+    (void) argv;
+    fit_data_print(stderr, s->fit);
+    return 0;
+}
+
+script_command_status script_show_aperture(struct script_session *s, int argc, char *const *argv) {
     (void) argv;
     struct fit_data *fit = s->fit;
     const int argc_orig = argc;

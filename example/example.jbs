@@ -40,3 +40,4 @@ save calibration "calibration_out.jbs"
 save sample "sample_out.txt"
 show detector
 show fit
+show fit ranges

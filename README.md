@@ -128,7 +128,7 @@ Interactive/script example:
     jabs> fit *calib*,fluence,thickness1
     jabs> show fit
 
-Use `show fitvar` to see a list of variables that can be fitted. This list changes when the sample and detector(s) change. Using `*` or `?` wildcards is possible, the example above will add all calibration parameters of all detectors.
+Use `show fit variables` to see a list of variables that can be fitted. This list changes when the sample and detector(s) change. Using `*` or `?` wildcards is possible, the example above will add all calibration parameters of all detectors.
 
 ## Open source licenses
 
