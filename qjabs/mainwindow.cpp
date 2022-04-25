@@ -21,6 +21,7 @@ MainWindow::MainWindow(QWidget *parent)
                        + "Using Qt version " + qVersion() + ", compiled using version " + QT_VERSION_STR + "\n\n"
                        + "Copyright 2021 - 2022 Jaakko Julin <jaakko.julin@jyu.fi>\n";
     ui->setupUi(this);
+    ui->widget->setVisible(false);
     ui->plotSettingsGroupBox->setVisible(false); /* Will be made visible if necessary */
     QIcon icon(":/icons/icon.svg");
     QApplication::setWindowIcon(icon);
@@ -75,7 +76,6 @@ MainWindow::MainWindow(QWidget *parent)
         connect(a, &QAction::triggered, this, &MainWindow::openRecentFile);
     }
     ui->menuRecent_Files->setToolTipsVisible(true);
-
 }
 
 void MainWindow::addMessage(jabs_msg_level level, const char *msg)
@@ -114,10 +114,11 @@ void MainWindow::openFile(const QString &filename)
     if(file.open(QFile::ReadOnly | QFile::Text)) {
         ui->plainTextEdit->setPlainText(file.readAll());
         file.close();
-        resetAll();
         setFilename(filename);
         needsSaving = false;
         updateWindowTitle();
+        resetAll();
+        plotSession();  /* Will hide plot etc. */
     }
 }
 
@@ -130,14 +131,18 @@ int MainWindow::runLine(const QString &line) {
 
 void MainWindow::plotSession()
 {
-    if(session && session->fit && session->fit->sim) {
-        ui->plotSpinBox->setMaximum(session->fit->sim->n_det);
-        ui->plotSettingsGroupBox->setVisible(session->fit->sim->n_det > 1);
+    if(session && session->fit && session->fit->sim && session->fit->n_ws && session->fit->stats.error >= 0) {
+        ui->plotSpinBox->setMaximum(session->fit->n_ws);
+        ui->plotSettingsGroupBox->setVisible(session->fit->n_ws > 1);
         plotSpectrum(ui->plotSpinBox->value() - 1);
         if(firstRun) {
             ui->widget->resetZoom();
             firstRun = false;
         }
+        ui->widget->setVisible(true);
+    } else {
+        ui->plotSettingsGroupBox->setVisible(false);
+        ui->widget->setVisible(false);
     }
 }
 
@@ -181,8 +186,7 @@ void MainWindow::enableRun(bool enabled)
     ui->commandLineEdit->setEnabled(enabled);
     ui->action_New_File->setEnabled(enabled);
     ui->action_Open_File->setEnabled(enabled);
-    ui->action_Save_File->setEnabled(enabled);
-    ui->action_Save_File->setEnabled(enabled);
+    ui->action_Save_File->setEnabled(enabled && needsSaving);
 }
 
 int MainWindow::fitCallback(fit_stats stats)
@@ -245,9 +249,7 @@ void MainWindow::on_action_Run_triggered()
         }
     }
     enableRun(true);
-    if(!error) {
-        plotSession();
-    }
+    plotSession();
 }
 
 
@@ -375,6 +377,7 @@ void MainWindow::on_action_New_File_triggered()
 {
     ui->plainTextEdit->clear();
     resetAll();
+    plotSession(); /* Will hide plot */
     filename.clear();
     filebasename.clear();
     QDir::setCurrent(originalPath);

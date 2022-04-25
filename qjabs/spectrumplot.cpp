@@ -70,7 +70,6 @@ void SpectrumPlot::clearAll()
     xmin = 0.0;
     xmax = 0.0;
     data_ymax = 0.0;
-    setVisible(false);
 }
 
 bool SpectrumPlot::eventFilter(QObject *obj, QEvent *event)
