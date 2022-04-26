@@ -14,7 +14,7 @@ int fit_iter_callback(fit_stats stats);
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow),
-      maxRecentFiles(5), fitDialog(NULL)
+      maxRecentFiles(5), fitDialog(NULL), jibal(NULL), session(NULL), highlighter(NULL)
 {
     aboutString = QString("JaBS version ") + jabs_version() + "\n\n"
                        + "Using JIBAL version "+ jibal_version() + ", compiled using version " + JIBAL_VERSION + "\n\n"
@@ -26,6 +26,8 @@ MainWindow::MainWindow(QWidget *parent)
     QIcon icon(":/icons/icon.svg");
     QApplication::setWindowIcon(icon);
     setWindowIcon(icon);
+    ui->msgTextBrowser->setOpenLinks(false); /* We use the connection below to handle links */
+    connect(ui->msgTextBrowser, &QTextBrowser::anchorClicked, this, &MainWindow::openLink);
     originalPath = QDir::currentPath();
     ui->splitter->setSizes(QList<int>() << 1 << 3 << 1);
     ui->splitter_2->setSizes(QList<int>() << 1 << 2);
@@ -37,24 +39,12 @@ MainWindow::MainWindow(QWidget *parent)
     fixedFont.setPointSize(12);
     ui->plainTextEdit->setFont(fixedFont);
     fixedFont.setPointSize(11);
-    ui->msgTextEdit->setFont(fixedFont);
-    ui->msgTextEdit->insertPlainText(aboutString);
-    ui->msgTextEdit->insertPlainText(QString(COPYRIGHT_STRING));
-    QString config_filename_str;
-#if defined(Q_OS_OSX)
-    config_filename_str = QApplication::applicationDirPath() + "/../Resources/jibal.conf";
-#endif
-    if(config_filename_str.isEmpty() || !QFile::exists(config_filename_str) ) {
-         jibal = jibal_init(NULL);
-    } else {
-         jibal = jibal_init(qPrintable(config_filename_str));
-    }
-    ui->msgTextEdit->insertPlainText(jibal_status_string(jibal));
-    session = script_session_init(jibal, NULL);
-    session->fit->fit_iter_callback = &fit_iter_callback;
+    ui->msgTextBrowser->setFont(fixedFont);
+    ui->msgTextBrowser->insertPlainText(aboutString);
+    ui->msgTextBrowser->insertPlainText(QString(COPYRIGHT_STRING));
+    ui->msgTextBrowser->insertHtml("<p>Visit the <a href=\"https://github.com/JYU-IBA/jabs\">GitHub page</a> for latest information.</p>");
+    ui->msgTextBrowser->insertPlainText("\n\n");
     ui->action_Run->setShortcutContext(Qt::ApplicationShortcut);
-    highlighter = new Highlighter(ui->plainTextEdit->document());
-    highlighter->setSession(session);
     ui->action_New_File->setShortcut(QKeySequence::New);
     ui->action_Open_File->setShortcut(QKeySequence::Open);
     ui->action_Save_File->setShortcut(QKeySequence::Save);
@@ -76,26 +66,30 @@ MainWindow::MainWindow(QWidget *parent)
         connect(a, &QAction::triggered, this, &MainWindow::openRecentFile);
     }
     ui->menuRecent_Files->setToolTipsVisible(true);
+    int status = initSession();
+    if(status != 0) {
+        enableRun(false);
+    }
 }
 
 void MainWindow::addMessage(jabs_msg_level level, const char *msg)
 {
-    ui->msgTextEdit->moveCursor(QTextCursor::End);
+    ui->msgTextBrowser->moveCursor(QTextCursor::End);
     switch(level) {
     case MSG_ERROR:
-        ui->msgTextEdit->setTextColor(Qt::red);
+        ui->msgTextBrowser->setTextColor(Qt::red);
         break;
     case MSG_WARNING:
-        ui->msgTextEdit->setTextColor(Qt::darkYellow);
+        ui->msgTextBrowser->setTextColor(Qt::darkYellow);
         break;
     case MSG_DEBUG:
-        ui->msgTextEdit->setTextColor(Qt::gray);
+        ui->msgTextBrowser->setTextColor(Qt::gray);
         break;
     default:
-        ui->msgTextEdit->setTextColor(Qt::black); /* TODO: defaults from theme? */
+        ui->msgTextBrowser->setTextColor(Qt::black); /* TODO: defaults from theme? */
         break;
     }
-    ui->msgTextEdit->insertPlainText(msg);
+    ui->msgTextBrowser->insertPlainText(msg);
     //repaint();
 }
 
@@ -186,7 +180,9 @@ void MainWindow::enableRun(bool enabled)
     ui->commandLineEdit->setEnabled(enabled);
     ui->action_New_File->setEnabled(enabled);
     ui->action_Open_File->setEnabled(enabled);
+    ui->menuRecent_Files->setEnabled(enabled);
     ui->action_Save_File->setEnabled(enabled && needsSaving);
+    ui->action_Save_File_as->setEnabled(enabled);
 }
 
 void MainWindow::closeFitDialog()
@@ -196,6 +192,62 @@ void MainWindow::closeFitDialog()
         delete fitDialog;
         fitDialog = NULL;
     }
+}
+
+int MainWindow::initSession()
+{
+    QString config_filename_str;
+#if defined(Q_OS_OSX)
+    config_filename_str = QApplication::applicationDirPath() + "/../Resources/jibal.conf";
+#elif defined(Q_OS_WIN)
+    config_filename_str = QApplication::applicationDirPath() + "\\jibal.conf";
+#else
+    config_filename_str = QApplication::applicationDirPath() + "/jibal.conf";
+#endif
+    if(config_filename_str.isEmpty() || !QFile::exists(config_filename_str) ) {
+         jibal = jibal_init(NULL);
+    } else {
+        ui->msgTextBrowser->insertHtml(QString("<p>Jibal configuration file: %1</p>\n").arg(MainWindow::makeFileLink(config_filename_str)));
+        ui->msgTextBrowser->insertPlainText("\n");
+        jibal = jibal_init(qPrintable(config_filename_str));
+    }
+    if(!jibal) {
+        QMessageBox::critical(this, "Error", "Could not initialize JIBAL (a NULL pointer was returned).\n");
+        return -1;
+    }
+    ui->msgTextBrowser->insertPlainText(jibal_status_string(jibal));
+    if(jibal->error) {
+        QMessageBox::critical(this, "Error", QString("Could not initialize JIBAL:\n\n%1\n").arg(jibal_status_string(jibal)));
+        return -1;
+    }
+    ui->msgTextBrowser->insertHtml(QString("<p>GSTO files defined in: %1</p>\n").arg(MainWindow::makeFileLink(jibal->config->files_file)));
+    if(jibal->gsto->n_files == 0) {
+        QString warning = "No GSTO files (stopping, straggling) have been defined. Please be adviced that JaBS is unable to do any real work.";
+        warning.append(QString("You could try adding %1 to %2").arg(JIBAL_FILES_FILE, jibal->config->userdatadir));
+        if(jibal->config->files_file) {
+            warning.append(QString(" or you should check contents of file %1.").arg(jibal->config->files_file));
+        } else {
+            warning.append(".");
+        }
+        QMessageBox::warning(this, "Warning", warning);
+    }
+    session = script_session_init(jibal, NULL);
+    if(!session)  {
+        QMessageBox::critical(this, "Error", "Could not initialize JaBS session.\n");
+        return -1;
+    }
+    session->fit->fit_iter_callback = &fit_iter_callback;
+    highlighter = new Highlighter(ui->plainTextEdit->document());
+    highlighter->setSession(session);
+    return 0;
+}
+
+QString MainWindow::makeFileLink(const QString &filename)
+{
+    if(filename.isEmpty()) {
+        return QString("(no filename)");
+    }
+    return QString("<a href=\"%1\">%2</a>").arg(QUrl::fromLocalFile(filename).toString(), filename.toHtmlEscaped());
 }
 
 int MainWindow::fitCallback(fit_stats stats)
@@ -215,6 +267,7 @@ int MainWindow::fitCallback(fit_stats stats)
 void MainWindow::on_action_Run_triggered()
 {
     if(!session) {
+        QMessageBox::critical(this, "Error", "Session not initialized.\n");
         return;
     }
     enableRun(false);
@@ -222,7 +275,7 @@ void MainWindow::on_action_Run_triggered()
         resetAll();
     } else {
         ui->widget->clearAll();
-        ui->msgTextEdit->clear();
+        ui->msgTextBrowser->clear();
         script_reset(session, 0, NULL);
     }
     QString text = ui->plainTextEdit->toPlainText();
@@ -441,7 +494,7 @@ void MainWindow::resetAll()
 {
     ui->widget->clearAll();
     ui->widget->replot();
-    ui->msgTextEdit->clear();
+    ui->msgTextBrowser->clear();
     firstRun = true;
     script_reset(session, 0, NULL);
 }
@@ -461,10 +514,10 @@ void MainWindow::on_commandLineEdit_returnPressed()
     plotSession(status < 0);
 }
 
-void MainWindow::on_msgTextEdit_textChanged()
+void MainWindow::on_msgTextBrowser_textChanged()
 {
-    ui->msgTextEdit->moveCursor(QTextCursor::End);
-    ui->msgTextEdit->ensureCursorVisible();
+    ui->msgTextBrowser->moveCursor(QTextCursor::End);
+    ui->msgTextBrowser->ensureCursorVisible();
 }
 
 void MainWindow::updateRecentFileActions()
@@ -494,5 +547,10 @@ void MainWindow::openRecentFile()
     QAction *action = qobject_cast<QAction *>(sender());
     if(action)
         openFile(action->data().toString());
+}
+
+void MainWindow::openLink(const QUrl &link)
+{
+    QDesktopServices::openUrl(link);
 }
 

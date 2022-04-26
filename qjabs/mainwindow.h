@@ -63,11 +63,14 @@ private slots:
     void on_actionAbout_triggered();
 
     void on_commandLineEdit_returnPressed();
-    void on_msgTextEdit_textChanged();
+
+    void on_msgTextBrowser_textChanged();
 
     void updateRecentFileActions();
 
     void openRecentFile();
+
+    void openLink(const QUrl &link);
 
 private:
     void updateWindowTitle();
@@ -78,6 +81,8 @@ private:
     void closeEvent(QCloseEvent *event);
     void enableRun(bool enabled);
     void closeFitDialog();
+    int initSession();
+    static QString makeFileLink(const QString &filename);
     Ui::MainWindow *ui;
     FitDialog *fitDialog;
     struct jibal *jibal;
