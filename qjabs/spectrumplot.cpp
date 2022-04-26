@@ -44,6 +44,8 @@ void SpectrumPlot::drawDataToChart(const QString &name, double *data, int n, con
     QPen graphPen;
     graphPen.setColor(color);
     graph()->setPen(graphPen);
+    graphPen.setWidth(2);
+    graph()->selectionDecorator()->setPen(graphPen);
     graph()->setName(name);
     double maxy = 0.0;
     double maxx = 0.0;
@@ -177,6 +179,11 @@ SpectrumPlot::~SpectrumPlot() {
 
 }
 
+const QColor SpectrumPlot::getColor(int index)
+{
+    return colors[index % n_colors];
+}
+
 void SpectrumPlot::plotxRangeChanged(const QCPRange &range)
 {
     QCPRange newrange(range);
@@ -291,8 +298,10 @@ void SpectrumPlot::contextMenuRequest(const QPoint &pos)
         menu->addAction(logAction);
         menu->addAction(autoRangeAction);
     } else {
-      if(selectedGraphs().size() > 0)
-        menu->addAction("Hide selected graph", this, &SpectrumPlot::hideSelectedGraph);
+      if(selectedGraphs().size() > 0) {
+        QString name = selectedGraphs().at(0)->name();
+        menu->addAction(QString("Hide selected graph (%1)").arg(name), this, &SpectrumPlot::hideSelectedGraph);
+      }
     }
     menu->addAction("Reset zoom", this, &SpectrumPlot::resetZoom);
     menu->popup(mapToGlobal(pos));

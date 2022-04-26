@@ -14,7 +14,8 @@ int fit_iter_callback(fit_stats stats);
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow),
-      maxRecentFiles(5), fitDialog(NULL), jibal(NULL), session(NULL), highlighter(NULL)
+      maxRecentFiles(5), fitDialog(NULL), jibal(NULL), session(NULL), highlighter(NULL), plotDialog(NULL),
+      showIsotopes(false), plotIsotopesZ(JIBAL_ANY_Z)
 {
     aboutString = QString("JaBS version ") + jabs_version() + "\n\n"
                        + "Using JIBAL version "+ jibal_version() + ", compiled using version " + JIBAL_VERSION + "\n\n"
@@ -30,7 +31,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->msgTextBrowser, &QTextBrowser::anchorClicked, this, &MainWindow::openLink);
     originalPath = QDir::currentPath();
     ui->splitter->setSizes(QList<int>() << 1 << 3 << 1);
-    ui->splitter_2->setSizes(QList<int>() << 1 << 2);
+    ui->splitter_2->setSizes(QList<int>() << 1 << 3);
 #ifdef WIN32
     QFont fixedFont = QFont("Courier New");
 #else
@@ -69,7 +70,11 @@ MainWindow::MainWindow(QWidget *parent)
     int status = initSession();
     if(status != 0) {
         enableRun(false);
+        return;
     }
+    readSettings();
+    ui->msgTextBrowser->append("\nReady.\n");
+    ui->msgTextBrowser->ensureCursorVisible();
 }
 
 void MainWindow::addMessage(jabs_msg_level level, const char *msg)
@@ -114,6 +119,19 @@ void MainWindow::openFile(const QString &filename)
         resetAll();
         plotSession();  /* Will hide plot etc. */
     }
+}
+
+void MainWindow::plotDialogClosed()
+{
+    plotDialog = NULL;
+}
+
+void MainWindow::readPlotSettings()
+{
+    showIsotopes = settings.value("showIsotopes", QVariant(false)).toBool();
+    plotIsotopesZ = settings.value("plotIsotopesZ", QVariant(JIBAL_ANY_Z)).toInt();
+    ui->widget->legend->setVisible(settings.value("showLegend", QVariant(true)).toBool());
+    plotSession();
 }
 
 
@@ -250,6 +268,11 @@ QString MainWindow::makeFileLink(const QString &filename)
     return QString("<a href=\"%1\">%2</a>").arg(QUrl::fromLocalFile(filename).toString(), filename.toHtmlEscaped());
 }
 
+void MainWindow::readSettings()
+{
+    readPlotSettings();
+}
+
 int MainWindow::fitCallback(fit_stats stats)
 {
     QCoreApplication::processEvents();
@@ -320,7 +343,6 @@ void MainWindow::plotSpectrum(size_t i_det)
 {
     ui->widget->clearAll();
     if(!session || !session->fit || !session->fit->sim) {
-        qDebug() << "Nothing to plot.";
         ui->widget->replot();
         return;
     }
@@ -337,6 +359,7 @@ void MainWindow::plotSpectrum(size_t i_det)
     }
     if(ws) {
         gsl_histogram *histo = NULL;
+        int colorindex = 0;
         for(int i = 0; i < session->fit->sim->n_reactions; ++i) {
             sim_reaction *r = &ws->reactions[i];
             sim_reaction *r_next = NULL;
@@ -356,12 +379,25 @@ void MainWindow::plotSpectrum(size_t i_det)
                 } else {
                     histo = gsl_histogram_clone(r->histo);
                 }
-                if(!r_next || (r->r->type != r_next->r->type || r->r->target->Z != r_next->r->target->Z)) {
+                bool showThisIsotope = showIsotopes &&  (plotIsotopesZ == JIBAL_ANY_Z || plotIsotopesZ == r->r->target->Z);
+                if(showThisIsotope || !r_next || (r->r->type != r_next->r->type || r->r->target->Z != r_next->r->target->Z)) {
+                    /* Plot histo if:
+                     * 1. If show isotopes is set and Z is JIBAL_ANY_Z or matches with target->Z
+                     * 2. If this is the last reaction (there is no r_next), therefore the last histogram
+                     * 3. Next reaction has different type (e.g. RBS vs ERD) or different Z
+                     * */
                     if(histo) {
-                      ui->widget->drawDataToChart(QString("") + reaction_name(r->r) + " " + jibal_element_name(jibal->elements, r->r->target->Z), histo->bin, histo->n, QColor("Red"));
-                      ui->widget->setGraphVisibility(ui->widget->graph(), false);
-                      gsl_histogram_free(histo);
-                      histo = NULL;
+                        QString name = QString("") + reaction_name(r->r) + " ";
+                        if(showThisIsotope) {
+                            name.append(r->r->target->name);
+                        } else {
+                            name.append(jibal_element_name(jibal->elements, r->r->target->Z));
+                        }
+                        ui->widget->drawDataToChart(name, histo->bin, histo->n, SpectrumPlot::getColor(colorindex));
+                        colorindex++;
+                        ui->widget->setGraphVisibility(ui->widget->graph(), false);
+                        gsl_histogram_free(histo);
+                        histo = NULL;
                     }
                 }
             }
@@ -419,7 +455,6 @@ void MainWindow::setFilename(const QString &filename)
     if(!QDir::setCurrent(fi.absolutePath())) {
         qDebug() << "Can't set the current working directory!";
     }
-    QSettings settings;
     QStringList files = settings.value("recentFileList").toStringList();
     files.removeAll(filename);
     files.prepend(filename);
@@ -552,5 +587,18 @@ void MainWindow::openRecentFile()
 void MainWindow::openLink(const QUrl &link)
 {
     QDesktopServices::openUrl(link);
+}
+
+
+void MainWindow::on_action_Plot_triggered()
+{
+    if(plotDialog) {
+        qDebug() << "Plot dialog already exists.";
+        return;
+    }
+    plotDialog = new PlotDialog(this, jibal);
+    connect(plotDialog, &PlotDialog::closed, this, &MainWindow::plotDialogClosed);
+    connect(plotDialog, &PlotDialog::settingsSaved, this, &MainWindow::readPlotSettings);
+    plotDialog->show();
 }
 

@@ -23,7 +23,14 @@
       <widget class="QWidget" name="verticalLayoutWidget">
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
-         <widget class="CodeEditor" name="plainTextEdit"/>
+         <widget class="CodeEditor" name="plainTextEdit">
+          <property name="minimumSize">
+           <size>
+            <width>100</width>
+            <height>300</height>
+           </size>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QGroupBox" name="plotSettingsGroupBox">
@@ -164,7 +171,14 @@
     </property>
     <addaction name="actionAbout"/>
    </widget>
+   <widget class="QMenu" name="menu_Edit">
+    <property name="title">
+     <string>&amp;Edit</string>
+    </property>
+    <addaction name="action_Plot"/>
+   </widget>
    <addaction name="menu_File"/>
+   <addaction name="menu_Edit"/>
    <addaction name="menu_Help"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -238,6 +252,11 @@
   <action name="actionAbout">
    <property name="text">
     <string>About</string>
+   </property>
+  </action>
+  <action name="action_Plot">
+   <property name="text">
+    <string>&amp;Plot preferences...</string>
    </property>
   </action>
  </widget>

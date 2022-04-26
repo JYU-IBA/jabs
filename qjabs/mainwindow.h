@@ -2,8 +2,10 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QSettings>
 #include "highlighter.h"
 #include "fitdialog.h"
+#include "plotdialog.h"
 
 extern "C" {
 #include <jibal_units.h>
@@ -38,6 +40,12 @@ public slots:
     void openFile(const QString &filename);
 
 private slots:
+    void plotDialogClosed();
+
+    void readPlotSettings();
+
+    void on_action_Plot_triggered();
+
     void on_action_Run_triggered();
 
     void on_plotSpinBox_valueChanged(int arg1);
@@ -83,8 +91,10 @@ private:
     void closeFitDialog();
     int initSession();
     static QString makeFileLink(const QString &filename);
+    void readSettings();
     Ui::MainWindow *ui;
     FitDialog *fitDialog;
+    PlotDialog *plotDialog;
     struct jibal *jibal;
     script_session *session;
     Highlighter *highlighter;
@@ -96,5 +106,8 @@ private:
     QString aboutString;
     int maxRecentFiles;
     QAction *recentFileActs; /* array */
+    bool showIsotopes;
+    int plotIsotopesZ;
+    QSettings settings;
 };
 #endif // MAINWINDOW_H

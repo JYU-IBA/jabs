@@ -2,9 +2,6 @@
 <ui version="4.0">
  <class>FitDialog</class>
  <widget class="QDialog" name="FitDialog">
-  <property name="windowModality">
-   <enum>Qt::WindowModal</enum>
-  </property>
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -17,7 +14,7 @@
    <string>Fit</string>
   </property>
   <property name="modal">
-   <bool>true</bool>
+   <bool>false</bool>
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">

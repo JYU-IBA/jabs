@@ -94,6 +94,7 @@ set(PROJECT_SOURCES
        spectrumplot.cpp spectrumplot.h
        codeeditor.cpp codeeditor.h
        highlighter.cpp highlighter.h
+       plotdialog.h plotdialog.cpp plotdialog.ui
        icons.qrc
 )
 
