@@ -21,6 +21,8 @@
 #include "script_file.h"
 
 int script_process(script_session *s) {
+    if(!s)
+        return SCRIPT_COMMAND_FAILURE;
     static const char *prompt = PROMPT;
     script_command_status status = SCRIPT_COMMAND_SUCCESS;
     while(s->file_depth > 0) {

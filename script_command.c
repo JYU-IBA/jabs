@@ -678,6 +678,10 @@ script_command_status script_disable_var(struct script_session *s, jibal_config_
 script_command_status script_execute_command(script_session *s, const char *cmd) {
     int argc = 0;
     script_command_status status;
+    if(!s) {
+        jabs_message(MSG_ERROR, stderr, "Session has not been initialized.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
     char **argv = string_to_argv(cmd, &argc);
     if(!argv) {
         jabs_message(MSG_ERROR, stderr, "Something went wrong in parsing arguments.\n");
@@ -1497,6 +1501,9 @@ script_command_status script_reset_experimental(script_session *s, int argc, cha
 }
 
 script_command_status script_reset(script_session *s, int argc, char *const *argv) {
+    if(!s) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
     struct fit_data *fit = s->fit;
     (void) argc; /* Unused */
     (void) argv; /* Unused */

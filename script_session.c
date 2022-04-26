@@ -42,6 +42,8 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
 }
 
 int script_session_load_script(script_session *s, const char *filename) {
+    if(!s)
+        return EXIT_FAILURE;
     if(s->file_depth >= SCRIPT_FILES_NESTED_MAX) {
         jabs_message(MSG_ERROR, stderr, "Script files nested too deep.\n");
         return EXIT_FAILURE;
