@@ -41,7 +41,7 @@ private slots:
 private:
     Ui::PlotDialog *ui;
     QSettings settings;
-    jibal *jibal;
+    struct jibal *jibal;
 };
 
 #endif // PLOTDIALOG_H
