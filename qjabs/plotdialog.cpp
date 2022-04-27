@@ -46,6 +46,7 @@ void PlotDialog::readSettings()
         ui->comboBox->setCurrentIndex(index);
     }
     ui->showlegendCheckBox->setChecked(settings.value("showLegend", QVariant(true)).toBool());
+    ui->legendOutsideCheckBox->setChecked(settings.value("legendOutside", QVariant(false)).toBool());
 }
 
 void PlotDialog::saveSettings()
@@ -55,6 +56,7 @@ void PlotDialog::saveSettings()
     settings.setValue("showIsotopes", ui->isotopesCheckBox->isChecked());
     settings.setValue("plotIsotopesZ", ui->comboBox->currentData().toInt());
     settings.setValue("showLegend", ui->showlegendCheckBox->isChecked());
+    settings.setValue("legendOutside", ui->legendOutsideCheckBox->isChecked());
     emit settingsSaved();
 }
 
@@ -62,4 +64,3 @@ void PlotDialog::on_isotopesCheckBox_stateChanged(int arg1)
 {
     ui->comboBox->setEnabled(arg1 == Qt::Checked);
 }
-

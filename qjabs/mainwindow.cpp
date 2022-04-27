@@ -130,7 +130,8 @@ void MainWindow::readPlotSettings()
 {
     showIsotopes = settings.value("showIsotopes", QVariant(false)).toBool();
     plotIsotopesZ = settings.value("plotIsotopesZ", QVariant(JIBAL_ANY_Z)).toInt();
-    ui->widget->legend->setVisible(settings.value("showLegend", QVariant(true)).toBool());
+    ui->widget->setLegendVisible(settings.value("showLegend", QVariant(true)).toBool());
+    ui->widget->setLegendOutside(settings.value("legendOutside", QVariant(false)).toBool());
     plotSession();
 }
 

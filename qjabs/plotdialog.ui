@@ -7,11 +7,11 @@
     <x>0</x>
     <y>0</y>
     <width>278</width>
-    <height>217</height>
+    <height>176</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Plot settings</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_2">
    <item>
@@ -48,6 +48,13 @@
        </property>
        <property name="checked">
         <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="legendOutsideCheckBox">
+       <property name="text">
+        <string>Legend outside</string>
        </property>
       </widget>
      </item>

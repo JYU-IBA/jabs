@@ -37,6 +37,9 @@ protected:
 public slots:
     void setLogScale(bool value);
     void setAutoRange(bool value);
+    void setLegendOutside(bool value);
+    void setLegendVisible(bool value);
+
     void updateMaxima();
     void resetZoom();
 
@@ -46,8 +49,10 @@ private slots:
     void legendClicked(QCPLegend *legend, QCPAbstractLegendItem *item, QMouseEvent *event);
     void contextMenuRequest(const QPoint &pos);
     void hideSelectedGraph();
+    void replotAll();
 
 private:
+    QCPGraph *graphWithLegendItem(const QCPAbstractLegendItem *item);
     double getVerticalMaximum();
     double xmin, xmax;
     double data_ymax;
@@ -56,7 +61,11 @@ private:
     QFont legendFont;
     QAction *logAction;
     QAction *autoRangeAction;
+    QAction *legendOutsideAction;
     QCPLayoutGrid *subLayout;
+    void moveLegendOutside();
+    void moveLegendInside();
+    bool legendOutside;
 };
 
 #endif // SPECTRUMPLOT_H

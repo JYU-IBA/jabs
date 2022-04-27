@@ -1,18 +1,11 @@
 #include "spectrumplot.h"
 
 SpectrumPlot::SpectrumPlot(QWidget *parent) : QCustomPlot(parent) {
+    subLayout = NULL;
     setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
     xAxis->setLabel("Channel");
     yAxis->setLabel("Counts");
-#ifdef SPECTRUM_PLOT_LABEL_OUTSIDE
-    subLayout = new QCPLayoutGrid;
-    plotLayout()->addElement(1, 0, subLayout);
-    subLayout->setMargins(QMargins(5, 0, 5, 5));
-    subLayout->addElement(0, 0, legend);
-    plotLayout()->setRowStretchFactor(1, 0.001);
-#endif
-    legend->setFillOrder(QCPLegend::foColumnsFirst);
-    legend->setWrap(5);
+    moveLegendInside();
     legend->setBorderPen(QPen(Qt::NoPen));
     legend->setBrush(QBrush(QColor(255,255,255,127)));
     legend->setSelectableParts(QCPLegend::spItems);
@@ -32,6 +25,9 @@ SpectrumPlot::SpectrumPlot(QWidget *parent) : QCustomPlot(parent) {
     autoRangeAction = new QAction("Autorange", this);
     autoRangeAction->setCheckable(true);
     connect(autoRangeAction, &QAction::triggered, this, &SpectrumPlot::setAutoRange);
+    legendOutsideAction = new QAction("Legend outside", this);
+    legendOutsideAction->setCheckable(true);
+    connect(legendOutsideAction, &QAction::triggered, this, &SpectrumPlot::setLegendOutside);
     setAutoRange(true);
     setFocusPolicy(Qt::ClickFocus);
     installEventFilter(this);
@@ -145,7 +141,7 @@ void SpectrumPlot::setLogScale(bool value)
     }
     updateVerticalRange();
     logAction->setChecked(logscale);
-    replot();
+    replot(QCustomPlot::rpQueuedReplot);
 }
 
 void SpectrumPlot::setAutoRange(bool value)
@@ -176,7 +172,9 @@ void SpectrumPlot::resetZoom()
 }
 
 SpectrumPlot::~SpectrumPlot() {
-
+    delete logAction;
+    delete autoRangeAction;
+    delete legendOutsideAction;
 }
 
 const QColor SpectrumPlot::getColor(int index)
@@ -231,13 +229,15 @@ void SpectrumPlot::plotyRangeChanged(const QCPRange &range)
 
 void SpectrumPlot::legendClicked(QCPLegend *legend, QCPAbstractLegendItem *item, QMouseEvent *event)
 {
-    for (int i=0; i< graphCount(); ++i) {
-        if(item == legend->itemWithPlottable(graph(i))) {
-            setGraphVisibility(graph(i), !graph(i)->visible());
-            replot();
-            return;
-        }
+    QCPGraph *g = graphWithLegendItem(item);
+    if(!g)
+        return;
+    qDebug() << "Legend clicked" << g;
+    setGraphVisibility(g, !g->visible());
+    if(autorange) {
+        updateVerticalRange();
     }
+    replot(QCustomPlot::rpQueuedReplot);
 }
 
 void SpectrumPlot::updateVerticalRange(bool force)
@@ -246,7 +246,7 @@ void SpectrumPlot::updateVerticalRange(bool force)
         return;
     double ymin;
     double ymax = getVerticalMaximum();
-    ymax *= 1.1;
+    ymax *= (legendOutside || !legend->visible()) ? 1.01 : 1.1; /* leave more room at the top when legend is inside */
     if(logscale) {
         ymin = 0.5;
         ymax = pow(10, ceil(log10(ymax))); /* lowest power of ten larger than actual maximum, .e.g     100000 for 12345 */
@@ -277,10 +277,41 @@ double SpectrumPlot::getVerticalMaximum()
     return ymax;
 }
 
+void SpectrumPlot::moveLegendOutside()
+{
+    qDebug() << "moveLegendOutside called";
+    if(subLayout) {
+        qDebug() << "subLayout exists, returning";
+        return;
+    }
+    subLayout = new QCPLayoutGrid;
+    plotLayout()->addElement(0, 1, subLayout);
+    subLayout->setMargins(QMargins(5, 0, 5, 5));
+    subLayout->addElement(0, 0, legend);
+    plotLayout()->setColumnStretchFactor(1, 0.001);
+    legend->setWrap(20);
+    legend->setFillOrder(QCPLegend::foRowsFirst);
+    legendOutside = true;
+    qDebug() << "moveLegendOutside sets legendOutside" << legendOutside;
+}
+
+void SpectrumPlot::moveLegendInside()
+{
+    qDebug() << "moveLegendInside called";
+    axisRect()->insetLayout()->addElement(legend, Qt::AlignRight|Qt::AlignTop);
+    legend->setWrap(5);
+    legend->setFillOrder(QCPLegend::foColumnsFirst);
+    legendOutside = false;
+    qDebug() << "subLayout (will be deleted and set to NULL) is " << subLayout;
+    delete subLayout; /* This is no longer needed */
+    subLayout = NULL;
+    qDebug() << "moveLegendInside sets legendOutside" << legendOutside;
+}
+
 void SpectrumPlot::setGraphVisibility(QCPGraph *g, bool visible) {
 
-    g->setVisible(visible);
     updateVerticalRange();
+    g->setVisible(visible);
     QCPAbstractLegendItem *item = legend->itemWithPlottable(g);
     if(item) {
         legendFont.setStrikeOut(!visible);
@@ -293,7 +324,13 @@ void SpectrumPlot::contextMenuRequest(const QPoint &pos)
     QMenu *menu = new QMenu(this);
     menu->setAttribute(Qt::WA_DeleteOnClose);
     if(legend->selectTest(pos, false) >= 0) { // legend
+        menu->addAction(legendOutsideAction);
+        for(int i = 0; i < legend->itemCount(); ++i) {
+            const QCPAbstractLegendItem *item = legend->item(i);
+            if(item->selectTest(pos, false) >= 0) { // legend item
 
+            }
+        }
     } if(yAxis->selectTest(pos, false) >=0) {
         menu->addAction(logAction);
         menu->addAction(autoRangeAction);
@@ -304,6 +341,7 @@ void SpectrumPlot::contextMenuRequest(const QPoint &pos)
       }
     }
     menu->addAction("Reset zoom", this, &SpectrumPlot::resetZoom);
+    menu->addAction("Replot", this, &SpectrumPlot::replotAll);
     menu->popup(mapToGlobal(pos));
 }
 
@@ -313,6 +351,48 @@ void SpectrumPlot::hideSelectedGraph()
         QCPGraph *graph = selectedGraphs().at(0);
         setGraphVisibility(graph, false);
         graph->setSelection(QCPDataSelection());
-        replot();
+        replot(QCustomPlot::rpQueuedReplot);
     }
+}
+
+void SpectrumPlot::replotAll() /* Wrapper for replot() */
+{
+    replot(QCustomPlot::rpQueuedReplot);
+}
+
+QCPGraph *SpectrumPlot::graphWithLegendItem(const QCPAbstractLegendItem *item)
+{
+    for (int i=0; i< graphCount(); ++i) {
+        if(item == legend->itemWithPlottable(graph(i))) {
+            return graph(i);
+        }
+    }
+    return nullptr;
+}
+
+void SpectrumPlot::setLegendOutside(bool value)
+{
+    qDebug() << "setLegendOutside called with "  << value;
+    if(!legend->visible())
+        value = false; /* When legend is not visible, override. This prevents an empty box outside the plot. */
+    legendOutsideAction->blockSignals(true);
+    legendOutsideAction->setChecked(value);
+    legendOutsideAction->blockSignals(false);
+    if(value == legendOutside) /* Legend is already where it is supposed to be */
+        return;
+    if(value)
+        moveLegendOutside();
+    else
+        moveLegendInside();
+    if(autorange) { /* We have different y-range scaling depending on the location of the legend */
+        updateVerticalRange();
+    }
+    replot(QCustomPlot::rpQueuedReplot);
+}
+
+void SpectrumPlot::setLegendVisible(bool value)
+{
+    legend->setVisible(value);
+    if(legendOutside)
+        moveLegendInside();
 }

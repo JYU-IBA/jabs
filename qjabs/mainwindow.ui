@@ -256,7 +256,7 @@
   </action>
   <action name="action_Plot">
    <property name="text">
-    <string>&amp;Plot preferences...</string>
+    <string>&amp;Plot settings...</string>
    </property>
   </action>
  </widget>
