@@ -53,8 +53,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->action_Run->setShortcut(QKeySequence::Refresh);
     ui->action_Run->setShortcutVisibleInContextMenu(true);
     ui->action_Quit->setShortcut(QKeySequence::Quit);
-    needsSaving = false;
-    updateWindowTitle();
+    setNeedsSaving(false);
     firstRun = true;
     statusBar()->showMessage(QString("JaBS ") + jabs_version() + ", cwd: " +  QDir::currentPath(), 2000);
     recentFileActs = new QAction[maxRecentFiles];
@@ -67,14 +66,20 @@ MainWindow::MainWindow(QWidget *parent)
         connect(a, &QAction::triggered, this, &MainWindow::openRecentFile);
     }
     ui->menuRecent_Files->setToolTipsVisible(true);
+    readSettings();
     int status = initSession();
     if(status != 0) {
         enableRun(false);
-        return;
+        ui->action_Plot->setEnabled(false);
     }
-    readSettings();
-    ui->msgTextBrowser->append("\nReady.\n");
+    ui->msgTextBrowser->append("\n");
     ui->msgTextBrowser->ensureCursorVisible();
+    ui->plainTextEdit->blockSignals(true); /* extremely dirty hack:
+    on Linux (for whatever reason) textChanged() gets emitted although the text does not change.
+    Maybe it is related to highlighter or clipboard, who knows.
+
+    The workaround is to wait 100 ms (0 was not enough, 50 ms was not enough) and then allow signals again. */
+    QTimer::singleShot(100, this, &MainWindow::postInit);
 }
 
 void MainWindow::addMessage(jabs_msg_level level, const char *msg)
@@ -114,8 +119,7 @@ void MainWindow::openFile(const QString &filename)
         ui->plainTextEdit->setPlainText(file.readAll());
         file.close();
         setFilename(filename);
-        needsSaving = false;
-        updateWindowTitle();
+        setNeedsSaving(false);
         resetAll();
         plotSession();  /* Will hide plot etc. */
     }
@@ -272,6 +276,12 @@ QString MainWindow::makeFileLink(const QString &filename)
 void MainWindow::readSettings()
 {
     readPlotSettings();
+}
+
+void MainWindow::setNeedsSaving(bool value)
+{
+    needsSaving = value;
+    updateWindowTitle();
 }
 
 int MainWindow::fitCallback(fit_stats stats)
@@ -469,22 +479,23 @@ void MainWindow::setFilename(const QString &filename)
 
 void MainWindow::on_action_New_File_triggered()
 {
+    if(!askToSave()) {
+        return;
+    }
     ui->plainTextEdit->clear();
     resetAll();
     plotSession(); /* Will hide plot */
     filename.clear();
     filebasename.clear();
     QDir::setCurrent(originalPath);
-    needsSaving = false;
-    updateWindowTitle();
+    setNeedsSaving(false);
 }
 
 
 void MainWindow::on_plainTextEdit_textChanged()
 {
     if(!needsSaving) {
-        needsSaving = true;
-        updateWindowTitle();
+        setNeedsSaving(true);
     }
 }
 
@@ -495,8 +506,7 @@ void MainWindow::on_action_Save_File_as_triggered()
     if(!filename.isEmpty()) {
         if(saveScriptToFile(filename)) {
             setFilename(filename);
-            needsSaving = false;
-            updateWindowTitle();
+            setNeedsSaving(false);
         }
     }
 }
@@ -521,8 +531,7 @@ void MainWindow::on_action_Save_File_triggered()
     if(filename.isEmpty())
         return;
     if(saveScriptToFile(filename)) {
-        needsSaving = false;
-        updateWindowTitle();
+        setNeedsSaving(false);
     }
 }
 
@@ -590,6 +599,11 @@ void MainWindow::openLink(const QUrl &link)
     QDesktopServices::openUrl(link);
 }
 
+void MainWindow::postInit()
+{
+    ui->plainTextEdit->blockSignals(false);
+}
+
 
 void MainWindow::on_action_Plot_triggered()
 {
@@ -597,6 +611,8 @@ void MainWindow::on_action_Plot_triggered()
         qDebug() << "Plot dialog already exists.";
         return;
     }
+    if(!jibal)
+        return;
     plotDialog = new PlotDialog(this, jibal);
     connect(plotDialog, &PlotDialog::closed, this, &MainWindow::plotDialogClosed);
     connect(plotDialog, &PlotDialog::settingsSaved, this, &MainWindow::readPlotSettings);

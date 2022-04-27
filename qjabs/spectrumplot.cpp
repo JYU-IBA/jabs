@@ -200,7 +200,6 @@ SpectrumPlot::~SpectrumPlot() {
     delete logAction;
     delete autoRangeAction;
     delete legendOutsideAction;
-    delete coordinatesText;
 }
 
 const QColor SpectrumPlot::getColor(int index)
@@ -228,6 +227,7 @@ void SpectrumPlot::startZoom()
 
 void SpectrumPlot::plotxRangeChanged(const QCPRange &range)
 {
+
     QCPRange newrange(range);
     double w = range.upper - range.lower;
     if(w > xmax - xmin) {

@@ -85,7 +85,7 @@ void Highlighter::highlightBlock(const QString &text)
         return;
     }
     if(text.at(0) == '#') {
-        setFormat(0, text.length(), singleLineCommentFormat);
+        setFormat(0, len, singleLineCommentFormat);
         setCurrentBlockState(0);
         return;
     }
@@ -97,7 +97,7 @@ void Highlighter::highlightBlock(const QString &text)
     }
     highlightArgv(argc, argv);
     argv_free(argv, argc);
-
+    setCurrentBlockState(0);
 
     return;
 

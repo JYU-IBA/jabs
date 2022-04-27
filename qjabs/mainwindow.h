@@ -80,6 +80,8 @@ private slots:
 
     void openLink(const QUrl &link);
 
+    void postInit();
+
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);
@@ -92,6 +94,7 @@ private:
     int initSession();
     static QString makeFileLink(const QString &filename);
     void readSettings();
+    void setNeedsSaving(bool value);
     Ui::MainWindow *ui;
     FitDialog *fitDialog;
     PlotDialog *plotDialog;
