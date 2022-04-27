@@ -1,0 +1,12 @@
+[Desktop Entry]
+Encoding=UTF-8
+Version=1.0
+Name=JaBS
+Comment=Simulate and fit RBS spectra
+Comment[fi]=Simuloi ja sovita RBS-spektrejä
+Type=Application
+Exec=qjabs %F
+Icon=jabs
+Terminal=false
+MimeType=text/vnd.jabs;
+Categories=Science;Education;

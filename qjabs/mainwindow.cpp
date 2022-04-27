@@ -24,7 +24,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     ui->widget->setVisible(false);
     ui->plotSettingsGroupBox->setVisible(false); /* Will be made visible if necessary */
-    QIcon icon(":/icons/icon.svg");
+    QIcon icon(":/icons/jabs.svg");
     QApplication::setWindowIcon(icon);
     setWindowIcon(icon);
     ui->msgTextBrowser->setOpenLinks(false); /* We use the connection below to handle links */
@@ -230,7 +230,7 @@ int MainWindow::initSession()
     if(config_filename_str.isEmpty() || !QFile::exists(config_filename_str) ) {
          jibal = jibal_init(NULL);
     } else {
-        ui->msgTextBrowser->insertHtml(QString("<p>Jibal configuration file: %1</p>\n").arg(MainWindow::makeFileLink(config_filename_str)));
+        ui->msgTextBrowser->insertHtml(QString("<p>JIBAL configuration file: %1</p>\n").arg(MainWindow::makeFileLink(config_filename_str)));
         ui->msgTextBrowser->insertPlainText("\n");
         jibal = jibal_init(qPrintable(config_filename_str));
     }
