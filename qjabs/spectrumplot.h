@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QVector>
+#include <QClipboard>
 #include "qcustomplot.h"
 
 
@@ -37,8 +38,12 @@ protected:
 public slots:
     void setLogScale(bool value);
     void setAutoRange(bool value);
+    void setZoom(bool value);
     void setLegendOutside(bool value);
     void setLegendVisible(bool value);
+    void setSelectRect(bool value);
+    void startSelection();
+    void startZoom();
 
     void updateMaxima();
     void resetZoom();
@@ -49,7 +54,9 @@ private slots:
     void legendClicked(QCPLegend *legend, QCPAbstractLegendItem *item, QMouseEvent *event);
     void contextMenuRequest(const QPoint &pos);
     void hideSelectedGraph();
+    void onMouseMove(QMouseEvent *event);
     void replotAll();
+    void selectionAccepted(const QRect &rect, QMouseEvent *event);
 
 private:
     QCPGraph *graphWithLegendItem(const QCPAbstractLegendItem *item);
@@ -62,10 +69,14 @@ private:
     QAction *logAction;
     QAction *autoRangeAction;
     QAction *legendOutsideAction;
+    QAction *zoomAction;
     QCPLayoutGrid *subLayout;
+    QCPItemText *coordinatesText;
     void moveLegendOutside();
     void moveLegendInside();
     bool legendOutside;
+    bool selectRect;
+    int zoom;
 };
 
 #endif // SPECTRUMPLOT_H
