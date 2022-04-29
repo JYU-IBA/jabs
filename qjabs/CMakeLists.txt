@@ -146,7 +146,9 @@ set_target_properties(qjabs PROPERTIES
     MACOSX_BUNDLE_ICON_FILE icon.icns
 )
 
-install(TARGETS qjabs RUNTIME DESTINATION bin)
+install(TARGETS qjabs
+    BUNDLE DESTINATION .
+    RUNTIME DESTINATION bin)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES jabs.desktop DESTINATION share/applications)
     install(FILES jabs.xml DESTINATION share/mime/packages) 
