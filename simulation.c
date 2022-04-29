@@ -666,16 +666,22 @@ double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E)
     const struct reaction_point *t = r->cs_table;
     hi = r->n_cs_table - 1;
     lo = 0;
-#ifdef REACTIONS_FALL_BACK
     if(E < t[lo].E || E > t[hi].E) {
+#ifdef REACTIONS_FALL_BACK
         return sim_reaction_cross_section_rutherford(sim_r, E); /* Fall back quietly to analytical formulae outside tabulated values */
-    }
+#else
+        return 0.0;
 #endif
+    }
     if(fabs(sim_r->theta - sim_r->r->theta) > 0.01 * C_DEG) {
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction theta %g deg different from one in the file: %g deg\n", sim_r->theta/C_DEG, sim_r->r->theta/C_DEG);
 #endif
-        return sim_reaction_cross_section_rutherford(sim_r, E); /* Fall back quietly if reaction theta has been changed from original scattering angle (in the file) */
+#ifdef REACTIONS_FALL_BACK
+        return sim_reaction_cross_section_rutherford(sim_r, E);
+#else
+        return 0.0;
+#endif
     }
     while (hi - lo > 1) {
         mi = (hi + lo) / 2;
