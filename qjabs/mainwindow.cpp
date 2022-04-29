@@ -307,6 +307,12 @@ void MainWindow::setNeedsSaving(bool value)
     updateWindowTitle();
 }
 
+void MainWindow::updateListOfVisibleGraphs()
+{
+    visibleGraphs = ui->widget->visibleGraphs();
+    qDebug() << "Visible graphs " << visibleGraphs;
+}
+
 int MainWindow::fitCallback(fit_stats stats)
 {
     QCoreApplication::processEvents();
@@ -331,7 +337,7 @@ void MainWindow::on_action_Run_triggered()
     if(firstRun) {
         resetAll();
     } else {
-        ui->widget->clearAll();
+        updateListOfVisibleGraphs();
         ui->msgTextBrowser->clear();
         script_reset(session, 0, NULL);
     }
@@ -437,6 +443,11 @@ void MainWindow::plotSpectrum(size_t i_det)
                 }
             }
         }
+    }
+    for(int i = 0; i < ui->widget->graphCount(); ++i) {
+        QString name = ui->widget->graph(i)->name();
+        ui->widget->setGraphVisibility(ui->widget->graph(i), visibleGraphs.contains(name));
+
     }
     ui->widget->updateVerticalRange();
     ui->widget->replot();
@@ -566,6 +577,9 @@ void MainWindow::resetAll()
     ui->msgTextBrowser->clear();
     firstRun = true;
     script_reset(session, 0, NULL);
+    visibleGraphs.clear();
+    visibleGraphs.append("Simulated");
+    visibleGraphs.append("Experimental");
 }
 
 
@@ -576,6 +590,7 @@ void MainWindow::on_actionAbout_triggered()
 
 void MainWindow::on_commandLineEdit_returnPressed()
 {
+    updateListOfVisibleGraphs();
     int status = runLine(ui->commandLineEdit->text());
     if(status == SCRIPT_COMMAND_SUCCESS) {
             ui->commandLineEdit->clear();
@@ -632,6 +647,8 @@ void MainWindow::on_action_Plot_triggered()
 {
     if(plotDialog) {
         qDebug() << "Plot dialog already exists.";
+        plotDialog->show();
+        plotDialog->raise();
         return;
     }
     if(!jibal)

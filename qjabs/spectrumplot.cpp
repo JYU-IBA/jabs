@@ -321,6 +321,17 @@ double SpectrumPlot::getVerticalMaximum()
     return ymax;
 }
 
+QStringList SpectrumPlot::visibleGraphs()
+{
+    QStringList result;
+    for(int i = 0; i < graphCount(); ++i) {
+        if(graph(i)->visible()) {
+            result.append(graph(i)->name());
+        }
+    }
+    return result;
+}
+
 void SpectrumPlot::moveLegendOutside()
 {
     if(subLayout) {

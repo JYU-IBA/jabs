@@ -100,6 +100,7 @@ private:
     int closeSession();
     static QString makeFileLink(const QString &filename);
     void setNeedsSaving(bool value);
+    void updateListOfVisibleGraphs();
     Ui::MainWindow *ui;
     FitDialog *fitDialog;
     PlotDialog *plotDialog;
@@ -117,5 +118,6 @@ private:
     bool showIsotopes;
     int plotIsotopesZ;
     QSettings settings;
+    QStringList visibleGraphs;
 };
 #endif // MAINWINDOW_H

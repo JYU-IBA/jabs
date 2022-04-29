@@ -31,6 +31,7 @@ public:
         QColor(0x33, 0xa0, 0x2c),
     };
     static const QColor getColor(int index);
+    QStringList visibleGraphs();
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
