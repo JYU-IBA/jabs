@@ -17,6 +17,7 @@
 #include <time.h>
 #include <jibal.h>
 #include "defaults.h"
+#include "fit.h"
 
 struct script_command;
 
@@ -32,6 +33,7 @@ typedef struct script_file {
 typedef struct script_session {
     jibal *jibal;
     struct fit_data *fit;
+    int (*fit_iter_callback)(struct fit_stats stats);
     char *output_filename; /* File name for automatic spectra saving */ /* TODO: multidetector! */
     clock_t start, end;
     script_file *files[SCRIPT_FILES_NESTED_MAX];

@@ -28,6 +28,7 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
     if(!sim) { /* Sim shouldn't be NULL. If it is, we make a new one. */
         sim = sim_init(jibal);
     }
+    s->fit_iter_callback = NULL;
     s->fit = fit_data_new(jibal, sim); /* Not just fit, but this conveniently holds everything we need. */
     if(!s->fit) {
         jabs_message(MSG_ERROR, stderr,"Script session initialization failed.\n");
