@@ -628,12 +628,6 @@ void MainWindow::postInit()
     ui->editor->blockSignals(false);
 }
 
-void MainWindow::preferencesDialogFinished()
-{
-    qDebug() << "Finished, I suppose.";
-}
-
-
 void MainWindow::on_action_Plot_triggered()
 {
     if(plotDialog) {

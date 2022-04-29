@@ -87,8 +87,6 @@ private slots:
 
     void postInit();
 
-    void preferencesDialogFinished();
-
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);
