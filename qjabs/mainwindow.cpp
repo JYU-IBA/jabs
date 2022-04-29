@@ -281,11 +281,7 @@ QString MainWindow::makeFileLink(const QString &filename)
 
 void MainWindow::readSettings()
 {
-#ifdef WIN32
-    static const QString defaultFontFamily = "Courier New";
-#else
     static const QString defaultFontFamily = QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
-#endif
     QString editorFontFamily = settings.value("editorFontFamily").toString();
     if(editorFontFamily.isEmpty()) {
         editorFontFamily = defaultFontFamily;

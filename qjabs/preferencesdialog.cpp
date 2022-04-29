@@ -53,11 +53,11 @@ void PreferencesDialog::saveSettings()
 void PreferencesDialog::readSettings()
 {
     static QString defaultFontFamily = QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
-    jibalConfFilename = settings.value("jibalConfigurationFile", defaultFontFamily).toString();
+    jibalConfFilename = settings.value("jibalConfigurationFile").toString();
     ui->jibalconfigurationfileLineEdit->setText(jibalConfFilename);
     ui->editorFontComboBox->setCurrentFont(QFont(settings.value("editorFontFamily", defaultFontFamily).toString()));
     ui->editorfontsizeSpinBox->setValue(settings.value("editorFontSize", 11).toInt());
-    ui->messageFontComboBox->setCurrentFont(QFont(settings.value("messageFontFamily").toString()));
+    ui->messageFontComboBox->setCurrentFont(QFont(settings.value("messageFontFamily", defaultFontFamily).toString()));
     ui->messagefontsizeSpinBox->setValue(settings.value("messageFontSize", 10).toInt());
 }
 
