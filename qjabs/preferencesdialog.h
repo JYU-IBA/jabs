@@ -27,6 +27,7 @@ signals:
 private:
     Ui::PreferencesDialog *ui;
     QSettings settings;
+    QString jibalConfFilename;
 };
 
 #endif // PREFERENCESDIALOG_H

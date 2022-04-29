@@ -221,6 +221,10 @@ int MainWindow::initSession()
 #else
     config_filename_str = QApplication::applicationDirPath() + "/jibal.conf";
 #endif
+    } else {
+        if(!QFile::exists(config_filename_str)) {
+            QMessageBox::information(this, "Warning", QString("JIBAL configuration file is supposed to be \"%1\", but this file does not exist. Ignoring it. Change the value in preferences.").arg(config_filename_str));
+        }
     }
     if(config_filename_str.isEmpty() || !QFile::exists(config_filename_str) ) {
          jibal = jibal_init(NULL);

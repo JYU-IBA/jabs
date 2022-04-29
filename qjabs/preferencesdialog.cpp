@@ -38,14 +38,23 @@ void PreferencesDialog::saveSettings()
     settings.setValue("editorFontSize", ui->editorfontsizeSpinBox->value());
     settings.setValue("messageFontFamily", ui->messageFontComboBox->currentFont().family());
     settings.setValue("messageFontSize", ui->messagefontsizeSpinBox->value());
-    settings.setValue("jibalConfigurationFile", ui->jibalconfigurationfileLineEdit->text());
+    QString newJibalConfFilename = ui->jibalconfigurationfileLineEdit->text();
+    if(jibalConfFilename != newJibalConfFilename) {
+        QString msg = "Please restart JaBS for the change in JIBAL configuration to take effect.";
+        if(!newJibalConfFilename.isEmpty() && !QFile::exists(newJibalConfFilename)) {
+            msg.append(" Note that the file you have given does not exist!");
+        }
+        QMessageBox::information(this, "JIBAL configuration file changed", msg);
+        settings.setValue("jibalConfigurationFile", newJibalConfFilename);
+    }
     emit settingsSaved();
 }
 
 void PreferencesDialog::readSettings()
 {
     static QString defaultFontFamily = QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
-    ui->jibalconfigurationfileLineEdit->setText(settings.value("jibalConfigurationFile", defaultFontFamily).toString());
+    jibalConfFilename = settings.value("jibalConfigurationFile", defaultFontFamily).toString();
+    ui->jibalconfigurationfileLineEdit->setText(jibalConfFilename);
     ui->editorFontComboBox->setCurrentFont(QFont(settings.value("editorFontFamily", defaultFontFamily).toString()));
     ui->editorfontsizeSpinBox->setValue(settings.value("editorFontSize", 11).toInt());
     ui->messageFontComboBox->setCurrentFont(QFont(settings.value("messageFontFamily").toString()));
