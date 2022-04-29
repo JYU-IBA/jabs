@@ -40,7 +40,12 @@ public slots:
     void openFile(const QString &filename);
 
 private slots:
+    void on_actionPreferences_triggered();
+
+private slots:
     void plotDialogClosed();
+
+    void readSettings(); /* does not include plot settings, see readPlotSettings() */
 
     void readPlotSettings();
 
@@ -58,7 +63,7 @@ private slots:
 
     void on_action_New_File_triggered();
 
-    void on_plainTextEdit_textChanged();
+    void on_editor_textChanged();
 
     void on_action_Save_File_as_triggered();
 
@@ -82,6 +87,8 @@ private slots:
 
     void postInit();
 
+    void preferencesDialogFinished();
+
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);
@@ -92,8 +99,8 @@ private:
     void enableRun(bool enabled);
     void closeFitDialog();
     int initSession();
+    int closeSession();
     static QString makeFileLink(const QString &filename);
-    void readSettings();
     void setNeedsSaving(bool value);
     Ui::MainWindow *ui;
     FitDialog *fitDialog;

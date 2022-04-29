@@ -364,7 +364,7 @@ void SpectrumPlot::contextMenuRequest(const QPoint &pos)
         menu->addAction(legendOutsideAction);
         for(int i = 0; i < legend->itemCount(); ++i) {
             const QCPAbstractLegendItem *item = legend->item(i);
-            if(item->selectTest(pos, false) >= 0) { // legend item
+            if(item && item->selectTest(pos, false) >= 0) { // legend item
 
             }
         }

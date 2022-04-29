@@ -23,7 +23,7 @@
       <widget class="QWidget" name="verticalLayoutWidget">
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
-         <widget class="CodeEditor" name="plainTextEdit">
+         <widget class="CodeEditor" name="editor">
           <property name="minimumSize">
            <size>
             <width>100</width>
@@ -176,6 +176,7 @@
      <string>&amp;Edit</string>
     </property>
     <addaction name="action_Plot"/>
+    <addaction name="actionPreferences"/>
    </widget>
    <addaction name="menu_File"/>
    <addaction name="menu_Edit"/>
@@ -257,6 +258,11 @@
   <action name="action_Plot">
    <property name="text">
     <string>&amp;Plot settings...</string>
+   </property>
+  </action>
+  <action name="actionPreferences">
+   <property name="text">
+    <string>Preferences...</string>
    </property>
   </action>
  </widget>

@@ -3,6 +3,8 @@
 #include <QFontDatabase>
 #include <QDebug>
 #include <QTextStream>
+#include "preferencesdialog.h"
+
 
 extern "C" {
 #include "script.h"
@@ -32,15 +34,6 @@ MainWindow::MainWindow(QWidget *parent)
     originalPath = QDir::currentPath();
     ui->splitter->setSizes(QList<int>() << 1 << 3 << 1);
     ui->splitter_2->setSizes(QList<int>() << 1 << 3);
-#ifdef WIN32
-    QFont fixedFont = QFont("Courier New");
-#else
-    QFont fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-#endif
-    fixedFont.setPointSize(12);
-    ui->plainTextEdit->setFont(fixedFont);
-    fixedFont.setPointSize(11);
-    ui->msgTextBrowser->setFont(fixedFont);
     ui->msgTextBrowser->insertPlainText(aboutString);
     ui->msgTextBrowser->insertPlainText(QString(COPYRIGHT_STRING));
     ui->msgTextBrowser->insertHtml("<p>Visit the <a href=\"https://github.com/JYU-IBA/jabs\">GitHub page</a> for latest information.</p>");
@@ -67,6 +60,7 @@ MainWindow::MainWindow(QWidget *parent)
     }
     ui->menuRecent_Files->setToolTipsVisible(true);
     readSettings();
+    readPlotSettings();
     int status = initSession();
     if(status != 0) {
         enableRun(false);
@@ -74,7 +68,7 @@ MainWindow::MainWindow(QWidget *parent)
     }
     ui->msgTextBrowser->append("\n");
     ui->msgTextBrowser->ensureCursorVisible();
-    ui->plainTextEdit->blockSignals(true); /* extremely dirty hack:
+    ui->editor->blockSignals(true); /* extremely dirty hack:
     on Linux (for whatever reason) textChanged() gets emitted although the text does not change.
     Maybe it is related to highlighter or clipboard, who knows.
 
@@ -105,8 +99,7 @@ void MainWindow::addMessage(jabs_msg_level level, const char *msg)
 
 MainWindow::~MainWindow()
 {
-    script_session_free(session);
-    jibal_free(jibal);
+    closeSession();
     delete [] recentFileActs;
     delete highlighter;
     delete ui;
@@ -116,7 +109,7 @@ void MainWindow::openFile(const QString &filename)
 {
     QFile file(filename);
     if(file.open(QFile::ReadOnly | QFile::Text)) {
-        ui->plainTextEdit->setPlainText(file.readAll());
+        ui->editor->setPlainText(file.readAll());
         file.close();
         setFilename(filename);
         setNeedsSaving(false);
@@ -219,7 +212,8 @@ void MainWindow::closeFitDialog()
 
 int MainWindow::initSession()
 {
-    QString config_filename_str;
+    QString config_filename_str = settings.value("jibalConfigurationFile").toString();
+    if(config_filename_str.isEmpty()) {
 #if defined(Q_OS_OSX)
     config_filename_str = QApplication::applicationDirPath() + "/../Resources/jibal.conf";
 #elif defined(Q_OS_WIN)
@@ -227,6 +221,7 @@ int MainWindow::initSession()
 #else
     config_filename_str = QApplication::applicationDirPath() + "/jibal.conf";
 #endif
+    }
     if(config_filename_str.isEmpty() || !QFile::exists(config_filename_str) ) {
          jibal = jibal_init(NULL);
     } else {
@@ -260,8 +255,15 @@ int MainWindow::initSession()
         return -1;
     }
     session->fit->fit_iter_callback = &fit_iter_callback;
-    highlighter = new Highlighter(ui->plainTextEdit->document());
+    highlighter = new Highlighter(ui->editor->document());
     highlighter->setSession(session);
+    return 0;
+}
+
+int MainWindow::closeSession()
+{
+    script_session_free(session);
+    jibal_free(jibal);
     return 0;
 }
 
@@ -275,7 +277,28 @@ QString MainWindow::makeFileLink(const QString &filename)
 
 void MainWindow::readSettings()
 {
-    readPlotSettings();
+#ifdef WIN32
+    static const QString defaultFontFamily = "Courier New";
+#else
+    static const QString defaultFontFamily = QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
+#endif
+    QString editorFontFamily = settings.value("editorFontFamily").toString();
+    if(editorFontFamily.isEmpty()) {
+        editorFontFamily = defaultFontFamily;
+    }
+    QFont editorFont;
+    editorFont.setFamily(editorFontFamily);
+    editorFont.setPointSize(settings.value("editorFontSize", 11).toInt());
+    ui->editor->setFont(editorFont);
+
+    QString messageFontFamily = settings.value("messageFontFamily").toString();
+    if(!messageFontFamily.isEmpty()) {
+        messageFontFamily = defaultFontFamily;
+    }
+    QFont messageFont;
+    messageFont.setFamily(messageFontFamily);
+    messageFont.setPointSize(settings.value("messageFontSize", 10).toInt());
+    ui->msgTextBrowser->setFont(messageFont);
 }
 
 void MainWindow::setNeedsSaving(bool value)
@@ -312,7 +335,7 @@ void MainWindow::on_action_Run_triggered()
         ui->msgTextBrowser->clear();
         script_reset(session, 0, NULL);
     }
-    QString text = ui->plainTextEdit->toPlainText();
+    QString text = ui->editor->toPlainText();
     QTextStream stream = QTextStream(&text, QIODevice::ReadOnly);
     size_t lineno = 0;
     bool error = false;
@@ -341,6 +364,7 @@ void MainWindow::on_action_Run_triggered()
     }
     closeFitDialog();
     enableRun(true);
+    ui->msgTextBrowser->ensureCursorVisible();
     plotSession(error);
 }
 
@@ -482,7 +506,7 @@ void MainWindow::on_action_New_File_triggered()
     if(!askToSave()) {
         return;
     }
-    ui->plainTextEdit->clear();
+    ui->editor->clear();
     resetAll();
     plotSession(); /* Will hide plot */
     filename.clear();
@@ -492,7 +516,7 @@ void MainWindow::on_action_New_File_triggered()
 }
 
 
-void MainWindow::on_plainTextEdit_textChanged()
+void MainWindow::on_editor_textChanged()
 {
     if(!needsSaving) {
         setNeedsSaving(true);
@@ -516,7 +540,7 @@ bool MainWindow::saveScriptToFile(const QString &filename)
     QFile file(filename);
     if(file.open(QFile::WriteOnly | QFile::Text)) {
         QTextStream stream(&file);
-        stream << ui->plainTextEdit->toPlainText();
+        stream << ui->editor->toPlainText();
         file.close();
     } else {
          QMessageBox::critical(this, tr("Error"), tr("Can not save to file."));
@@ -601,7 +625,12 @@ void MainWindow::openLink(const QUrl &link)
 
 void MainWindow::postInit()
 {
-    ui->plainTextEdit->blockSignals(false);
+    ui->editor->blockSignals(false);
+}
+
+void MainWindow::preferencesDialogFinished()
+{
+    qDebug() << "Finished, I suppose.";
 }
 
 
@@ -617,5 +646,14 @@ void MainWindow::on_action_Plot_triggered()
     connect(plotDialog, &PlotDialog::closed, this, &MainWindow::plotDialogClosed);
     connect(plotDialog, &PlotDialog::settingsSaved, this, &MainWindow::readPlotSettings);
     plotDialog->show();
+}
+
+
+void MainWindow::on_actionPreferences_triggered()
+{
+    PreferencesDialog *dialog = new PreferencesDialog(this);
+    dialog->setModal(true);
+    connect(dialog, &PreferencesDialog::settingsSaved, this, &MainWindow::readSettings);
+    dialog->open();
 }
 

@@ -95,6 +95,7 @@ set(PROJECT_SOURCES
        codeeditor.cpp codeeditor.h
        highlighter.cpp highlighter.h
        plotdialog.h plotdialog.cpp plotdialog.ui
+       preferencesdialog.h preferencesdialog.cpp preferencesdialog.ui
        icons.qrc
 )
 
