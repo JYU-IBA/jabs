@@ -296,7 +296,7 @@ void MainWindow::readSettings()
     ui->editor->setFont(editorFont);
 
     QString messageFontFamily = settings.value("messageFontFamily").toString();
-    if(!messageFontFamily.isEmpty()) {
+    if(messageFontFamily.isEmpty()) {
         messageFontFamily = defaultFontFamily;
     }
     QFont messageFont;
