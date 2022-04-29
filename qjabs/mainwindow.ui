@@ -153,7 +153,7 @@
     </property>
     <widget class="QMenu" name="menuRecent_Files">
      <property name="title">
-      <string>Recent Files</string>
+      <string>R&amp;ecent Files</string>
      </property>
     </widget>
     <addaction name="action_Run"/>
@@ -204,7 +204,7 @@
      <normaloff>:/icons/play-box.svg</normaloff>:/icons/play-box.svg</iconset>
    </property>
    <property name="text">
-    <string>Run script</string>
+    <string>&amp;Run script</string>
    </property>
    <property name="toolTip">
     <string>Reset and run script</string>
@@ -252,7 +252,7 @@
   </action>
   <action name="actionAbout">
    <property name="text">
-    <string>About</string>
+    <string>&amp;About</string>
    </property>
   </action>
   <action name="action_Plot">
@@ -262,7 +262,7 @@
   </action>
   <action name="actionPreferences">
    <property name="text">
-    <string>Preferences...</string>
+    <string>Prefere&amp;nces...</string>
    </property>
   </action>
  </widget>
