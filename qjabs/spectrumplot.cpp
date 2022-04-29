@@ -34,6 +34,7 @@ SpectrumPlot::SpectrumPlot(QWidget *parent) : QCustomPlot(parent) {
     connect(zoomAction, &QAction::triggered, this, &SpectrumPlot::setZoom);
     setZoom(false);
     coordinatesText = new QCPItemText(this);
+    coordinatesText->setText("");
     coordinatesText->setPositionAlignment(Qt::AlignLeft | Qt::AlignBottom);
     coordinatesText->setFont(QFont(font().family(), 10));
     connect(this, &QCustomPlot::mouseMove, this, &SpectrumPlot::onMouseMove);
