@@ -1524,11 +1524,15 @@ script_command_status script_reset(script_session *s, int argc, char *const *arg
     sample_model_free(fit->sm);
     fit->sm = NULL;
     sim_free(fit->sim);
-    fit->sim = sim_init(s->jibal);
-    fit->exp = calloc(fit->sim->n_det, sizeof(gsl_histogram *));
+    fit_data_free(s->fit);
+    s->fit = fit_data_new(s->jibal, sim_init(s->jibal));
+    if(!s->fit) {
+        jabs_message(MSG_ERROR, stderr, "Reset fails due to an allocation issue. This should not happen.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
     script_commands_free(s->commands);
     s->commands = script_commands_create(s);
-    jibal_gsto_assign_clear_all(s->fit->jibal->gsto);
+    jibal_gsto_assign_clear_all(s->jibal->gsto);
     return 0;
 }
 

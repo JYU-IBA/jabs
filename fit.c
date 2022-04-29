@@ -276,14 +276,6 @@ void fit_data_fit_ranges_free(struct fit_data *fit_data) {
 
 fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     struct fit_data *f = malloc(sizeof(struct fit_data));
-    f->n_iters_max = FIT_ITERS_MAX;
-    f->n_fit_ranges = 0;
-    f->xtol = FIT_XTOL;
-    f->gtol = FIT_GTOL;
-    f->ftol = FIT_FTOL;
-    f->chisq_tol = FIT_CHISQ_TOL;
-    f->chisq_fast_tol = FIT_FAST_CHISQ_TOL;
-    f->fit_ranges = NULL;
     f->jibal = jibal;
     f->sim = sim;
     f->exp = calloc(sim->n_det, sizeof(gsl_histogram *)); /* Allocating based on initial number of detectors. */
@@ -291,11 +283,23 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     f->ws = NULL; /* Initialized later */
     f->n_ws = 0; /* Number of allocated workspaces, initially same as number of detectors. */
     f->fit_params = NULL; /* Holds fit parameters AFTER a fit. */
-    f->phase_start = FIT_PHASE_FAST;
-    f->phase_stop = FIT_PHASE_SLOW;
     f->histo_sum_iter = NULL; /* Initialized later */
     f->fit_iter_callback = NULL; /* Optional */
+    f->n_fit_ranges = 0;
+    f->fit_ranges = NULL;
+    fit_data_defaults(f);
     return f;
+}
+
+void fit_data_defaults(fit_data *f) {
+    f->n_iters_max = FIT_ITERS_MAX;
+    f->xtol = FIT_XTOL;
+    f->gtol = FIT_GTOL;
+    f->ftol = FIT_FTOL;
+    f->chisq_tol = FIT_CHISQ_TOL;
+    f->chisq_fast_tol = FIT_FAST_CHISQ_TOL;
+    f->phase_start = FIT_PHASE_FAST;
+    f->phase_stop = FIT_PHASE_SLOW;
 }
 
 void fit_data_free(fit_data *fit) {
