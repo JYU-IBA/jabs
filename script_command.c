@@ -221,6 +221,7 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
     if(script_prepare_sim_or_fit(s)) {
         return SCRIPT_COMMAND_FAILURE;
     }
+    fit_data->fit_iter_callback = s->fit_iter_callback;
     if(fit(fit_data) < 0) {
         return SCRIPT_COMMAND_FAILURE;
     }

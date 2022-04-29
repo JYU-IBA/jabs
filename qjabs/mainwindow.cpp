@@ -258,7 +258,7 @@ int MainWindow::initSession()
         QMessageBox::critical(this, "Error", "Could not initialize JaBS session.\n");
         return -1;
     }
-    session->fit->fit_iter_callback = &fit_iter_callback;
+    session->fit_iter_callback = &fit_iter_callback;
     highlighter = new Highlighter(ui->editor->document());
     highlighter->setSession(session);
     return 0;
