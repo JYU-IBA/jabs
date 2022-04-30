@@ -58,8 +58,8 @@
 
 #include "highlighter.h"
 extern "C" {
-#include <../generic.h>
-#include <../script_command.h>
+#include "generic.h"
+#include "script_command.h"
 }
 
 Highlighter::Highlighter(QTextDocument *parent)

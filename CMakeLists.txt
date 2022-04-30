@@ -15,11 +15,18 @@ if(WIN32 AND DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
       CACHE STRING "")
   message(STATUS "CMake toolchain file ${CMAKE_TOOLCHAIN_FILE}")
 endif()
-if(NOT CMAKE_BUILD_TYPE)
+
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release)
 endif()
-include(git_watcher_config.cmake)
-include(version.cmake)
+
+add_subdirectory(gitwatcher)
+
+#Read version from file
+file(READ "${CMAKE_CURRENT_LIST_DIR}/version.txt" BUILD_VERSION)
+string(STRIP "${BUILD_VERSION}" BUILD_VERSION)
+
+
 project(jabs
         VERSION "${BUILD_VERSION}"
         DESCRIPTION "Jaakko's Backscattering Simulator (JaBS)"
@@ -27,41 +34,4 @@ project(jabs
         )
 set(CMAKE_C_STANDARD 99)
 
-
-
-configure_file(version.h.in version.h @ONLY)
-
-
-find_package(GSL 2.6 REQUIRED)
-find_package(Jibal 0.3.7 REQUIRED)
-
-if(WIN32)
-    find_path(GETOPT_INCLUDE_DIR getopt.h)
-    find_library(GETOPT_LIBRARY getopt)
-endif()
-
-option(DEBUG_MODE_ENABLE "Enable debug mode" OFF)
-if(DEBUG_MODE_ENABLE)
-    if (MSVC)
-        add_compile_options(/W4 /WX /DDEBUG)
-    else()
-        add_compile_options(-Wall -Wextra -pedantic -DDEBUG)
-    endif()
-endif()
-
-add_executable(jabs main.c sample.c sample.h brick.c ion.c ion.h simulation.c simulation.h reaction.c reaction.h
-        options.c options.h spectrum.c spectrum.h fit.c fit.h rotate.c rotate.h detector.c detector.h jabs.c jabs.h
-        roughness.c roughness.h script.c script.h generic.c generic.h message.c message.h aperture.c aperture.h
-        geostragg.c geostragg.h script_command.c script_command.h script_session.c script_session.h script_file.c
-        script_file.h calibration.c calibration.h script_generic.h)
-
-target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
-
-target_link_libraries(jabs
-    PRIVATE jibal
-    PRIVATE GSL::gsl
-    PRIVATE "$<$<BOOL:${UNIX}>:m>"
-    ${GETOPT_LIBRARY} gitwatcher
-    )
-
-install(TARGETS jabs RUNTIME DESTINATION bin)
+add_subdirectory(src)

@@ -1,15 +1,17 @@
 #!/bin/bash
+versionfile="../version.txt"
+citationfile="../CITATION.cff"
 do_release() {
     git status;
-    new_version=$(awk -F '.' '{printf("%i.%i.%i\n", $1, $2, $3+1)}' < version.txt)
+    new_version=$(awk -F '.' '{printf("%i.%i.%i\n", $1, $2, $3+1)}' < $versionfile)
     read -p "New version (^C to cancel, empty for $new_version: " version_given
     if [ ! -z "$version_given" ]; then
         new_version="$version_given";
     fi
     echo "You have chosen: $new_version"
-    echo "$new_version" > version.txt
+    echo "$new_version" > "$versionfile"
     ./citation.sh
-    git add version.txt CITATION.cff
+    git add "$versionfile" "$citationfile"
     git commit -m "Version bump to $new_version"
     git tag "v$new_version"
     echo "You can now push (I won't do it)"
@@ -24,7 +26,7 @@ fi
 
 echo "Change version number, commit and tag the repository."
 echo -n "Current version is: "
-cat version.txt
+cat "$versionfile"
 read -p "Do you wish to continue? " reply
 case $reply in 
     [Yy]* ) do_release;;

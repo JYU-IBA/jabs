@@ -1,4 +1,5 @@
 #!/bin/bash
+cd ..
 build_dir="build-qjabs"
 jibal_install_prefix="/usr/local"
 read version < version.txt

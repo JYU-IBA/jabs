@@ -11,6 +11,7 @@ project(qjabs
     LANGUAGES C CXX)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
+include_directories(../src)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -21,7 +22,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_MACOSX_BUNDLE TRUE)
 
-include(../git_watcher_config.cmake)
+include(../gitwatcher/git_watcher_config.cmake)
 
 configure_file(version.h.in version.h @ONLY)
 
@@ -39,54 +40,54 @@ if(WIN32)
 endif()
 
 set(PROJECT_SOURCES
-        ../sample.c
-        ../sample.h
-        ../brick.c
-        ../ion.c
-        ../ion.h
-        ../simulation.c
-        ../simulation.h
-        ../reaction.c
-        ../reaction.h
-       ../sample.c
-       ../sample.h
-       ../spectrum.c
-       ../spectrum.h
-       ../fit.c
-       ../fit.h
-       ../rotate.c
-       ../rotate.h
-       ../jabs.c
-       ../jabs.h
-       ../generic.c
-       ../generic.h
-       ../detector.c
-       ../detector.h
-       ../roughness.c
-       ../roughness.h
-       ../script.c
-       ../script.h
-       ../jabs.c
-       ../jabs.h
-       ../options.c
-       ../options.h
-       ../message.h
-        ../win_compat.c
-        ../win_compat.h
-        ../defaults.h
-        ../aperture.c
-        ../aperture.h
-        ../geostragg.c
-        ../geostragg.h
-        ../script_command.c
-        ../script_command.h
-        ../script_session.c
-        ../script_session.h
-        ../script_file.c
-        ../script_file.h
-        ../script_generic.h
-        ../calibration.c
-        ../calibration.h
+        ../src/sample.c
+        ../src/sample.h
+        ../src/brick.c
+        ../src/ion.c
+        ../src/ion.h
+        ../src/simulation.c
+        ../src/simulation.h
+        ../src/reaction.c
+        ../src/reaction.h
+       ../src/sample.c
+       ../src/sample.h
+       ../src/spectrum.c
+       ../src/spectrum.h
+       ../src/fit.c
+       ../src/fit.h
+       ../src/rotate.c
+       ../src/rotate.h
+       ../src/jabs.c
+       ../src/jabs.h
+       ../src/generic.c
+       ../src/generic.h
+       ../src/detector.c
+       ../src/detector.h
+       ../src/roughness.c
+       ../src/roughness.h
+       ../src/script.c
+       ../src/script.h
+       ../src/jabs.c
+       ../src/jabs.h
+       ../src/options.c
+       ../src/options.h
+       ../src/message.h
+        ../src/win_compat.c
+        ../src/win_compat.h
+        ../src/defaults.h
+        ../src/aperture.c
+        ../src/aperture.h
+        ../src/geostragg.c
+        ../src/geostragg.h
+        ../src/script_command.c
+        ../src/script_command.h
+        ../src/script_session.c
+        ../src/script_session.h
+        ../src/script_file.c
+        ../src/script_file.h
+        ../src/script_generic.h
+        ../src/calibration.c
+        ../src/calibration.h
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui
        fitdialog.cpp fitdialog.h fitdialog.ui

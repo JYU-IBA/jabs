@@ -62,7 +62,7 @@
 #include <QTextCharFormat>
 #include <QRegularExpression>
 extern "C" {
-#include "../script_generic.h"
+#include "script_generic.h"
 }
 
 

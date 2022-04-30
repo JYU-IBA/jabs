@@ -1,7 +1,9 @@
 #!/bin/bash
 #This script will generate CITATION.cff
+citationfile="../CITATION.cff"
+versionfile="../version.txt"
 today=$(date "+%Y-%m-%d")
-read version < version.txt
+read version < "$versionfile"
 echo "cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 authors:
@@ -13,4 +15,4 @@ repository-code: "https://github.com/JYU-IBA/jabs"
 license: GPL-2.0-or-later
 version: $version
 doi: 10.5281/zenodo.6362701
-date-released: $today" > CITATION.CFF
+date-released: $today" > "$citationfile"
