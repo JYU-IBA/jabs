@@ -23,6 +23,7 @@ chu,chu.stg
 bohr,bohr.stg
 " > "qjabs.app/Contents/Resources/files.txt"
 cp "$HOME/.jibal/srim2013.ele" "$HOME/.jibal/yang.stg" "$HOME/.jibal/chu.stg" "$HOME/.jibal/bohr.stg" "qjabs.app/Contents/Resources/"
+rm -rf JaBS.app
 mv qjabs.app JaBS.app
 macdeployqt JaBS.app -dmg
 #rm -rf JaBS.app
