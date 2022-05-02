@@ -9,6 +9,9 @@
 #   See LICENSE.txt for the full license.
 #
 
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_C_STANDARD 99)
+
 configure_file(version.h.in version.h @ONLY)
 find_package(GSL 2.6 REQUIRED)
 find_package(Jibal 0.3.7 REQUIRED)
@@ -16,15 +19,6 @@ find_package(Jibal 0.3.7 REQUIRED)
 if(WIN32)
     find_path(GETOPT_INCLUDE_DIR getopt.h)
     find_library(GETOPT_LIBRARY getopt)
-endif()
-
-option(DEBUG_MODE_ENABLE "Enable debug mode" OFF)
-if(DEBUG_MODE_ENABLE)
-    if (MSVC)
-        add_compile_options(/W4 /WX /DDEBUG)
-    else()
-        add_compile_options(-Wall -Wextra -pedantic -DDEBUG)
-    endif()
 endif()
 
 add_executable(jabs main.c sample.c sample.h brick.c ion.c ion.h simulation.c simulation.h reaction.c reaction.h

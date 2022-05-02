@@ -6,7 +6,7 @@ set QT6_DIR=C:\Qt\6.1.2
 REM And vcpkg
 set VCPKG_DIR=C:\vcpkg
 REM Try to remove CMakeCache.txt files if your configuration (e.g. compiler) changes or you want to do a fresh build
-
+cd ..
 mkdir build
 cd build
 REM del CMakeCache.txt
@@ -22,7 +22,7 @@ cmake -DCMAKE_PREFIX_PATH="%QT6_DIR%\msvc2019_64\lib\cmake" -G "Visual Studio 16
 cmake --build . --target ALL_BUILD --config Release
 REM Windeployqt will handle most dlls and other Qt dependencies
 %QT6_DIR%\msvc2019_64\bin\windeployqt.exe Release
-copy ..\..\build\Release\jabs.exe Release
+copy ..\..\build\src\Release\jabs.exe Release
 copy "%JIBAL_DIR%\bin\*.dll" Release
 del Release\jibal.conf
 ( 

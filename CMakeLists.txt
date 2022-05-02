@@ -9,7 +9,13 @@
 #   See LICENSE.txt for the full license.
 #
 cmake_minimum_required(VERSION 3.15)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
+include(version.cmake)
+project(jabs
+        VERSION "${BUILD_VERSION}"
+        DESCRIPTION "Jaakko's Backscattering Simulator (JaBS)"
+        LANGUAGES C
+        )
+
 if(WIN32 AND DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
       CACHE STRING "")
@@ -20,15 +26,16 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+
+option(DEBUG_MODE_ENABLE "Enable debug mode" OFF)
+if(DEBUG_MODE_ENABLE)
+    if (MSVC)
+        add_compile_options(/W4 /WX /DDEBUG)
+    else()
+        add_compile_options(-Wall -Wextra -pedantic -DDEBUG)
+    endif()
+endif()
+
 add_subdirectory(gitwatcher)
-
-include(version.cmake)
-
-project(jabs
-        VERSION "${BUILD_VERSION}"
-        DESCRIPTION "Jaakko's Backscattering Simulator (JaBS)"
-        LANGUAGES C
-        )
-set(CMAKE_C_STANDARD 99)
 
 add_subdirectory(src)
