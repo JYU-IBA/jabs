@@ -1,10 +1,13 @@
 #!/usr/bin/env jabs
 set ion 4He
-set energy "3.1 MeV"
-set emin "200 keV"
-set det theta "160 deg"
+set energy "3.035 MeV"
+set emin "130 keV"
+set fluence 5.4e12
+set det theta "160 deg" solid 70msr calib slope 2.00keV offset 10keV reso 20keV
+set det foil Si 150tfu
 set alpha "0 deg"
-set sample SiO2 5000tfu Si 20000tfu
+set sample Au 32.5tfu rough 30tfu SiO2 6680tfu Si 20000tfu yield 0.96
+load exp "rbs_114.dat"
 #Adding reactions is optional. If no reactions are specified, RBS and ERD reactions are added automatically. Reactions that are not possible are not calculated!
 add reactions RBS
 #We can remove a specific reaction.
@@ -15,4 +18,8 @@ add reaction RBS 16O cs Andersen max "1.769 MeV"
 #The options are as: R33, keV, RTR, Tab, O-16, (alpha, alpha), scattering angle 160
 load reaction "sigmacalc_16O_alpha_alpha_16O_160deg.r33"
 simulate
+add fit range [254:926] [1338:1424]
+set fit slow
+fit *calib*,fluence,energy,yield3
 save spectra "non_rutherford_out.csv"
+show fit
