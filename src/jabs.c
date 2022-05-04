@@ -675,16 +675,31 @@ fit_params *fit_params_all(fit_data *fit) {
     if(sm) {
         for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
             sample_range *r = &(sm->ranges[i_range]);
-            snprintf(param_name, param_name_max_len, "thick%zu", i_range + 1);
-            fit_params_add_parameter(params, &(r->x), param_name, "tfu", C_TFU);
-            if(r->rough.model != ROUGHNESS_NONE) {
-                snprintf(param_name, param_name_max_len, "rough%zu", i_range + 1);
+            size_t range_index = i_range + 1; /* Human readable indexing */
+            if(r->x > 0.0) {
+                snprintf(param_name, param_name_max_len, "thick%zu", range_index);
+                fit_params_add_parameter(params, &(r->x), param_name, "tfu", C_TFU);
+            }
+            if(r->yield != 1.0) {
+                snprintf(param_name, param_name_max_len, "yield%zu", range_index);
+                fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0);
+            }
+            if(r->bragg != 1.0) {
+                snprintf(param_name, param_name_max_len, "bragg%zu", range_index);
+                fit_params_add_parameter(params, &(r->bragg), param_name, "", 1.0);
+            }
+            if(r->stragg != 1.0) {
+                snprintf(param_name, param_name_max_len, "stragg%zu", range_index);
+                fit_params_add_parameter(params, &(r->stragg), param_name, "", 1.0);
+            }
+            if(r->rough.model != ROUGHNESS_NONE && r->rough.x > 0.0) {
+                snprintf(param_name, param_name_max_len, "rough%zu", range_index);
                 fit_params_add_parameter(params, &(r->rough.x), param_name, "tfu", C_TFU);
             }
             for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
                 if(*sample_model_conc_bin(sm, i_range, i_mat) < CONC_TOLERANCE) /* Don't add fit variables for negative, zero or very low concentrations. */
                     continue;
-                snprintf(param_name, param_name_max_len, "conc%zu_%s", i_range + 1, sm->materials[i_mat]->name);
+                snprintf(param_name, param_name_max_len, "conc%zu_%s", range_index, sm->materials[i_mat]->name);
                 fit_params_add_parameter(params, sample_model_conc_bin(sm, i_range, i_mat), param_name, "%", C_PERCENT);
             }
         }
