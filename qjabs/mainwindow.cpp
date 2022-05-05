@@ -228,8 +228,9 @@ int MainWindow::initSession()
     }
     if(config_filename_str.isEmpty() || !QFile::exists(config_filename_str) ) {
          jibal = jibal_init(NULL);
+         ui->msgTextBrowser->insertHtml(QString("JIBAL configuration file (determined by JIBAL): %1\n\n").arg(MainWindow::makeFileLink(jibal_config_filename(jibal))));
     } else {
-        ui->msgTextBrowser->insertHtml(QString("<p>JIBAL configuration file: %1</p>\n").arg(MainWindow::makeFileLink(config_filename_str)));
+        ui->msgTextBrowser->insertHtml(QString("<p>JIBAL configuration file (determined by JaBS): %1</p>\n").arg(MainWindow::makeFileLink(config_filename_str)));
         ui->msgTextBrowser->insertPlainText("\n");
         jibal = jibal_init(qPrintable(config_filename_str));
     }
@@ -237,6 +238,7 @@ int MainWindow::initSession()
         QMessageBox::critical(this, "Error", "Could not initialize JIBAL (a NULL pointer was returned).\n");
         return -1;
     }
+    ui->msgTextBrowser->insertPlainText("\n");
     ui->msgTextBrowser->insertPlainText(jibal_status_string(jibal));
     if(jibal->error) {
         QMessageBox::critical(this, "Error", QString("Could not initialize JIBAL:\n\n%1\n").arg(jibal_status_string(jibal)));
@@ -310,7 +312,6 @@ void MainWindow::setNeedsSaving(bool value)
 void MainWindow::updateListOfVisibleGraphs()
 {
     visibleGraphs = ui->widget->visibleGraphs();
-    qDebug() << "Visible graphs " << visibleGraphs;
 }
 
 int MainWindow::fitCallback(fit_stats stats)
