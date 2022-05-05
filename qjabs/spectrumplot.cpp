@@ -197,6 +197,23 @@ void SpectrumPlot::resetZoom()
     replot();
 }
 
+void SpectrumPlot::saveAsFile()
+{
+    QFileDialog dialog(this);
+    dialog.setFileMode(QFileDialog::AnyFile);
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setNameFilter(tr("PDF files (*.pdf)"));
+    dialog.setDefaultSuffix(".pdf");
+    if (!dialog.exec())
+        return;
+    if(dialog.selectedFiles().isEmpty())
+        return;
+    QString fileName = dialog.selectedFiles().at(0);
+    int w = QInputDialog::getInt(this, "Width", "Width", this->width(), 100, 10000);
+    int h = QInputDialog::getInt(this, "Height", "Height", this->height(), 100, 10000);
+    this->savePdf(fileName, w, h);
+}
+
 SpectrumPlot::~SpectrumPlot() {
     delete logAction;
     delete autoRangeAction;
@@ -392,7 +409,11 @@ void SpectrumPlot::contextMenuRequest(const QPoint &pos)
     menu->addAction("Reset zoom", this, &SpectrumPlot::resetZoom);
     menu->addAction(zoomAction);
     menu->addAction("Select range and copy to clipboard", this, &SpectrumPlot::startSelection);
+#ifdef SAVING_QCUSTOMPLOT_PDF_DOES_NOT_CRASH
+    menu->addAction("Save as file...", this, &SpectrumPlot::saveAsFile);
+#endif
     menu->popup(mapToGlobal(pos));
+
 }
 
 void SpectrumPlot::hideSelectedGraph()

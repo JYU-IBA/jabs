@@ -48,6 +48,7 @@ public slots:
 
     void updateMaxima();
     void resetZoom();
+    void saveAsFile();
 
 private slots:
     void plotxRangeChanged(const QCPRange &range);
