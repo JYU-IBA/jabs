@@ -26,7 +26,7 @@ double scattering_angle(const ion *incident, const sim_workspace *ws) { /* Calcu
 #ifdef DEBUG
     fprintf(stderr, "theta = %g deg, phi = %g deg.\n", theta/C_DEG, phi/C_DEG);
     fprintf(stderr, "scatter_theta = %g deg, scatter_phi = %g deg.\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
-    if(!ws->params.ds && !ws->params.geostragg) {
+    if(!ws->params->ds && !ws->params->geostragg) {
         assert(fabs(ws->det->theta - scatter_theta) < 0.01 * C_DEG); /* with DS this assert will fail */
     }
 #endif
@@ -53,7 +53,7 @@ return deriv;
 }
 
 double exit_angle_delta(const sim_workspace *ws, const char direction) {
-    if(!ws->params.geostragg)
+    if(!ws->params->geostragg)
         return 0.0;
     if(ws->det->distance < 0.001 * C_MM)
         return 0.0;
@@ -76,7 +76,7 @@ double exit_angle_delta(const sim_workspace *ws, const char direction) {
 geostragg_vars geostragg_vars_calculate(const sim_workspace *ws, const ion *incident) {
     geostragg_vars g;
     g.scatter_theta = scattering_angle(incident, ws);
-    if(ws->params.beta_manual) {
+    if(ws->params->beta_manual) {
         g.theta_product = C_PI - ws->det->beta;
         g.phi_product = 0.0;
     } else {
@@ -93,7 +93,7 @@ geostragg_vars geostragg_vars_calculate(const sim_workspace *ws, const ion *inci
     geostragg_vars_dir *gds[] = {&g.x, &g.y, NULL};
     for(geostragg_vars_dir **gdp = gds; *gdp; gdp++) {
         geostragg_vars_dir *gd = *gdp;
-        if(!ws->params.geostragg) { /* These variables will actually not be used, but let's set them just in case */
+        if(!ws->params->geostragg) { /* These variables will actually not be used, but let's set them just in case */
             gd->delta_beta = 0.0;
             gd->theta_deriv = 0.0;
             gd->phi = 0.0;
@@ -142,7 +142,7 @@ geostragg_vars geostragg_vars_calculate(const sim_workspace *ws, const ion *inci
 }
 
 double geostragg(const sim_workspace *ws, const sample *sample, const sim_reaction *r, const geostragg_vars_dir *gd, const depth d, const double E_0) {
-    if(!ws->params.geostragg) {
+    if(!ws->params->geostragg) {
         return 0.0;
     }
     ion ion;

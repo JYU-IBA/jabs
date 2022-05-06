@@ -87,7 +87,10 @@ int script_prepare_sim_or_fit(script_session *s) {
     jibal_gsto_print_files(fit->jibal->gsto, TRUE); /* TODO: this don't use jabs_message() */
     jabs_message(MSG_VERBOSE, stderr, "Loading stopping data.\n");
     jibal_gsto_load_all(fit->jibal->gsto);
-    sim_calc_params_update(&fit->sim->params);
+#ifdef DEBUG
+    fprintf(stderr, "Updating calculation params before sim/fit\n");
+#endif
+    sim_calc_params_update(fit->sim->params);
     simulation_print(stderr, fit->sim);
     s->start = clock();
     return 0;
@@ -1174,18 +1177,18 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_DOUBLE, "ftolerance",           &fit->ftol,                          NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",      &fit->chisq_tol,                     NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance", &fit->chisq_fast_tol,                NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "ds",                   &sim->params.ds,                     NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "rk4",                  &sim->params.rk4,                    NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "sigmas_cutoff",        &sim->params.sigmas_cutoff,          NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_incident",   &sim->params.stop_step_incident,     NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_exiting",    &sim->params.stop_step_exiting,      NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "stop_step_fudge",      &sim->params.stop_step_fudge_factor, NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_min",        &sim->params.stop_step_min,          NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_add",        &sim->params.stop_step_add,          NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "nucl_stop_accurate",   &sim->params.nucl_stop_accurate,     NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy", &sim->params.mean_conc_and_energy,   NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "geostragg",            &sim->params.geostragg,              NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",          &sim->params.beta_manual,            NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "ds",                   &sim->params->ds,                     NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "rk4",                  &sim->params->rk4,                    NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "sigmas_cutoff",        &sim->params->sigmas_cutoff,          NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_incident",   &sim->params->stop_step_incident,     NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_exiting",    &sim->params->stop_step_exiting,      NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "stop_step_fudge",      &sim->params->stop_step_fudge_factor, NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_min",        &sim->params->stop_step_min,          NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_add",        &sim->params->stop_step_add,          NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "nucl_stop_accurate",   &sim->params->nucl_stop_accurate,     NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy", &sim->params->mean_conc_and_energy,   NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "geostragg",            &sim->params->geostragg,              NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",          &sim->params->beta_manual,            NULL},
             {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                                                    NULL}
     };
     c = script_command_list_from_vars_array(vars, 0);

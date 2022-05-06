@@ -64,7 +64,7 @@ typedef struct {
     double emin;
     double channeling_offset; /* a very ad-hoc channeling yield correction */
     double channeling_slope;
-    sim_calc_params params;
+    sim_calc_params *params;
     int erd; /* Add ERD reactions */
     int rbs; /* Add RBS reactions */
     jibal_cross_section_type cs_rbs;
@@ -106,7 +106,7 @@ typedef struct {
     ion ion;
     sim_reaction *reactions;
     const jibal_isotope *isotopes;
-    sim_calc_params params;
+    sim_calc_params *params;
     double emin;
 } sim_workspace;
 
@@ -114,10 +114,12 @@ typedef struct {
 #include "sample.h"
 simulation *sim_init(jibal *jibal);
 void sim_free(simulation *sim);
-sim_calc_params sim_calc_params_defaults();
+sim_calc_params *sim_calc_params_defaults();
+void sim_calc_params_free();
+sim_calc_params *sim_calc_params_copy(const sim_calc_params *p);
 void sim_calc_params_update(sim_calc_params *p); /* Computes variables that can be computed from other variables */
-void sim_calc_params_ds(sim_calc_params *p, int ds);
-void sim_calc_params_fast(sim_calc_params *p, int fast);
+void sim_calc_params_ds(sim_calc_params *p, int ds); /* if ds is TRUE, set DS parameters, otherwise no action is taken */
+void sim_calc_params_fast(sim_calc_params *p, int fast); /* if fast is TRUE, set fast parameters, otherwise no action is taken */
 jibal_cross_section_type sim_cs(const simulation *sim, reaction_type type);
 int sim_reactions_add_reaction(simulation *sim, reaction *r);
 int sim_reactions_remove_reaction(simulation *sim, size_t i);

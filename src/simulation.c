@@ -60,31 +60,47 @@ void sim_free(simulation *sim) {
         reaction_free(sim->reactions[i]);
     }
     free(sim->reactions);
+    sim_calc_params_free(sim->params);
     free(sim);
 }
 
-sim_calc_params sim_calc_params_defaults() {
-    sim_calc_params p;
-    p.stop_step_incident = STOP_STEP_INCIDENT;
-    p.stop_step_exiting = STOP_STEP_EXITING;
-    p.stop_step_fudge_factor = STOP_STEP_FUDGE_FACTOR;
-    p.stop_step_min = STOP_STEP_MIN;
-    p.stop_step_add = STOP_STEP_ADD;
-    p.depthsteps_max = 0; /* automatic */
-    p.geostragg = FALSE;
-    p.beta_manual  = FALSE;
-    p.ds = FALSE;
-    p.ds_steps_azi = 0;
-    p.ds_steps_polar = 0;
-    p.rk4 = TRUE;
-    p.nucl_stop_accurate = TRUE;
-    p.mean_conc_and_energy = FALSE;
-    p.cs_stragg_half_n = CS_STRAGG_HALF_N;
-    p.cs_n_steps = CS_CONC_STEPS;
-    p.rough_layer_multiplier = 1.0;
-    p.sigmas_cutoff = SIGMAS_CUTOFF;
-    sim_calc_params_update(&p);
+sim_calc_params *sim_calc_params_defaults() {
+    sim_calc_params *p = malloc(sizeof(sim_calc_params));
+    p->stop_step_incident = STOP_STEP_INCIDENT;
+    p->stop_step_exiting = STOP_STEP_EXITING;
+    p->stop_step_fudge_factor = STOP_STEP_FUDGE_FACTOR;
+    p->stop_step_min = STOP_STEP_MIN;
+    p->stop_step_add = STOP_STEP_ADD;
+    p->depthsteps_max = 0; /* automatic */
+    p->geostragg = FALSE;
+    p->beta_manual  = FALSE;
+    p->ds = FALSE;
+    p->ds_steps_azi = 0;
+    p->ds_steps_polar = 0;
+    p->rk4 = TRUE;
+    p->nucl_stop_accurate = TRUE;
+    p->mean_conc_and_energy = FALSE;
+    p->cs_stragg_half_n = CS_STRAGG_HALF_N;
+    p->cs_n_steps = CS_CONC_STEPS;
+    p->rough_layer_multiplier = 1.0;
+    p->sigmas_cutoff = SIGMAS_CUTOFF;
+#ifdef DEBUG
+    fprintf(stderr, "New calc params created.\n");
+#endif
+    sim_calc_params_update(p);
     return p;
+}
+
+void sim_calc_params_free(sim_calc_params *p) {
+    if(!p)
+        return;
+    free(p);
+}
+
+sim_calc_params *sim_calc_params_copy(const sim_calc_params *p) {
+    sim_calc_params *p_out = malloc(sizeof(sim_calc_params));
+    *p_out = *p;
+    return p_out;
 }
 
 void sim_calc_params_update(sim_calc_params *p) {
@@ -97,13 +113,16 @@ void sim_calc_params_update(sim_calc_params *p) {
         p->ds_steps_polar = DUAL_SCATTER_POLAR_STEPS;
     }
     p->n_ds = p->ds_steps_azi *  p->ds_steps_polar;
+#ifdef DEBUG
+    fprintf(stderr, "Calculation parameters (%p) updated. DS %i (%p).\n", (void *)p, p->ds, (void *) &p->ds);
+#endif
 }
 
 void sim_calc_params_ds(sim_calc_params *p, int ds) {
     if(ds) {
         p->ds = TRUE;
+        sim_calc_params_update(p);
     }
-    sim_calc_params_update(p);
 }
 
 void sim_calc_params_fast(sim_calc_params *p, int fast) {
@@ -118,7 +137,6 @@ void sim_calc_params_fast(sim_calc_params *p, int fast) {
         p->rough_layer_multiplier = 0.5;
         p->sigmas_cutoff = SIGMAS_FAST_CUTOFF;
     }
-    sim_calc_params_update(p);
 }
 
 jibal_cross_section_type sim_cs(const simulation *sim, const reaction_type type) {
@@ -307,16 +325,16 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->fluence = sim->fluence;
     ws->det = det;
     ws->sample = sim->sample;
-    ws->params = sim->params;
-    if(ws->params.stop_step_min == 0.0) { /* Automatic, calculate here. */
+    ws->params = sim_calc_params_copy(sim->params);
+    if(ws->params->stop_step_min == 0.0) { /* Automatic, calculate here. */
         if(det->type == DETECTOR_ENERGY) {
-            ws->params.stop_step_min = sqrt(det->calibration->resolution_variance)/2.0;
+            ws->params->stop_step_min = sqrt(det->calibration->resolution_variance)/2.0;
         } else {
-            ws->params.stop_step_min = STOP_STEP_MIN_FALLBACK;
+            ws->params->stop_step_min = STOP_STEP_MIN_FALLBACK;
         }
     }
 #ifdef DEBUG
-    fprintf(stderr, "Minimum stop step %g keV.\n", ws->params.stop_step_min/C_KEV);
+    fprintf(stderr, "Minimum stop step %g keV.\n", ws->params->stop_step_min/C_KEV);
 #endif
     ws->gsto = jibal->gsto;
     ws->isotopes = jibal->isotopes;
@@ -328,14 +346,14 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         return NULL;
     }
 
-    if(sim->params.beta_manual && sim->params.ds) {
+    if(sim->params->beta_manual && sim->params->ds) {
         jabs_message(MSG_WARNING, stderr,  "Manual exit angle is enabled in addition to dual scattering. This is an unsupported combination. Manual exit angle calculation will be disabled.\n");
-        ws->params.beta_manual  = FALSE;
+        ws->params->beta_manual  = FALSE;
     }
 
-    if(sim->params.beta_manual && sim->params.geostragg) {
+    if(sim->params->beta_manual && sim->params->geostragg) {
         jabs_message(MSG_WARNING, stderr,  "Manual exit angle is enabled in addition to geometric scattering. This is an unsupported combination. Geometric straggling calculation will be disabled.\n");
-        ws->params.geostragg = FALSE;
+        ws->params->geostragg = FALSE;
     }
     ion_reset(&ws->ion);
     ion_set_isotope(&ws->ion, sim->beam_isotope);
@@ -368,14 +386,14 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
 
     size_t n_bricks = 0;
 
-    if(ws->params.depthsteps_max) {
-        n_bricks = ws->params.depthsteps_max;
+    if(ws->params->depthsteps_max) {
+        n_bricks = ws->params->depthsteps_max;
     } else {
         if(det->type == DETECTOR_ENERGY) {
-            if(ws->params.stop_step_incident == 0.0) { /* Automatic incident step size */
-                n_bricks = (int) ceil(sim->beam_E / (ws->params.stop_step_fudge_factor*sqrt(detector_resolution(ws->det, sim->beam_isotope, sim->beam_E))) + ws->sample->n_ranges);
+            if(ws->params->stop_step_incident == 0.0) { /* Automatic incident step size */
+                n_bricks = (int) ceil(sim->beam_E / (ws->params->stop_step_fudge_factor*sqrt(detector_resolution(ws->det, sim->beam_isotope, sim->beam_E))) + ws->sample->n_ranges);
             } else {
-                n_bricks = (int) ceil(sim->beam_E / ws->params.stop_step_incident + ws->sample->n_ranges); /* This is conservative */
+                n_bricks = (int) ceil(sim->beam_E / ws->params->stop_step_incident + ws->sample->n_ranges); /* This is conservative */
             }
         } /* TODO: other detectors? */
         if(n_bricks > 10000) {
@@ -442,6 +460,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
 void sim_workspace_free(sim_workspace *ws) {
     if(!ws)
         return;
+    sim_calc_params_free(ws->params);
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = &ws->reactions[i];
         if(r->histo) {
@@ -523,7 +542,7 @@ void simulation_print(FILE *f, const simulation *sim) {
         jabs_message(MSG_INFO, f, "  type = %s\n", detector_type_name(det));
         jabs_message(MSG_INFO, f, "  theta = %.3lf deg\n", det->theta / C_DEG);
         jabs_message(MSG_INFO, f, "  phi = %.3lf deg\n", det->phi / C_DEG);
-        if(sim->params.beta_manual) {
+        if(sim->params->beta_manual) {
             jabs_message(MSG_INFO, f, "  beta = %.3lf deg (calculated)\n", sim_exit_angle(sim, det) / C_DEG);
             jabs_message(MSG_INFO, f, "  beta = %.3lf deg (manual)\n", det->beta / C_DEG);
         } else {
@@ -543,12 +562,12 @@ void simulation_print(FILE *f, const simulation *sim) {
     }
     jabs_message(MSG_INFO, f, "n_reactions = %zu\n", sim->n_reactions);
     jabs_message(MSG_INFO, f, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence*C_E*1.0e6);
-    jabs_message(MSG_INFO, f, "step for incident ions = %.3lf keV\n", sim->params.stop_step_incident/C_KEV);
-    jabs_message(MSG_INFO, f, "step for exiting ions = %.3lf keV\n", sim->params.stop_step_exiting/C_KEV);
-    jabs_message(MSG_INFO, f, "stopping RK4 = %s\n", sim->params.rk4?"true":"false");
-    jabs_message(MSG_INFO, f, "depth steps max = %zu\n", sim->params.depthsteps_max);
-    jabs_message(MSG_INFO, f, "cross section weighted by straggling = %s\n", sim->params.mean_conc_and_energy?"false":"true");
-    jabs_message(MSG_INFO, f, "accurate nuclear stopping = %s\n", sim->params.nucl_stop_accurate?"true":"false");
+    jabs_message(MSG_INFO, f, "step for incident ions = %.3lf keV\n", sim->params->stop_step_incident/C_KEV);
+    jabs_message(MSG_INFO, f, "step for exiting ions = %.3lf keV\n", sim->params->stop_step_exiting/C_KEV);
+    jabs_message(MSG_INFO, f, "stopping RK4 = %s\n", sim->params->rk4?"true":"false");
+    jabs_message(MSG_INFO, f, "depth steps max = %zu\n", sim->params->depthsteps_max);
+    jabs_message(MSG_INFO, f, "cross section weighted by straggling = %s\n", sim->params->mean_conc_and_energy?"false":"true");
+    jabs_message(MSG_INFO, f, "accurate nuclear stopping = %s\n", sim->params->nucl_stop_accurate?"true":"false");
     if(sim->channeling_offset != 1.0 || sim->channeling_slope != 0.0) {
         jabs_message(MSG_INFO, f, "substrate channeling yield correction offset = %.5lf\n", sim->channeling_offset);
         jabs_message(MSG_INFO, f, "substrate channeling yield correction slope = %g / keV (%e)\n", sim->channeling_slope/(1.0/C_KEV), sim->channeling_slope);
@@ -576,7 +595,7 @@ void sim_workspace_histograms_calculate(sim_workspace *ws) {
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
         bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
-        bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params.sigmas_cutoff);
+        bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff);
     }
 }
 
@@ -732,7 +751,7 @@ int sim_do_we_need_erd(const simulation *sim) {
     if(!sim->erd) {
         return FALSE; /* ERD has been (intentionally) disabled */
     }
-    if(sim->params.ds) {
+    if(sim->params->ds) {
         return TRUE; /* In case of DS, ERD becomes possible kind-of possible with any detector geometry */
     }
     int forward_angles = FALSE;
