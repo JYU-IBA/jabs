@@ -31,8 +31,10 @@ typedef struct {
     int n_ds;
     int cs_n_steps; /* Number of steps to take, when calculating cross section * concentration product */
     double cs_frac; /* Fractional step size 1.0/(cs_n_steps+1), calculated from cs_n_steps. */
-    int cs_stragg_half_n;
+    int cs_stragg_half_n; /* TODO: move all these cs_stragg things to a separate struct */
     int cs_n_stragg_steps; /* calculated from cs_stragg_half_n */
+    double *cs_stragg_prob; /* probability distribution array, size cs_n_stragg_steps */
+    double *cs_stragg_x; /* probability range */
     size_t depthsteps_max;
     int rk4; /* Use fourth order Runge-Kutta for energy loss calculation (differential equation with dE/dx). When false, a first-order method is used. */
     int nucl_stop_accurate; /* Use accurate nuclear stopping equation true/false. When false a faster (poorly approximating) equation is used below the nuclear stopping maximum. */

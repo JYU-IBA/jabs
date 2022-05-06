@@ -81,6 +81,8 @@ sim_calc_params *sim_calc_params_defaults() {
     p->nucl_stop_accurate = TRUE;
     p->mean_conc_and_energy = FALSE;
     p->cs_stragg_half_n = CS_STRAGG_HALF_N;
+    p->cs_stragg_prob = NULL; /* Will be allocated by sim_calc_params_update() */
+    p->cs_stragg_x = NULL;
     p->cs_n_steps = CS_CONC_STEPS;
     p->rough_layer_multiplier = 1.0;
     p->sigmas_cutoff = SIGMAS_CUTOFF;
@@ -94,13 +96,22 @@ sim_calc_params *sim_calc_params_defaults() {
 void sim_calc_params_free(sim_calc_params *p) {
     if(!p)
         return;
+    free(p->cs_stragg_prob);
+    free(p->cs_stragg_x);
     free(p);
 }
 
 sim_calc_params *sim_calc_params_copy(const sim_calc_params *p) {
     sim_calc_params *p_out = malloc(sizeof(sim_calc_params));
     *p_out = *p;
+    p_out->cs_stragg_prob = NULL;
+    p_out->cs_stragg_x = NULL;
+    sim_calc_params_update(p_out);
     return p_out;
+}
+
+double normal_pdf_std_tmp(double x) {
+    return 0.398942280401432703 * exp(-0.5*x*x);
 }
 
 void sim_calc_params_update(sim_calc_params *p) {
@@ -108,6 +119,42 @@ void sim_calc_params_update(sim_calc_params *p) {
     p->cs_frac = 1.0/(1.0*(p->cs_n_steps+1));
     assert(p->cs_stragg_half_n >= 0);
     p->cs_n_stragg_steps = p->cs_stragg_half_n * 2 + 1;
+    p->cs_stragg_prob = calloc(p->cs_n_stragg_steps, sizeof(double)); /* probability density values */
+    p->cs_stragg_x = calloc(p->cs_n_stragg_steps, sizeof(double)); /* probability density ranges */
+
+    double w = 1.0 / (p->cs_stragg_half_n);
+    if(p->cs_stragg_half_n <= 2) { /* Determine number of sigmas.based on number of steps */
+        w *= 2.0;
+    } else if (p->cs_stragg_half_n == 3) {
+        w *= 2.5;
+    } else {
+        w *= 3.0;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "CS weighted by straggling %i steps, w=%g.\n", p->cs_n_stragg_steps, w);
+#endif
+    double prob_sum = 0.0;
+    for(int i = 0; i < p->cs_n_stragg_steps; i++) {
+        double x = w * (i - p->cs_stragg_half_n); /* x goes from negative sigmas to positive sigmas */
+        double prob = normal_pdf_std_tmp(x); /* sampled gaussian */
+        prob *= w;
+        p->cs_stragg_x[i] = x;
+        p->cs_stragg_prob[i] = prob;
+#ifdef DEBUG
+        fprintf(stderr, "%i %g %g\n", i, x, prob);
+#endif
+        prob_sum += prob;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Will be normalized by sum of probabilities %g. Final values:\n", prob_sum);
+#endif
+    for(int i = 0; i < p->cs_n_stragg_steps; i++) {
+        p->cs_stragg_prob[i] /= prob_sum; /* Normalize to unity */
+#ifdef DEBUG
+        fprintf(stderr, "%i %g\n", i, p->cs_stragg_prob[i]);
+#endif
+    }
+
     if(p->ds && p->ds_steps_azi == 0 && p->ds_steps_polar == 0) { /* DS defaults are applied if nothing else is specified */
         p->ds_steps_azi = DUAL_SCATTER_AZI_STEPS;
         p->ds_steps_polar = DUAL_SCATTER_POLAR_STEPS;
