@@ -23,6 +23,7 @@
 #include "brick.h"
 #include "detector.h"
 #include "sample.h"
+#include "prob_dist.h"
 
 
 typedef struct {
@@ -30,12 +31,10 @@ typedef struct {
     int ds_steps_azi;
     int ds_steps_polar;
     int n_ds;
-    int cs_n_steps; /* Number of steps to take, when calculating cross section * concentration product */
+    size_t cs_n_steps; /* Number of steps to take, when calculating cross section * concentration product */
     double cs_frac; /* Fractional step size 1.0/(cs_n_steps+1), calculated from cs_n_steps. */
-    int cs_stragg_half_n; /* TODO: move all these cs_stragg things to a separate struct */
-    int cs_n_stragg_steps; /* calculated from cs_stragg_half_n */
-    double *cs_stragg_prob; /* probability distribution array, size cs_n_stragg_steps */
-    double *cs_stragg_x; /* probability range */
+    prob_dist *cs_stragg_pd;
+    size_t cs_n_stragg_steps; /* Number of steps to take, when calculating straggling weighted cross sections (note that these are substeps of cs_n_steps) */
     size_t depthsteps_max;
     int rk4; /* Use fourth order Runge-Kutta for energy loss calculation (differential equation with dE/dx). When false, a first-order method is used. */
     int nucl_stop_accurate; /* Use accurate nuclear stopping equation true/false. When false a faster (poorly approximating) equation is used below the nuclear stopping maximum. */
@@ -117,12 +116,15 @@ typedef struct {
 #include "sample.h"
 simulation *sim_init(jibal *jibal);
 void sim_free(simulation *sim);
-sim_calc_params *sim_calc_params_defaults();
-void sim_calc_params_free();
-sim_calc_params *sim_calc_params_copy(const sim_calc_params *p);
+sim_calc_params *sim_calc_params_defaults(sim_calc_params *p); /* if p is NULL, allocates params */
+sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p); /* Sets parameters to defaults and then makes them faster */
+sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p);
+sim_calc_params *sim_calc_params_defaults_brisk(sim_calc_params *p); /* Sets parameters to defaults and then makes them slightly faster */
+void sim_calc_params_free(sim_calc_params *p);
+void sim_calc_params_copy(const sim_calc_params *p_src, sim_calc_params *p_dst);
 void sim_calc_params_update(sim_calc_params *p); /* Computes variables that can be computed from other variables */
 void sim_calc_params_ds(sim_calc_params *p, int ds); /* if ds is TRUE, set DS parameters, otherwise no action is taken */
-void sim_calc_params_fast(sim_calc_params *p, int fast); /* if fast is TRUE, set fast parameters, otherwise no action is taken */
+void sim_calc_params_faster(sim_calc_params *p, int fast); /* if fast is TRUE, set faster parameters, otherwise no action is taken */
 jibal_cross_section_type sim_cs(const simulation *sim, reaction_type type);
 int sim_reactions_add_reaction(simulation *sim, reaction *r);
 int sim_reactions_remove_reaction(simulation *sim, size_t i);

@@ -753,11 +753,11 @@ int fit(struct fit_data *fit_data) {
             }
         }
         if(phase == FIT_PHASE_FAST) {
-            sim_calc_params_fast(fit_data->sim->params, TRUE); /* Set current parameters to be faster in phase 0. */
+            sim_calc_params_faster(fit_data->sim->params, TRUE); /* Set current parameters to be faster in phase 0. */
             xtol *= FIT_FAST_XTOL_MULTIPLIER;
             chisq_tol = fit_data->chisq_fast_tol;
         } else if(phase == FIT_PHASE_SLOW) {
-            *fit_data->sim->params = p_orig; /* Restore original parameters in phase 1 */
+            sim_calc_params_copy(&p_orig, fit_data->sim->params);
         }
         sim_calc_params_update(fit_data->sim->params);
         for(size_t i = 0; i < fit_params->n; i++) { /* Set active variables to vector */

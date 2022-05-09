@@ -88,6 +88,8 @@ set(PROJECT_SOURCES
         ../src/script_generic.h
         ../src/calibration.c
         ../src/calibration.h
+        ../src/prob_dist.h
+        ../src/prob_dist.c
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui
        fitdialog.cpp fitdialog.h fitdialog.ui

@@ -49,6 +49,7 @@ script_command_status script_show_var(struct script_session *s, jibal_config_var
 script_command_status script_set_detector_val(struct script_session *s, int val, int argc, char *const *argv);
 script_command_status script_set_detector_calibration_val(struct script_session *s, int val, int argc, char *const *argv);
 script_command_status script_set_fit_val(struct script_session *s, int val, int argc, char *const *argv);
+script_command_status script_set_simulation_val(struct script_session *s, int val, int argc, char *const *argv);
 script_command_status script_enable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_disable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_add_detector(struct script_session *s, int argc, char * const *argv);

@@ -33,10 +33,8 @@
 #include "message.h"
 #include "win_compat.h"
 
-extern inline double normal_pdf_std(double x);
-
 double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
-    double em = E / incident->mass;
+    const double em = E * incident->mass_inverse;
     double S1 = 0.0;
 #ifdef NEUTRONS_EXIST
     if(incident->Z == 0)
@@ -44,6 +42,7 @@ double stop_sample(const sim_workspace *ws, const ion *incident, const sample *s
 #endif
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
         double c;
+        const jibal_isotope *target = sample->isotopes[i_isotope];
         if(sample->no_conc_gradients) {
             c = *sample_conc_bin(sample, depth.i, i_isotope);
         } else {
@@ -53,15 +52,15 @@ double stop_sample(const sim_workspace *ws, const ion *incident, const sample *s
             continue;
         if(type == GSTO_STO_TOT) {
             S1 += c * (
-                    jibal_gsto_get_em(ws->gsto, GSTO_STO_ELE, incident->Z, sample->isotopes[i_isotope]->Z, em)
+                    jibal_gsto_get_em(ws->gsto, GSTO_STO_ELE, incident->Z, target->Z, em)
                     #ifdef NUCLEAR_STOPPING_FROM_JIBAL
-                    +jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, sample->isotopes[i_isotope]->Z, sample->isotopes[i_isotope]->mass)
+                    + jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, target->Z, target->mass)
                     #else
-                    + ion_nuclear_stop(incident, sample->isotopes[i_isotope], ws->isotopes, ws->params->nucl_stop_accurate)
+                    + ion_nuclear_stop(incident, target, ws->isotopes, ws->params->nucl_stop_accurate)
 #endif
             );
         } else {
-            S1 += c * (jibal_gsto_get_em(ws->gsto, type, incident->Z, sample->isotopes[i_isotope]->Z, em));
+            S1 += c * (jibal_gsto_get_em(ws->gsto, type, incident->Z, target->Z, em));
         }
     }
     switch(type) {
@@ -178,18 +177,23 @@ double normal_pdf(double x, double mean, double sigma) {
 double cross_section_straggling(const sim_reaction *sim_r, const sim_calc_params *p, double E, double S) {
     const double std_dev = sqrt(S);
     double cs_sum = 0.0;
-    for(int i = 0; i < p->cs_n_stragg_steps; i++) {
-        double E_stragg = E + p->cs_stragg_x[i] * std_dev;
-        double cs = p->cs_stragg_prob[i] * sim_r->cross_section(sim_r, E_stragg);
+    assert(p->cs_stragg_pd);
+#ifdef DEBUG
+    fprintf(stderr, "CS stragg, E = %g keV, S = %g keV (std. dev)\n", E/C_KEV, std_dev/C_KEV);
+#endif
+    for(size_t i = 0; i < p->cs_stragg_pd->n; i++) {
+        prob_point *pp = &(p->cs_stragg_pd->points[i]);
+        double E_stragg = E + pp->x * std_dev;
+        double cs = pp->p * sim_r->cross_section(sim_r, E_stragg);
         cs_sum += cs;
-#ifdef DEBUG_CS_STRAGG
-        fprintf(stderr, "%i %10g %10g %10g %10g\n", i, p->cs_stragg_x[i], E_stragg/C_KEV, p->cs_stragg_prob[i], cs/C_MB_SR);
+#ifdef DEBUG
+        fprintf(stderr, "%zu %10g %10g %10g %10g\n", i, pp->x, E_stragg/C_KEV, pp->p, cs/C_MB_SR);
 #endif
     }
-#ifdef DEBUG_CS_STRAGG
+#ifdef DEBUG
     double unweighted = sim_r->cross_section(sim_r, E);
     double diff = (cs_sum-unweighted)/unweighted;
-    fprintf(stderr, "Got cs %.7lf mb/sr (unweighted by straggling %.7lf mb/sr) diff %.5lf%%.\n", cs_sum/C_MB_SR, unweighted/C_MB_SR, 100.0*diff);
+    fprintf(stderr, "Got cs %.7lf mb/sr (unweighted by straggling %.7lf mb/sr) diff %.7lf%%.\n", cs_sum/C_MB_SR, unweighted/C_MB_SR, 100.0*diff);
 #endif
     return cs_sum;
 }
@@ -214,16 +218,19 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
         const double E_step = (E_back - E_front) * ws->params->cs_frac;
         const double S_step = (S_back - S_front) * ws->params->cs_frac;
         double sum = 0.0;
-        for(int i = 1; i <= ws->params->cs_n_steps; i++) { /* Compute cross section and concentration product in several "sub-steps" */
+        for(size_t i = 1; i <= ws->params->cs_n_steps; i++) { /* Compute cross section and concentration product in several "sub-steps" */
             d.x = d_before->x + x_step * i;
             double E = E_front + E_step * i;
-#ifdef DEBUG_VERBOSE
-            fprintf(stderr, "i=%i, E = %g keV, (E_front = %g keV, E_back = %g keV)\n", i, E/C_KEV, E_front/C_KEV, E_back/C_KEV);
+#ifdef DEBUG_CS_VERBOSE
+            fprintf(stderr, "i = %zu, E = %g keV, (E_front = %g keV, E_back = %g keV)\n", i, E/C_KEV, E_front/C_KEV, E_back/C_KEV);
 #endif
             double c = get_conc(sample, d, sim_r->i_isotope);
             double sigma;
-            if(ws->params->cs_n_stragg_steps > 1) { /* Further weighted with straggling */
+            if(ws->params->cs_stragg_pd) { /* Further weighted with straggling */
                 double S = S_front + S_step * i;
+#ifdef DEBUG_CS_VERBOSE
+                fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
+#endif
                 sigma = cross_section_straggling(sim_r, ws->params, E, S);
             } else {
                 sigma = sim_r->cross_section(sim_r, E);
@@ -840,7 +847,7 @@ int simulate_with_ds(sim_workspace *ws) {
     ion ion1 = ws->ion;
     ion ion2 = ion1;
     depth d_before = depth_seek(ws->sample, 0.0);
-    sim_calc_params_fast(ws->params, TRUE); /* This makes DS faster. Changes to ws->params are not reverted, but they don't affect original sim settings */
+    sim_calc_params_faster(ws->params, TRUE); /* This makes DS faster. Changes to ws->params are not reverted, but they don't affect original sim settings */
     sim_calc_params_update(ws->params);
     jabs_message(MSG_ERROR, stderr, "\n");
     const jibal_isotope *incident = ws->sim->beam_isotope;

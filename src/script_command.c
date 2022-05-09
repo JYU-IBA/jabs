@@ -616,6 +616,33 @@ script_command_status script_set_fit_val(struct script_session *s, int val, int 
     return SCRIPT_COMMAND_SUCCESS;
 }
 
+script_command_status script_set_simulation_val(struct script_session *s, int val, int argc, char *const *argv) {
+    (void) argv;
+    simulation *sim = s->fit->sim;
+
+    switch(val) {
+        case 'd': /* default */
+            sim->params = sim_calc_params_defaults(sim->params);
+            return 0;
+        case 'f': /* fast */
+            sim->params = sim_calc_params_defaults_fast(sim->params);
+            return 0;
+        case 'a': /* accurate */
+            sim->params = sim_calc_params_defaults_accurate(sim->params);
+            return 0;
+        case 'b': /* brisk */
+            sim->params = sim_calc_params_defaults_brisk(sim->params);
+            return 0;
+        default:
+            break;
+    }
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Not enough parameters to set simulation values.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
 
 script_command_status script_show_var(struct script_session *s, jibal_config_var *var, int argc, char *const *argv) {
     (void) argv;
@@ -1156,27 +1183,36 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_set->subcommands, c_set_fit);
 
     script_command_list_add_command(&c_set->subcommands, script_command_new("sample", "Set sample.", 0, &script_set_sample));
+
+    script_command *c_set_simulation = script_command_new("simulation", "Set simulation related things.", 0, NULL);
+    c_set_simulation->f_val = &script_set_simulation_val;
+    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("defaults", "Set default calculation parameters.", 'd', NULL));
+    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("brisk", "Set slightly faster calculation parameters.", 'b', NULL));
+    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("fast", "Set fast calculation parameters.", 'f', NULL));
+    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("accurate", "Set more accurate calculation parameters.", 'a', NULL));
+    script_command_list_add_command(&c_set->subcommands, c_set_simulation);
+
     script_command_list_add_command(&c_set->subcommands, script_command_new("stopping", "Set (assign) stopping or straggling.", 0, &script_set_stopping));
     script_command_list_add_command(&c_set->subcommands, script_command_new("variable", "Set a variable.", 0, NULL));
 
     const jibal_config_var vars[] = {
-            {JIBAL_CONFIG_VAR_UNIT,   "fluence",              &sim->fluence,                       NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "energy",               &sim->beam_E,                        NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",         &sim->beam_E_broad,                  NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "emin",                 &sim->emin,                          NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "alpha",                &sim->sample_theta,                  NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "phi",                  &sim->sample_phi,                    NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "channeling",           &sim->channeling_offset,             NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",     &sim->channeling_slope,              NULL},
-            {JIBAL_CONFIG_VAR_STRING, "output",               &s->output_filename,                 NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "erd",                  &sim->erd,                           NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "rbs",                  &sim->rbs,                           NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "maxiter",              &fit->n_iters_max,                   NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",           &fit->xtol,                          NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "gtolerance",           &fit->gtol,                          NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "ftolerance",           &fit->ftol,                          NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",      &fit->chisq_tol,                     NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance", &fit->chisq_fast_tol,                NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "fluence",              &sim->fluence,                        NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "energy",               &sim->beam_E,                         NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",         &sim->beam_E_broad,                   NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "emin",                 &sim->emin,                           NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "alpha",                &sim->sample_theta,                   NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "phi",                  &sim->sample_phi,                     NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "channeling",           &sim->channeling_offset,              NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",     &sim->channeling_slope,               NULL},
+            {JIBAL_CONFIG_VAR_STRING, "output",               &s->output_filename,                  NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "erd",                  &sim->erd,                            NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "rbs",                  &sim->rbs,                            NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "maxiter",              &fit->n_iters_max,                    NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",           &fit->xtol,                           NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "gtolerance",           &fit->gtol,                           NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "ftolerance",           &fit->ftol,                           NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",      &fit->chisq_tol,                      NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance", &fit->chisq_fast_tol,                 NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "ds",                   &sim->params->ds,                     NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "rk4",                  &sim->params->rk4,                    NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "sigmas_cutoff",        &sim->params->sigmas_cutoff,          NULL},
@@ -1189,7 +1225,9 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy", &sim->params->mean_conc_and_energy,   NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "geostragg",            &sim->params->geostragg,              NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",          &sim->params->beta_manual,            NULL},
-            {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                                                    NULL}
+            {JIBAL_CONFIG_VAR_SIZE,   "cs_n_steps",           &sim->params->cs_n_steps,             NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "cs_n_stragg_steps",    &sim->params->cs_n_stragg_steps,      NULL},
+            {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                                                     NULL}
     };
     c = script_command_list_from_vars_array(vars, 0);
     script_command_list_add_command(&c_set->subcommands, c);

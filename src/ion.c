@@ -38,6 +38,7 @@ void ion_set_isotope(ion *ion, const jibal_isotope *isotope) {
         return;
     ion->isotope = isotope;
     ion->mass = isotope->mass;
+    ion->mass_inverse = 1.0/isotope->mass;
     ion->Z = isotope->Z;
 }
 

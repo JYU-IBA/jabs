@@ -12,6 +12,7 @@ typedef struct {
     double E;
     double S;
     double mass;
+    double mass_inverse;
     int Z;
     double theta; /* polar angle. theta = 0 is along the z axis (deeper into sample, perpendicular to surface) */
     double phi; /* azimuthal angle. phi = 0 is x-axis, phi = 90deg is y-axis. */

@@ -36,7 +36,7 @@ simulation *sim_init(jibal *jibal) {
     sim->n_reactions = 0;
     sim->n_det = 0;
     sim->det = NULL;
-    sim->params = sim_calc_params_defaults();
+    sim->params = sim_calc_params_defaults(NULL);
     sim->rbs = TRUE;
     sim->erd = TRUE;
     sim->cs_rbs =  jibal->config->cs_rbs;
@@ -64,8 +64,11 @@ void sim_free(simulation *sim) {
     free(sim);
 }
 
-sim_calc_params *sim_calc_params_defaults() {
-    sim_calc_params *p = malloc(sizeof(sim_calc_params));
+sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
+    if(!p) {
+        p = malloc(sizeof(sim_calc_params));
+        p->cs_stragg_pd = NULL; /* Will be allocated by sim_calc_params_update() */
+    }
     p->stop_step_incident = STOP_STEP_INCIDENT;
     p->stop_step_exiting = STOP_STEP_EXITING;
     p->stop_step_fudge_factor = STOP_STEP_FUDGE_FACTOR;
@@ -80,80 +83,57 @@ sim_calc_params *sim_calc_params_defaults() {
     p->rk4 = TRUE;
     p->nucl_stop_accurate = TRUE;
     p->mean_conc_and_energy = FALSE;
-    p->cs_stragg_half_n = CS_STRAGG_HALF_N;
-    p->cs_stragg_prob = NULL; /* Will be allocated by sim_calc_params_update() */
-    p->cs_stragg_x = NULL;
+    p->cs_n_stragg_steps = CS_STRAGG_STEPS;
     p->cs_n_steps = CS_CONC_STEPS;
     p->rough_layer_multiplier = 1.0;
     p->sigmas_cutoff = SIGMAS_CUTOFF;
 #ifdef DEBUG
     fprintf(stderr, "New calc params created.\n");
 #endif
-    sim_calc_params_update(p);
+    return p;
+}
+
+sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
+    sim_calc_params_defaults(p);
+    sim_calc_params_faster(p, TRUE);
+    return p;
+}
+
+sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
+    sim_calc_params_defaults(p);
+    p->cs_n_steps += 2;
+    p->cs_n_stragg_steps += 2;
+    p->stop_step_fudge_factor *= 0.5;
+    p->sigmas_cutoff += 1.0;
+    return p;
+}
+
+sim_calc_params *sim_calc_params_defaults_brisk(sim_calc_params *p) {
+    sim_calc_params_defaults(p);
+    p->cs_n_stragg_steps -= 2;
+    p->stop_step_fudge_factor *= 1.25;
+    p->stop_step_add *= 2.0;
+    p->sigmas_cutoff -= 1.0;
     return p;
 }
 
 void sim_calc_params_free(sim_calc_params *p) {
     if(!p)
         return;
-    free(p->cs_stragg_prob);
-    free(p->cs_stragg_x);
+    prob_dist_free(p->cs_stragg_pd);
     free(p);
 }
 
-sim_calc_params *sim_calc_params_copy(const sim_calc_params *p) {
-    sim_calc_params *p_out = malloc(sizeof(sim_calc_params));
-    *p_out = *p;
-    p_out->cs_stragg_prob = NULL;
-    p_out->cs_stragg_x = NULL;
-    sim_calc_params_update(p_out);
-    return p_out;
-}
-
-double normal_pdf_std_tmp(double x) {
-    return 0.398942280401432703 * exp(-0.5*x*x);
+void sim_calc_params_copy(const sim_calc_params *p_src, sim_calc_params *p_dst) {
+    *p_dst = *p_src;
+    p_dst->cs_stragg_pd = NULL;
 }
 
 void sim_calc_params_update(sim_calc_params *p) {
     assert(p->mean_conc_and_energy || p->cs_n_steps >= 1);
     p->cs_frac = 1.0/(1.0*(p->cs_n_steps+1));
-    assert(p->cs_stragg_half_n >= 0);
-    p->cs_n_stragg_steps = p->cs_stragg_half_n * 2 + 1;
-    p->cs_stragg_prob = calloc(p->cs_n_stragg_steps, sizeof(double)); /* probability density values */
-    p->cs_stragg_x = calloc(p->cs_n_stragg_steps, sizeof(double)); /* probability density ranges */
-
-    double w = 1.0 / (p->cs_stragg_half_n);
-    if(p->cs_stragg_half_n <= 2) { /* Determine number of sigmas.based on number of steps */
-        w *= 2.0;
-    } else if (p->cs_stragg_half_n == 3) {
-        w *= 2.5;
-    } else {
-        w *= 3.0;
-    }
-#ifdef DEBUG
-    fprintf(stderr, "CS weighted by straggling %i steps, w=%g.\n", p->cs_n_stragg_steps, w);
-#endif
-    double prob_sum = 0.0;
-    for(int i = 0; i < p->cs_n_stragg_steps; i++) {
-        double x = w * (i - p->cs_stragg_half_n); /* x goes from negative sigmas to positive sigmas */
-        double prob = normal_pdf_std_tmp(x); /* sampled gaussian */
-        prob *= w;
-        p->cs_stragg_x[i] = x;
-        p->cs_stragg_prob[i] = prob;
-#ifdef DEBUG
-        fprintf(stderr, "%i %g %g\n", i, x, prob);
-#endif
-        prob_sum += prob;
-    }
-#ifdef DEBUG
-    fprintf(stderr, "Will be normalized by sum of probabilities %g. Final values:\n", prob_sum);
-#endif
-    for(int i = 0; i < p->cs_n_stragg_steps; i++) {
-        p->cs_stragg_prob[i] /= prob_sum; /* Normalize to unity */
-#ifdef DEBUG
-        fprintf(stderr, "%i %g\n", i, p->cs_stragg_prob[i]);
-#endif
-    }
+    prob_dist_free(p->cs_stragg_pd);
+    p->cs_stragg_pd = prob_dist_gaussian(p->cs_n_stragg_steps);
 
     if(p->ds && p->ds_steps_azi == 0 && p->ds_steps_polar == 0) { /* DS defaults are applied if nothing else is specified */
         p->ds_steps_azi = DUAL_SCATTER_AZI_STEPS;
@@ -168,16 +148,17 @@ void sim_calc_params_update(sim_calc_params *p) {
 void sim_calc_params_ds(sim_calc_params *p, int ds) {
     if(ds) {
         p->ds = TRUE;
-        sim_calc_params_update(p);
     }
 }
 
-void sim_calc_params_fast(sim_calc_params *p, int fast) {
+void sim_calc_params_faster(sim_calc_params *p, int fast) {
+    if(!p)
+        return;
     if (fast) {
         p->rk4 = FALSE;
         p->nucl_stop_accurate = FALSE;
         p->mean_conc_and_energy = TRUE;
-        p->cs_stragg_half_n = 0; /* Not used if mean_conc_and_energy == TRUE */
+        p->cs_n_stragg_steps = 0; /* Not used if mean_conc_and_energy == TRUE */
         p->cs_n_steps = 0; /* Not used if mean_conc_and_energy == TRUE */
         p->stop_step_fudge_factor *= 1.4;
         p->geostragg = FALSE;
@@ -185,6 +166,8 @@ void sim_calc_params_fast(sim_calc_params *p, int fast) {
         p->sigmas_cutoff = SIGMAS_FAST_CUTOFF;
     }
 }
+
+
 
 jibal_cross_section_type sim_cs(const simulation *sim, const reaction_type type) {
     if(type == REACTION_RBS)
@@ -372,7 +355,8 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->fluence = sim->fluence;
     ws->det = det;
     ws->sample = sim->sample;
-    ws->params = sim_calc_params_copy(sim->params);
+    ws->params = sim_calc_params_defaults(NULL);
+    sim_calc_params_copy(sim->params,  ws->params);
     if(ws->params->stop_step_min == 0.0) { /* Automatic, calculate here. */
         if(det->type == DETECTOR_ENERGY) {
             ws->params->stop_step_min = sqrt(det->calibration->resolution_variance)/2.0;
@@ -611,10 +595,19 @@ void simulation_print(FILE *f, const simulation *sim) {
     jabs_message(MSG_INFO, f, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence*C_E*1.0e6);
     jabs_message(MSG_INFO, f, "step for incident ions = %.3lf keV\n", sim->params->stop_step_incident/C_KEV);
     jabs_message(MSG_INFO, f, "step for exiting ions = %.3lf keV\n", sim->params->stop_step_exiting/C_KEV);
+    jabs_message(MSG_INFO, f, "stopping step fudge factor = %g\n", sim->params->stop_step_fudge_factor);
+    jabs_message(MSG_INFO, f, "stopping step minimum = %.3lf keV\n", sim->params->stop_step_min / C_KEV);
     jabs_message(MSG_INFO, f, "stopping RK4 = %s\n", sim->params->rk4?"true":"false");
     jabs_message(MSG_INFO, f, "depth steps max = %zu\n", sim->params->depthsteps_max);
-    jabs_message(MSG_INFO, f, "cross section weighted by straggling = %s\n", sim->params->mean_conc_and_energy?"false":"true");
+
+    jabs_message(MSG_INFO, f, "cross section of brick determined using mean concentration and energy = %s\n", sim->params->mean_conc_and_energy?"true":"false");
+    if(!sim->params->mean_conc_and_energy) {
+        jabs_message(MSG_INFO, f, "concentration * cross section steps per brick = %zu\n", sim->params->cs_n_steps);
+        jabs_message(MSG_INFO, f, "straggling substeps = %zu\n", sim->params->cs_n_stragg_steps);
+    }
     jabs_message(MSG_INFO, f, "accurate nuclear stopping = %s\n", sim->params->nucl_stop_accurate?"true":"false");
+
+
     if(sim->channeling_offset != 1.0 || sim->channeling_slope != 0.0) {
         jabs_message(MSG_INFO, f, "substrate channeling yield correction offset = %.5lf\n", sim->channeling_offset);
         jabs_message(MSG_INFO, f, "substrate channeling yield correction slope = %g / keV (%e)\n", sim->channeling_slope/(1.0/C_KEV), sim->channeling_slope);
@@ -774,7 +767,7 @@ void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *inci
         return;
     }
     r->p.E = reaction_product_energy(r->r, r->theta, incident->E);
-    double epsilon = 0.01*C_KEV;
+    double epsilon = 0.001*C_KEV;
     double deriv = (reaction_product_energy(r->r, r->theta, incident->E+epsilon) - r->p.E)/(epsilon); /* TODO: this derivative could be solved analytically */
     r->p.S = incident->S * pow2(deriv) * incident->E;
 #ifdef DEBUG

@@ -39,7 +39,7 @@
 #include "script_session.h"
 #include "script_command.h"
 
-#include "prob_density.h"
+#include "prob_dist.h"
 int main(int argc, char * const *argv) {
 #ifdef DEBUG
     fprintf(stderr, "Note: this is a debug build!\n");
@@ -79,7 +79,7 @@ int main(int argc, char * const *argv) {
     sim->rbs = cmd_opt->rbs;
     sim->erd = cmd_opt->erd;
     sim_calc_params_ds(sim->params, cmd_opt->ds);
-    sim_calc_params_fast(sim->params, cmd_opt->fast);
+    sim_calc_params_faster(sim->params, cmd_opt->fast);
     sim_calc_params_update(sim->params);
     session->output_filename = strdup_non_null(cmd_opt->output_filename);
     roi range = {.i_det = 0, .low = cmd_opt->fit_low, .high = cmd_opt->fit_high};
