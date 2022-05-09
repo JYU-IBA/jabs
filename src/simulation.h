@@ -24,6 +24,7 @@
 #include "detector.h"
 #include "sample.h"
 
+
 typedef struct {
     int ds; /* Dual scattering true/false */
     int ds_steps_azi;

@@ -39,10 +39,22 @@
 #include "script_session.h"
 #include "script_command.h"
 
+#include "prob_density.h"
 int main(int argc, char * const *argv) {
 #ifdef DEBUG
     fprintf(stderr, "Note: this is a debug build!\n");
 #endif
+#if 0
+    for(size_t n = 1; n < 10; n++) {
+        fprintf(stderr, "n = %zu\n", n);
+        prob_dist *pd = prob_dist_gaussian(n);
+        prob_dist_free(pd);
+        fprintf(stderr, "\n");
+    }
+    exit(EXIT_SUCCESS);
+#endif
+
+
     int script_files = FALSE;
     jibal *jibal = jibal_init(NULL);
     if(jibal->error) {
