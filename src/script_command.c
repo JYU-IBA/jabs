@@ -13,6 +13,11 @@
  */
 #include <stdlib.h>
 #include <string.h>
+#ifdef WIN32
+#include <direct.h> // getcwd
+#else
+#include <unistd.h>
+#endif
 #include "message.h"
 #include "sample.h"
 #include "spectrum.h"
@@ -1325,6 +1330,9 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_split->subcommands, c_split_sample);
     script_command_list_add_command(&c_split_sample->subcommands, script_command_new("elements", "Split materials down to their constituent elements.", 0, script_split_sample_elements));
 
+    script_command_list_add_command(&head, script_command_new("cwd", "Display current working directory.", 0, script_cwd));
+    script_command_list_add_command(&head, script_command_new("pwd", "Display current working directory.", 0, script_cwd));
+    script_command_list_add_command(&head, script_command_new("cd", "Change current working directory.", 0, script_cd));
     return script_commands_sort_all(head);
 }
 
@@ -2205,4 +2213,32 @@ script_command_status script_help_commands(script_session *s, int argc, char *co
         return SCRIPT_COMMAND_SUCCESS;
     }
     return SCRIPT_COMMAND_NOT_FOUND;
+}
+
+script_command_status script_cwd(struct script_session *s, int argc, char *const *argv) {
+    (void) s;
+    (void) argv;
+    if(argc != 0) {
+        return SCRIPT_COMMAND_NOT_FOUND;
+    }
+    char *cwd = getcwd(NULL, 0);
+    jabs_message(MSG_INFO, stderr, "%s\n", cwd);
+    free(cwd);
+    return SCRIPT_COMMAND_SUCCESS;
+}
+
+script_command_status script_cd(struct script_session *s, int argc, char *const *argv) {
+    (void) s;
+    const int argc_orig = argc;
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: cd <path>\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(chdir(argv[0])) {
+        jabs_message(MSG_ERROR, stderr, "Could not change directory to \"%s\"\n", argv[0]);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    argc--;
+    argv++;
+    return argc_orig - argc;
 }
