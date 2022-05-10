@@ -15,6 +15,7 @@
 #define JABS_SIMULATION_H
 
 #include <gsl/gsl_histogram.h>
+#include <gsl/gsl_integration.h>
 #include <jibal.h>
 #include <time.h>
 
@@ -110,6 +111,8 @@ typedef struct {
     const jibal_isotope *isotopes;
     sim_calc_params *params;
     double emin;
+    size_t n_integration_intervals_max;
+    gsl_integration_workspace *w_integration;
 } sim_workspace;
 
 

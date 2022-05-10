@@ -101,9 +101,9 @@ sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
 
 sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
     sim_calc_params_defaults(p);
-    p->cs_n_steps += 2;
-    p->cs_n_stragg_steps += 2;
-    p->stop_step_fudge_factor *= 0.5;
+    p->cs_n_steps = 0; /* Automatic (adaptive) */
+    p->cs_n_stragg_steps = p->cs_n_stragg_steps*4 + 1;
+    p->stop_step_fudge_factor *= 0.25;
     p->sigmas_cutoff += 1.0;
     return p;
 }
@@ -486,6 +486,8 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         }
         ws->n_reactions++;
     }
+    ws->n_integration_intervals_max = CS_INTEGRATION_INTERVALS;
+    ws->w_integration = gsl_integration_workspace_alloc (ws->n_integration_intervals_max);
     return ws;
 }
 
@@ -509,6 +511,7 @@ void sim_workspace_free(sim_workspace *ws) {
     }
     free(ws->ion.nucl_stop);
     free(ws->reactions);
+    gsl_integration_workspace_free(ws->w_integration);
     free(ws);
 }
 

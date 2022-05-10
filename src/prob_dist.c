@@ -33,8 +33,8 @@ prob_dist *prob_dist_gaussian(size_t n) { /* creates a discrete gaussian (mu = 0
     if(!pd)
         return NULL;
     double sigmas = 0.5 * n; /* number of standard deviations (+/-) around mean. n dependent scaling here means the bin width is one standard deviation */
-    if(sigmas >= 3.5) /* +/- 3.5 sigmas is large enough, use extra bins for extra accuracy */
-        sigmas = 3.5;
+    if(sigmas >= 3.0) /* +/- 3.0 sigmas is large enough, use extra bins for extra accuracy */
+        sigmas = 3.0;
     double low = -1.0 * sigmas;
     double high = 1.0 * sigmas;
     double step = (high - low)/n;

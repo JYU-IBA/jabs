@@ -2,8 +2,8 @@
 #include <assert.h>
 #include <jibal_units.h>
 
-#ifdef ERF_Q_FROM_GSL
-#include <gsl/gsl_sf.h>
+#ifdef NO_ERF_Q_FROM_GSL
+#include <gsl/gsl_sf_erf.h>
 #endif
 #include "brick.h"
 
@@ -80,8 +80,11 @@ void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, 
                 break; /* Assumes histograms have increasing energy */
             const double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
             const double w = h->range[j + 1] - h->range[j];
-            //const double y = (erf_Q((b_low->E - E) / b_low->sigma) - erf_Q((b_high->E - E) / b_high->sigma)) / (b_high->E - b_low->E);
+#ifdef ERF_Q_FROM_GSL
+            const double y = (gsl_sf_erf_Q((b_low->E - E) / b_low->sigma) - gsl_sf_erf_Q((b_high->E - E) / b_high->sigma)) / (b_high->E - b_low->E);
+#else
             const double y = (erf_Q_new((b_low->E - E) / b_low->sigma) - erf_Q_new((b_high->E - E) / b_high->sigma)) / (b_high->E - b_low->E);
+#endif
             h->bin[j] += scale * y * w * b_low->Q;
         }
     }

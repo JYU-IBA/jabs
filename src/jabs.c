@@ -23,6 +23,8 @@
 #include <jibal_units.h>
 #include <jibal_kin.h>
 #include <jibal_r33.h>
+#include <gsl/gsl_integration.h>
+#include <gsl/gsl_errno.h>
 
 #include "geostragg.h"
 #include "generic.h"
@@ -174,23 +176,23 @@ double normal_pdf(double x, double mean, double sigma) {
     return (inv_sqrt_2pi / sigma) * exp(-0.5 * a * a);
 }
 
-double cross_section_straggling(const sim_reaction *sim_r, const sim_calc_params *p, double E, double S) {
+double cross_section_straggling(const sim_reaction *sim_r, const prob_dist *pd, double E, double S) {
     const double std_dev = sqrt(S);
     double cs_sum = 0.0;
-    assert(p->cs_stragg_pd);
-#ifdef DEBUG
+    assert(pd);
+#ifdef DEBUG_CS_STRAGG
     fprintf(stderr, "CS stragg, E = %g keV, S = %g keV (std. dev)\n", E/C_KEV, std_dev/C_KEV);
 #endif
-    for(size_t i = 0; i < p->cs_stragg_pd->n; i++) {
-        prob_point *pp = &(p->cs_stragg_pd->points[i]);
+    for(size_t i = 0; i < pd->n; i++) {
+        prob_point *pp = &(pd->points[i]);
         double E_stragg = E + pp->x * std_dev;
         double cs = pp->p * sim_r->cross_section(sim_r, E_stragg);
         cs_sum += cs;
-#ifdef DEBUG
+#ifdef DEBUG_CS_STRAGG
         fprintf(stderr, "%zu %10g %10g %10g %10g\n", i, pp->x, E_stragg/C_KEV, pp->p, cs/C_MB_SR);
 #endif
     }
-#ifdef DEBUG
+#ifdef DEBUG_CS_STRAGG
     double unweighted = sim_r->cross_section(sim_r, E);
     double diff = (cs_sum-unweighted)/unweighted;
     fprintf(stderr, "Got cs %.7lf mb/sr (unweighted by straggling %.7lf mb/sr) diff %.7lf%%.\n", cs_sum/C_MB_SR, unweighted/C_MB_SR, 100.0*diff);
@@ -198,10 +200,106 @@ double cross_section_straggling(const sim_reaction *sim_r, const sim_calc_params
     return cs_sum;
 }
 
+struct cs_int_params {
+    const depth *d_before;
+    const depth *d_after;
+    double E_front;
+    double S_front;
+    const sample *sample;
+    const sim_reaction *sim_r;
+    double stop_slope;
+    double stragg_slope;
+    const prob_dist *cs_stragg_pd;
+    depth d; /* changes between calls */
+};
+
+double cs_function(double x, void * params) {
+    struct cs_int_params *p = (struct cs_int_params *) params;
+    p->d.x = p->d_before->x + p->stop_slope * (x - p->E_front); /* Depth assuming constant stopping inside brick */
+    double c = get_conc(p->sample, p->d, p->sim_r->i_isotope);
+    double sigma = p->sim_r->cross_section(p->sim_r, x);
+
+    if(p->cs_stragg_pd) { /* Further weighted with straggling */
+        double S = p->S_front + p->stragg_slope * (x - p->E_front);
+#ifdef DEBUG_CS_VERBOSE
+        fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
+#endif
+        sigma = cross_section_straggling(p->sim_r, p->cs_stragg_pd, x, S);
+    } else {
+        sigma = p->sim_r->cross_section(p->sim_r, x);
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Depth %g tfu, energy %g keV, sigma  %g mb/sr, c %g %%\n", p->d.x/C_TFU, x/C_KEV, sigma/C_MB_SR, c/C_PERCENT);
+#endif
+    return c*sigma;
+}
+
+double cross_section_concentration_product_adaptive(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after,
+                                                    double S_front, double S_back) {
+    double result, error;
+    struct cs_int_params params;
+    params.sim_r = sim_r;
+    params.d_before = d_before;
+    params.d_after = d_after;
+    params.E_front = E_front;
+    params.stop_slope = (d_after->x - d_before->x)/(E_back - E_front);
+    params.S_front = S_front;
+    params.d.i = d_after->i;
+    params.sample = sample;
+    params.cs_stragg_pd = ws->params->cs_stragg_pd; /* Can be NULL */
+    params.stragg_slope = (S_back-S_front)/(E_back-E_front);
+    gsl_function F;
+    F.function = &cs_function;
+    F.params = &params;
+    gsl_set_error_handler_off();
+
+    gsl_integration_qags (&F, E_back, E_front, 0, 1e-5, 100,
+                          ws->w_integration, &result, &error);
+    double final = result/(E_front - E_back);
+#ifdef DEBUG
+    fprintf(stderr, "E from %g keV to %g keV, diff %g keV\n", E_front/C_KEV, E_back/C_KEV, (E_front - E_back) / C_KEV);
+        fprintf(stderr, "stop avg %g eV/tfu\n", params.stop_slope/(C_EV/C_TFU));
+        fprintf(stderr, "integration result          = % 18g\n", result);
+        fprintf(stderr, "integration estimated error = % 18g\n", error);
+        fprintf(stderr, "integration intervals       = %zu\n", ws->w_integration->size);
+        fprintf(stderr, "final result                = %g mb/sr\n", final/C_MB_SR);
+#endif
+    return final;
+}
+
+double cross_section_concentration_product_fixed(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after,
+                                           double S_front, double S_back) {
+    depth d;
+    d.i = d_after->i;
+    const double x_step = (d_after->x - d_before->x) * ws->params->cs_frac;
+    const double E_step = (E_back - E_front) * ws->params->cs_frac;
+    const double S_step = (S_back - S_front) * ws->params->cs_frac;
+    double sum = 0.0;
+    for(size_t i = 1; i <= ws->params->cs_n_steps; i++) { /* Compute cross section and concentration product in several "sub-steps" */
+        d.x = d_before->x + x_step * i;
+        double E = E_front + E_step * i;
+#ifdef DEBUG_CS_VERBOSE
+        fprintf(stderr, "i = %zu, E = %g keV, (E_front = %g keV, E_back = %g keV)\n", i, E/C_KEV, E_front/C_KEV, E_back/C_KEV);
+#endif
+        double c = get_conc(sample, d, sim_r->i_isotope);
+        double sigma;
+        if(ws->params->cs_stragg_pd) { /* Further weighted with straggling */
+            double S = S_front + S_step * i;
+#ifdef DEBUG_CS_VERBOSE
+            fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
+#endif
+            sigma = cross_section_straggling(sim_r, ws->params->cs_stragg_pd, E, S);
+        } else {
+            sigma = sim_r->cross_section(sim_r, E);
+        }
+        sum += sigma * c;
+    }
+    return sample->ranges[d.i].yield * sum / (ws->params->cs_n_steps * 1.0);
+}
 
 double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after,
                                            double S_front, double S_back) {
-    if(ws->params->mean_conc_and_energy) { /* This if-branch is slightly faster (maybe) and also serves as a testing branch, since it is a lot easier to understand... */
+    if(ws->params->mean_conc_and_energy) { /* This if-branch is fast and also serves as a testing branch, since it is a lot easier to understand... */
         const depth d_halfdepth = {.x = (d_before->x + d_after->x) /
                                         2.0, .i = d_after->i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         double c = get_conc(sample, d_halfdepth, sim_r->i_isotope);
@@ -211,33 +309,10 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
         assert(sim_r->cross_section);
         double sigma = sim_r->cross_section(sim_r, E_mean);
         return sigma * c * sample->ranges[d_halfdepth.i].yield;
+    } else if(ws->params->cs_n_steps == 0) {
+        return cross_section_concentration_product_adaptive(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
     } else {
-        depth d;
-        d.i = d_after->i;
-        const double x_step = (d_after->x - d_before->x) * ws->params->cs_frac;
-        const double E_step = (E_back - E_front) * ws->params->cs_frac;
-        const double S_step = (S_back - S_front) * ws->params->cs_frac;
-        double sum = 0.0;
-        for(size_t i = 1; i <= ws->params->cs_n_steps; i++) { /* Compute cross section and concentration product in several "sub-steps" */
-            d.x = d_before->x + x_step * i;
-            double E = E_front + E_step * i;
-#ifdef DEBUG_CS_VERBOSE
-            fprintf(stderr, "i = %zu, E = %g keV, (E_front = %g keV, E_back = %g keV)\n", i, E/C_KEV, E_front/C_KEV, E_back/C_KEV);
-#endif
-            double c = get_conc(sample, d, sim_r->i_isotope);
-            double sigma;
-            if(ws->params->cs_stragg_pd) { /* Further weighted with straggling */
-                double S = S_front + S_step * i;
-#ifdef DEBUG_CS_VERBOSE
-                fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
-#endif
-                sigma = cross_section_straggling(sim_r, ws->params, E, S);
-            } else {
-                sigma = sim_r->cross_section(sim_r, E);
-            }
-            sum += sigma * c;
-        }
-        return sample->ranges[d.i].yield * sum / (ws->params->cs_n_steps * 1.0);
+        return cross_section_concentration_product_fixed(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
     }
     return 0.0;
 }
