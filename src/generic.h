@@ -14,7 +14,9 @@
 #ifndef JABS_GENERIC_H
 #define JABS_GENERIC_H
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <stdio.h>
 
 char *strsep_with_quotes(char **stringp, const char *delim);

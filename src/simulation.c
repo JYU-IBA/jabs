@@ -357,6 +357,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->sample = sim->sample;
     ws->params = sim_calc_params_defaults(NULL);
     sim_calc_params_copy(sim->params,  ws->params);
+    sim_calc_params_update(ws->params);
     if(ws->params->stop_step_min == 0.0) { /* Automatic, calculate here. */
         if(det->type == DETECTOR_ENERGY) {
             ws->params->stop_step_min = sqrt(det->calibration->resolution_variance)/2.0;
