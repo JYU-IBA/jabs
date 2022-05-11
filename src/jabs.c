@@ -243,7 +243,11 @@ double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integra
         E_low = 1.0*C_KEV;
     double E_high = E + 4.0*params.sigma;
     double result, error;
+#ifdef SINGULARITIES
     gsl_integration_qags(&F, E_low, E_high, 0, accuracy, w->limit,w, &result, &error);
+#else
+    gsl_integration_qag(&F, E_low, E_high, 0, accuracy, w->limit, GSL_INTEG_GAUSS15, w, &result, &error);
+#endif
     static const double inv_sqrt_2pi = 0.398942280401432703;
     result *= (inv_sqrt_2pi / params.sigma) * 1.000063346496191; /* Normalize gaussian. The 1.00006 accounts for tails outside +- 4 sigmas */
 #ifdef DEBUG_CS_VERBOSE
@@ -288,9 +292,13 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
     F.function = &cs_function;
     F.params = &params;
     gsl_set_error_handler_off();
-
-    gsl_integration_qags (&F, E_back, E_front, 0, ws->params->int_cs_accuracy, ws->w_int_cs->limit,
+#ifdef SINGULARITIES
+    gsl_integration_qags(&F, E_back, E_front, 0, ws->params->int_cs_accuracy, ws->w_int_cs->limit,
                           ws->w_int_cs, &result, &error);
+#else
+    gsl_integration_qag(&F, E_back, E_front, 0, ws->params->int_cs_accuracy, ws->w_int_cs->limit, GSL_INTEG_GAUSS15,
+                          ws->w_int_cs, &result, &error);
+#endif
     double final = result/(E_front - E_back);
 #ifdef DEBUG
     fprintf(stderr, "E from %g keV to %g keV, diff %g keV\n", E_front/C_KEV, E_back/C_KEV, (E_front - E_back) / C_KEV);
