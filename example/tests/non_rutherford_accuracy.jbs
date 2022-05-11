@@ -1,0 +1,37 @@
+#!/usr/bin/env jabs
+set ion 4He
+set energy "3.200 MeV"
+set emin "100 keV"
+set fluence 1e14
+set det theta "160 deg" solid 10msr calib slope 1.00keV offset 0keV reso 1keV
+set alpha "0 deg"
+set sample SiO2 30000tfu
+
+#add reaction RBS 16O cs Andersen max "1.769 MeV"
+load reaction "non_rutherford_accuracy.r33"
+
+#Sets Chu straggling (for sake of comparison)
+set stopping chu He Si O
+set stopping srim2013 He Si O
+
+
+
+set sim defaults
+simulate
+save spectra "non_rutherford_accuracy_defaults_out.csv"
+
+set sim fast
+simulate
+save spectra "non_rutherford_accuracy_fast_out.csv"
+
+set sim brisk
+simulate
+save spectra "non_rutherford_accuracy_brisk_out.csv"
+
+set sim accurate
+#set stop_step_incident 1keV
+simulate
+save spectra "non_rutherford_accuracy_accurate_out.csv"
+save bricks "bricks_out.dat"
+
+roi [650:900]

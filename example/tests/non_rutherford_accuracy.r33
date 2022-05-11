@@ -1,0 +1,28 @@
+Comment: Test data
+
+Version: R33
+Source: Completely made up
+Name: J. Julin
+Address1: 
+Address2: 
+Address3: 
+Address4: 
+Serial Number: 
+Reaction: 16O(a,a0)16O
+Distribution: Energy
+Composition: 
+Masses:    4.0026,   15.9949,    4.0026,   15.9949
+Zeds: 2, 8, 2, 8
+Qvalue:      0.00,      0.00,      0.00,      0.00,      0.00
+Theta: 160.0
+Sigfactors: 1.00, 0.00
+Enfactors: 1.00, 0.00, 0.00, 0.00
+Units: mb
+Data:
+1769.000 0.0 0.0000 0.0 
+2950.000 0.0 0.0000 0.0
+2950.001 0.0 100.00 0.0
+3050.001 0.0 100.00 0.0
+3050.002 0.0 0.0000 0.0
+3300.000 0.0 0.0000 0.0
+EndData:
