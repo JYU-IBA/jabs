@@ -176,13 +176,9 @@ double normal_pdf(double x, double mean, double sigma) {
     return (inv_sqrt_2pi / sigma) * exp(-0.5 * a * a);
 }
 
-double cross_section_straggling(const sim_reaction *sim_r, const prob_dist *pd, double E, double S) {
+double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S) {
     const double std_dev = sqrt(S);
     double cs_sum = 0.0;
-    assert(pd);
-#ifdef DEBUG_CS_STRAGG
-    fprintf(stderr, "CS stragg, E = %g keV, S = %g keV (std. dev)\n", E/C_KEV, std_dev/C_KEV);
-#endif
     for(size_t i = 0; i < pd->n; i++) {
         prob_point *pp = &(pd->points[i]);
         double E_stragg = E + pp->x * std_dev;
@@ -194,10 +190,42 @@ double cross_section_straggling(const sim_reaction *sim_r, const prob_dist *pd, 
     }
 #ifdef DEBUG_CS_STRAGG
     double unweighted = sim_r->cross_section(sim_r, E);
-    double diff = (cs_sum-unweighted)/unweighted;
-    fprintf(stderr, "Got cs %.7lf mb/sr (unweighted by straggling %.7lf mb/sr) diff %.7lf%%.\n", cs_sum/C_MB_SR, unweighted/C_MB_SR, 100.0*diff);
+        double diff = (cs_sum-unweighted)/unweighted;
+        fprintf(stderr, "Got cs %.7lf mb/sr (unweighted by straggling %.7lf mb/sr) diff %.7lf%%.\n", cs_sum/C_MB_SR, unweighted/C_MB_SR, 100.0*diff);
 #endif
     return cs_sum;
+}
+
+
+double cross_section_straggling(const sim_reaction *sim_r, gsl_integration_workspace *w, const prob_dist *pd, double E, double S) {
+#ifdef DEBUG_CS_STRAGG
+    fprintf(stderr, "CS stragg, E = %g keV, S = %g keV (std. dev)\n", E/C_KEV, std_dev/C_KEV);
+#endif
+    if(w) {
+        return cross_section_straggling_adaptive(sim_r, w, E, S);
+    }
+    if(pd) {
+        return cross_section_straggling_fixed(sim_r, pd, E, S);
+    }
+    return sim_r->cross_section(sim_r, E); /* Fallback, no weights applied */
+}
+
+
+struct cs_stragg_int_params {
+    const sim_reaction *sim_r;
+    double sigma;
+    double E_mean;
+};
+
+double cs_stragg_function(double x, void *params) {
+    static const double inv_sqrt_2pi = 0.398942280401432703;
+    struct cs_stragg_int_params *p = (struct cs_stragg_int_params *) params;
+    double a = (x - p->E_mean) / p->sigma;
+    double result = (inv_sqrt_2pi / p->sigma) * exp(-0.5 * a * a) * p->sim_r->cross_section(p->sim_r, x);
+#ifdef DEBUG_CS_VERBOSE
+    fprintf(stderr, "cs_stragg_function(), E = %g keV, S = %g keV FWHM, E_mean = %g keV, a = %g. Result %g mb/sr.\n", x/C_KEV, p->sigma*C_FWHM/C_KEV, p->E_mean/C_KEV, a, result/C_MB_SR);
+#endif
+    return result;
 }
 
 struct cs_int_params {
@@ -210,24 +238,42 @@ struct cs_int_params {
     double stop_slope;
     double stragg_slope;
     const prob_dist *cs_stragg_pd;
+    gsl_integration_workspace *w;
     depth d; /* changes between calls */
 };
+
+double cross_section_straggling_adaptive(const sim_reaction *sim_r, gsl_integration_workspace *w, double E, double S) { /* Uses real numerical integration */
+    struct cs_stragg_int_params params;
+    params.sigma = sqrt(S);
+    params.E_mean = E;
+    params.sim_r = sim_r;
+    gsl_function F;
+    F.function = &cs_stragg_function;
+    F.params = &params;
+    double E_low = E - 4.0*params.sigma;
+    if(E_low < 1.0*C_KEV)
+        E_low = 1.0*C_KEV;
+    double E_high = E + 4.0*params.sigma;
+    /* TODO: compensate for things outside +- 4 sigma (multiply by 1.0000633?)*/
+    double result, error;
+    gsl_integration_qags(&F, E_low, E_high, 0, 1e-6, w->limit,w, &result, &error);
+#ifdef DEBUG_CS_VERBOSE
+    fprintf(stderr, "Integrated from %g keV to %g keV in %zu steps, got (%g +- %g) mb/sr\n", E_low/C_KEV, E_high/C_KEV, w->size, result/C_MB_SR, error/C_MB_SR);
+#endif
+    return result;
+}
 
 double cs_function(double x, void * params) {
     struct cs_int_params *p = (struct cs_int_params *) params;
     p->d.x = p->d_before->x + p->stop_slope * (x - p->E_front); /* Depth assuming constant stopping inside brick */
     double c = get_conc(p->sample, p->d, p->sim_r->i_isotope);
-    double sigma = p->sim_r->cross_section(p->sim_r, x);
-
-    if(p->cs_stragg_pd) { /* Further weighted with straggling */
-        double S = p->S_front + p->stragg_slope * (x - p->E_front);
+    double sigma;
+    double S = p->S_front + p->stragg_slope * (x - p->E_front);
 #ifdef DEBUG_CS_VERBOSE
         fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
 #endif
-        sigma = cross_section_straggling(p->sim_r, p->cs_stragg_pd, x, S);
-    } else {
-        sigma = p->sim_r->cross_section(p->sim_r, x);
-    }
+        sigma = cross_section_straggling(p->sim_r, p->w, p->cs_stragg_pd, x, S);
+
 #ifdef DEBUG
     fprintf(stderr, "Depth %g tfu, energy %g keV, sigma  %g mb/sr, c %g %%\n", p->d.x/C_TFU, x/C_KEV, sigma/C_MB_SR, c/C_PERCENT);
 #endif
@@ -246,6 +292,7 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
     params.S_front = S_front;
     params.d.i = d_after->i;
     params.sample = sample;
+    params.w = ws->w_int_cs_stragg; /* Can be NULL */
     params.cs_stragg_pd = ws->params->cs_stragg_pd; /* Can be NULL */
     params.stragg_slope = (S_back-S_front)/(E_back-E_front);
     gsl_function F;
@@ -253,8 +300,8 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
     F.params = &params;
     gsl_set_error_handler_off();
 
-    gsl_integration_qags (&F, E_back, E_front, 0, 1e-5, 100,
-                          ws->w_integration, &result, &error);
+    gsl_integration_qags (&F, E_back, E_front, 0, 1e-6, ws->w_int_cs->limit,
+                          ws->w_int_cs, &result, &error);
     double final = result/(E_front - E_back);
 #ifdef DEBUG
     fprintf(stderr, "E from %g keV to %g keV, diff %g keV\n", E_front/C_KEV, E_back/C_KEV, (E_front - E_back) / C_KEV);
@@ -282,16 +329,11 @@ double cross_section_concentration_product_fixed(const sim_workspace *ws, const 
         fprintf(stderr, "i = %zu, E = %g keV, (E_front = %g keV, E_back = %g keV)\n", i, E/C_KEV, E_front/C_KEV, E_back/C_KEV);
 #endif
         double c = get_conc(sample, d, sim_r->i_isotope);
-        double sigma;
-        if(ws->params->cs_stragg_pd) { /* Further weighted with straggling */
-            double S = S_front + S_step * i;
+        double S = S_front + S_step * i;
+        double sigma = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->cs_stragg_pd, E, S);
 #ifdef DEBUG_CS_VERBOSE
-            fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
+        fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
 #endif
-            sigma = cross_section_straggling(sim_r, ws->params->cs_stragg_pd, E, S);
-        } else {
-            sigma = sim_r->cross_section(sim_r, E);
-        }
         sum += sigma * c;
     }
     return sample->ranges[d.i].yield * sum / (ws->params->cs_n_steps * 1.0);

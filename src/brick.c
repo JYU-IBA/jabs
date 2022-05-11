@@ -1,62 +1,12 @@
 #include <math.h>
 #include <assert.h>
 #include <jibal_units.h>
-
-#ifdef NO_ERF_Q_FROM_GSL
 #include <gsl/gsl_sf_erf.h>
-#endif
 #include "brick.h"
 
-extern inline double erfc_fast(double);
-
-inline double erfc_fast(double x) {
-    return exp(-1.0950081470333*x-0.75651138383854*x*x);
-    /* Tsay, WJ., Huang, C.J., Fu, TT. et al. J Prod Anal 39, 259–269 (2013). https://doi.org/10.1007/s11123-012-0283-1 */
-}
-
-extern inline double erf_Q(double);
-
-inline double erf_Q(double x) {
-    return x < 0.0 ? 1.0-0.5*erfc_fast(-1.0*x/M_SQRT2) : 0.5*erfc_fast(x/M_SQRT2);
-}
-
-extern inline double erf_Q_new(double);
-
-inline double erf_Q_new(double x) { /* Same as above, but without calling erfc_fast(). Saves a multiplication or two. */
+extern inline double erf_Q_fast(double x) { /* Approximative gaussian CDF */
     return x < 0.0 ? 1.0-0.5*exp(0.77428768622*x-0.37825569191*x*x) : 0.5*exp(-0.77428768622*x-0.37825569191*x*x);
-}
-
-#define ERFQ_A (-1.0950081470333/M_SQRT2)
-#define ERFQ_B (-0.75651138383854*0.5)
-#define ERFQ_CUTOFF 5.0 // 5.0 is enough
-
-double erf_Q_optim(double x);
-
-inline double erf_Q_optim(double x) { /* This turned out to be slower than expected */
-    return x < (-ERFQ_CUTOFF) ? 1.0 : x > (ERFQ_CUTOFF) ? 0.0 : x < 0.0? 1.0-0.5*exp(-1.0*ERFQ_A*x+ERFQ_B*x*x) : 0.5*exp(ERFQ_A*x+ERFQ_B*x*x);
-}
-
-void erf_Q_test() {
-    double x;
-    int i;
-    double sigma = 1.0;
-    double x_L = 10.0;
-    double x_H = 15.0;
-    double sum = 0.0;
-    double step = 0.03;
-    for(i=0; i <10000; i++) {
-        x = -50.0 + i*step;
-#ifdef ERF_Q_FROM_GSL
-        double fx = gsl_sf_erf_Q((x_H-x)/sigma);
-        double fx_low = gsl_sf_erf_Q((x_L-x)/sigma);
-#else
-        double fx = erf_Q((x_H-x)/sigma);
-        double fx_low = erf_Q((x_L-x)/sigma);
-#endif
-        double out = (fx_low-fx)/(x_H-x_L); /* One count, convolution of gaussian rectangle */
-        sum += out*step; /* This is the integral! */
-        fprintf(stdout, "%g %g %g %12.8lf\n", x, fx, out, sum);
-    }
+    /* Based on: Tsay, WJ., Huang, C.J., Fu, TT. et al. J Prod Anal 39, 259–269 (2013). https://doi.org/10.1007/s11123-012-0283-1 */
 }
 
 void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, brick *bricks, size_t last_brick) {
@@ -65,12 +15,17 @@ void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, b
     }
 }
 
-void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, const double scale, const double sigmas_cutoff) {
+void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, const double scale, const double sigmas_cutoff, int accurate) {
+    double (*erf_Q)(double);
+    if(accurate) {
+        erf_Q = gsl_sf_erf_Q;
+    } else {
+        erf_Q = erf_Q_fast;
+    }
+
     for(size_t i = 1; i <= last_brick; i++) {
         const brick *b_high = &bricks[i-1];
         const brick *b_low = &bricks[i];
-        //double E_diff_brick = b_high->E - b_low->E;
-        //fprintf(stderr, "delta d = %.3lf, E_high = %.3lf, E_low = %.3lf), sigma_low = %.3lf, sigma_high = %.3lf, Q = %.3lf\n", (b_low->d - b_high->d)/C_TFU, b_high->E/C_KEV, b_low->E/C_KEV, sigma_low/C_KEV, sigma_high/C_KEV, b_low->Q);
         double E_cutoff_low = b_low->E - b_low->sigma * sigmas_cutoff; /* Low energy cutoff (brick) */
         double E_cutoff_high = b_high->E + b_high->sigma * sigmas_cutoff;
         for(size_t j = 0; j < h->n; j++) {
@@ -80,11 +35,7 @@ void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, 
                 break; /* Assumes histograms have increasing energy */
             const double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
             const double w = h->range[j + 1] - h->range[j];
-#ifdef ERF_Q_FROM_GSL
-            const double y = (gsl_sf_erf_Q((b_low->E - E) / b_low->sigma) - gsl_sf_erf_Q((b_high->E - E) / b_high->sigma)) / (b_high->E - b_low->E);
-#else
-            const double y = (erf_Q_new((b_low->E - E) / b_low->sigma) - erf_Q_new((b_high->E - E) / b_high->sigma)) / (b_high->E - b_low->E);
-#endif
+            const double y = (erf_Q((b_low->E - E) / b_low->sigma) - erf_Q((b_high->E - E) / b_high->sigma)) / (b_high->E - b_low->E);
             h->bin[j] += scale * y * w * b_low->Q;
         }
     }

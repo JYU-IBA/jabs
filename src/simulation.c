@@ -87,6 +87,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->cs_n_steps = CS_CONC_STEPS;
     p->rough_layer_multiplier = 1.0;
     p->sigmas_cutoff = SIGMAS_CUTOFF;
+    p->gaussian_accurate = FALSE;
 #ifdef DEBUG
     fprintf(stderr, "New calc params created.\n");
 #endif
@@ -102,9 +103,10 @@ sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
 sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
     sim_calc_params_defaults(p);
     p->cs_n_steps = 0; /* Automatic (adaptive) */
-    p->cs_n_stragg_steps = p->cs_n_stragg_steps*4 + 1;
+    p->cs_n_stragg_steps = 0; /* Automatic (adaptive) */
     p->stop_step_fudge_factor *= 0.25;
     p->sigmas_cutoff += 1.0;
+    p->gaussian_accurate = TRUE;
     return p;
 }
 
@@ -486,8 +488,16 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         }
         ws->n_reactions++;
     }
-    ws->n_integration_intervals_max = CS_INTEGRATION_INTERVALS;
-    ws->w_integration = gsl_integration_workspace_alloc (ws->n_integration_intervals_max);
+    if(ws->params->cs_n_steps == 0) { /* Actually integrate, allocate workspace for this */
+        ws->w_int_cs = gsl_integration_workspace_alloc(CS_CONC_INTEGRATION_INTERVALS);
+    } else {
+        ws->w_int_cs = NULL;
+    }
+    if(ws->params->cs_n_stragg_steps == 0) {
+        ws->w_int_cs_stragg = gsl_integration_workspace_alloc(CS_STRAGG_INTEGRATION_INTERVALS);
+    } else {
+        ws->w_int_cs_stragg = NULL;
+    }
     return ws;
 }
 
@@ -511,7 +521,8 @@ void sim_workspace_free(sim_workspace *ws) {
     }
     free(ws->ion.nucl_stop);
     free(ws->reactions);
-    gsl_integration_workspace_free(ws->w_integration);
+    gsl_integration_workspace_free(ws->w_int_cs);
+    gsl_integration_workspace_free(ws->w_int_cs_stragg);
     free(ws);
 }
 
@@ -639,7 +650,7 @@ void sim_workspace_histograms_calculate(sim_workspace *ws) {
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
         bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
-        bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff);
+        bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->params->gaussian_accurate);
     }
 }
 
