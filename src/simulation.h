@@ -126,8 +126,9 @@ simulation *sim_init(jibal *jibal);
 void sim_free(simulation *sim);
 sim_calc_params *sim_calc_params_defaults(sim_calc_params *p); /* if p is NULL, allocates params */
 sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p); /* Sets parameters to defaults and then makes them faster */
-sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p);
+sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p); /* Sets parameters to defaults and then makes them a lot slower */
 sim_calc_params *sim_calc_params_defaults_brisk(sim_calc_params *p); /* Sets parameters to defaults and then makes them slightly faster */
+sim_calc_params *sim_calc_params_defaults_improved(sim_calc_params *p); /* Sets parameters to defaults and then makes them slightly faster */
 void sim_calc_params_free(sim_calc_params *p);
 void sim_calc_params_copy(const sim_calc_params *p_src, sim_calc_params *p_dst);
 void sim_calc_params_update(sim_calc_params *p); /* Computes variables that can be computed from other variables */

@@ -639,6 +639,9 @@ script_command_status script_set_simulation_val(struct script_session *s, int va
         case 'b': /* brisk */
             sim->params = sim_calc_params_defaults_brisk(sim->params);
             return 0;
+        case 'i': /* improved */
+            sim->params = sim_calc_params_defaults_improved(sim->params);
+            return 0;
         default:
             break;
     }
@@ -1195,7 +1198,8 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("defaults", "Set default calculation parameters.", 'd', NULL));
     script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("brisk", "Set slightly faster calculation parameters.", 'b', NULL));
     script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("fast", "Set fast calculation parameters.", 'f', NULL));
-    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("accurate", "Set more accurate calculation parameters.", 'a', NULL));
+    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("accurate", "Set the most accurate calculation parameters.", 'a', NULL));
+    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("improved", "Set more accurate calculation parameters.", 'i', NULL));
     script_command_list_add_command(&c_set->subcommands, c_set_simulation);
 
     script_command_list_add_command(&c_set->subcommands, script_command_new("stopping", "Set (assign) stopping or straggling.", 0, &script_set_stopping));

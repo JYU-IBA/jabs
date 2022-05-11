@@ -28,6 +28,11 @@ set sim brisk
 simulate
 save spectra "non_rutherford_accuracy_brisk_out.csv"
 
+
+set sim improved
+simulate
+save spectra "non_rutherford_accuracy_improved_out.csv"
+
 set sim accurate
 #set stop_step_incident 1keV
 simulate

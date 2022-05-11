@@ -132,6 +132,16 @@ sim_calc_params *sim_calc_params_defaults_brisk(sim_calc_params *p) {
     return p;
 }
 
+sim_calc_params *sim_calc_params_defaults_improved(sim_calc_params *p) {
+    sim_calc_params_defaults(p);
+    p->cs_n_steps += 2;
+    p->cs_n_stragg_steps += 4;
+    p->stop_step_fudge_factor *= 0.75;
+    p->sigmas_cutoff += 0.5;
+    p->gaussian_accurate = TRUE;
+    return p;
+}
+
 void sim_calc_params_free(sim_calc_params *p) {
     if(!p)
         return;
