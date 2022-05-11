@@ -132,7 +132,6 @@ void sim_calc_params_copy(const sim_calc_params *p_src, sim_calc_params *p_dst) 
 }
 
 void sim_calc_params_update(sim_calc_params *p) {
-    assert(p->mean_conc_and_energy || p->cs_n_steps >= 1);
     p->cs_frac = 1.0/(1.0*(p->cs_n_steps+1));
     prob_dist_free(p->cs_stragg_pd);
     p->cs_stragg_pd = prob_dist_gaussian(p->cs_n_stragg_steps);
@@ -142,9 +141,6 @@ void sim_calc_params_update(sim_calc_params *p) {
         p->ds_steps_polar = DUAL_SCATTER_POLAR_STEPS;
     }
     p->n_ds = p->ds_steps_azi *  p->ds_steps_polar;
-#ifdef DEBUG
-    fprintf(stderr, "Calculation parameters (%p) updated. DS %i (%p).\n", (void *)p, p->ds, (void *) &p->ds);
-#endif
 }
 
 void sim_calc_params_ds(sim_calc_params *p, int ds) {
@@ -156,7 +152,7 @@ void sim_calc_params_ds(sim_calc_params *p, int ds) {
 void sim_calc_params_faster(sim_calc_params *p, int fast) {
     if(!p)
         return;
-    if (fast) {
+    if(fast) {
         p->rk4 = FALSE;
         p->nucl_stop_accurate = FALSE;
         p->mean_conc_and_energy = TRUE;
@@ -561,6 +557,8 @@ void sim_workspace_calculate_sum_spectra(sim_workspace *ws) {
     }
 }
 
+
+
 void simulation_print(FILE *f, const simulation *sim) {
     if(!sim) {
         return;
@@ -608,17 +606,17 @@ void simulation_print(FILE *f, const simulation *sim) {
     }
     jabs_message(MSG_INFO, f, "n_reactions = %zu\n", sim->n_reactions);
     jabs_message(MSG_INFO, f, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence*C_E*1.0e6);
-    jabs_message(MSG_INFO, f, "step for incident ions = %.3lf keV\n", sim->params->stop_step_incident/C_KEV);
-    jabs_message(MSG_INFO, f, "step for exiting ions = %.3lf keV\n", sim->params->stop_step_exiting/C_KEV);
+    jabs_message(MSG_INFO, f, "step for incident ions = %.3lf keV (0 = auto)\n", sim->params->stop_step_incident/C_KEV);
+    jabs_message(MSG_INFO, f, "step for exiting ions = %.3lf keV (0 = auto)\n", sim->params->stop_step_exiting/C_KEV);
     jabs_message(MSG_INFO, f, "stopping step fudge factor = %g\n", sim->params->stop_step_fudge_factor);
-    jabs_message(MSG_INFO, f, "stopping step minimum = %.3lf keV\n", sim->params->stop_step_min / C_KEV);
+    jabs_message(MSG_INFO, f, "stopping step minimum = %.3lf keV (0 = auto)\n", sim->params->stop_step_min / C_KEV);
     jabs_message(MSG_INFO, f, "stopping RK4 = %s\n", sim->params->rk4?"true":"false");
     jabs_message(MSG_INFO, f, "depth steps max = %zu\n", sim->params->depthsteps_max);
 
     jabs_message(MSG_INFO, f, "cross section of brick determined using mean concentration and energy = %s\n", sim->params->mean_conc_and_energy?"true":"false");
     if(!sim->params->mean_conc_and_energy) {
-        jabs_message(MSG_INFO, f, "concentration * cross section steps per brick = %zu\n", sim->params->cs_n_steps);
-        jabs_message(MSG_INFO, f, "straggling substeps = %zu\n", sim->params->cs_n_stragg_steps);
+        jabs_message(MSG_INFO, f, "concentration * cross section steps per brick = %zu (0 = adaptive)\n", sim->params->cs_n_steps);
+        jabs_message(MSG_INFO, f, "straggling substeps = %zu (0 = adaptive)\n", sim->params->cs_n_stragg_steps);
     }
     jabs_message(MSG_INFO, f, "accurate nuclear stopping = %s\n", sim->params->nucl_stop_accurate?"true":"false");
 

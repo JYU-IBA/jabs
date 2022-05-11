@@ -155,25 +155,13 @@ depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, de
     }
     assert(stop > 0.0);
     dE = -1.0 * h * stop; /* Energy change in thickness "h". It is always negative! */
-#ifndef STATISTICAL_STRAGGLING
+#ifndef NO_STATISTICAL_STRAGGLING
     double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, fulldepth, E + dE) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
-#ifdef DEBUG
-    //if((s_ratio)*(s_ratio) < 0.9 || (s_ratio)*(s_ratio) > 1.1) { /* Non-statistical broadening. */
-    //   fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
-    //}
-#endif
-#endif
     incident->S *= pow2(s_ratio);
+#endif
     incident->S += h * stop_sample(ws, incident, sample, GSTO_STO_STRAGG, halfdepth, E + (0.5 * dE)); /* Straggling, calculate at mid-energy */
     incident->E += dE;
     return fulldepth; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
-}
-
-
-double normal_pdf(double x, double mean, double sigma) {
-    static const double inv_sqrt_2pi = 0.398942280401432703;
-    double a = (x - mean) / sigma;
-    return (inv_sqrt_2pi / sigma) * exp(-0.5 * a * a);
 }
 
 double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S) {
@@ -218,12 +206,11 @@ struct cs_stragg_int_params {
 };
 
 double cs_stragg_function(double x, void *params) {
-    static const double inv_sqrt_2pi = 0.398942280401432703;
     struct cs_stragg_int_params *p = (struct cs_stragg_int_params *) params;
     double a = (x - p->E_mean) / p->sigma;
-    double result = (inv_sqrt_2pi / p->sigma) * exp(-0.5 * a * a) * p->sim_r->cross_section(p->sim_r, x);
+    double result = exp(-0.5 * a * a) * p->sim_r->cross_section(p->sim_r, x); /* Gaussian (not normalized!) times cross section */
 #ifdef DEBUG_CS_VERBOSE
-    fprintf(stderr, "cs_stragg_function(), E = %g keV, S = %g keV FWHM, E_mean = %g keV, a = %g. Result %g mb/sr.\n", x/C_KEV, p->sigma*C_FWHM/C_KEV, p->E_mean/C_KEV, a, result/C_MB_SR);
+    fprintf(stderr, "cs_stragg_function(), E = %g keV, S = %g keV FWHM, E_mean = %g keV, a = %g. Result %g mb/sr.\n", x/C_KEV, p->sigma*C_FWHM/C_KEV, p->E_mean/C_KEV, a, (0.398942280401432703/p->sigma) * result/C_MB_SR );
 #endif
     return result;
 }
@@ -254,9 +241,10 @@ double cross_section_straggling_adaptive(const sim_reaction *sim_r, gsl_integrat
     if(E_low < 1.0*C_KEV)
         E_low = 1.0*C_KEV;
     double E_high = E + 4.0*params.sigma;
-    /* TODO: compensate for things outside +- 4 sigma (multiply by 1.0000633?)*/
     double result, error;
-    gsl_integration_qags(&F, E_low, E_high, 0, 1e-6, w->limit,w, &result, &error);
+    gsl_integration_qags(&F, E_low, E_high, 0, 1e-7, w->limit,w, &result, &error);
+    static const double inv_sqrt_2pi = 0.398942280401432703;
+    result *= (inv_sqrt_2pi / params.sigma) * 1.000063346496191; /* Normalize gaussian. The 1.00006 accounts for tails outside +- 4 sigmas */
 #ifdef DEBUG_CS_VERBOSE
     fprintf(stderr, "Integrated from %g keV to %g keV in %zu steps, got (%g +- %g) mb/sr\n", E_low/C_KEV, E_high/C_KEV, w->size, result/C_MB_SR, error/C_MB_SR);
 #endif
@@ -418,8 +406,7 @@ double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calcula
     return ws->params->stop_step_fudge_factor * broad; /* Fudge factor also affects the minimum stop step */
 }
 
-int simulate(const ion *incident, const depth depth_start, sim_workspace *ws,
-             const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
+int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
     assert(sample->n_ranges);
     int warnings = 0;
     double thickness = sample->ranges[sample->n_ranges - 1].x;
@@ -589,7 +576,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws,
                 if(d_after.i == sample->n_ranges - 2) {
                     sigma_conc *= ws->sim->channeling_offset + ws->sim->channeling_slope * (E_front + E_back) / 2.0;
                 }
-                b->Q = ion1.inverse_cosine_theta * sigma_conc * d_diff;
+                b->Q = ion1.inverse_cosine_theta * sigma_conc * b->thick;
                 b->sc = sigma_conc;
                 assert(b->Q >= 0.0);
 #ifdef DEBUG_VERBOSE
