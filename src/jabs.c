@@ -23,6 +23,8 @@
 #include <jibal_units.h>
 #include <jibal_kin.h>
 #include <jibal_r33.h>
+#include <gsl/gsl_integration.h>
+#include <gsl/gsl_errno.h>
 
 #include "geostragg.h"
 #include "generic.h"
@@ -153,55 +155,181 @@ depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, de
     }
     assert(stop > 0.0);
     dE = -1.0 * h * stop; /* Energy change in thickness "h". It is always negative! */
-#ifndef STATISTICAL_STRAGGLING
+#ifndef NO_STATISTICAL_STRAGGLING
     double s_ratio = stop_sample(ws, incident, sample, ws->stopping_type, fulldepth, E + dE) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
-#ifdef DEBUG
-    //if((s_ratio)*(s_ratio) < 0.9 || (s_ratio)*(s_ratio) > 1.1) { /* Non-statistical broadening. */
-    //   fprintf(stderr, "YIKES, s_ratio = %g, sq= %g\n", s_ratio, (s_ratio)*(s_ratio));
-    //}
-#endif
-#endif
     incident->S *= pow2(s_ratio);
+#endif
     incident->S += h * stop_sample(ws, incident, sample, GSTO_STO_STRAGG, halfdepth, E + (0.5 * dE)); /* Straggling, calculate at mid-energy */
     incident->E += dE;
     return fulldepth; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
-
-double normal_pdf(double x, double mean, double sigma) {
-    static const double inv_sqrt_2pi = 0.398942280401432703;
-    double a = (x - mean) / sigma;
-    return (inv_sqrt_2pi / sigma) * exp(-0.5 * a * a);
-}
-
-double cross_section_straggling(const sim_reaction *sim_r, const sim_calc_params *p, double E, double S) {
+double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S) {
     const double std_dev = sqrt(S);
     double cs_sum = 0.0;
-    assert(p->cs_stragg_pd);
-#ifdef DEBUG
-    fprintf(stderr, "CS stragg, E = %g keV, S = %g keV (std. dev)\n", E/C_KEV, std_dev/C_KEV);
-#endif
-    for(size_t i = 0; i < p->cs_stragg_pd->n; i++) {
-        prob_point *pp = &(p->cs_stragg_pd->points[i]);
+    for(size_t i = 0; i < pd->n; i++) {
+        prob_point *pp = &(pd->points[i]);
         double E_stragg = E + pp->x * std_dev;
         double cs = pp->p * sim_r->cross_section(sim_r, E_stragg);
         cs_sum += cs;
-#ifdef DEBUG
+#ifdef DEBUG_CS_STRAGG
         fprintf(stderr, "%zu %10g %10g %10g %10g\n", i, pp->x, E_stragg/C_KEV, pp->p, cs/C_MB_SR);
 #endif
     }
-#ifdef DEBUG
+#ifdef DEBUG_CS_STRAGG
     double unweighted = sim_r->cross_section(sim_r, E);
-    double diff = (cs_sum-unweighted)/unweighted;
-    fprintf(stderr, "Got cs %.7lf mb/sr (unweighted by straggling %.7lf mb/sr) diff %.7lf%%.\n", cs_sum/C_MB_SR, unweighted/C_MB_SR, 100.0*diff);
+        double diff = (cs_sum-unweighted)/unweighted;
+        fprintf(stderr, "Got cs %.7lf mb/sr (unweighted by straggling %.7lf mb/sr) diff %.7lf%%.\n", cs_sum/C_MB_SR, unweighted/C_MB_SR, 100.0*diff);
 #endif
     return cs_sum;
 }
 
 
+double cross_section_straggling(const sim_reaction *sim_r, gsl_integration_workspace *w, const prob_dist *pd, double E, double S) {
+#ifdef DEBUG_CS_STRAGG
+    fprintf(stderr, "CS stragg, E = %g keV, S = %g keV (std. dev)\n", E/C_KEV, std_dev/C_KEV);
+#endif
+    if(w) {
+        return cross_section_straggling_adaptive(sim_r, w, E, S);
+    }
+    if(pd) {
+        return cross_section_straggling_fixed(sim_r, pd, E, S);
+    }
+    return sim_r->cross_section(sim_r, E); /* Fallback, no weights applied */
+}
+
+
+struct cs_stragg_int_params {
+    const sim_reaction *sim_r;
+    double sigma;
+    double E_mean;
+};
+
+double cs_stragg_function(double x, void *params) {
+    struct cs_stragg_int_params *p = (struct cs_stragg_int_params *) params;
+    double a = (x - p->E_mean) / p->sigma;
+    double result = exp(-0.5 * a * a) * p->sim_r->cross_section(p->sim_r, x); /* Gaussian (not normalized!) times cross section */
+#ifdef DEBUG_CS_VERBOSE
+    fprintf(stderr, "cs_stragg_function(), E = %g keV, S = %g keV FWHM, E_mean = %g keV, a = %g. Result %g mb/sr.\n", x/C_KEV, p->sigma*C_FWHM/C_KEV, p->E_mean/C_KEV, a, (0.398942280401432703/p->sigma) * result/C_MB_SR );
+#endif
+    return result;
+}
+
+struct cs_int_params {
+    const depth *d_before;
+    const depth *d_after;
+    double E_front;
+    double S_front;
+    const sample *sample;
+    const sim_reaction *sim_r;
+    double stop_slope;
+    double stragg_slope;
+    const prob_dist *cs_stragg_pd;
+    gsl_integration_workspace *w;
+    depth d; /* changes between calls */
+};
+
+double cross_section_straggling_adaptive(const sim_reaction *sim_r, gsl_integration_workspace *w, double E, double S) { /* Uses real numerical integration */
+    struct cs_stragg_int_params params;
+    params.sigma = sqrt(S);
+    params.E_mean = E;
+    params.sim_r = sim_r;
+    gsl_function F;
+    F.function = &cs_stragg_function;
+    F.params = &params;
+    double E_low = E - 4.0*params.sigma;
+    if(E_low < 1.0*C_KEV)
+        E_low = 1.0*C_KEV;
+    double E_high = E + 4.0*params.sigma;
+    double result, error;
+    gsl_integration_qags(&F, E_low, E_high, 0, 1e-7, w->limit,w, &result, &error);
+    static const double inv_sqrt_2pi = 0.398942280401432703;
+    result *= (inv_sqrt_2pi / params.sigma) * 1.000063346496191; /* Normalize gaussian. The 1.00006 accounts for tails outside +- 4 sigmas */
+#ifdef DEBUG_CS_VERBOSE
+    fprintf(stderr, "Integrated from %g keV to %g keV in %zu steps, got (%g +- %g) mb/sr\n", E_low/C_KEV, E_high/C_KEV, w->size, result/C_MB_SR, error/C_MB_SR);
+#endif
+    return result;
+}
+
+double cs_function(double x, void * params) {
+    struct cs_int_params *p = (struct cs_int_params *) params;
+    p->d.x = p->d_before->x + p->stop_slope * (x - p->E_front); /* Depth assuming constant stopping inside brick */
+    double c = get_conc(p->sample, p->d, p->sim_r->i_isotope);
+    double sigma;
+    double S = p->S_front + p->stragg_slope * (x - p->E_front);
+#ifdef DEBUG_CS_VERBOSE
+        fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
+#endif
+        sigma = cross_section_straggling(p->sim_r, p->w, p->cs_stragg_pd, x, S);
+
+#ifdef DEBUG
+    fprintf(stderr, "Depth %g tfu, energy %g keV, sigma  %g mb/sr, c %g %%\n", p->d.x/C_TFU, x/C_KEV, sigma/C_MB_SR, c/C_PERCENT);
+#endif
+    return c*sigma;
+}
+
+double cross_section_concentration_product_adaptive(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after,
+                                                    double S_front, double S_back) {
+    double result, error;
+    struct cs_int_params params;
+    params.sim_r = sim_r;
+    params.d_before = d_before;
+    params.d_after = d_after;
+    params.E_front = E_front;
+    params.stop_slope = (d_after->x - d_before->x)/(E_back - E_front);
+    params.S_front = S_front;
+    params.d.i = d_after->i;
+    params.sample = sample;
+    params.w = ws->w_int_cs_stragg; /* Can be NULL */
+    params.cs_stragg_pd = ws->params->cs_stragg_pd; /* Can be NULL */
+    params.stragg_slope = (S_back-S_front)/(E_back-E_front);
+    gsl_function F;
+    F.function = &cs_function;
+    F.params = &params;
+    gsl_set_error_handler_off();
+
+    gsl_integration_qags (&F, E_back, E_front, 0, 1e-6, ws->w_int_cs->limit,
+                          ws->w_int_cs, &result, &error);
+    double final = result/(E_front - E_back);
+#ifdef DEBUG
+    fprintf(stderr, "E from %g keV to %g keV, diff %g keV\n", E_front/C_KEV, E_back/C_KEV, (E_front - E_back) / C_KEV);
+        fprintf(stderr, "stop avg %g eV/tfu\n", params.stop_slope/(C_EV/C_TFU));
+        fprintf(stderr, "integration result          = % 18g\n", result);
+        fprintf(stderr, "integration estimated error = % 18g\n", error);
+        fprintf(stderr, "integration intervals       = %zu\n", ws->w_integration->size);
+        fprintf(stderr, "final result                = %g mb/sr\n", final/C_MB_SR);
+#endif
+    return final;
+}
+
+double cross_section_concentration_product_fixed(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after,
+                                           double S_front, double S_back) {
+    depth d;
+    d.i = d_after->i;
+    const double x_step = (d_after->x - d_before->x) * ws->params->cs_frac;
+    const double E_step = (E_back - E_front) * ws->params->cs_frac;
+    const double S_step = (S_back - S_front) * ws->params->cs_frac;
+    double sum = 0.0;
+    for(size_t i = 1; i <= ws->params->cs_n_steps; i++) { /* Compute cross section and concentration product in several "sub-steps" */
+        d.x = d_before->x + x_step * i;
+        double E = E_front + E_step * i;
+#ifdef DEBUG_CS_VERBOSE
+        fprintf(stderr, "i = %zu, E = %g keV, (E_front = %g keV, E_back = %g keV)\n", i, E/C_KEV, E_front/C_KEV, E_back/C_KEV);
+#endif
+        double c = get_conc(sample, d, sim_r->i_isotope);
+        double S = S_front + S_step * i;
+        double sigma = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->cs_stragg_pd, E, S);
+#ifdef DEBUG_CS_VERBOSE
+        fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
+#endif
+        sum += sigma * c;
+    }
+    return sample->ranges[d.i].yield * sum / (ws->params->cs_n_steps * 1.0);
+}
+
 double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after,
                                            double S_front, double S_back) {
-    if(ws->params->mean_conc_and_energy) { /* This if-branch is slightly faster (maybe) and also serves as a testing branch, since it is a lot easier to understand... */
+    if(ws->params->mean_conc_and_energy) { /* This if-branch is fast and also serves as a testing branch, since it is a lot easier to understand... */
         const depth d_halfdepth = {.x = (d_before->x + d_after->x) /
                                         2.0, .i = d_after->i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         double c = get_conc(sample, d_halfdepth, sim_r->i_isotope);
@@ -211,33 +339,10 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
         assert(sim_r->cross_section);
         double sigma = sim_r->cross_section(sim_r, E_mean);
         return sigma * c * sample->ranges[d_halfdepth.i].yield;
+    } else if(ws->params->cs_n_steps == 0) {
+        return cross_section_concentration_product_adaptive(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
     } else {
-        depth d;
-        d.i = d_after->i;
-        const double x_step = (d_after->x - d_before->x) * ws->params->cs_frac;
-        const double E_step = (E_back - E_front) * ws->params->cs_frac;
-        const double S_step = (S_back - S_front) * ws->params->cs_frac;
-        double sum = 0.0;
-        for(size_t i = 1; i <= ws->params->cs_n_steps; i++) { /* Compute cross section and concentration product in several "sub-steps" */
-            d.x = d_before->x + x_step * i;
-            double E = E_front + E_step * i;
-#ifdef DEBUG_CS_VERBOSE
-            fprintf(stderr, "i = %zu, E = %g keV, (E_front = %g keV, E_back = %g keV)\n", i, E/C_KEV, E_front/C_KEV, E_back/C_KEV);
-#endif
-            double c = get_conc(sample, d, sim_r->i_isotope);
-            double sigma;
-            if(ws->params->cs_stragg_pd) { /* Further weighted with straggling */
-                double S = S_front + S_step * i;
-#ifdef DEBUG_CS_VERBOSE
-                fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
-#endif
-                sigma = cross_section_straggling(sim_r, ws->params, E, S);
-            } else {
-                sigma = sim_r->cross_section(sim_r, E);
-            }
-            sum += sigma * c;
-        }
-        return sample->ranges[d.i].yield * sum / (ws->params->cs_n_steps * 1.0);
+        return cross_section_concentration_product_fixed(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
     }
     return 0.0;
 }
@@ -301,8 +406,7 @@ double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calcula
     return ws->params->stop_step_fudge_factor * broad; /* Fudge factor also affects the minimum stop step */
 }
 
-int simulate(const ion *incident, const depth depth_start, sim_workspace *ws,
-             const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
+int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
     assert(sample->n_ranges);
     int warnings = 0;
     double thickness = sample->ranges[sample->n_ranges - 1].x;
@@ -472,7 +576,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws,
                 if(d_after.i == sample->n_ranges - 2) {
                     sigma_conc *= ws->sim->channeling_offset + ws->sim->channeling_slope * (E_front + E_back) / 2.0;
                 }
-                b->Q = ion1.inverse_cosine_theta * sigma_conc * d_diff;
+                b->Q = ion1.inverse_cosine_theta * sigma_conc * b->thick;
                 b->sc = sigma_conc;
                 assert(b->Q >= 0.0);
 #ifdef DEBUG_VERBOSE

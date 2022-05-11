@@ -1232,6 +1232,7 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",          &sim->params->beta_manual,            NULL},
             {JIBAL_CONFIG_VAR_SIZE,   "cs_n_steps",           &sim->params->cs_n_steps,             NULL},
             {JIBAL_CONFIG_VAR_SIZE,   "cs_n_stragg_steps",    &sim->params->cs_n_stragg_steps,      NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "gaussian_accurate",    &sim->params->gaussian_accurate,      NULL},
             {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                                                     NULL}
     };
     c = script_command_list_from_vars_array(vars, 0);

@@ -61,4 +61,6 @@
 #define FIT_FAST_CHISQ_TOL (1e-1)  /* Relative change in chi squared to stop fitting (fast fitting phase). This can be quite large, as turning on better physics changes the chisq. */
 #define SIGMAS_CUTOFF (5.0)
 #define SIGMAS_FAST_CUTOFF (3.5)
+#define CS_CONC_INTEGRATION_INTERVALS 100
+#define CS_STRAGG_INTEGRATION_INTERVALS 100
 #endif // JABS_DEFAULTS_H

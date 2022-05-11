@@ -36,6 +36,11 @@ int print_bricks(const char *filename, const sim_workspace *ws);
 int simulate_with_ds(sim_workspace *ws);
 void ds(sim_workspace *ws); /* TODO: the DS routine is more pseudocode at this stage... */
 double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back);
+double cross_section_concentration_product_fixed(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back);
+double cross_section_concentration_product_adaptive(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back);
+double cross_section_straggling(const sim_reaction *sim_r, gsl_integration_workspace *w, const prob_dist *pd, double E, double S);
+double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S);
+double cross_section_straggling_adaptive(const sim_reaction *sim_r, gsl_integration_workspace *w, double E, double S);
 fit_params *fit_params_all(fit_data *fit);
 void fit_params_print(const fit_params *params, int active, const char *pattern); /* if active is TRUE print only active variables. pattern can be NULL to bypass matching. */
 void fit_params_print_final(const fit_params *params);

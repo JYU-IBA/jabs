@@ -87,6 +87,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->cs_n_steps = CS_CONC_STEPS;
     p->rough_layer_multiplier = 1.0;
     p->sigmas_cutoff = SIGMAS_CUTOFF;
+    p->gaussian_accurate = FALSE;
 #ifdef DEBUG
     fprintf(stderr, "New calc params created.\n");
 #endif
@@ -101,10 +102,11 @@ sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
 
 sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
     sim_calc_params_defaults(p);
-    p->cs_n_steps += 2;
-    p->cs_n_stragg_steps += 2;
-    p->stop_step_fudge_factor *= 0.5;
+    p->cs_n_steps = 0; /* Automatic (adaptive) */
+    p->cs_n_stragg_steps = 0; /* Automatic (adaptive) */
+    p->stop_step_fudge_factor *= 0.25;
     p->sigmas_cutoff += 1.0;
+    p->gaussian_accurate = TRUE;
     return p;
 }
 
@@ -130,7 +132,6 @@ void sim_calc_params_copy(const sim_calc_params *p_src, sim_calc_params *p_dst) 
 }
 
 void sim_calc_params_update(sim_calc_params *p) {
-    assert(p->mean_conc_and_energy || p->cs_n_steps >= 1);
     p->cs_frac = 1.0/(1.0*(p->cs_n_steps+1));
     prob_dist_free(p->cs_stragg_pd);
     p->cs_stragg_pd = prob_dist_gaussian(p->cs_n_stragg_steps);
@@ -140,9 +141,6 @@ void sim_calc_params_update(sim_calc_params *p) {
         p->ds_steps_polar = DUAL_SCATTER_POLAR_STEPS;
     }
     p->n_ds = p->ds_steps_azi *  p->ds_steps_polar;
-#ifdef DEBUG
-    fprintf(stderr, "Calculation parameters (%p) updated. DS %i (%p).\n", (void *)p, p->ds, (void *) &p->ds);
-#endif
 }
 
 void sim_calc_params_ds(sim_calc_params *p, int ds) {
@@ -154,7 +152,7 @@ void sim_calc_params_ds(sim_calc_params *p, int ds) {
 void sim_calc_params_faster(sim_calc_params *p, int fast) {
     if(!p)
         return;
-    if (fast) {
+    if(fast) {
         p->rk4 = FALSE;
         p->nucl_stop_accurate = FALSE;
         p->mean_conc_and_energy = TRUE;
@@ -486,6 +484,16 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         }
         ws->n_reactions++;
     }
+    if(ws->params->cs_n_steps == 0) { /* Actually integrate, allocate workspace for this */
+        ws->w_int_cs = gsl_integration_workspace_alloc(CS_CONC_INTEGRATION_INTERVALS);
+    } else {
+        ws->w_int_cs = NULL;
+    }
+    if(ws->params->cs_n_stragg_steps == 0) {
+        ws->w_int_cs_stragg = gsl_integration_workspace_alloc(CS_STRAGG_INTEGRATION_INTERVALS);
+    } else {
+        ws->w_int_cs_stragg = NULL;
+    }
     return ws;
 }
 
@@ -509,6 +517,8 @@ void sim_workspace_free(sim_workspace *ws) {
     }
     free(ws->ion.nucl_stop);
     free(ws->reactions);
+    gsl_integration_workspace_free(ws->w_int_cs);
+    gsl_integration_workspace_free(ws->w_int_cs_stragg);
     free(ws);
 }
 
@@ -546,6 +556,8 @@ void sim_workspace_calculate_sum_spectra(sim_workspace *ws) {
         ws->histo_sum->bin[i] = sum;
     }
 }
+
+
 
 void simulation_print(FILE *f, const simulation *sim) {
     if(!sim) {
@@ -594,17 +606,17 @@ void simulation_print(FILE *f, const simulation *sim) {
     }
     jabs_message(MSG_INFO, f, "n_reactions = %zu\n", sim->n_reactions);
     jabs_message(MSG_INFO, f, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence*C_E*1.0e6);
-    jabs_message(MSG_INFO, f, "step for incident ions = %.3lf keV\n", sim->params->stop_step_incident/C_KEV);
-    jabs_message(MSG_INFO, f, "step for exiting ions = %.3lf keV\n", sim->params->stop_step_exiting/C_KEV);
+    jabs_message(MSG_INFO, f, "step for incident ions = %.3lf keV (0 = auto)\n", sim->params->stop_step_incident/C_KEV);
+    jabs_message(MSG_INFO, f, "step for exiting ions = %.3lf keV (0 = auto)\n", sim->params->stop_step_exiting/C_KEV);
     jabs_message(MSG_INFO, f, "stopping step fudge factor = %g\n", sim->params->stop_step_fudge_factor);
-    jabs_message(MSG_INFO, f, "stopping step minimum = %.3lf keV\n", sim->params->stop_step_min / C_KEV);
+    jabs_message(MSG_INFO, f, "stopping step minimum = %.3lf keV (0 = auto)\n", sim->params->stop_step_min / C_KEV);
     jabs_message(MSG_INFO, f, "stopping RK4 = %s\n", sim->params->rk4?"true":"false");
     jabs_message(MSG_INFO, f, "depth steps max = %zu\n", sim->params->depthsteps_max);
 
     jabs_message(MSG_INFO, f, "cross section of brick determined using mean concentration and energy = %s\n", sim->params->mean_conc_and_energy?"true":"false");
     if(!sim->params->mean_conc_and_energy) {
-        jabs_message(MSG_INFO, f, "concentration * cross section steps per brick = %zu\n", sim->params->cs_n_steps);
-        jabs_message(MSG_INFO, f, "straggling substeps = %zu\n", sim->params->cs_n_stragg_steps);
+        jabs_message(MSG_INFO, f, "concentration * cross section steps per brick = %zu (0 = adaptive)\n", sim->params->cs_n_steps);
+        jabs_message(MSG_INFO, f, "straggling substeps = %zu (0 = adaptive)\n", sim->params->cs_n_stragg_steps);
     }
     jabs_message(MSG_INFO, f, "accurate nuclear stopping = %s\n", sim->params->nucl_stop_accurate?"true":"false");
 
@@ -636,7 +648,7 @@ void sim_workspace_histograms_calculate(sim_workspace *ws) {
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
         bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
-        bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff);
+        bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->params->gaussian_accurate);
     }
 }
 

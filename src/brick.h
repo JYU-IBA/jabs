@@ -23,5 +23,5 @@ typedef struct {
 } brick;
 
 void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, brick *bricks, size_t last_brick); /* Sums up all the contributions to sigma (including detector resolution) */
-void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, double scale, double sigmas_cutoff);
+void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, double scale, double sigmas_cutoff, int accurate);
 #endif // JABS_BRICK_H

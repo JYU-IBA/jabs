@@ -15,6 +15,7 @@
 #define JABS_SIMULATION_H
 
 #include <gsl/gsl_histogram.h>
+#include <gsl/gsl_integration.h>
 #include <jibal.h>
 #include <time.h>
 
@@ -41,6 +42,7 @@ typedef struct {
     int mean_conc_and_energy; /* Calculation of cross-section concentration product is simplified by calculating cross section at mean energy of a depth step and concentration at mid-bin (only relevant for samples with concentration gradients) */
     int geostragg; /* Geometric straggling true/false */
     int beta_manual; /* Don't calculate exit angle based on detector geometry, use something given by user, true/false */
+    int gaussian_accurate; /* If this is FALSE an approximative gaussian CDF is used in convolution of spectra, otherwise function from GSL is used. */
     double stop_step_incident;
     double stop_step_exiting;
     double stop_step_fudge_factor;
@@ -110,6 +112,8 @@ typedef struct {
     const jibal_isotope *isotopes;
     sim_calc_params *params;
     double emin;
+    gsl_integration_workspace *w_int_cs; /* Integration workspace for conc * cross section product */
+    gsl_integration_workspace *w_int_cs_stragg;
 } sim_workspace;
 
 
