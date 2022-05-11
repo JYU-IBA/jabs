@@ -185,12 +185,12 @@ double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist
 }
 
 
-double cross_section_straggling(const sim_reaction *sim_r, gsl_integration_workspace *w, const prob_dist *pd, double E, double S) {
+double cross_section_straggling(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, const prob_dist *pd, double E, double S) {
 #ifdef DEBUG_CS_STRAGG
     fprintf(stderr, "CS stragg, E = %g keV, S = %g keV (std. dev)\n", E/C_KEV, std_dev/C_KEV);
 #endif
     if(w) {
-        return cross_section_straggling_adaptive(sim_r, w, E, S);
+        return cross_section_straggling_adaptive(sim_r, w, accuracy, E, S);
     }
     if(pd) {
         return cross_section_straggling_fixed(sim_r, pd, E, S);
@@ -226,10 +226,11 @@ struct cs_int_params {
     double stragg_slope;
     const prob_dist *cs_stragg_pd;
     gsl_integration_workspace *w;
+    double stragg_int_accuracy;
     depth d; /* changes between calls */
 };
 
-double cross_section_straggling_adaptive(const sim_reaction *sim_r, gsl_integration_workspace *w, double E, double S) { /* Uses real numerical integration */
+double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, double E, double S) { /* Uses real numerical integration */
     struct cs_stragg_int_params params;
     params.sigma = sqrt(S);
     params.E_mean = E;
@@ -242,7 +243,7 @@ double cross_section_straggling_adaptive(const sim_reaction *sim_r, gsl_integrat
         E_low = 1.0*C_KEV;
     double E_high = E + 4.0*params.sigma;
     double result, error;
-    gsl_integration_qags(&F, E_low, E_high, 0, 1e-7, w->limit,w, &result, &error);
+    gsl_integration_qags(&F, E_low, E_high, 0, accuracy, w->limit,w, &result, &error);
     static const double inv_sqrt_2pi = 0.398942280401432703;
     result *= (inv_sqrt_2pi / params.sigma) * 1.000063346496191; /* Normalize gaussian. The 1.00006 accounts for tails outside +- 4 sigmas */
 #ifdef DEBUG_CS_VERBOSE
@@ -260,7 +261,7 @@ double cs_function(double x, void * params) {
 #ifdef DEBUG_CS_VERBOSE
         fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
 #endif
-        sigma = cross_section_straggling(p->sim_r, p->w, p->cs_stragg_pd, x, S);
+        sigma = cross_section_straggling(p->sim_r, p->w, p->stragg_int_accuracy, p->cs_stragg_pd, x, S);
 
 #ifdef DEBUG
     fprintf(stderr, "Depth %g tfu, energy %g keV, sigma  %g mb/sr, c %g %%\n", p->d.x/C_TFU, x/C_KEV, sigma/C_MB_SR, c/C_PERCENT);
@@ -288,7 +289,7 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
     F.params = &params;
     gsl_set_error_handler_off();
 
-    gsl_integration_qags (&F, E_back, E_front, 0, 1e-6, ws->w_int_cs->limit,
+    gsl_integration_qags (&F, E_back, E_front, 0, ws->params->int_cs_accuracy, ws->w_int_cs->limit,
                           ws->w_int_cs, &result, &error);
     double final = result/(E_front - E_back);
 #ifdef DEBUG
@@ -318,7 +319,7 @@ double cross_section_concentration_product_fixed(const sim_workspace *ws, const 
 #endif
         double c = get_conc(sample, d, sim_r->i_isotope);
         double S = S_front + S_step * i;
-        double sigma = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->cs_stragg_pd, E, S);
+        double sigma = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, E, S);
 #ifdef DEBUG_CS_VERBOSE
         fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
 #endif
@@ -951,7 +952,7 @@ int simulate_with_ds(sim_workspace *ws) {
     ion ion1 = ws->ion;
     ion ion2 = ion1;
     depth d_before = depth_seek(ws->sample, 0.0);
-    sim_calc_params_faster(ws->params, TRUE); /* This makes DS faster. Changes to ws->params are not reverted, but they don't affect original sim settings */
+    sim_calc_params_defaults_fast(ws->params); /* This makes DS faster. Changes to ws->params are not reverted, but they don't affect original sim settings */
     sim_calc_params_update(ws->params);
     jabs_message(MSG_ERROR, stderr, "\n");
     const jibal_isotope *incident = ws->sim->beam_isotope;

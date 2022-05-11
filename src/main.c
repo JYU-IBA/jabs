@@ -73,13 +73,15 @@ int main(int argc, char * const *argv) {
     if(!sim->beam_isotope) {
         sim->beam_isotope = jibal_isotope_find(jibal->isotopes, NULL, 2, 4); /* 4He default */
     }
+    if(cmd_opt->fast) {
+        sim_calc_params_defaults_fast(sim->params);
+    }
+    sim_calc_params_ds(sim->params, cmd_opt->ds);
     sim->params->stop_step_incident = cmd_opt->stop_step_incident;
     sim->params->stop_step_exiting = cmd_opt->stop_step_exiting;
     sim->params->depthsteps_max = cmd_opt->depthsteps_max;
     sim->rbs = cmd_opt->rbs;
     sim->erd = cmd_opt->erd;
-    sim_calc_params_ds(sim->params, cmd_opt->ds);
-    sim_calc_params_faster(sim->params, cmd_opt->fast);
     sim_calc_params_update(sim->params);
     session->output_filename = strdup_non_null(cmd_opt->output_filename);
     roi range = {.i_det = 0, .low = cmd_opt->fit_low, .high = cmd_opt->fit_high};

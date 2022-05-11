@@ -753,7 +753,7 @@ int fit(struct fit_data *fit_data) {
             }
         }
         if(phase == FIT_PHASE_FAST) {
-            sim_calc_params_faster(fit_data->sim->params, TRUE); /* Set current parameters to be faster in phase 0. */
+            sim_calc_params_defaults_fast(fit_data->sim->params); /* Set current parameters to be faster in phase 0. */
             xtol *= FIT_FAST_XTOL_MULTIPLIER;
             chisq_tol = fit_data->chisq_fast_tol;
         } else if(phase == FIT_PHASE_SLOW) {
@@ -767,6 +767,8 @@ int fit(struct fit_data *fit_data) {
             }
         }
         jabs_message(MSG_INFO, stderr, "\nInitializing fit phase %i. Xtol = %e, chisq_tol %e\n", phase, xtol, chisq_tol);
+        jabs_message(MSG_INFO, stderr, "Simulation parameters for this phase:\n");
+        sim_calc_params_print(fit_data->sim->params);
         gsl_multifit_nlinear_winit(x, &wts.vector, &fdf, w);
 
         /* compute initial cost function */

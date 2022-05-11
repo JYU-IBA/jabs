@@ -50,6 +50,10 @@ typedef struct {
     double stop_step_add; /* This is added to stop step */
     double rough_layer_multiplier; /* Multiply given (or default) number of subspectra when calculating rough layers. */
     double sigmas_cutoff; /* Number of (+-) sigmas to consider when turning bricks to spectra */
+    size_t int_cs_max_intervals;
+    double int_cs_accuracy; /* Accuracy of conc*cross section integration (not always relevant) */
+    size_t int_cs_stragg_max_intervals;
+    double int_cs_stragg_accuracy; /* Accuracy of conc * straggling (gaussian) integration (not always relevant) */
 } sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
 
 typedef struct {
@@ -128,7 +132,7 @@ void sim_calc_params_free(sim_calc_params *p);
 void sim_calc_params_copy(const sim_calc_params *p_src, sim_calc_params *p_dst);
 void sim_calc_params_update(sim_calc_params *p); /* Computes variables that can be computed from other variables */
 void sim_calc_params_ds(sim_calc_params *p, int ds); /* if ds is TRUE, set DS parameters, otherwise no action is taken */
-void sim_calc_params_faster(sim_calc_params *p, int fast); /* if fast is TRUE, set faster parameters, otherwise no action is taken */
+void sim_calc_params_print(const sim_calc_params *params);
 jibal_cross_section_type sim_cs(const simulation *sim, reaction_type type);
 int sim_reactions_add_reaction(simulation *sim, reaction *r);
 int sim_reactions_remove_reaction(simulation *sim, size_t i);
@@ -144,7 +148,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
 void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);
 void sim_workspace_calculate_sum_spectra(sim_workspace *ws);
-void simulation_print(FILE *f, const simulation *sim);
+void sim_print(const simulation *sim);
 void sim_workspace_histograms_reset(sim_workspace *ws);
 void sim_workspace_histograms_calculate(sim_workspace *ws);
 void sim_workspace_histograms_scale(sim_workspace *ws, double scale);
