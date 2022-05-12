@@ -960,6 +960,8 @@ int simulate_with_ds(sim_workspace *ws) {
     ion ion1 = ws->ion;
     ion ion2 = ion1;
     depth d_before = depth_seek(ws->sample, 0.0);
+    int ds_steps_polar = ws->params->ds_steps_polar;
+    int ds_steps_azi = ws->params->ds_steps_azi;
     sim_calc_params_defaults_fast(ws->params); /* This makes DS faster. Changes to ws->params are not reverted, but they don't affect original sim settings */
     sim_calc_params_update(ws->params);
     jabs_message(MSG_ERROR, stderr, "\n");
@@ -978,16 +980,17 @@ int simulate_with_ds(sim_workspace *ws) {
         jabs_message(MSG_VERBOSE, stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x / C_TFU, d_after.x / C_TFU, E_front / C_KEV,
                      E_back / C_KEV, fluence);
         double p_sum = 0.0;
-        for(int i_polar = 0; i_polar < ws->params->ds_steps_polar; i_polar++) {
+        for(int i_polar = 0; i_polar < ds_steps_polar; i_polar++) {
             const double ds_polar_min = 20.0 * C_DEG;
             const double ds_polar_max = 180.0 * C_DEG;
-            double ds_polar_step = (ds_polar_max - ds_polar_min) / (ws->params->ds_steps_polar * 1.0);
+            double ds_polar_step = (ds_polar_max - ds_polar_min) / (ds_steps_polar * 1.0);
             double ds_polar = ds_polar_min + i_polar * ds_polar_step;
             double cs_sum = 0.0;
             for(size_t i = 0; i < ws->sample->n_isotopes; i++) {
                 double c = get_conc(ws->sample, d_halfdepth, i);
-                if(c < ABUNDANCE_THRESHOLD)
+                if(c < ABUNDANCE_THRESHOLD) {
                     continue;
+                }
                 const jibal_isotope *target = ws->sample->isotopes[i];
                 if(incident->mass >= target->mass && ds_polar > asin(target->mass / incident->mass)) { /* Scattering not possible */
                     continue;
@@ -1001,10 +1004,10 @@ int simulate_with_ds(sim_workspace *ws) {
             }
             double fluence_tot = cs_sum * thick_step * ion1.inverse_cosine_theta * (2.0 * C_PI) * ds_polar_step; /* TODO: check calculation after moving from p_sr to fluence!*/
             p_sum += fluence_tot;
-            double fluence_azi = fluence_tot / (1.0 * (ws->params->ds_steps_azi));
-            for(int i_azi = 0; i_azi < ws->params->ds_steps_azi; i_azi++) {
+            double fluence_azi = fluence_tot / (1.0 * (ds_steps_azi));
+            for(int i_azi = 0; i_azi < ds_steps_azi; i_azi++) {
                 ion2 = ion1;
-                double ds_azi = C_2PI * (1.0 * i_azi) / (ws->params->ds_steps_azi * 1.0);
+                double ds_azi = C_2PI * (1.0 * i_azi) / (ds_steps_azi * 1.0);
                 ion_rotate(&ion2, ds_polar, ds_azi); /* Dual scattering: first scattering to some angle (scattering angle: ds_polar). Note that this does not follow SimNRA conventions. */
                 ws->fluence = fluence_azi * fluence;
 #ifdef DEBUG
