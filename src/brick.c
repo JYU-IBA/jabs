@@ -28,6 +28,7 @@ void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, 
         const brick *b_low = &bricks[i];
         double E_cutoff_low = b_low->E - b_low->sigma * sigmas_cutoff; /* Low energy cutoff (brick) */
         double E_cutoff_high = b_high->E + b_high->sigma * sigmas_cutoff;
+        double b_w_inv = 1.0/(b_high->E - b_low->E); /* inverse of brick width (in energy) */
         for(size_t j = 0; j < h->n; j++) {
             if(h->range[j+1] < E_cutoff_low) /* High energy edge of histogram is below cutoff */
                 continue;
@@ -35,8 +36,8 @@ void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, 
                 break; /* Assumes histograms have increasing energy */
             const double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
             const double w = h->range[j + 1] - h->range[j];
-            const double y = (erf_Q((b_low->E - E) / b_low->sigma) - erf_Q((b_high->E - E) / b_high->sigma)) / (b_high->E - b_low->E);
-            h->bin[j] += scale * y * w * b_low->Q;
+            const double y = (erf_Q((b_low->E - E) / b_low->sigma) - erf_Q((b_high->E - E) / b_high->sigma));
+            h->bin[j] += scale * y * w * b_w_inv * b_low->Q;
         }
     }
 }
