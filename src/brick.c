@@ -29,9 +29,16 @@ void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, 
         double E_cutoff_low = b_low->E - b_low->sigma * sigmas_cutoff; /* Low energy cutoff (brick) */
         double E_cutoff_high = b_high->E + b_high->sigma * sigmas_cutoff;
         double b_w_inv = 1.0/(b_high->E - b_low->E); /* inverse of brick width (in energy) */
-        for(size_t j = 0; j < h->n; j++) {
-            if(h->range[j+1] < E_cutoff_low) /* High energy edge of histogram is below cutoff */
-                continue;
+        size_t lo = 0, mi, hi = h->n;
+        while(hi - lo > 1) { /* Find histogram range with E_cutoff. This should be safe. */
+            mi = (hi + lo) / 2;
+            if(E_cutoff_low >= h->range[mi]) {
+                lo = mi;
+            } else {
+                hi = mi;
+            }
+        }
+        for(size_t j = lo; j < h->n; j++) {
             if(h->range[j] > E_cutoff_high) /* Low energy edge of histogram is above cutoff */
                 break; /* Assumes histograms have increasing energy */
             const double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
