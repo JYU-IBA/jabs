@@ -58,7 +58,7 @@ Launch JaBS in interactive mode simply by running `jabs` or `jabs --interactive`
 
 The interactive mode should be self-explanatory and an internal help is provided. Please see [the example script](example/example.jbs) to get started. Note that scripts are executed in the directory where the file is located, when opened in the GUI, but in the current working directory by the command-line program. This affects loading and saving filenames.
 
-The scripting language is not a programming language, there is no flow control, new variables can not be introducted etc. This may change in the future.
+The scripting language is not a programming language, there is no flow control, new variables can not be introduced etc. This may change in the future.
 
 ## Command line usage
 
@@ -135,7 +135,7 @@ Use `show fit variables` to see a list of variables that can be fitted. This lis
 This repository contains following open source software, or parts of them:
  * Code derived from GSL (GNU Scientific Library) examples, e.g. in [fit.c](fit.c). Used under the terms of GPL v3.
  * QCustomPlot [qcustomplot.cpp](qjabs/qcustomplot.cpp) and [qcustomplot.h](qjabs/qcustomplot.h), Copyright (C) 2011-2021 Emanuel Eichhammer. Used under the terms of GPL v3.
- * Coordinate rotate routine from MCERD [rotate.c](rotate.c). Copyright Kai Arstila. User under the terms of GPL v2.
+ * Coordinate rotate routine from MCERD [rotate.c](rotate.c). Copyright Kai Arstila. Used under the terms of GPL v2.
  * Some routines from NetBSD, Copyright (c) 2011 The NetBSD Foundation, Inc. See [win_compat.c](win_compat.c) for the full copyright notice.
  * [Qt6](https://www.qt.io/) GUI is distributed under the provisions of [LGPL version 3](https://doc.qt.io/qt-6/lgpl.html). Qt Toolkit is Copyright (C) 2018 The Qt Company Ltd. and other contributors.
  * [Material Design](https://google.github.io/material-design-icons/) [icons](qjabs/icons) licensed under [Apache 2.0 license](https://www.apache.org/licenses/LICENSE-2.0.html).

@@ -305,7 +305,7 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
         fprintf(stderr, "stop avg %g eV/tfu\n", params.stop_slope/(C_EV/C_TFU));
         fprintf(stderr, "integration result          = % 18g\n", result);
         fprintf(stderr, "integration estimated error = % 18g\n", error);
-        fprintf(stderr, "integration intervals       = %zu\n", ws->w_integration->size);
+        fprintf(stderr, "integration intervals       = %zu\n", ws->w_int_cs->size);
         fprintf(stderr, "final result                = %g mb/sr\n", final/C_MB_SR);
 #endif
     return final;
