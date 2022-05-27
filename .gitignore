@@ -3,6 +3,8 @@
 *plots/*
 /tests/
 /.idea/
+/.vscode/
+qjabs/.vscode/
 /tmp/
 *.swp
 *.dmg

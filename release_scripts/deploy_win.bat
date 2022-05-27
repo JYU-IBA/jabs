@@ -21,7 +21,7 @@ REM del CMakeCache.txt
 cmake -DCMAKE_PREFIX_PATH="%QT6_DIR%\msvc2019_64\lib\cmake" -G "Visual Studio 16 2019" -A x64 -DCMAKE_TOOLCHAIN_FILE="%VCPKG_DIR%\scripts\buildsystems\vcpkg.cmake" ../
 cmake --build . --target ALL_BUILD --config Release
 REM Windeployqt will handle most dlls and other Qt dependencies
-%QT6_DIR%\msvc2019_64\bin\windeployqt.exe Release
+%QT6_DIR%\msvc2019_64\bin\windeployqt.exe Release\qjabs.exe
 copy ..\..\build\src\Release\jabs.exe Release
 copy "%JIBAL_DIR%\bin\*.dll" Release
 del Release\jibal.conf
