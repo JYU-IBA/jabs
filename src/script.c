@@ -44,7 +44,7 @@ int script_process(script_session *s) {
         }
         if(script_file_getline(sfile) > 0) {
             if(!interactive) {
-                jabs_message(MSG_INFO, stderr, "%s%s\n", prompt, sfile->line);
+                    jabs_message(MSG_INFO, stderr, "%s:%zu jabs> %s\n", sfile->filename, sfile->lineno, sfile->line);
             }
             status = script_execute_command(s, sfile->line);
             if(!interactive && status != SCRIPT_COMMAND_SUCCESS) {
