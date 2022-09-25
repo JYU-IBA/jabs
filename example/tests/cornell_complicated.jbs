@@ -1,0 +1,13 @@
+#!/usr/bin/env jabs
+set ion 4He
+set energy 1.0MeV
+set sim improved
+set ds true
+set geostragg true
+set sample Au 1000tfu Si 10000tfu
+set alpha 40deg
+set det resolution 15keV slope 1keV theta 110deg phi 90deg
+set det aperture circle diameter 10.0mm
+set det distance 10cm solid 10msr
+simulate
+save spectra "cornell2_out.csv"
