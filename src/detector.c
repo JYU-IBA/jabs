@@ -86,8 +86,8 @@ int detector_sanity_check(const detector *det) {
         jabs_message(MSG_ERROR, stderr, "No detector!\n");
         return -1;
     }
-    if(det->calibration->resolution <= 0.0) {
-        jabs_message(MSG_ERROR, stderr, "Warning: detector resolution (%g) is negative.\n", det->calibration->resolution);
+    if(!isfinite(det->calibration->resolution) || det->calibration->resolution <= 0.0) {
+        jabs_message(MSG_ERROR, stderr, "Warning: detector resolution (%g) is negative or not finite.\n", det->calibration->resolution);
         return -1;
     }
     double slope = calibration_get_param(det->calibration, CALIBRATION_PARAM_SLOPE);

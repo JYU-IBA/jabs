@@ -1487,6 +1487,9 @@ script_command_status script_load_experimental(script_session *s, int argc, char
         for(i_det = 0; i_det < fit->sim->n_det; i_det++) {
             if(fit_data_load_exp(s->fit, i_det, argv[0])) {
                 return SCRIPT_COMMAND_FAILURE;
+            } else {
+                const gsl_histogram *h = fit->exp[i_det];
+                jabs_message(MSG_VERBOSE, stderr, "Detector %zu: experimental spectrum with %zu channels loaded.\n", i_det + 1, h?h->n:0);
             }
         }
     }
@@ -1706,7 +1709,9 @@ script_command_status script_show_detector(script_session *s, int argc, char *co
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(argc != argc_orig || fit->sim->n_det == 1) { /* Show information on particular detector if a number was given or if we only have one detector. */
+    if(fit->sim->n_det == 0) {
+        jabs_message(MSG_INFO, stderr, "No detectors have been defined.\n");
+    } else if(argc != argc_orig || fit->sim->n_det == 1) { /* Show information on particular detector if a number was given or if we only have one detector. */
         if(detector_print(s->jibal, NULL, sim_det(fit->sim, i_det))) {
             jabs_message(MSG_ERROR, stderr, "No detectors set or other error.\n");
         }

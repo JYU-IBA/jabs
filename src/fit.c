@@ -43,6 +43,11 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     for(size_t i = 0; i < fit_data->fit_params->n; i++) {
         fit_variable *var = &fit_data->fit_params->vars[i];
         if(var->active) {
+            if(!isfinite(*(var->value))) {
+                fprintf(stderr, "Fit iteration %zu, call %zu, fit variable %zu (%s) is not finite.\n", fit_data->stats.iter, fit_data->stats.iter_call, var->i_v, var->name);
+                fit_data->stats.error = FIT_ERROR_SANITY;
+                return GSL_FAILURE;
+            }
             *(var->value) = gsl_vector_get(x, var->i_v);
             if(fit_data->stats.iter_call == 1) { /* Store the value of fit parameters at the first function evaluation */
                 var->value_iter = *(var->value);
@@ -566,7 +571,6 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
                 return FIT_ERROR_ABORTED;
             }
         }
-
         if(iter == 0)
             continue;
         /* test for convergence */
