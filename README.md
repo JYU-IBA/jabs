@@ -85,7 +85,8 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Reading of experimental data, integer factor compress
  - Fitting to experimental spectrum (multidimensional non-linear least squares fitting)
  - Linear ad-hoc substrate channeling correction
- - Faster (less accurate) mode
+ - Faster (less accurate) modes
+ - Slower (more accurate) modes
  - User defined "molecules" i.e. elements with fixed concentration ratios (e.g. you can fit C in SiO2 without changing Si/O ratio)
  - Weighting of cross-sections by straggling 
  - Kinematic (geometric) broadening due to finite detector size and beam spot
@@ -124,8 +125,8 @@ The command line interface for fitting is currently undocumented and may be remo
 
 Interactive/script example:
 
-    jabs> add fit_range [500:900] [1000:1200] 
-    jabs> fit *calib*,fluence,thickness1
+    jabs> add fit range [500:900] [1000:1200]
+    jabs> fit *calib*,fluence,thick1
     jabs> show fit
 
 Use `show fit variables` to see a list of variables that can be fitted. This list changes when the sample and detector(s) change. Using `*` or `?` wildcards is possible, the example above will add all calibration parameters of all detectors.
