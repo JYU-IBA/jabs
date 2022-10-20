@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>729</width>
-    <height>188</height>
+    <width>565</width>
+    <height>198</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -34,6 +34,12 @@
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
         <widget class="QFontComboBox" name="editorFontComboBox">
+         <property name="minimumSize">
+          <size>
+           <width>150</width>
+           <height>0</height>
+          </size>
+         </property>
          <property name="fontFilters">
           <set>QFontComboBox::AllFonts</set>
          </property>
@@ -48,6 +54,12 @@
        </item>
        <item>
         <widget class="QSpinBox" name="editorfontsizeSpinBox">
+         <property name="minimumSize">
+          <size>
+           <width>100</width>
+           <height>0</height>
+          </size>
+         </property>
          <property name="minimum">
           <number>5</number>
          </property>
@@ -99,6 +111,12 @@
       <layout class="QHBoxLayout" name="horizontalLayout_2">
        <item>
         <widget class="QFontComboBox" name="messageFontComboBox">
+         <property name="minimumSize">
+          <size>
+           <width>150</width>
+           <height>0</height>
+          </size>
+         </property>
          <property name="fontFilters">
           <set>QFontComboBox::MonospacedFonts</set>
          </property>
@@ -113,6 +131,12 @@
        </item>
        <item>
         <widget class="QSpinBox" name="messagefontsizeSpinBox">
+         <property name="minimumSize">
+          <size>
+           <width>100</width>
+           <height>0</height>
+          </size>
+         </property>
          <property name="minimum">
           <number>5</number>
          </property>

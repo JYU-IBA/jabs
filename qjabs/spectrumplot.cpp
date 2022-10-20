@@ -430,7 +430,11 @@ void SpectrumPlot::onMouseMove(QMouseEvent *event)
 {
     int x = qFloor(xAxis->pixelToCoord(event->pos().x()));
     double y = yAxis->pixelToCoord(event->pos().y());
-    coordinatesText->setText(QString("(%1, %2)").arg(x).arg(y, 6, 'f', 1));
+    if(zoom) {
+        coordinatesText->setText(QString("Zoom (%1, %2)").arg(x).arg(y, 6, 'f', 1));
+    } else {
+        coordinatesText->setText(QString("(%1, %2)").arg(x).arg(y, 6, 'f', 1));
+    }
     coordinatesText->position->setCoords(QPointF(x, y));
     replot(QCustomPlot::rpQueuedReplot);
 }
