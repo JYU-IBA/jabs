@@ -5,7 +5,6 @@ versionfile="../version.txt"
 today=$(date "+%Y-%m-%d")
 read version < "$versionfile"
 echo "cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
 authors:
  - family-names: "Julin"
    given-names: "Jaakko"
