@@ -828,7 +828,10 @@ int print_bricks(const char *filename, const sim_workspace *ws) {
         return EXIT_FAILURE;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const sim_reaction *r = &ws->reactions[i];
-        fprintf(f, "#%s %s\n", reaction_name(r->r), r->r->target->name);
+        fprintf(f, "#Reaction %zu: %s %s\n", i+1, reaction_name(r->r), r->r->target->name);
+        if(r->r->filename) {
+            fprintf(f, "#Filename: %s\n", r->r->filename);
+        }
         fprintf(f, "#i  brick  depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo) sigma*conc        Q\n");
         for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
