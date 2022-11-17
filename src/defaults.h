@@ -21,6 +21,9 @@
 #define SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE 16 /* Commands are sorted alphabetically using a merge sort, the algorithm uses a "Bottom-up" approach with a small fixed size array (can sort up to 2^SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE elements) */
 #define PROMPT "jabs> "
 
+#define CHANNELS_ABSOLUTE_MIN 128
+#define CHANNELS_ABSOLUTE_MAX 100000
+
 /* Defaults for new simulations */
 #define ENERGY (2.0*C_MEV)
 #define ALPHA (0.0*C_DEG)

@@ -553,26 +553,20 @@ void sim_workspace_free(sim_workspace *ws) {
 }
 
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim) { /* TODO: assumes calibration function is increasing */
-    double E_max = 0.0;
+    size_t n_max = CHANNELS_ABSOLUTE_MIN; /* Always simulate at least CHANNELS_ABSOLUTE_MIN channels */
     for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-        double E = reaction_product_energy(sim->reactions[i_reaction], ws->det->theta, sim->beam_E);
-        if(E > E_max) {
-            E_max = E;
-        }
+        const reaction *r = sim->reactions[i_reaction];
+        double E = reaction_product_energy(r, ws->det->theta, sim->beam_E);
+        double E_safer = E + 3.0*sqrt(detector_resolution(ws->det, r->product, E)); /* Add 3x resolution sigma to max energy */
+        E_safer *= 1.1; /* and 10% for good measure! */
+        while(detector_calibrated(ws->det, JIBAL_ANY_Z, n_max) < E_safer && n_max <= CHANNELS_ABSOLUTE_MAX) {n_max++;} /* Increase number of channels until we hit this energy. TODO: this requires changes for ToF spectra. */
+#ifdef DEBUG
+        fprintf(stderr, "Reaction %zu, max E = %g keV -> %g keV after resolution and safety factor have been added, current n_max %zu (channels)\n", i_reaction + 1, E/C_KEV, E_safer/C_KEV, n_max);
+#endif
     }
-    E_max *= 1.1;
-    E_max += detector_resolution(ws->det, sim->beam_isotope, E_max);
-#ifdef DEBUG
-    fprintf(stderr, "E_max of this simulation is %g keV\n", E_max/C_KEV);
-#endif
-    size_t i=0;
-    while(detector_calibrated(ws->det, JIBAL_ANY_Z, i) < E_max && i <= 1000000) {i++;} /* TODO: this requires changes for ToF spectra. Also TODO: Z-specific calibrations are ignored here */
-#ifdef DEBUG
-    fprintf(stderr, "Simulating %zu channels\n", i);
-#endif
-    if(i == 1000000)
-        i=0;
-    ws->n_channels = i;
+    if(n_max == CHANNELS_ABSOLUTE_MAX)
+        n_max=0;
+    ws->n_channels = n_max;
 }
 
 void sim_workspace_calculate_sum_spectra(sim_workspace *ws) {
