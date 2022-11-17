@@ -27,6 +27,7 @@ typedef struct sample_range {
     double yield; /* Ad-hoc correction to scattering yield (cross section) */
     double bragg; /* Ad-hoc correction to stopping */
     double stragg; /* Ad-hoc correction to straggling */
+    double density; /* Density of range (preferably of a layer) , used only to convert at./cm2 into nm if > 0.0 */
 } sample_range;
 
 typedef struct depth {
@@ -74,6 +75,7 @@ sample *sample_from_sample_model(const sample_model *sm);
 int sample_model_print(const char *filename, const sample_model *sm);
 size_t sample_model_number_of_rough_ranges(const sample_model *sm);
 size_t sample_model_number_of_ranges_with_non_unity_corrections(const sample_model *sm);
+size_t sample_model_number_of_range_with_non_zero_density(const sample_model *sm);
 
 depth depth_seek(const sample *sample, double x);
 inline double depth_diff(const depth a, const depth b) {
@@ -83,7 +85,11 @@ double get_conc(const sample *s, depth depth, size_t i_isotope);
 
 sample *sample_alloc(size_t n_isotopes, size_t n_ranges);
 sample *sample_copy(const sample *sample); /* Deep copy */
+double sample_mass_density_range(const sample *sample, size_t i_range);
+double sample_thickness_in_nm_range(const sample *sample, size_t i_range);
+double sample_areal_density_isotope_range(const sample *sample,  size_t i_isotope, size_t i_range);
 void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes);
+int sample_print_thicknesses(const char *filename, const sample *sample);
 int sample_print(const char *filename, const sample *sample, int print_isotopes);  /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
 void sample_free(sample *sample);
 double sample_isotope_max_depth(const sample *sample, size_t i_isotope);

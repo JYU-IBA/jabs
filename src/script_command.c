@@ -242,6 +242,8 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
     jabs_message(MSG_INFO, stderr, "\nFinal profile:\n");
     sample_print(NULL, fit_data->sim->sample, FALSE);
     sample_areal_densities_print(stderr, fit_data->sim->sample, FALSE);
+    jabs_message(MSG_INFO, stderr, "\nFinal layer thicknesses:\n");
+    sample_print_thicknesses(NULL, fit_data->sim->sample);
     jabs_message(MSG_INFO, stderr, "\nFinal sample model:\n");
     sample_model_print(NULL, fit_data->sm);
     jabs_message(MSG_INFO, stderr, "\n");

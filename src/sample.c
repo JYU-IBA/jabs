@@ -344,6 +344,7 @@ int sample_model_print(const char *filename, const sample_model *sm) {
     }
     size_t n_rl = sample_model_number_of_rough_ranges(sm);
     size_t n_layers_corrections = sample_model_number_of_ranges_with_non_unity_corrections(sm);
+    size_t n_nonzero_density = sample_model_number_of_range_with_non_zero_density(sm);
     switch(sm->type) {
         case SAMPLE_MODEL_NONE:
             jabs_message(MSG_INFO, f, "Sample model is none.\n"); /* Not an error as such. No output (to f) is created. */
@@ -360,6 +361,9 @@ int sample_model_print(const char *filename, const sample_model *sm) {
         jabs_message(MSG_INFO, f, "        rough");
         jabs_message(MSG_INFO, f, " n_rough");
     }
+    if(n_nonzero_density) {
+        jabs_message(MSG_INFO, f, "  density");
+    }
     if(n_layers_corrections) {
         jabs_message(MSG_INFO, f, "  yield");
         jabs_message(MSG_INFO, f, "  bragg");
@@ -375,6 +379,9 @@ int sample_model_print(const char *filename, const sample_model *sm) {
         if(n_rl) {
             jabs_message(MSG_INFO, f, " %12.3lf", r->rough.x / C_TFU);
             jabs_message(MSG_INFO, f, " %7zu", r->rough.n);
+        }
+        if(n_nonzero_density) {
+            jabs_message(MSG_INFO, f, " %8.4lf", r->density / C_G_CM3);
         }
         if(n_layers_corrections) {
             jabs_message(MSG_INFO, f, " %5.4lf %5.4lf %6.4lf", r->yield, r->bragg, r->stragg);
@@ -411,6 +418,18 @@ size_t sample_model_number_of_ranges_with_non_unity_corrections(const sample_mod
     return n;
 }
 
+size_t sample_model_number_of_range_with_non_zero_density(const sample_model *sm) { /* Used to determine if "nm" field needs to be output by sample_model_print() */
+    if(!sm)
+        return 0;
+    size_t n = 0;
+    for(size_t i = 0; i < sm->n_ranges; i++) {
+        const sample_range *r = &(sm->ranges[i]);
+        if(r->density > 0.0)
+            n++;
+    }
+    return n;
+}
+
 sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
     FILE *in;
     if(!filename)
@@ -430,7 +449,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
     size_t line_size = 0;
     size_t lineno = 0;
 
-    size_t i_depth = 0, i_rough = 0, i_nrough = 0, i_bragg = 0, i_yield = 0, i_stragg = 0;
+    size_t i_depth = 0, i_rough = 0, i_nrough = 0, i_bragg = 0, i_yield = 0, i_stragg = 0, i_density = 0;
 
     int headers = 1;
 
@@ -454,6 +473,8 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                     i_yield = n;
                 } else if(strncmp(col, "stragg", 5) == 0) {
                     i_stragg = n;
+                } else if(strncmp(col, "density", 7) == 0) {
+                    i_density = n;
                 } else if(strncmp(col, "rough", 5) == 0) {
                     i_rough = n;
                 } else if(strncmp(col, "n_rough", 7) == 0) {
@@ -485,6 +506,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 r->yield = 1.0;
                 r->bragg = 1.0;
                 r->stragg = 1.0;
+                r->density = 0.0;
                 r->rough.x = 0.0;
                 r->rough.model = ROUGHNESS_NONE;
                 r->rough.n = 0;
@@ -507,6 +529,8 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 r->yield = x;
             } else if (n == i_stragg) {
                 r->stragg = x;
+            } else if (n == i_rough) {
+                r->density = x*C_G_CM3;
             } else if (n == i_rough) {
                 r->rough.x = x*C_TFU;
             } else if (n == i_nrough) {
@@ -595,8 +619,10 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
         } else if(sm->n_ranges && strcmp((*argv)[0], "stragg") == 0) {
             sample_range *range = &sm->ranges[sm->n_ranges - 1];
             range->stragg = strtod((*argv)[1], NULL);
-        }
-        else {
+        } else if(sm->n_ranges && strcmp((*argv)[0], "density") == 0) {
+            sample_range *range = &sm->ranges[sm->n_ranges - 1];
+            range->density = jibal_get_val(jibal->units, UNIT_TYPE_ANY, (*argv)[1]); /* TODO: JIBAL doesn't support density yet */
+        } else {
             sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, (*argv)[0]);
             if(!sm->materials[sm->n_ranges]) {
 #ifdef DEBUG
@@ -612,6 +638,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             range->bragg = 1.0;
             range->yield = 1.0;
             range->stragg = 1.0;
+            range->density = 0.0;
             range->rough.x = 0.0;
             range->rough.model = ROUGHNESS_NONE;
             range->rough.n = 0;
@@ -695,6 +722,9 @@ char *sample_model_to_string(const sample_model *sm) {
         if(r->stragg != 1.0) {
             asprintf_append(&out, " stragg %g", r->stragg);
         }
+        if(r->density != 0.0) {
+            asprintf_append(&out, " density %g", r->density);
+        }
     }
     return out;
 }
@@ -713,15 +743,43 @@ sample *sample_copy(const sample *s_in) {
     return s_out;
 }
 
+double sample_mass_density_range(const sample *sample, size_t i_range) {
+    if(i_range < 1 || i_range >= sample->n_ranges)
+        return 0.0;
+    double thickness = (sample->ranges[i_range].x - sample->ranges[i_range-1].x); /* areal density */
+    double sum = 0.0;
+    for (size_t i = 0; i < sample->n_isotopes; i++) {
+        double conc = 0.5 * ( *(sample_conc_bin(sample, i_range, i)) + *(sample_conc_bin(sample, i_range-1, i))); /* average */
+        sum += conc * sample->isotopes[i]->mass;
+    }
+    return sum * thickness;
+}
+
+double sample_thickness_in_nm_range(const sample *sample, size_t i_range) {
+    if(i_range < 1 || i_range >= sample->n_ranges)
+        return 0.0;
+    double massdensity = sample_mass_density_range(sample, i_range); /* kg/m2 areal mass density */
+    double avgdensity = 0.5*(sample->ranges[i_range-1].density + sample->ranges[i_range].density); /* kg/m3 density */
+    return massdensity/avgdensity;
+}
+
+double sample_areal_density_isotope_range(const sample *sample, size_t i_isotope, size_t i_range) {
+    if(i_range < 1 || i_range >= sample->n_ranges)
+        return 0.0;
+    if(i_isotope >= sample->n_isotopes)
+        return 0.0;
+    double thickness = (sample->ranges[i_range].x - sample->ranges[i_range-1].x);
+    return 0.5 * ( *(sample_conc_bin(sample, i_range, i_isotope)) + *(sample_conc_bin(sample, i_range-1, i_isotope))) * thickness;
+}
+
 void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes) {
     if(!sample)
         return;
-    jabs_message(MSG_INFO, f, "AREAL D(tfu)             ");
+    jabs_message(MSG_INFO, f, "SUM (tfu)        ");
     double sum = 0.0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         for (size_t j = 1; j < sample->n_ranges; j++) {
-            double thickness = (sample->ranges[j].x - sample->ranges[j-1].x);
-            sum += 0.5 * ( *(sample_conc_bin(sample, j, i)) + *(sample_conc_bin(sample, j-1, i))) * thickness;
+            sum += sample_areal_density_isotope_range(sample, i, j);
         }
         if (print_isotopes || i == sample->n_isotopes-1 || sample->isotopes[i]->Z != sample->isotopes[i+1]->Z) {
             jabs_message(MSG_INFO, f, " %9.3lf", sum/C_TFU);
@@ -732,13 +790,32 @@ void sample_areal_densities_print(FILE *f, const sample *sample, int print_isoto
 }
 
 
+int sample_print_thicknesses(const char *filename, const sample *sample) {
+    if(!sample)
+        return EXIT_FAILURE;
+    FILE *f = fopen_file_or_stream(filename, "w");
+    if(!f)
+        return EXIT_FAILURE;
+    if(sample->no_conc_gradients) {
+        jabs_message(MSG_INFO, f, "Layer       tfu     ug/cm2       nm\n");
+        for(size_t i = 1; i < sample->n_ranges; i += 2) {
+            jabs_message(MSG_INFO, f, "%5zu %9.3lf  %9.3lf %8.1lf\n", (i + 1)/2,
+                         (sample->ranges[i].x - sample->ranges[i-1].x) / C_TFU,
+                         sample_mass_density_range(sample, i) / (C_UG / C_CM2),
+                         sample_thickness_in_nm_range(sample, i) / C_NM);
+        }
+    }
+    fclose_file_or_stream(f);
+    return EXIT_SUCCESS;
+}
+
 int sample_print(const char *filename, const sample *sample, int print_isotopes) {
     if(!sample)
         return EXIT_FAILURE;
     FILE *f = fopen_file_or_stream(filename, "w");
     if(!f)
         return EXIT_FAILURE;
-    jabs_message(MSG_INFO, f, "  DEPTH(tfu)   ROUGH(tfu)");
+    jabs_message(MSG_INFO, f, "    DEPTH   ROUGH");
     int Z = 0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         if(print_isotopes) {
@@ -751,9 +828,10 @@ int sample_print(const char *filename, const sample *sample, int print_isotopes)
         }
     }
     jabs_message(MSG_INFO, f, "\n");
+    jabs_message(MSG_INFO, f, "      tfu     tfu\n");
     for (size_t i = 0; i < sample->n_ranges; i++) {
-        jabs_message(MSG_INFO, f, "%12.3lf", sample->ranges[i].x/C_TFU);
-        jabs_message(MSG_INFO, f, " %12.3lf", sample->ranges[i].rough.x/C_TFU);
+        jabs_message(MSG_INFO, f, "%9.3lf", sample->ranges[i].x/C_TFU);
+        jabs_message(MSG_INFO, f, " %7.3lf", sample->ranges[i].rough.x/C_TFU);
         double sum = 0.0;
         for (size_t j = 0; j < sample->n_isotopes; j++) {
             sum += sample->cbins[i * sample->n_isotopes + j];
@@ -764,18 +842,7 @@ int sample_print(const char *filename, const sample *sample, int print_isotopes)
         }
         jabs_message(MSG_INFO, f, "\n");
     }
-#ifdef PRINT_SAMPLE_MODEL
-    fprintf(f, "\n");
-    for (i = 0; i < 1000; ++i) {
-        double d = 10.0*C_TFU*i;
-        fprintf(f, "%10.3lf", d/C_TFU);
-        for (j = 0; j < sample->n_isotopes; j++) {
-            double x = get_conc(sample, d, j);
-            fprintf(f, " %8.4lf", x*100.0);
-        }
-        fprintf(f, "\n");
-    }
-#endif
+    jabs_message(MSG_INFO, f, "\n");
     fclose_file_or_stream(f);
     return EXIT_SUCCESS;
 }
