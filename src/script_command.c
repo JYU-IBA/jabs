@@ -1609,18 +1609,23 @@ script_command_status script_show_sample(script_session *s, int argc, char *cons
     if(!fit->sm) {
         jabs_message(MSG_WARNING, stderr, "No sample has been set.\n");
         return 0;
-    } else {
+    }
 #ifdef DEBUG
-        char *sample_str = sample_model_to_string(fit->sm);
+    char *sample_str = sample_model_to_string(fit->sm);
         fprintf(stderr, "Sample: %s\n", sample_str);
         free(sample_str);
 #endif
-        if(sample_model_print(NULL, fit->sm)) {
-            return SCRIPT_COMMAND_FAILURE;
-        } else {
-            return 0;
-        }
+    jabs_message(MSG_INFO, stderr, "Sample model (use \"save sample\" to save):\n");
+    if(sample_model_print(NULL, fit->sm)) {
+        return SCRIPT_COMMAND_FAILURE;
     }
+    if(fit->sm->type == SAMPLE_MODEL_LAYERED) {
+        jabs_message(MSG_INFO, stderr, "\nLayers:\n");
+        sample *sample = sample_from_sample_model(fit->sm);
+        sample_print_thicknesses(NULL, sample);
+        sample_free(sample);
+    }
+    return 0;
 }
 
 script_command_status script_show_simulation(script_session *s, int argc, char *const *argv) {

@@ -621,7 +621,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             range->stragg = strtod((*argv)[1], NULL);
         } else if(sm->n_ranges && strcmp((*argv)[0], "density") == 0) {
             sample_range *range = &sm->ranges[sm->n_ranges - 1];
-            range->density = jibal_get_val(jibal->units, UNIT_TYPE_ANY, (*argv)[1]); /* TODO: JIBAL doesn't support density yet */
+            range->density = jibal_get_val(jibal->units, UNIT_TYPE_DENSITY, (*argv)[1]);
         } else {
             sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, (*argv)[0]);
             if(!sm->materials[sm->n_ranges]) {
