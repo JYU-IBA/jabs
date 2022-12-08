@@ -529,7 +529,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 r->yield = x;
             } else if (n == i_stragg) {
                 r->stragg = x;
-            } else if (n == i_rough) {
+            } else if (n == i_density) {
                 r->density = x*C_G_CM3;
             } else if (n == i_rough) {
                 r->rough.x = x*C_TFU;
