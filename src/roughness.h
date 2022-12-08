@@ -34,13 +34,22 @@ typedef enum roughness_model {
     ROUGHNESS_FILE = 3
 } roughness_model;
 
+typedef struct roughness_file {
+    char *filename;
+    thick_prob_dist *tpd;
+} roughness_file;
+
 typedef struct roughness {
     roughness_model model;
     double x; /* Amount, model specific? */
     size_t n; /* Number of spectra (e.g. for gamma roughness) */
+    roughness_file *file;
 } roughness;
 
-thick_prob_dist *thickness_probability_table_gen(double thickness, double sigma, size_t n);
+
+thick_prob_dist *thickness_probability_table_gamma(double thickness, double sigma, size_t n);
+thick_prob_dist *thickness_probability_table_new(size_t n);
 void thickness_probability_table_free(thick_prob_dist *tpd);
+thick_prob_dist *thickness_probability_table_copy(thick_prob_dist *tpd);
 double thickness_gamma_pdf(double x, double thickness, double sigma);
 #endif // JABS_ROUGHNESS_H

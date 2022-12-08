@@ -11,9 +11,7 @@ double thickness_gamma_pdf(double x, double thickness, double sigma) {
     return gsl_cdf_gamma_P(x, a, b);
 }
 
-
-
-thick_prob_dist *thickness_probability_table_gen(double thickness, double sigma, size_t n) {
+thick_prob_dist *thickness_probability_table_gamma(double thickness, double sigma, size_t n) {
     if(thickness < 0.0) {
         thickness = 0.0;
     }
@@ -28,11 +26,7 @@ thick_prob_dist *thickness_probability_table_gen(double thickness, double sigma,
         low = 0.0;
     }
     double step = (high-low)/(n*1.0);
-    thick_prob_dist *tpd = malloc(sizeof(thick_prob_dist));
-    tpd->n = n;
-    tpd->p = malloc(sizeof(thick_prob) * tpd->n);
-
-    
+    thick_prob_dist *tpd = thickness_probability_table_new(n);
     double sum = 0.0;
     double areal_sum = 0.0;
     if(n == 1) {
@@ -58,8 +52,16 @@ thick_prob_dist *thickness_probability_table_gen(double thickness, double sigma,
         thick_prob *p = &tpd->p[i];
         p->prob *= corr;
     }
-    tpd->modulo = 1; /* Will be recalculated */
-    tpd->i_range = 0; /* Will be reset */
+    return tpd;
+}
+
+
+thick_prob_dist *thickness_probability_table_new(size_t n) {
+    thick_prob_dist *tpd = malloc(sizeof(thick_prob_dist));
+    tpd->modulo = 0;
+    tpd->i_range = 0;
+    tpd->n = n;
+    tpd->p = calloc(n, sizeof(thick_prob));
     return tpd;
 }
 
@@ -68,4 +70,11 @@ void thickness_probability_table_free(thick_prob_dist *tpd) {
         return;
     free(tpd->p);
     free(tpd);
+}
+thick_prob_dist *thickness_probability_table_copy(thick_prob_dist *tpd) {
+    thick_prob_dist *tpd_copy = thickness_probability_table_new(tpd->n);
+    for(size_t i = 0; i < tpd_copy -> n; i++) {
+        tpd_copy->p[i] = tpd->p[i];
+    }
+    return tpd_copy;
 }

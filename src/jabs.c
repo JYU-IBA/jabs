@@ -879,21 +879,27 @@ int simulate_with_roughness(sim_workspace *ws) {
     thick_prob_dist **tpds = malloc(sizeof(thick_prob_dist *) * n_rl);
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
         sample_range *r = &(ws->sample->ranges[i]);
+        if(r->rough.model == ROUGHNESS_NONE)
+            continue;
+        tpds[i_rl] = NULL;
         if(r->rough.model == ROUGHNESS_GAMMA) {
 #ifdef DEBUG
             fprintf(stderr, "Range %zu is rough (gamma), amount %g tfu, n = %zu spectra\n", i, ws->sample->ranges[i].rough.x/C_TFU, ws->sample->ranges[i].rough.n);
 #endif
-            tpds[i_rl] = thickness_probability_table_gen(r->x, r->rough.x, r->rough.n);
-            thick_prob_dist *tpd = tpds[i_rl];
-            tpd->i_range = i;
-#ifdef DEBUG
+            tpds[i_rl] = thickness_probability_table_gamma(r->x, r->rough.x, r->rough.n);
+        } else if(r->rough.model == ROUGHNESS_FILE) {
+            tpds[i_rl] = thickness_probability_table_copy(r->rough.file->tpd);
+        }
+        if(tpds[i_rl]) {
+            tpds[i_rl]->i_range = i;
+#ifdef DEBUG /* TODO: modify printing when a file is given */
             fprintf(stderr, "TPD (i_range %zu) for depth %zu (%.3lf tfu nominal), roughness %.3lf tfu:\n", tpd->i_range, i, ws->sample->ranges[i].x/C_TFU, ws->sample->ranges[i].rough.x/C_TFU);
             for(size_t i_tpd = 0; i_tpd < tpd->n; i_tpd++) {
                 fprintf(stderr, "%zu: %.3lf tfu %.3lf%%\n", i_tpd, tpds[i_rl]->p[i_tpd].x/C_TFU, tpd->p[i_tpd].prob/C_PERCENT);
             }
 #endif
             i_rl++;
-        } else if(r->rough.model == ROUGHNESS_NONE)
+        }
     }
     size_t iter_total = 1;
     for(i_rl = 0; i_rl < n_rl; i_rl++) { /* Calculate cumulative product (number of subspectra) */

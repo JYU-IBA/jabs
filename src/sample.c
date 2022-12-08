@@ -510,6 +510,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 r->rough.x = 0.0;
                 r->rough.model = ROUGHNESS_NONE;
                 r->rough.n = 0;
+                r->rough.file = NULL;
                 sm->n_ranges++;
 #ifdef DEBUG
                 fprintf(stderr, "Sample from file: NEW POINT, n = %zu, n_ranges = %zu, n_materials=%zu\n", n, sm->n_ranges, sm->n_materials);
@@ -548,7 +549,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
 
     for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Set defaults for roughness*/
         sample_range *r = &sm->ranges[i_range];
-        if(r->rough.x > 0.1*C_TFU) {
+        if(r->rough.x > ROUGH_TOLERANCE) {
             r->rough.model = ROUGHNESS_GAMMA; /* TODO: other models */
         } else {
             r->rough.model = ROUGHNESS_NONE;
@@ -607,6 +608,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             sample_range *range = &sm->ranges[sm->n_ranges - 1];
             range->rough.x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1]);
             range->rough.model = ROUGHNESS_GAMMA;
+            range->rough.file = NULL;
         } else if(sm->n_ranges && strcmp((*argv)[0], "n_rough") == 0) {
                 sample_range *range = &sm->ranges[sm->n_ranges - 1];
                 range->rough.n = strtoul((*argv)[1], NULL, 10);
@@ -642,6 +644,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             range->rough.x = 0.0;
             range->rough.model = ROUGHNESS_NONE;
             range->rough.n = 0;
+            range->rough.file = NULL;
             sm->n_ranges++;
             sm->n_materials++;
         }
@@ -709,7 +712,9 @@ char *sample_model_to_string(const sample_model *sm) {
         asprintf_append(&out, " %g%s", r->x/C_TFU, "tfu");
         if(r->rough.model != ROUGHNESS_NONE && r->x > ROUGH_TOLERANCE) {
             asprintf_append(&out, " rough %gtfu", r->rough.x/C_TFU, "tfu");
-            if(r->rough.n != 0) {
+            if(r->rough.file) {
+                asprintf_append(&out, " file \"%s\"", r->rough.file->filename);
+            } else if(r->rough.n != 0) {
                 asprintf_append(&out, " n_rough %zu", r->rough.n);
             }
         }
