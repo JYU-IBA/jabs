@@ -862,7 +862,7 @@ int simulate_with_roughness(sim_workspace *ws) {
         if(r->rough.n == 0) {
             r->rough.model = ROUGHNESS_NONE;
         }
-        if(r->rough.model == ROUGHNESS_GAMMA) {
+        if(r->rough.model == ROUGHNESS_GAMMA || r->rough.model == ROUGHNESS_FILE) {
             n_rl++;
         }
     }
@@ -875,54 +875,52 @@ int simulate_with_roughness(sim_workspace *ws) {
         return simulate(&ws->ion, depth_seek(ws->sample, 0.0 * C_TFU), ws, ws->sample);
     }
     struct sample *sample_rough = sample_copy(ws->sample);
-    size_t *index = malloc(sizeof(size_t) * n_rl);
-    size_t *modulos = malloc(sizeof(size_t) * n_rl);
-    size_t j = 0;
-    thick_prob_dist **tpd = malloc(sizeof(thick_prob_dist *) * n_rl);
+    size_t i_rl = 0;
+    thick_prob_dist **tpds = malloc(sizeof(thick_prob_dist *) * n_rl);
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
         sample_range *r = &(ws->sample->ranges[i]);
         if(r->rough.model == ROUGHNESS_GAMMA) {
 #ifdef DEBUG
             fprintf(stderr, "Range %zu is rough (gamma), amount %g tfu, n = %zu spectra\n", i, ws->sample->ranges[i].rough.x/C_TFU, ws->sample->ranges[i].rough.n);
 #endif
-            tpd[j] = thickness_probability_table_gen(r->x, r->rough.x, r->rough.n);
+            tpds[i_rl] = thickness_probability_table_gen(r->x, r->rough.x, r->rough.n);
+            thick_prob_dist *tpd = tpds[i_rl];
+            tpd->i_range = i;
 #ifdef DEBUG
-            fprintf(stderr, "TPD for depth %zu (%.3lf tfu nominal), roughness %.3lf tfu:\n", i, ws->sample->ranges[i].x/C_TFU, ws->sample->ranges[i].rough.x/C_TFU);
-            for(size_t i_tpd = 0; i_tpd < tpd[j]->n; i_tpd++) {
-                fprintf(stderr, "%zu: %.3lf tfu %.3lf%%\n", i_tpd, tpd[j]->p[i_tpd].x/C_TFU, tpd[j]->p[i_tpd].prob/C_PERCENT);
+            fprintf(stderr, "TPD (i_range %zu) for depth %zu (%.3lf tfu nominal), roughness %.3lf tfu:\n", tpd->i_range, i, ws->sample->ranges[i].x/C_TFU, ws->sample->ranges[i].rough.x/C_TFU);
+            for(size_t i_tpd = 0; i_tpd < tpd->n; i_tpd++) {
+                fprintf(stderr, "%zu: %.3lf tfu %.3lf%%\n", i_tpd, tpds[i_rl]->p[i_tpd].x/C_TFU, tpd->p[i_tpd].prob/C_PERCENT);
             }
 #endif
-            index[j] = i;
-            if(j)
-                modulos[j] = modulos[j - 1] * tpd[j - 1]->n;
-            else
-                modulos[j] = 1;
-            j++;
-        }
+            i_rl++;
+        } else if(r->rough.model == ROUGHNESS_NONE)
     }
-    size_t iter_total = modulos[n_rl - 1] * tpd[n_rl - 1]->n;
+    size_t iter_total = 1;
+    for(i_rl = 0; i_rl < n_rl; i_rl++) { /* Calculate cumulative product (number of subspectra) */
+        thick_prob_dist *tpd = tpds[i_rl];
+        tpd->modulo = iter_total;
+        iter_total *= tpd->n;
+    }
     for(size_t i_iter = 0; i_iter < iter_total; i_iter++) {
 #ifdef DEBUG
-        fprintf(stderr, "Gamma roughness step %zu/%zu\n", i_iter+1, iter_total);
+        fprintf(stderr, "Roughness step %zu/%zu\n", i_iter+1, iter_total);
 #endif
         double p = 1.0;
         for(size_t i_range = 0; i_range < ws->sample->n_ranges; i_range++) { /* Reset ranges for every iter */
             sample_rough->ranges[i_range].x = ws->sample->ranges[i_range].x;
         }
-        for(size_t i = 0; i < n_rl; i++) {
-            j = (i_iter / modulos[i]) % tpd[i]->n; /* "j"th roughness element */
-            //fprintf(stderr, " %zu", j);
-
-            size_t i_range = index[i];
-            p *= tpd[i]->p[j].prob; /* Probability is multiplied by the "i"th roughness, element "j" */
-            double x_diff = tpd[i]->p[j].x - ws->sample->ranges[i_range].x; /* Amount to change thickness of this and and all subsequent layers */
-            for(; i_range < ws->sample->n_ranges; i_range++) {
+        for(i_rl = 0; i_rl < n_rl; i_rl++) {
+            thick_prob_dist *tpd = tpds[i_rl];
+            size_t j = (i_iter / tpd->modulo) % tpd->n; /* "j"th roughness element */
+            p *= tpds[i_rl]->p[j].prob; /* Probability is multiplied by the "i"th roughness, element "j" */
+            double x_diff = tpds[i_rl]->p[j].x - ws->sample->ranges[tpd->i_range].x; /* Amount to change thickness of this and and all subsequent layers */
+            for(size_t i_range = tpd->i_range; i_range < ws->sample->n_ranges; i_range++) {
                 sample_rough->ranges[i_range].x += x_diff;
             }
 #ifdef DEBUG
-            fprintf(stderr, "Gamma roughness diff %g tfu (from %g tfu, index i_range=%zu), probability %.3lf%%)\n", x_diff/C_TFU, ws->sample->ranges[i_range].x/C_TFU, i_range, tpd[i]->p[j].prob*100.0);
+            fprintf(stderr, "Gamma roughness diff %g tfu (from %g tfu, index i_range=%zu), probability %.3lf%%)\n", x_diff/C_TFU, ws->sample->ranges[tpd->i_range].x/C_TFU, tpd->i_range, tpd->p[j].prob*100.0);
             fprintf(stderr, "Gamma roughness, ranges (%zu):", ws->sample->n_ranges);
-            for(i_range = 0; i_range < ws->sample->n_ranges; i_range++) {
+            for(size_t i_range = 0; i_range < ws->sample->n_ranges; i_range++) {
                 fprintf(stderr, ", %zu: %g tfu ", i_range, sample_rough->ranges[i_range].x/C_TFU);
             }
             fprintf(stderr, "\n");
@@ -936,12 +934,10 @@ int simulate_with_roughness(sim_workspace *ws) {
             break;
     }
     for(size_t i = 0; i < n_rl; i++) {
-        thickness_probability_table_free(tpd[i]);
+        thickness_probability_table_free(tpds[i]);
     }
     sample_free(sample_rough);
-    free(modulos);
-    free(index);
-    free(tpd);
+    free(tpds);
     return status;
 }
 

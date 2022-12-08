@@ -23,12 +23,15 @@ typedef struct {
 typedef struct {
     thick_prob *p;
     size_t n;
+    size_t modulo; /* cumulative product of number of thickness probability distributions. When we have two rough layers with n1 and n2, we need to simulate n1*n2 subspectra. */
+    size_t i_range; /* depth bin */
 } thick_prob_dist;
 
 typedef enum roughness_model {
     ROUGHNESS_NONE = 0,
     ROUGHNESS_GAUSSIAN = 1, /* TODO: implement! */
-    ROUGHNESS_GAMMA = 2
+    ROUGHNESS_GAMMA = 2,
+    ROUGHNESS_FILE = 3
 } roughness_model;
 
 typedef struct roughness {
