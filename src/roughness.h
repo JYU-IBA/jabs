@@ -50,6 +50,8 @@ typedef struct roughness {
 thick_prob_dist *thickness_probability_table_gamma(double thickness, double sigma, size_t n);
 thick_prob_dist *thickness_probability_table_new(size_t n);
 void thickness_probability_table_free(thick_prob_dist *tpd);
-thick_prob_dist *thickness_probability_table_copy(thick_prob_dist *tpd);
+thick_prob_dist *thickness_probability_table_copy(const thick_prob_dist *tpd);
+roughness_file *roughness_file_copy(const roughness_file *rf);
+void roughness_file_free(roughness_file *rf);
 double thickness_gamma_pdf(double x, double thickness, double sigma);
 #endif // JABS_ROUGHNESS_H

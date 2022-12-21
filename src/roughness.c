@@ -2,6 +2,7 @@
 #include <jibal_units.h>
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_cdf.h>
+#include <generic.h>
 #include "roughness.h"
 
 double thickness_gamma_pdf(double x, double thickness, double sigma) {
@@ -71,10 +72,29 @@ void thickness_probability_table_free(thick_prob_dist *tpd) {
     free(tpd->p);
     free(tpd);
 }
-thick_prob_dist *thickness_probability_table_copy(thick_prob_dist *tpd) {
+
+thick_prob_dist *thickness_probability_table_copy(const thick_prob_dist *tpd) {
+    if(!tpd)
+        return NULL;
     thick_prob_dist *tpd_copy = thickness_probability_table_new(tpd->n);
     for(size_t i = 0; i < tpd_copy -> n; i++) {
         tpd_copy->p[i] = tpd->p[i];
     }
     return tpd_copy;
+}
+
+roughness_file *roughness_file_copy(const roughness_file *rf) {
+    if(!rf)
+        return NULL;
+    roughness_file *rf_out = malloc(sizeof(roughness_file));
+    rf_out->tpd = thickness_probability_table_copy(rf->tpd);
+    rf_out->filename = strdup_non_null(rf->filename);
+    return rf_out;
+}
+
+void roughness_file_free(roughness_file *rf) {
+    if(!rf)
+        return;
+    free(rf->filename);
+    thickness_probability_table_free(rf->tpd);
 }

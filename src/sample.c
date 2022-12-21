@@ -742,6 +742,9 @@ sample *sample_copy(const sample *s_in) {
     memcpy(s_out->isotopes, s_in->isotopes, sizeof(jibal_isotope *) * s_out->n_isotopes);
     memcpy(s_out->ranges, s_in->ranges, sizeof (struct sample_range) * s_out->n_ranges);
     memcpy(s_out->cbins, s_in->cbins, sizeof (double) * s_out->n_isotopes * s_out->n_ranges);
+    for(size_t i = 0; i < s_in->n_ranges; i++) {
+        s_out->ranges[i].rough.file = roughness_file_copy(s_in->ranges[i].rough.file);
+    }
 #ifdef DEBUG
         fprintf(stderr, "Made a sample copy with %zu ranges and %zu isotopes.\n", s_out->n_ranges, s_out->n_isotopes);
 #endif
@@ -855,6 +858,9 @@ int sample_print(const char *filename, const sample *sample, int print_isotopes)
 void sample_free(sample *sample) {
     if(!sample)
         return;
+    for(size_t i = 0; i < sample->n_ranges; i++) {
+        roughness_file_free(sample->ranges[i].rough.file);
+    }
     free(sample->ranges);
     free(sample->isotopes);
     free(sample->cbins);
