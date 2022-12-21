@@ -25,9 +25,10 @@
 typedef enum {
     REACTION_NONE = 0,
     REACTION_RBS = 1,
-    REACTION_ERD = 2,
-    REACTION_FILE = 3,
-    REACTION_ARB = 4 /* TODO: types of reactions */
+    REACTION_RBS_ALT = 2,
+    REACTION_ERD = 3,
+    REACTION_FILE = 4,
+    REACTION_ARB = 5
 } reaction_type;
 
 struct reaction_point {

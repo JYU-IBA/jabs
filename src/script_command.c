@@ -2105,6 +2105,8 @@ script_command_status script_add_reactions(script_session *s, int argc, char *co
     if(argc > 0) {
         if(strcmp(argv[0], "RBS") == 0) {
             sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim, REACTION_RBS));
+        } else if(strcmp(argv[0], "RBS-") == 0) {
+            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS_ALT, sim_cs(fit->sim, REACTION_RBS_ALT));
         } else if(strcmp(argv[0], "ERD") == 0) {
             sim_reactions_add_auto(fit->sim, fit->sm, REACTION_ERD, sim_cs(fit->sim, REACTION_ERD));
         } else {

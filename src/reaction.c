@@ -52,6 +52,8 @@ const char *reaction_name(const reaction *r) {
             return "NONE";
         case REACTION_RBS:
             return "RBS";
+        case REACTION_RBS_ALT:
+            return "RBS-";
         case REACTION_ERD:
             return "ERD";
         case REACTION_FILE:
@@ -68,6 +70,8 @@ reaction_type reaction_type_from_string(const char *s) {
         return REACTION_NONE;
     if(strcmp(s, "RBS") == 0)
         return REACTION_RBS;
+    if(strcmp(s, "RBS-") == 0)
+        return REACTION_RBS_ALT;
     if(strcmp(s, "ERD") == 0)
         return REACTION_ERD;
     if(strcmp(s, "FILE") == 0)
@@ -115,7 +119,8 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
             r->product = target;
             r->product_nucleus = incident;
             break;
-        case REACTION_RBS:
+        case REACTION_RBS: /* Falls through */
+        case REACTION_RBS_ALT:
             r->product = incident;
             r->product_nucleus = target;
             break;
@@ -267,8 +272,12 @@ int reaction_compare(const void *a, const void *b) {
 double reaction_product_energy(const reaction *r, double theta, double E) { /* Hint: call with E == 1.0 to get kinematic factor */
     const double Q = r->Q;
     if(Q == 0.0) {
-        if(r->product == r->incident) {
-            return jibal_kin_rbs(r->incident->mass, r->target->mass, theta, '+')*E;
+        if(r->product == r->incident) { /* RBS */
+            if(r->type == REACTION_RBS_ALT) {
+                return jibal_kin_rbs(r->incident->mass, r->target->mass, theta, '-') * E;
+            } else {
+                return jibal_kin_rbs(r->incident->mass, r->target->mass, theta, '+') * E;
+            }
         }  else if(r->product == r->target) {
             return jibal_kin_erd(r->incident->mass, r->target->mass, theta)*E;
         } else {

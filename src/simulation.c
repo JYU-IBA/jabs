@@ -198,7 +198,7 @@ void sim_calc_params_print(const sim_calc_params *params) {
 }
 
 jibal_cross_section_type sim_cs(const simulation *sim, const reaction_type type) {
-    if(type == REACTION_RBS)
+    if(type == REACTION_RBS ||type == REACTION_RBS_ALT)
         return sim->cs_rbs;
     if(type == REACTION_ERD)
         return sim->cs_erd;
@@ -496,7 +496,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         r->n_bricks = n_bricks;
         r->bricks = calloc(r->n_bricks, sizeof(brick));
         ion_set_isotope(p, r->r->product);
-        if(r->r->type == REACTION_RBS) {
+        if(r->r->type == REACTION_RBS || r->r->type == REACTION_RBS_ALT) {
             assert(p->isotope == ws->ion.isotope);
             p->nucl_stop_isotopes = ws->ion.nucl_stop_isotopes;
             p->nucl_stop = ws->ion.nucl_stop; /* Shallow copy! Shared. */
@@ -541,7 +541,7 @@ void sim_workspace_free(sim_workspace *ws) {
             free(r->bricks);
             r->bricks = NULL;
         }
-        if(r->r->type != REACTION_RBS) {
+        if(r->r->type != REACTION_RBS && r->r->type != REACTION_RBS_ALT) {
             free(r->p.nucl_stop); /* RBS ions share nuclear stopping table. Others needs to free the memory. */
         }
     }
@@ -691,10 +691,21 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
             sim_r->stop = TRUE;
             return;
         }
-        sim_r->theta_cm = sim_r->theta + asin(sim_r->mass_ratio * sin(sim_r->theta));
-        sim_r->cs_constant = (pow2(sin(sim_r->theta_cm))) / (pow2(sin(sim_r->theta)) * cos(sim_r->theta_cm - sim_r->theta)) *
+        if(sim_r->r->type == REACTION_RBS_ALT) {
+            if(target->mass < incident->mass) {
+                sim_r->theta_cm = C_PI - (asin(sim_r->mass_ratio * sin(sim_r->theta)) - sim_r->theta);
+            } else {
+#ifdef DEBUG
+                fprintf(stderr, "RBS(-) with %s is not possible (target must be lighter than incident)\n", target->name);
+#endif
+                sim_r->stop = TRUE;
+            }
+        } else {
+            sim_r->theta_cm = sim_r->theta + asin(sim_r->mass_ratio * sin(sim_r->theta));
+        }
+        sim_r->cs_constant = fabs((pow2(sin(sim_r->theta_cm))) / (pow2(sin(sim_r->theta)) * cos(sim_r->theta_cm - sim_r->theta)) *
                              pow2((incident->Z * C_E * target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) *
-                             pow4(1.0 / sin(sim_r->theta_cm / 2.0)) * (1.0 / 16.0);
+                             pow4(1.0 / sin(sim_r->theta_cm / 2.0)) * (1.0 / 16.0));
     } else if(product == target) { /* ERD */
         if(sim_r->theta > C_PI/2.0) {
 #ifdef DEBUG
