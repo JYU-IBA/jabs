@@ -893,9 +893,9 @@ int simulate_with_roughness(sim_workspace *ws) {
         if(tpds[i_rl]) {
             tpds[i_rl]->i_range = i;
 #ifdef DEBUG /* TODO: modify printing when a file is given */
-            fprintf(stderr, "TPD (i_range %zu) for depth %zu (%.3lf tfu nominal), roughness %.3lf tfu:\n", tpd->i_range, i, ws->sample->ranges[i].x/C_TFU, ws->sample->ranges[i].rough.x/C_TFU);
-            for(size_t i_tpd = 0; i_tpd < tpd->n; i_tpd++) {
-                fprintf(stderr, "%zu: %.3lf tfu %.3lf%%\n", i_tpd, tpds[i_rl]->p[i_tpd].x/C_TFU, tpd->p[i_tpd].prob/C_PERCENT);
+            fprintf(stderr, "TPD (i_range %zu) for depth %zu (%.3lf tfu nominal), roughness %.3lf tfu:\n", tpds[i_rl]->i_range, i, ws->sample->ranges[i].x/C_TFU, ws->sample->ranges[i].rough.x/C_TFU);
+            for(size_t i_tpd = 0; i_tpd < tpds[i_rl]->n; i_tpd++) {
+                fprintf(stderr, "%zu: %.3lf tfu %.3lf%%\n", i_tpd, tpds[i_rl]->p[i_tpd].x/C_TFU, tpds[i_rl]->p[i_tpd].prob/C_PERCENT);
             }
 #endif
             i_rl++;
