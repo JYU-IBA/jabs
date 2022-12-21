@@ -1,0 +1,9 @@
+#!/usr/bin/env jabs
+set ion 35Cl
+set energy 10MeV
+set emin 10keV
+set sample Si 100tfu
+set det theta 40deg
+set alpha 70deg
+sim
+save spectra "rbs_alternative_solution_out.csv"
