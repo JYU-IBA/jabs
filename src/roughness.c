@@ -1,8 +1,10 @@
 #include <stdio.h>
+#include <string.h>
 #include <jibal_units.h>
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_cdf.h>
-#include <generic.h>
+#include "generic.h"
+#include "defaults.h"
 #include "roughness.h"
 
 double thickness_gamma_pdf(double x, double thickness, double sigma) {
@@ -64,6 +66,75 @@ thick_prob_dist *thickness_probability_table_new(size_t n) {
     tpd->n = n;
     tpd->p = calloc(n, sizeof(thick_prob));
     return tpd;
+}
+
+thick_prob_dist *thickness_probability_table_from_file(const char *filename) { /* TODO: untested, contains bugs with extremely high probability! */
+    size_t n = ROUGHNESS_SUBSPECTRA_MAXIMUM, n_true = 0;
+    char *line = NULL;
+    size_t line_size = 0;
+    size_t lineno = 0;
+    int fail = FALSE;
+    FILE *in;
+    if(!filename)
+        return NULL;
+    in = fopen(filename, "r");
+    if(!in)
+        return NULL;
+    thick_prob_dist *tpd = thickness_probability_table_new(n);
+    while(getline(&line, &line_size, in) > 0) {
+        lineno++;
+        line[strcspn(line, "\r\n")] = 0; /* Strips all kinds of newlines! */
+        if(strlen(line) >= 1 && *line == '#') {/* Comment */
+            continue;
+        }
+        if(n_true == n) {
+            fail = TRUE;
+#ifdef DEBUG
+            fprintf(stderr, "TPD file too long, max = %zu.\n", n);
+#endif
+            break;
+        }
+        char *s = line, *end;
+        double thick = strtod(s, &end);
+        if(s == end) {
+            fail = TRUE;
+            break;
+        }
+        double prob = strtod(s, &end);
+        if(*end != '\0') {
+            fail = TRUE;
+            break;
+        }
+        thick_prob *p = &(tpd->p[n_true]);
+        p->prob = prob;
+        p->x = thick;
+        n_true++;
+    }
+    fclose(in);
+    if(fail) {
+#ifdef DEBUG
+        fprintf(stderr, "Failure in reading line %zu of file %s filename.\n", lineno, filename);
+#endif
+        thickness_probability_table_free(tpd);
+        return NULL;
+    }
+    /* TODO: shrink tpd to actual size */
+    return tpd;
+}
+
+void thickness_probability_table_normalize(thick_prob_dist *tpd) {
+    double psum = 0.0;
+    for(size_t i = 0; i < tpd->n; i++) {
+        thick_prob *p = &tpd->p[i];
+        psum += p->prob;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "TPD sum of probabilities is %g.\n", psum);
+#endif
+    for(size_t i = 0; i < tpd->n; i++) {
+        thick_prob *p = &tpd->p[i];
+        p->prob /= psum;
+    }
 }
 
 void thickness_probability_table_free(thick_prob_dist *tpd) {

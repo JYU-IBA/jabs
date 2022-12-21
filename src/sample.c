@@ -313,8 +313,8 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
         }
     }
 
-    for(size_t i_range = 0; i_range < s->n_ranges; i_range++) { /* Set defaults for roughness */
-        sample_range *r = &s->ranges[i_range];
+    for(size_t i_range = 0; i_range < s->n_ranges; i_range++) { /* Set defaults for roughness and copy thickness distribution */
+        sample_range *r = &s->ranges[i_range]; /* Shallow copy in case of roughness file, handled below */
         if(r->rough.x < ROUGH_TOLERANCE) {
             r->rough.model = ROUGHNESS_NONE;
             r->rough.x = 0.0;
@@ -325,6 +325,19 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
 #ifdef DEBUG
             fprintf(stderr, "Range %zu roughness is gamma, number of steps is automatic and set to %zu\n", i_range, r->rough.n);
 #endif
+        }
+        if(r->rough.model == ROUGHNESS_FILE) {
+            if(r->rough.file) {
+                r->rough.file = roughness_file_copy(r->rough.file);
+            } else {
+#ifdef DEBUG
+                fprintf(stderr, "Roughness model of range %zu is supposed to be file, but there is no file pointer.\n", i_range);
+#endif
+                r->rough.model = ROUGHNESS_NONE;
+                r->rough.file = NULL;
+            }
+        } else {
+            r->rough.file = NULL;
         }
     }
 
