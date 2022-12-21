@@ -151,6 +151,7 @@ int main(int argc, char * const *argv) {
         }
         if(fit_data->sim->rbs) {
             sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_RBS, sim_cs(fit_data->sim, REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
+            sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_RBS_ALT, sim_cs(fit_data->sim, REACTION_RBS_ALT));
         }
         if(fit_data->sim->erd) {
             sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_ERD, sim_cs(fit_data->sim, REACTION_ERD));

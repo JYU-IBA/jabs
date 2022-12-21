@@ -66,6 +66,7 @@ int script_prepare_sim_or_fit(script_session *s) {
                      "No reactions, adding some automatically. Please be aware there are commands called \"reset reactions\" and \"add reactions\".\n");
         if(fit->sim->rbs) {
             sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim, REACTION_RBS));
+            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS_ALT, sim_cs(fit->sim, REACTION_RBS_ALT));
             /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
         }
         if(sim_do_we_need_erd(fit->sim)) {
@@ -2118,6 +2119,8 @@ script_command_status script_add_reactions(script_session *s, int argc, char *co
     if(fit->sim->rbs) {
         sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS,
                                sim_cs(fit->sim, REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
+        sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS_ALT,
+                               sim_cs(fit->sim, REACTION_RBS_ALT));
     }
 
     if(sim_do_we_need_erd(fit->sim)) {

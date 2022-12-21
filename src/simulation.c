@@ -257,9 +257,15 @@ int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_typ
         return -1;
     }
     for (size_t i = 0; i < sample->n_isotopes; i++) {
-        reaction *r_new = reaction_make(sim->beam_isotope, sample->isotopes[i], type, cs);
+        const jibal_isotope *isotope = sample->isotopes[i];
+        if(type == REACTION_RBS_ALT) {
+            if(sim->beam_isotope->mass <= isotope->mass) { /* alternative solution for RBS exists only if m1 > m2 */
+                continue;
+            }
+        }
+        reaction *r_new = reaction_make(sim->beam_isotope, isotope, type, cs);
         if (!r_new) {
-            jabs_message(MSG_ERROR, stderr, "Failed to make an %s reaction with isotope %zu (%s)\n", jibal_cross_section_name(cs), i, sample->isotopes[i]->name);
+            jabs_message(MSG_ERROR, stderr, "Failed to make an %s reaction with isotope %zu (%s)\n", jibal_cross_section_name(cs), i, isotope->name);
             continue;
         }
         sim_reactions_add_reaction(sim, r_new);
