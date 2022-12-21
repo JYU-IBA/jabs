@@ -685,6 +685,9 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
     sim_r->theta_cm = 0.0;
     if(product == incident) { /* RBS */
         if(incident->mass >= target->mass && sim_r->theta > asin(target->mass / incident->mass)) {
+#ifdef DEBUG
+            fprintf(stderr, "RBS with %s is not possible (theta %g deg > %g deg)\n", target->name, sim_r->theta/C_DEG, asin(target->mass / incident->mass)/C_DEG);
+#endif
             sim_r->stop = TRUE;
             return;
         }
