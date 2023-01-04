@@ -1,0 +1,19 @@
+#!/usr/bin/env jabs
+set ion a
+set energy 2MeV
+set det theta 165deg
+set det phi 0deg
+set alpha 0deg
+#Note that thickness must be given, but it is ignored when layer roughness (thickness probability distribution) is loaded from a file.
+set sample Au 0 roughnessfile "roughness.txt" Si 20000tfu
+##We can also load roughness after setting the sample. This is useful if you load the sample from a file, since the data contained in the roughness file is not included in the sample file (see output)
+#load roughness 1 "roughness.txt"
+add reactions RBS
+set fluence 1e14
+set det solid 10msr
+set det reso 10keV
+simulate
+save spectra "roughness_file_test_out.csv"
+show sample
+save sample "roughness_file_sample_out.dat"
+test roi [1675:1860] 3.54371e+06 1e-3
