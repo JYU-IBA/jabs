@@ -1536,6 +1536,7 @@ script_command_status script_load_roughness(script_session *s, int argc, char *c
         jabs_message(MSG_ERROR, stderr, "Setting roughness from file failed.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
+    range->x = thickness_probability_table_areal_density(range->rough.file->tpd); /* Update thickness of layer to correspond the average areal density */
     if(range->rough.file && range->rough.file->tpd) {
         jabs_message(MSG_INFO, stderr, "Layer %zu: roughness from file \"%s\", containing %zu data points, loaded.\n", n + 1, range->rough.file->filename, range->rough.file->tpd->n);
     }

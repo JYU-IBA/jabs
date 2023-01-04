@@ -801,7 +801,7 @@ void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *inci
     if(r->r->Q == 0.0) {
         r->p.E = incident->E * r->K;
         r->p.S = incident->S * pow2(r->K);
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
         fprintf(stderr, "Product energy %g keV, eloss straggling %g keV FWHM. Calculated using K = %g\n", r->p.E/C_KEV, C_FWHM * sqrt(r->p.S) / C_KEV, r->K);
 #endif
         return;
@@ -810,7 +810,7 @@ void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *inci
     double epsilon = 0.001*C_KEV;
     double deriv = (reaction_product_energy(r->r, r->theta, incident->E+epsilon) - r->p.E)/(epsilon); /* TODO: this derivative could be solved analytically */
     r->p.S = incident->S * pow2(deriv) * incident->E;
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
     fprintf(stderr, "deriv %g, E_out/E %g, E_out = %g keV, E = %g keV\n", deriv, r->p.E / incident->E, r->p.E/C_KEV, incident->E/C_KEV);
 #endif
 }

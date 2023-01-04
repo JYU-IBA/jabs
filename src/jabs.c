@@ -485,6 +485,9 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         ion1.cosine_theta = cos(ion1.theta);
     }
     while(1) {
+#ifdef DEBUG
+        fprintf(stderr, "\r %04zu %8.3lf keV %8.3lf tfu. ", i_depth, ion1.E/C_KEV, d_before.x / C_TFU);
+#endif
         if(warnings > SIMULATE_WARNING_LIMIT) {
             fprintf(stderr, "Warning limit reached. Won't calculate anything.\n");
             break;
@@ -530,7 +533,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
                         E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ion1.S) / C_KEV);
 #endif
-        int all_stop = 1; /* Do we have any reactions left (or are we too deep in the sample) */
+        int alive = 0;
         for(size_t i = 0; i < ws->n_reactions; i++) {
             sim_reaction *r = &ws->reactions[i];
             if(r->stop)
@@ -543,14 +546,14 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             brick *b = &r->bricks[i_depth];
             if(!ws->params->ds && d_before.x >= r->max_depth) { /* Reactions stop when we are too deep in the sample, unless, of course, if DS is enabled. TODO: check optimizations for DS */
 #ifdef DEBUG
-                fprintf(stderr, "Reaction %lu with %s stops, because maximum depth is reached at x = %.3lf tfu.\n",
+                fprintf(stderr, "\nReaction %lu with %s stops, because maximum depth is reached at x = %.3lf tfu.\n",
                         i, r->r->target->name, d_before.x / C_TFU); /* TODO: give reactions a name */
 #endif
                 b->Q = 0.0;
                 r->stop = TRUE;
                 continue;
             }
-            all_stop = 0;
+            alive++;
             b->d = d_after;
             b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
             b->S_0 = ion1.S;
@@ -570,7 +573,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             foil_traverse(&r->p, ws->det->foil, ws);
             b->E = r->p.E;
             b->S = r->p.S;
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
             fprintf(stderr, "Reaction %2zu depth from %8.3lf tfu to %8.3lf tfu, E = %8.3lf keV, Straggling: eloss %7.3lf keV, geo %7.3lf keV\n", i, d_before.x/C_TFU, d_after.x/C_TFU, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo_x+b->S_geo_y)/C_KEV);
 #endif
             if(r->p.E < ws->emin) {
@@ -601,9 +604,9 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         d_before = d_after;
         i_depth++;
 
-        if(all_stop) {
+        if(!alive) {
 #ifdef DEBUG
-            fprintf(stderr, "All reactions have ceased by depth %g.\n", d_before.x/C_TFU);
+            fprintf(stderr, "\nAll reactions have ceased by depth %g.\n", d_before.x/C_TFU);
 #endif
             break;
         }
@@ -899,11 +902,9 @@ int simulate_with_roughness(sim_workspace *ws) {
         }
         if(tpds[i_rl]) {
             tpds[i_rl]->i_range = i;
-#ifdef DEBUG /* TODO: modify printing when a file is given */
+#ifdef DEBUG
             fprintf(stderr, "TPD (i_range %zu) for depth %zu (%.3lf tfu nominal), roughness %.3lf tfu:\n", tpds[i_rl]->i_range, i, ws->sample->ranges[i].x/C_TFU, ws->sample->ranges[i].rough.x/C_TFU);
-            for(size_t i_tpd = 0; i_tpd < tpds[i_rl]->n; i_tpd++) {
-                fprintf(stderr, "%zu: %.3lf tfu %.3lf%%\n", i_tpd, tpds[i_rl]->p[i_tpd].x/C_TFU, tpds[i_rl]->p[i_tpd].prob/C_PERCENT);
-            }
+            thickness_probability_table_print(stderr, tpds[i_rl]);
 #endif
             i_rl++;
         }
@@ -916,29 +917,29 @@ int simulate_with_roughness(sim_workspace *ws) {
     }
     for(size_t i_iter = 0; i_iter < iter_total; i_iter++) {
 #ifdef DEBUG
-        fprintf(stderr, "Roughness step %zu/%zu\n", i_iter+1, iter_total);
+        fprintf(stderr, "Roughness step %zu/%zu.\n", i_iter+1, iter_total);
 #endif
         double p = 1.0;
         for(size_t i_range = 0; i_range < ws->sample->n_ranges; i_range++) { /* Reset ranges for every iter */
             sample_rough->ranges[i_range].x = ws->sample->ranges[i_range].x;
         }
         for(i_rl = 0; i_rl < n_rl; i_rl++) {
-            thick_prob_dist *tpd = tpds[i_rl];
+            thick_prob_dist *tpd = tpds[i_rl]; /* One particular thickness probability distribution ("i"th one) */
             size_t j = (i_iter / tpd->modulo) % tpd->n; /* "j"th roughness element */
-            p *= tpds[i_rl]->p[j].prob; /* Probability is multiplied by the "i"th roughness, element "j" */
-            double x_diff = tpds[i_rl]->p[j].x - ws->sample->ranges[tpd->i_range].x; /* Amount to change thickness of this and and all subsequent layers */
+            thick_prob *pj = &tpds[i_rl]->p[j]; /* ..is this one */
+            p *= pj->prob; /* Probability is multiplied by the "i"th roughness, element "j" to get the subspectra weight */
+            double x_diff = pj->x - ws->sample->ranges[tpd->i_range].x; /* Amount to change thickness of this and all subsequent layers */
+#ifdef DEBUG
+            fprintf(stderr, "Modifying ranges from %zu to %zu by %g tfu.\n", tpd->i_range, ws->sample->n_ranges, x_diff/C_TFU);
+#endif
             for(size_t i_range = tpd->i_range; i_range < ws->sample->n_ranges; i_range++) {
                 sample_rough->ranges[i_range].x += x_diff;
             }
-#ifdef DEBUG
-            fprintf(stderr, "Gamma roughness diff %g tfu (from %g tfu, index i_range=%zu), probability %.3lf%%)\n", x_diff/C_TFU, ws->sample->ranges[tpd->i_range].x/C_TFU, tpd->i_range, tpd->p[j].prob*100.0);
-            fprintf(stderr, "Gamma roughness, ranges (%zu):", ws->sample->n_ranges);
-            for(size_t i_range = 0; i_range < ws->sample->n_ranges; i_range++) {
-                fprintf(stderr, ", %zu: %g tfu ", i_range, sample_rough->ranges[i_range].x/C_TFU);
-            }
-            fprintf(stderr, "\n");
-#endif
         }
+#ifdef DEBUG
+        fprintf(stderr, "Weight %.6lf.\n", p);
+        sample_print(NULL, sample_rough, FALSE);
+#endif
         ws->fluence = p * p_sr;
         ion_set_angle(&ws->ion, 0.0, 0.0);
         ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);

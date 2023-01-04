@@ -51,6 +51,7 @@ thick_prob_dist *thickness_probability_table_gamma(double thickness, double sigm
 thick_prob_dist *thickness_probability_table_new(size_t n);
 thick_prob_dist *thickness_probability_table_from_file(const char *filename);
 void thickness_probability_table_normalize(thick_prob_dist *tpd);
+double thickness_probability_table_areal_density(thick_prob_dist *tpd);
 void thickness_probability_table_free(thick_prob_dist *tpd);
 void thickness_probability_table_print(FILE *f, const thick_prob_dist *tpd);
 thick_prob_dist *thickness_probability_table_realloc(thick_prob_dist *tpd, size_t n);

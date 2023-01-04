@@ -146,6 +146,17 @@ void thickness_probability_table_normalize(thick_prob_dist *tpd) {
     }
 }
 
+double thickness_probability_table_areal_density(thick_prob_dist *tpd) { /* Doesn't make sense unless the table is normalized */
+    if(!tpd)
+        return 0.0;
+    double ad = 0.0;
+    for(size_t i = 0; i < tpd->n; i++) {
+        thick_prob *p = &tpd->p[i];
+        ad += p->prob * p->x;
+    }
+    return ad;
+}
+
 void thickness_probability_table_free(thick_prob_dist *tpd) {
     if(!tpd)
         return;
@@ -209,7 +220,7 @@ int roughness_set_from_file(roughness *r, const char *filename) {
     }
     r->file = rf;
     r->model = ROUGHNESS_FILE;
-    r->n = 0; /* Should be ignored */
+    r->n = rf->tpd->n; /* "n" should always match, but in calculations tpd->n takes precedence. r->n is for convenience, since it is no longer a variable for a roughness model. */
     r->x = 0.0;
     return EXIT_SUCCESS;
 }

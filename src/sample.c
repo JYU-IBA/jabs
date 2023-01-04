@@ -384,9 +384,13 @@ int sample_model_print(const char *filename, const sample_model *sm) {
     jabs_message(MSG_INFO, f, "\n");
     for (size_t i = 0; i < sm->n_ranges; i++) {
         const sample_range *r = &(sm->ranges[i]);
-        jabs_message(MSG_INFO, f, "%12.3lf", r->x/C_TFU);
+        jabs_message(MSG_INFO, f, "%12.3lf", r->x / C_TFU);
         if(n_rl) {
-            jabs_message(MSG_INFO, f, " %12.3lf", r->rough.x / C_TFU);
+            if(r->rough.model == ROUGHNESS_FILE) {
+                jabs_message(MSG_INFO, f, "         file");
+            } else {
+                jabs_message(MSG_INFO, f, " %12.3lf", r->rough.x / C_TFU);
+            }
             jabs_message(MSG_INFO, f, " %7zu", r->rough.n);
         }
         if(n_nonzero_density) {
