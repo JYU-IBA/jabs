@@ -111,6 +111,9 @@ thick_prob_dist *thickness_probability_table_from_file(const char *filename) { /
         n_true++;
     }
     fclose(in);
+    if(n_true == 0) {
+        fail = TRUE;
+    }
     if(fail) {
 #ifdef DEBUG
         fprintf(stderr, "Failure in reading line %zu of file %s filename.\n", lineno, filename);
@@ -118,7 +121,7 @@ thick_prob_dist *thickness_probability_table_from_file(const char *filename) { /
         thickness_probability_table_free(tpd);
         return NULL;
     }
-    /* TODO: shrink tpd to actual size */
+    thickness_probability_table_realloc(tpd, n_true); /* Shrink to true size */
     return tpd;
 }
 
@@ -142,6 +145,16 @@ void thickness_probability_table_free(thick_prob_dist *tpd) {
         return;
     free(tpd->p);
     free(tpd);
+}
+
+thick_prob_dist *thickness_probability_table_realloc(thick_prob_dist *tpd, size_t n) {
+    tpd->p = realloc(tpd->p, n * sizeof(thick_prob));
+    if(!tpd->p) {
+        thickness_probability_table_free(tpd);
+        return NULL;
+    }
+    tpd->n = n;
+    return tpd;
 }
 
 thick_prob_dist *thickness_probability_table_copy(const thick_prob_dist *tpd) {

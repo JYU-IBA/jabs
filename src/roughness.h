@@ -52,6 +52,7 @@ thick_prob_dist *thickness_probability_table_new(size_t n);
 thick_prob_dist *thickness_probability_table_from_file(const char *filename);
 void thickness_probability_table_normalize(thick_prob_dist *tpd);
 void thickness_probability_table_free(thick_prob_dist *tpd);
+thick_prob_dist *thickness_probability_table_realloc(thick_prob_dist *tpd, size_t n);
 thick_prob_dist *thickness_probability_table_copy(const thick_prob_dist *tpd);
 roughness_file *roughness_file_copy(const roughness_file *rf);
 void roughness_file_free(roughness_file *rf);
