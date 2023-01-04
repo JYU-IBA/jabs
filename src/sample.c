@@ -315,10 +315,6 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
 
     for(size_t i_range = 0; i_range < s->n_ranges; i_range++) { /* Set defaults for roughness and copy thickness distribution */
         sample_range *r = &s->ranges[i_range]; /* Shallow copy in case of roughness file, handled below */
-        if(r->rough.x < ROUGH_TOLERANCE) {
-            r->rough.model = ROUGHNESS_NONE;
-            r->rough.x = 0.0;
-        }
         if(r->rough.model == ROUGHNESS_GAMMA && r->rough.n == 0) { /* Zero is not valid number, but it means "auto" */
             /* TODO: implement variable number of spectra based on absolute and relative roughness. */
             r->rough.n = GAMMA_ROUGHNESS_STEPS;
@@ -333,12 +329,12 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
 #ifdef DEBUG
                 fprintf(stderr, "Roughness model of range %zu is supposed to be file, but there is no file pointer.\n", i_range);
 #endif
-                r->rough.model = ROUGHNESS_NONE;
-                r->rough.file = NULL;
+                roughness_reset(&r->rough);
             }
         } else {
             r->rough.file = NULL;
         }
+        roughness_reset_if_below_tolerance(&r->rough);
     }
 
 #ifdef DEBUG
@@ -520,10 +516,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 r->bragg = 1.0;
                 r->stragg = 1.0;
                 r->density = 0.0;
-                r->rough.x = 0.0;
-                r->rough.model = ROUGHNESS_NONE;
-                r->rough.n = 0;
-                r->rough.file = NULL;
+                roughness_reset(&r->rough);
                 sm->n_ranges++;
 #ifdef DEBUG
                 fprintf(stderr, "Sample from file: NEW POINT, n = %zu, n_ranges = %zu, n_materials=%zu\n", n, sm->n_ranges, sm->n_materials);
@@ -560,13 +553,12 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
 
     sample_model_renormalize(sm);
 
-    for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Set defaults for roughness*/
+    for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Set defaults (roughness model) for roughness. */
         sample_range *r = &sm->ranges[i_range];
         if(r->rough.x > ROUGH_TOLERANCE) {
             r->rough.model = ROUGHNESS_GAMMA; /* TODO: other models */
         } else {
-            r->rough.model = ROUGHNESS_NONE;
-            r->rough.x = 0.0;
+            roughness_reset(&r->rough);
         }
     }
     free(line);
@@ -578,6 +570,9 @@ void sample_model_free(sample_model *sm) {
         return;
     for(size_t i = 0; i < sm->n_materials; i++) {
         jibal_material_free(sm->materials[i]);
+    }
+    for(size_t i = 0; i < sm->n_ranges; i++) {
+        roughness_file_free(sm->ranges[i].rough.file);
     }
     free(sm->ranges);
     free(sm->materials);
@@ -654,10 +649,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             range->yield = 1.0;
             range->stragg = 1.0;
             range->density = 0.0;
-            range->rough.x = 0.0;
-            range->rough.model = ROUGHNESS_NONE;
-            range->rough.n = 0;
-            range->rough.file = NULL;
+            roughness_reset(&range->rough);
             sm->n_ranges++;
             sm->n_materials++;
         }

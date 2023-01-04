@@ -41,8 +41,8 @@ typedef struct roughness_file {
 
 typedef struct roughness {
     roughness_model model;
-    double x; /* Amount, model specific? */
-    size_t n; /* Number of spectra (e.g. for gamma roughness) */
+    double x; /* Amount, model specific. */
+    size_t n; /* Number of spectra to simulate (e.g. for gamma roughness), not used for roughness files. */
     roughness_file *file;
 } roughness;
 
@@ -52,8 +52,13 @@ thick_prob_dist *thickness_probability_table_new(size_t n);
 thick_prob_dist *thickness_probability_table_from_file(const char *filename);
 void thickness_probability_table_normalize(thick_prob_dist *tpd);
 void thickness_probability_table_free(thick_prob_dist *tpd);
+void thickness_probability_table_print(FILE *f, const thick_prob_dist *tpd);
 thick_prob_dist *thickness_probability_table_realloc(thick_prob_dist *tpd, size_t n);
 thick_prob_dist *thickness_probability_table_copy(const thick_prob_dist *tpd);
+int roughness_reset(roughness *r);
+int roughness_reset_if_below_tolerance(roughness *r);
+int roughness_set_from_file(roughness *r, const char *filename);
+roughness_file *roughness_file_read(const char *filename);
 roughness_file *roughness_file_copy(const roughness_file *rf);
 void roughness_file_free(roughness_file *rf);
 double thickness_gamma_pdf(double x, double thickness, double sigma);

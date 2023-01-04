@@ -1257,6 +1257,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_load->subcommands, script_command_new("script", "Load (run) a script.", 0, &script_load_script));
     script_command_list_add_command(&c_load->subcommands, script_command_new("sample", "Load a sample.", 0, &script_load_sample));
     script_command_list_add_command(&c_load->subcommands, script_command_new("reaction", "Load a reaction from R33 file.", 0, &script_load_reaction));
+    script_command_list_add_command(&c_load->subcommands, script_command_new("roughness", "Load layer thickness table (roughness) from a file.", 0, &script_load_roughness));
 
     script_command *c_show = script_command_new("show", "Show information on things.", 0, NULL);
     script_command_list_add_command(&head, c_show);
@@ -1504,7 +1505,7 @@ script_command_status script_load_experimental(script_session *s, int argc, char
 script_command_status script_load_reaction(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
     if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: load reaction [file]\n");
+        jabs_message(MSG_ERROR, stderr, "Usage: load reaction <file>\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(sim_reactions_add_r33(fit->sim, fit->jibal->isotopes, argv[0])) {
@@ -1512,6 +1513,33 @@ script_command_status script_load_reaction(script_session *s, int argc, char *co
     } else {
         return 1;
     }
+}
+
+script_command_status script_load_roughness(script_session *s, int argc, char *const *argv) {
+    struct fit_data *fit = s->fit;
+    sample_model *sm = fit->sm;
+    if(argc < 2) {
+        jabs_message(MSG_ERROR, stderr, "Usage: load roughness <layer> <file>\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(!sm) {
+        jabs_message(MSG_ERROR, stderr, "No sample has been set, can't use this command yet.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    size_t n = strtoull(argv[0], NULL, 10);
+    if(n == 0 || n > sm->n_ranges) {
+        jabs_message(MSG_ERROR, stderr, "Layer number must be between 1 and %zu (number of ranges in current sample).\n", sm->n_ranges);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    sample_range *range = &(sm->ranges[n - 1]);
+    if(roughness_set_from_file(&range->rough, argv[1])) {
+        jabs_message(MSG_ERROR, stderr, "Setting roughness from file failed.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(range->rough.file && range->rough.file->tpd) {
+        jabs_message(MSG_INFO, stderr, "Layer %zu: roughness from file \"%s\", containing %zu data points, loaded.\n", n + 1, range->rough.file->filename, range->rough.file->tpd->n);
+    }
+    return 2;
 }
 
 script_command_status script_reset_reactions(script_session *s, int argc, char *const *argv) {

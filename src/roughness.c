@@ -100,6 +100,7 @@ thick_prob_dist *thickness_probability_table_from_file(const char *filename) { /
             fail = TRUE;
             break;
         }
+        s = end;
         double prob = strtod(s, &end);
         if(*end != '\0') {
             fail = TRUE;
@@ -107,7 +108,10 @@ thick_prob_dist *thickness_probability_table_from_file(const char *filename) { /
         }
         thick_prob *p = &(tpd->p[n_true]);
         p->prob = prob;
-        p->x = thick;
+        p->x = thick * C_TFU;
+#ifdef DEBUG
+        fprintf(stderr, "Line %zu: parsed \"%s\" into %g tfu and %g\n", lineno, line, p->x/C_TFU, p->prob);
+#endif
         n_true++;
     }
     fclose(in);
@@ -116,7 +120,7 @@ thick_prob_dist *thickness_probability_table_from_file(const char *filename) { /
     }
     if(fail) {
 #ifdef DEBUG
-        fprintf(stderr, "Failure in reading line %zu of file %s filename.\n", lineno, filename);
+        fprintf(stderr, "Failure in reading line %zu of file \"%s\".\n", lineno, filename);
 #endif
         thickness_probability_table_free(tpd);
         return NULL;
@@ -126,6 +130,8 @@ thick_prob_dist *thickness_probability_table_from_file(const char *filename) { /
 }
 
 void thickness_probability_table_normalize(thick_prob_dist *tpd) {
+    if(!tpd)
+        return;
     double psum = 0.0;
     for(size_t i = 0; i < tpd->n; i++) {
         thick_prob *p = &tpd->p[i];
@@ -145,6 +151,16 @@ void thickness_probability_table_free(thick_prob_dist *tpd) {
         return;
     free(tpd->p);
     free(tpd);
+}
+
+void thickness_probability_table_print(FILE *f, const thick_prob_dist *tpd) {
+    if(!tpd)
+        return;
+    fprintf(f, " i | thickness | weight(%%)\n");
+    for(size_t i = 0; i < tpd->n; i++) {
+        thick_prob *p = &tpd->p[i];
+        fprintf(f, "%2zu | %9.2lf | %9.4lf\n", i, p->x/C_TFU, p->prob/C_PERCENT);
+    }
 }
 
 thick_prob_dist *thickness_probability_table_realloc(thick_prob_dist *tpd, size_t n) {
@@ -167,6 +183,53 @@ thick_prob_dist *thickness_probability_table_copy(const thick_prob_dist *tpd) {
     return tpd_copy;
 }
 
+int roughness_reset(roughness *r) {
+    r->model = ROUGHNESS_NONE;
+    r->x = 0.0;
+    r->n = 0;
+    roughness_file_free(r->file);
+    r->file = NULL;
+    return EXIT_SUCCESS;
+}
+
+int roughness_reset_if_below_tolerance(roughness *r) {
+    if(r->model == ROUGHNESS_FILE) { /* Files are kept as-is. */
+        return EXIT_SUCCESS;
+    }
+    if(r->x < ROUGH_TOLERANCE) {
+        return roughness_reset(r);
+    }
+    return EXIT_SUCCESS;
+}
+
+int roughness_set_from_file(roughness *r, const char *filename) {
+    roughness_file *rf = roughness_file_read(filename);
+    if(!rf) {
+        return EXIT_FAILURE;
+    }
+    r->file = rf;
+    r->model = ROUGHNESS_FILE;
+    r->n = 0; /* Should be ignored */
+    r->x = 0.0;
+    return EXIT_SUCCESS;
+}
+
+roughness_file *roughness_file_read(const char *filename) {
+    if(!filename)
+        return NULL;
+    thick_prob_dist *tpd = thickness_probability_table_from_file(filename);
+    if(!tpd)
+        return NULL;
+    roughness_file *rf = malloc(sizeof(roughness_file));
+    rf->filename = strdup(filename);
+    rf->tpd = tpd;
+    thickness_probability_table_normalize(rf->tpd);
+#ifdef DEBUG
+    thickness_probability_table_print(stderr, rf->tpd);
+#endif
+    return rf;
+}
+
 roughness_file *roughness_file_copy(const roughness_file *rf) {
     if(!rf)
         return NULL;
@@ -181,4 +244,5 @@ void roughness_file_free(roughness_file *rf) {
         return;
     free(rf->filename);
     thickness_probability_table_free(rf->tpd);
+    free(rf);
 }

@@ -855,6 +855,10 @@ int simulate_with_roughness(sim_workspace *ws) {
     size_t n_rl = 0; /* Number of rough layers */
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
         sample_range *r = &(ws->sample->ranges[i]);
+        if(r->rough.model == ROUGHNESS_FILE) {
+            n_rl++;
+            continue;
+        }
         r->rough.n *= ws->params->rough_layer_multiplier;
         if(r->rough.n > ROUGHNESS_SUBSPECTRA_MAXIMUM) { /* Artificial limit to n */
             r->rough.n = ROUGHNESS_SUBSPECTRA_MAXIMUM;
@@ -862,7 +866,7 @@ int simulate_with_roughness(sim_workspace *ws) {
         if(r->rough.n == 0) {
             r->rough.model = ROUGHNESS_NONE;
         }
-        if(r->rough.model == ROUGHNESS_GAMMA || r->rough.model == ROUGHNESS_FILE) {
+        if(r->rough.model == ROUGHNESS_GAMMA) {
             n_rl++;
         }
     }
@@ -888,6 +892,9 @@ int simulate_with_roughness(sim_workspace *ws) {
 #endif
             tpds[i_rl] = thickness_probability_table_gamma(r->x, r->rough.x, r->rough.n);
         } else if(r->rough.model == ROUGHNESS_FILE) {
+#ifdef DEBUG
+            fprintf(stderr, "Range %zu is rough (FILE), filename = \"%s\"\n", i, r->rough.file->filename);
+#endif
             tpds[i_rl] = thickness_probability_table_copy(r->rough.file->tpd);
         }
         if(tpds[i_rl]) {
