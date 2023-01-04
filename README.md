@@ -77,7 +77,7 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Automatic simulation of recoil spectra when working in forward angles (ERDA) and simulation of both solutions (+/-) for RBS when possible
  - Arbitrary cross sections and reactions from R33 files. Both EBS (Q-value is zero) as well as p-p NRA are implemented. 
  - Point-by-point and layered sample models
- - Roughness (gamma distribution)
+ - Roughness using a gamma distribution and arbitrary roughness using files (weight and thickness tables)
  - Arbitrary geometry, detector and sample tilt can be expressed in arbitrary spherical coordinates
  - Non-linear detector calibration (polynomial of arbitrary degree) and constant detector energy resolution or timing resolution (for ToF detectors)
  - Different calibrations are possible for different elements (Z-specific calibration).
