@@ -616,25 +616,33 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             if(!sm->ranges)
                 return NULL;
         }
-        if(sm->n_ranges && strcmp((*argv)[0], "rough") == 0) {
-            sample_range *range = &sm->ranges[sm->n_ranges - 1];
+        sample_range *range = NULL;
+        if(sm->n_ranges) {
+            range = &sm->ranges[sm->n_ranges - 1];
+        }
+        if(range && (strcmp((*argv)[0], "rough") == 0 || strcmp((*argv)[0], "gamma") == 0)) {
             range->rough.x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1]);
             range->rough.model = ROUGHNESS_GAMMA;
             range->rough.file = NULL;
-        } else if(sm->n_ranges && strcmp((*argv)[0], "n_rough") == 0) {
-                sample_range *range = &sm->ranges[sm->n_ranges - 1];
+        } else if(range && strcmp((*argv)[0], "n_rough") == 0) {
+            if(range->rough.model == ROUGHNESS_GAMMA) {
                 range->rough.n = strtoul((*argv)[1], NULL, 10);
-        } else if(sm->n_ranges && strcmp((*argv)[0], "yield") == 0) {
-                sample_range *range = &sm->ranges[sm->n_ranges - 1];
-                range->yield = strtod((*argv)[1], NULL);
-        } else if(sm->n_ranges && strcmp((*argv)[0], "bragg") == 0) {
-                sample_range *range = &sm->ranges[sm->n_ranges - 1];
-                range->bragg = strtod((*argv)[1], NULL);
-        } else if(sm->n_ranges && strcmp((*argv)[0], "stragg") == 0) {
-            sample_range *range = &sm->ranges[sm->n_ranges - 1];
+            } else {
+                jabs_message(MSG_WARNING, stderr, "Warning: setting rough_n to %.\n", (*argv)[1]);
+            }
+        } else if(range && strcmp((*argv)[0], "roughnessfile") == 0) {
+            if(roughness_set_from_file(&range->rough, (*argv)[1])) {
+                jabs_message(MSG_WARNING, stderr, "Warning: setting roughness from file \"%s\" failed.\n", (*argv)[1]);
+            } else {
+                range->x = thickness_probability_table_areal_density(range->rough.file->tpd);
+            }
+        } else if(range && strcmp((*argv)[0], "yield") == 0) {
+            range->yield = strtod((*argv)[1], NULL);
+        } else if(range && strcmp((*argv)[0], "bragg") == 0) {
+            range->bragg = strtod((*argv)[1], NULL);
+        } else if(range && strcmp((*argv)[0], "stragg") == 0) {
             range->stragg = strtod((*argv)[1], NULL);
-        } else if(sm->n_ranges && strcmp((*argv)[0], "density") == 0) {
-            sample_range *range = &sm->ranges[sm->n_ranges - 1];
+        } else if(range && strcmp((*argv)[0], "density") == 0) {
             range->density = jibal_get_val(jibal->units, UNIT_TYPE_DENSITY, (*argv)[1]);
         } else {
             sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, (*argv)[0]);
@@ -647,7 +655,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
 #ifdef DEBUG
             fprintf(stderr, "Material from formula \"%s\" was created\n", (*argv)[0]);
 #endif
-            sample_range *range = &sm->ranges[sm->n_ranges];
+            range = &sm->ranges[sm->n_ranges];
             range->x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1]);
             range->bragg = 1.0;
             range->yield = 1.0;
