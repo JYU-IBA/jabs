@@ -182,6 +182,12 @@ sample_model *sample_model_split_elements(const sample_model *sm) {
     }
     for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
         out->ranges[i_range] = sm->ranges[i_range];
+        sample_range *r = &out->ranges[i_range];
+        if(r->rough.model == ROUGHNESS_FILE) {
+            if(r->rough.file) {
+                r->rough.file = roughness_file_copy(r->rough.file);
+            }
+        }
     }
     return out;
 }
@@ -727,13 +733,14 @@ char *sample_model_to_string(const sample_model *sm) {
             }
         }
         asprintf_append(&out, " %g%s", r->x/C_TFU, "tfu");
-        if(r->rough.model != ROUGHNESS_NONE && r->x > ROUGH_TOLERANCE) {
-            asprintf_append(&out, " rough %gtfu", r->rough.x/C_TFU, "tfu");
-            if(r->rough.file) {
-                asprintf_append(&out, " file \"%s\"", r->rough.file->filename);
-            } else if(r->rough.n != 0) {
+        if(r->rough.model == ROUGHNESS_GAMMA && r->x > ROUGH_TOLERANCE) {
+            asprintf_append(&out, " gamma %gtfu", r->rough.x/C_TFU, "tfu");
+            if(r->rough.n != 0) {
                 asprintf_append(&out, " n_rough %zu", r->rough.n);
             }
+        }
+        if(r->rough.model == ROUGHNESS_FILE && r->rough.file) {
+            asprintf_append(&out, " roughnessfile \"%s\"", r->rough.file->filename);
         }
         if(r->bragg != 1.0) {
             asprintf_append(&out, " bragg %g", r->bragg);
