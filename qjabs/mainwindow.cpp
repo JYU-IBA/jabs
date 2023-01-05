@@ -22,7 +22,7 @@ MainWindow::MainWindow(QWidget *parent)
     aboutString = QString("JaBS version ") + jabs_version() + "\n\n"
                        + "Using JIBAL version "+ jibal_version() + ", compiled using version " + JIBAL_VERSION + "\n\n"
                        + "Using Qt version " + qVersion() + ", compiled using version " + QT_VERSION_STR + "\n\n"
-                       + "Copyright 2021 - 2022 Jaakko Julin <jaakko.julin@jyu.fi>\n";
+                       + "Copyright 2021 - 2023 Jaakko Julin <jaakko.julin@jyu.fi>\n";
     ui->setupUi(this);
     ui->widget->setVisible(false);
     ui->plotSettingsGroupBox->setVisible(false); /* Will be made visible if necessary */

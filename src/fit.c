@@ -1,6 +1,6 @@
 /*
  *  Jaakko's Backscattering Simulator (JaBS)
- *  Copyright (C) 2021 - 2022 Jaakko Julin
+ *  Copyright (C) 2021 - 2023 Jaakko Julin
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,47 +34,34 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     fprintf(stderr, "Fit iteration %zu, fit function evaluation %zu\n", fit_data->stats.iter, fit_data->stats.n_evals_iter);
 #endif
     size_t i_v_active = fit_data->stats.iter_call - 1; /* Which variable is being varied by the fit algorithm in this particular call inside an iteration (compared to first call (== 0)) */
-    fit_variable *var_active = fit_data->stats.iter_call && i_v_active < fit_data->fit_params->n_active ? &fit_data->fit_params->vars[i_v_active] : NULL;
-    fit_data->stats.iter_call++;
-#ifdef DEBUG
-    fprintf(stderr, "Iter %zu (call %zu)\n", fit_data->stats.iter, fit_data->stats.iter_call);
-#endif
-
-    for(size_t i = 0; i < fit_data->fit_params->n; i++) {
-        fit_variable *var = &fit_data->fit_params->vars[i];
-        if(var->active) {
-            if(!isfinite(*(var->value))) {
-                fprintf(stderr, "Fit iteration %zu, call %zu, fit variable %zu (%s) is not finite.\n", fit_data->stats.iter, fit_data->stats.iter_call, var->i_v, var->name);
-                fit_data->stats.error = FIT_ERROR_SANITY;
-                return GSL_FAILURE;
-            }
-            *(var->value) = gsl_vector_get(x, var->i_v);
-            if(fit_data->stats.iter_call == 1) { /* Store the value of fit parameters at the first function evaluation */
-                var->value_iter = *(var->value);
-            }
-#ifdef DEBUG
-            fprintf(stderr, "  %zu %12.10lf %12.10lf %s\n", var->i_v, *(var->value)/var->value_orig, *(var->value)/var->value_iter, var->i_v == i_v_active ? "THIS ONE":"");
-#endif
+    fit_variable *var_active = NULL;
+    for(size_t i_v = 0; i_v < fit_data->fit_params->n; i_v++) {
+        fit_variable *var = &fit_data->fit_params->vars[i_v];
+        if(fit_data->fit_params->vars[i_v].i_v == i_v_active) {
+            var_active = &fit_data->fit_params->vars[i_v];
+            break;
         }
     }
+    fit_data->stats.iter_call++;
 #ifdef DEBUG
-    fprintf(stderr, "\n");
+    fprintf(stderr, "Iter %zu (call %zu). var_active = %p (%s)\n", fit_data->stats.iter, fit_data->stats.iter_call, var_active, var_active?var_active->name:"none");
 #endif
 
+    if(fit_parameters_set_from_vector(fit_data, x)) {
+        return GSL_FAILURE;
+    }
 
     if(var_active && var_active->value == &fit_data->sim->fluence) {
-        double scale = *(var_active->value) / var_active->value_iter;
-#ifdef DEBUG
-        fprintf(stderr, "Varying fluence (iter %zu, call %zu) by %12.10lf.\n", fit_data->stats.iter, fit_data->stats.iter_call, scale);
-#endif
-        for(size_t i = 0; i < fit_data->n_ws; i++) {
-            sim_workspace *ws = fit_data_ws(fit_data, i);
-            sim_workspace_histograms_scale(ws, scale);
-            sim_workspace_calculate_sum_spectra(ws);
+        if(fit_scale_by_variable(fit_data, var_active)) {
+            return GSL_FAILURE;
         }
-        fit_set_residuals(fit_data, f);
         fit_data->stats.n_evals_iter++;
-        return GSL_SUCCESS;
+        fit_data->stats.error = fit_set_residuals(fit_data, f);
+        if(fit_data->stats.error) {
+            return GSL_FAILURE;
+        } else {
+            return GSL_SUCCESS;
+        }
     }
 
     sample_free(fit_data->sim->sample);
@@ -117,17 +104,25 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     fit_data->stats.n_evals_iter++;
 
     if(fit_data->stats.iter_call == 1) { /* First call of iter, store sum histograms to fit_data */
-        fit_data_histo_sum_free(fit_data);
-        fit_data->histo_sum_iter = calloc(fit_data->n_ws, sizeof(gsl_histogram *));
-        for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
-            sim_workspace *ws = fit_data_ws(fit_data, i_det);
-            fit_data->histo_sum_iter[i_det] = gsl_histogram_clone(ws->histo_sum);
-        }
-        fit_data->n_histo_sum = fit_data->n_ws;
+        fit_data_histo_sum_store(fit_data);
     }
     fit_data->stats.error = fit_set_residuals(fit_data, f);
-    if(fit_data->stats.error)
+    if(fit_data->stats.error) {
         return GSL_FAILURE;
+    }
+    return GSL_SUCCESS;
+}
+
+int fit_scale_by_variable(struct fit_data *fit, const fit_variable *var) {
+    double scale = *(var->value) / var->value_iter;
+#ifdef DEBUG
+    fprintf(stderr, "Varying fluence (iter %zu, call %zu) by %12.10lf (variable %s).\n", fit->stats.iter, fit->stats.iter_call, scale, var->name);
+#endif
+    for(size_t i = 0; i < fit->n_ws; i++) {
+        sim_workspace *ws = fit_data_ws(fit, i);
+        sim_workspace_histograms_scale(ws, scale);
+        sim_workspace_calculate_sum_spectra(ws);
+    }
     return GSL_SUCCESS;
 }
 
@@ -163,6 +158,30 @@ int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f) {
         return FIT_ERROR_IMPOSSIBLE;
     }
     return FIT_ERROR_NONE;
+}
+
+int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x) {
+    for(size_t i = 0; i < fit->fit_params->n; i++) {
+        fit_variable *var = &fit->fit_params->vars[i];
+        if(var->active) {
+            if(!isfinite(*(var->value))) {
+                fprintf(stderr, "Fit iteration %zu, call %zu, fit variable %zu (%s) is not finite.\n", fit->stats.iter, fit->stats.iter_call, var->i_v, var->name);
+                fit->stats.error = FIT_ERROR_SANITY;
+                return GSL_FAILURE;
+            }
+            *(var->value) = gsl_vector_get(x, var->i_v);
+            if(fit->stats.iter_call == 1) { /* Store the value of fit parameters at the first function evaluation */
+                var->value_iter = *(var->value);
+            }
+#ifdef DEBUG
+            fprintf(stderr, "  %zu %12.10lf %12.10lf %s\n", var->i_v, *(var->value)/var->value_orig, *(var->value)/var->value_iter, var->i_v == i_v_active ? "THIS ONE":"");
+#endif
+        }
+    }
+#ifdef DEBUG
+    fprintf(stderr, "\n");
+#endif
+    return GSL_SUCCESS;
 }
 
 void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear_workspace *w) {
@@ -400,6 +419,16 @@ void fit_data_histo_sum_free(struct fit_data *fit_data) {
     free(fit_data->histo_sum_iter);
     fit_data->histo_sum_iter = NULL;
     fit_data->n_histo_sum = 0;
+}
+
+void fit_data_histo_sum_store(struct fit_data *fit_data) {
+    fit_data_histo_sum_free(fit_data);
+    fit_data->histo_sum_iter = calloc(fit_data->n_ws, sizeof(gsl_histogram *));
+    for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
+        sim_workspace *ws = fit_data_ws(fit_data, i_det);
+        fit_data->histo_sum_iter[i_det] = gsl_histogram_clone(ws->histo_sum);
+    }
+    fit_data->n_histo_sum = fit_data->n_ws;
 }
 
 int fit_data_add_det(struct fit_data *fit_data, detector *det) {

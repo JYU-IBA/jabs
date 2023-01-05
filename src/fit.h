@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2022 Jaakko Julin
+    Copyright (C) 2021 - 2023 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -122,6 +122,7 @@ gsl_histogram *fit_data_sim(const struct fit_data *fit_data, size_t i_det);
 void fit_data_exp_free(struct fit_data *fit_data);
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename);
 void fit_data_histo_sum_free(struct fit_data *fit_data);
+void fit_data_histo_sum_store(struct fit_data *fit_data);
 int fit_data_add_det(struct fit_data *fit_data, detector *det);
 sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det);
 size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);
@@ -132,7 +133,9 @@ int fit(struct fit_data *fit_data);
 void fit_covar_print(const gsl_matrix *covar);
 void fit_parameters_update(const fit_data *fit, const gsl_multifit_nlinear_workspace *w, const gsl_matrix *covar); /* Updates values in fit_params, computes errors */
 void fit_parameters_update_changed(const fit_data *fit); /* Checks if values have changed since fit_parameters_update(), computes new error */
+int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x); /* Updates values in fit params as they are varied by the fit algorithm. */
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
+int fit_scale_by_variable(struct fit_data *fit, const fit_variable *var);
 int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f);
 void fit_iter_stats_update(struct fit_data *params, const gsl_multifit_nlinear_workspace *w);
 void fit_iter_stats_print(const struct fit_stats *stats);

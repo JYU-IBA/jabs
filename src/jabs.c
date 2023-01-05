@@ -756,7 +756,7 @@ fit_params *fit_params_all(fit_data *fit) {
     size_t param_name_max_len = 256; /* Laziness. We use a fixed size temporary string. snprintf is used, so no overflows should occur, but very long names may be truncated. */
     char *param_name = malloc(sizeof(char) * param_name_max_len);
     fit_params *params = fit_params_new();
-    fit_params_add_parameter(params, &sim->fluence, "fluence", "", 1.0);
+    fit_params_add_parameter(params, &sim->fluence, "fluence", "", 1.0); /* This must be the first parameter always, as there is a speedup in the fit routine */
     fit_params_add_parameter(params, &sim->channeling_offset, "channeling", "", 1.0);
     fit_params_add_parameter(params, &sim->channeling_slope, "channeling_slope", "1/keV", 1.0 / C_KEV);
     fit_params_add_parameter(params, &sim->sample_theta, "alpha", "deg", C_DEG);

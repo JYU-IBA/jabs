@@ -33,7 +33,7 @@ if(${QT_VERSION_MAJOR} NOT EQUAL 6)
 endif()
 
 find_package(GSL 2.6 REQUIRED)
-find_package(Jibal 0.3.5 REQUIRED)
+find_package(Jibal 0.3.8 REQUIRED)
 if(WIN32)
     find_path(GETOPT_INCLUDE_DIR getopt.h)
     find_library(GETOPT_LIBRARY getopt)
