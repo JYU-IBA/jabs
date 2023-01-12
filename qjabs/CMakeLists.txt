@@ -90,6 +90,9 @@ set(PROJECT_SOURCES
         ../src/calibration.h
         ../src/prob_dist.h
         ../src/prob_dist.c
+        ../src/plugin.c
+        ../src/plugin.h
+        ../src/plugin_interface.h
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui
        fitdialog.cpp fitdialog.h fitdialog.ui
