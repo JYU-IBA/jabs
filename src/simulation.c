@@ -797,7 +797,8 @@ double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E)
 }
 
 double sim_reaction_cross_section_plugin(const sim_reaction *sim_r, double E) {
-    return 0.0; /* TODO: implement */
+    jabs_plugin_reaction *r = sim_r->r->plugin_r;
+    return r->cs(r, sim_r->theta, E);
 }
 
 void sim_sort_reactions(const simulation *sim) {

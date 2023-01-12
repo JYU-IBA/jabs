@@ -48,3 +48,5 @@ endif()
 add_subdirectory(gitwatcher)
 
 add_subdirectory(src)
+
+add_subdirectory(plugins)

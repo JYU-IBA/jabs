@@ -33,9 +33,9 @@ void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) 
         }
         jabs_message(MSG_INFO, f, "%3zu: %4s with %5s (reaction product %s).", i + 1, reaction_name(r), r->target->name, r->product->name);
         if(r->type == REACTION_FILE) {
-            jabs_message(MSG_INFO, f, " Incident = %s, Theta = %g deg, E = [%g keV, %g keV]. Q = %g MeV. Data from file \"%s\".\n", r->incident->name, r->theta/C_DEG, r->cs_table[0].E/C_KEV, r->cs_table[r->n_cs_table-1].E/C_KEV, r->Q/C_MEV, r->filename);
+            jabs_message(MSG_INFO, f, " Incident = %s, Theta = %g deg, E = [%g keV, %g keV]. Q = %g MeV. Data from file \"%s\".\n", r->incident->name, r->theta/C_DEG, r->E_min/C_KEV, r->E_max/C_KEV, r->Q/C_MEV, r->filename);
         } else if(r->type == REACTION_PLUGIN) {
-            jabs_message(MSG_INFO, f, "Plugin %s filename \"%s\"\n", r->plugin->name, r->filename);
+            jabs_message(MSG_INFO, f, " Plugin \"%s\" filename \"%s\"\n", r->plugin->name, r->filename);
         } else{
             jabs_message(MSG_INFO, f, " %s cross sections (built-in).", jibal_cross_section_name(r->cs));
             if(r->E_max < E_MAX || r->E_min > 0.0) {
@@ -173,7 +173,10 @@ reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incid
 void reaction_free(reaction *r) {
     if(!r)
         return;
+    jabs_plugin_reaction_free(r->plugin, r->plugin_r);
+    jabs_plugin_close(r->plugin);
     free(r->cs_table);
+    free(r->filename);
 }
 
 int reaction_is_same(const reaction *r1, const reaction *r2) {
@@ -194,6 +197,10 @@ int reaction_is_same(const reaction *r1, const reaction *r2) {
 
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile) {
     const jibal_isotope *nuclei[R33_N_NUCLEI];
+    if(rfile->n_data < 2) {
+        jabs_message(MSG_ERROR, stderr, "Not enough data in file (n = %zu).\n", rfile->n_data);
+        return NULL;
+    }
     for(size_t i = 0; i < R33_N_NUCLEI; i++) {
 #ifdef R33_IGNORE_REACTION_STRING
         nuclei[i] = jibal_isotope_find(isotopes, NULL, r33_double_to_int(rfile->zeds[i]), r33_double_to_int(rfile->masses[i]));
@@ -252,13 +259,10 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
             rp->sigma = 0.0;
         }
     }
+    r->E_min = r->cs_table[0].E;
+    r->E_max = r->cs_table[r->n_cs_table - 1].E;
     return r;
 }
-
-reaction *plugin_reaction(jabs_plugin *plugin) {
-
-}
-
 int reaction_compare(const void *a, const void *b) {
     const reaction *r_a = *((const reaction **)a);
     const reaction *r_b = *((const reaction **)b);

@@ -64,6 +64,7 @@ script_command_status script_help_commands(script_session *s, int argc, char *co
 script_command_status script_identify_plugin(struct script_session *s, int argc, char * const *argv);
 script_command_status script_load_experimental(struct script_session *s, int argc, char *const *argv);
 script_command_status script_load_reaction(struct script_session *s, int argc, char *const *argv);
+script_command_status script_load_reaction_plugin(script_session *s, int argc, char *const *argv);
 script_command_status script_load_roughness(script_session *s, int argc, char *const *argv);
 script_command_status script_load_sample(struct script_session *s, int argc, char *const *argv);
 script_command_status script_load_script(struct script_session *s, int argc, char *const *argv);

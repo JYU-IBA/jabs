@@ -1,0 +1,5 @@
+#define testplugin_VERSION "@testplugin_VERSION@"
+#define testplugin_VERSION_MAJOR @testplugin_VERSION_MAJOR@
+#define testplugin_VERSION_MINOR @testplugin_VERSION_MINOR@
+#define testplugin_VERSION_PATCH @testplugin_VERSION_PATCH@
+#define testplugin_DESCRIPTION "@testplugin_DESCRIPTION@"

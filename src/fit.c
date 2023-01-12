@@ -37,14 +37,14 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     fit_variable *var_active = NULL;
     for(size_t i_v = 0; i_v < fit_data->fit_params->n; i_v++) {
         fit_variable *var = &fit_data->fit_params->vars[i_v];
-        if(fit_data->fit_params->vars[i_v].i_v == i_v_active) {
-            var_active = &fit_data->fit_params->vars[i_v];
+        if(var->i_v == i_v_active) {
+            var_active = var;
             break;
         }
     }
     fit_data->stats.iter_call++;
 #ifdef DEBUG
-    fprintf(stderr, "Iter %zu (call %zu). var_active = %p (%s)\n", fit_data->stats.iter, fit_data->stats.iter_call, var_active, var_active?var_active->name:"none");
+    fprintf(stderr, "Iter %zu (call %zu). var_active = %p (%s)\n", fit_data->stats.iter, fit_data->stats.iter_call, (void *)var_active, var_active?var_active->name:"none");
 #endif
 
     if(fit_parameters_set_from_vector(fit_data, x)) {
@@ -174,7 +174,7 @@ int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x) {
                 var->value_iter = *(var->value);
             }
 #ifdef DEBUG
-            fprintf(stderr, "  %zu %12.10lf %12.10lf %s\n", var->i_v, *(var->value)/var->value_orig, *(var->value)/var->value_iter, var->i_v == i_v_active ? "THIS ONE":"");
+            fprintf(stderr, "  %zu %12.10lf %12.10lf\n", var->i_v, *(var->value)/var->value_orig, *(var->value)/var->value_iter);
 #endif
         }
     }

@@ -17,7 +17,7 @@
 #include "generic.h"
 
 jabs_plugin *jabs_plugin_open(const char *filename) {
-    int (*typef)();
+    jabs_plugin_type (*typef)();
     const char *(*namef)();
     const char *(*versionf)();
     if(!filename) {
@@ -50,6 +50,9 @@ jabs_plugin *jabs_plugin_open(const char *filename) {
 }
 
 void jabs_plugin_close(jabs_plugin *plugin) {
+    if(!plugin) {
+        return;
+    }
     dlclose(plugin->handle);
     free(plugin->filename);
     free(plugin->name);
@@ -77,18 +80,36 @@ const char *jabs_plugin_type_string(jabs_plugin_type type) {
     }
 }
 
-jabs_plugin_reaction *jabs_plugin_reaction_init(const jabs_plugin *plugin, int argc,  char * const *argv) {
+jabs_plugin_reaction *jabs_plugin_reaction_init(const jabs_plugin *plugin, const jibal_isotope *incident, const jibal_isotope *target, int *argc, char * const **argv) {
     if(!plugin) {
+#ifdef DEBUG
+        fprintf(stderr, "Plugin is NULL. Can't init.\n");
+#endif
         return NULL;
     }
     if(plugin->type != JABS_PLUGIN_CS) {
         return NULL;
     }
-    jabs_plugin_reaction *(*initf)(int argc, char * const *argv);
+    jabs_plugin_reaction *(*initf)(const jibal_isotope *incident, const jibal_isotope *target, int *argc, char * const **argv);
     initf = dlsym(plugin->handle, "reaction_init");
     if(!initf) {
+#ifdef DEBUG
+        fprintf(stderr, "No reaction_init in plugin.\n");
+#endif
         return NULL;
     }
-    jabs_plugin_reaction *r = initf(argc, argv);
+    jabs_plugin_reaction *r = initf(incident, target, argc, argv);
     return r;
+}
+
+void jabs_plugin_reaction_free(const jabs_plugin *plugin, jabs_plugin_reaction *reaction) {
+    if(!plugin || !reaction) {
+        return;
+    }
+    void *(*freef)(jabs_plugin_reaction *reaction);
+    freef = dlsym(plugin->handle, "reaction_free");
+    if(!freef) {
+        return;
+    }
+    freef(reaction);
 }

@@ -89,7 +89,7 @@ typedef struct sim_reaction {
     int stop;
     double max_depth;
     size_t i_isotope; /* Number of isotope (r->target) in sample->isotopes */
-    double theta;
+    double theta; /* theta used in simulations (will be overwritten by simulate() when necessary) */
     double K;
     double (*cross_section)(const struct sim_reaction *, double);
     double theta_cm; /* theta in CM system */
