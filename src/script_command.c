@@ -29,6 +29,7 @@
 #include "generic.h"
 #include "script_session.h"
 #include "script_command.h"
+#include "plugin.h"
 
 
 int script_prepare_sim_or_fit(script_session *s) {
@@ -1152,6 +1153,10 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_help->subcommands, script_command_new("commands", "List of commands.", 0, &script_help_commands));
     script_command_list_add_command(&c_help->subcommands, script_command_new("version", "Help on (show) version.", 0, &script_help_version));
 
+    script_command *c_identify = script_command_new("identify", "Identify something.", 0, NULL);
+    script_command_list_add_command(&head, c_identify);
+    script_command_list_add_command(&c_identify->subcommands, script_command_new("plugin", "Identify plugin.", 0, &script_identify_plugin));
+
 
     script_command *c_set = script_command_new("set", "Set something.", 0, NULL);
     c_set->f_var = &script_set_var;
@@ -2270,6 +2275,21 @@ script_command_status script_help_commands(script_session *s, int argc, char *co
         return SCRIPT_COMMAND_SUCCESS;
     }
     return SCRIPT_COMMAND_NOT_FOUND;
+}
+
+script_command_status script_identify_plugin(struct script_session *s, int argc, char * const *argv) {
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: identify plugin <path>\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    jabs_plugin *plugin = jabs_plugin_open(argv[0]);
+    if(!plugin) {
+        jabs_message(MSG_ERROR, stderr, "Plugin %s not found or could not be opened.\n", argv[0]);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    jabs_message(MSG_INFO, stderr, "Plugin identifies as \"%s\" version \"%s\".\n", plugin->name, plugin->version);
+    jabs_plugin_close(plugin);
+    return 1;
 }
 
 script_command_status script_cwd(struct script_session *s, int argc, char *const *argv) {

@@ -27,12 +27,21 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 
-option(DEBUG_MODE_ENABLE "Enable debug mode" OFF)
-if(DEBUG_MODE_ENABLE)
+option(DEBUG_MODE "Debug mode" OFF)
+if(DEBUG_MODE)
     if (MSVC)
         add_compile_options(/W4 /WX /DDEBUG)
     else()
         add_compile_options(-Wall -Wextra -pedantic -DDEBUG)
+    endif()
+endif()
+
+option(PLUGINS "Support for plugins" OFF)
+if(PLUGINS)
+    if (MSVC)
+        #No Windows support in the first phase
+    else()
+        add_compile_options(-DJABS_PLUGIN_SUPPORT)
     endif()
 endif()
 

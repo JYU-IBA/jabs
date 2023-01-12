@@ -513,6 +513,9 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         } else if(r->r->type == REACTION_FILE) {
             ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes); /* This allocates memory. We could share (like with RBS) in some cases, but that's not necessarily convenient. */
             r->cross_section = sim_reaction_cross_section_tabulated;
+        } else if(r->r->type == REACTION_PLUGIN) {
+            ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes);
+            r->cross_section = sim_reaction_cross_section_plugin;
         } else {
             p->nucl_stop = NULL;
             p->nucl_stop_isotopes = 0;
@@ -791,6 +794,10 @@ double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E)
         }
     }
     return t[lo].sigma+((t[lo+1].sigma-t[lo].sigma)/(t[lo+1].E-t[lo].E))*(E-t[lo].E);
+}
+
+double sim_reaction_cross_section_plugin(const sim_reaction *sim_r, double E) {
+    return 0.0; /* TODO: implement */
 }
 
 void sim_sort_reactions(const simulation *sim) {

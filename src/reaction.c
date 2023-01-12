@@ -34,7 +34,9 @@ void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) 
         jabs_message(MSG_INFO, f, "%3zu: %4s with %5s (reaction product %s).", i + 1, reaction_name(r), r->target->name, r->product->name);
         if(r->type == REACTION_FILE) {
             jabs_message(MSG_INFO, f, " Incident = %s, Theta = %g deg, E = [%g keV, %g keV]. Q = %g MeV. Data from file \"%s\".\n", r->incident->name, r->theta/C_DEG, r->cs_table[0].E/C_KEV, r->cs_table[r->n_cs_table-1].E/C_KEV, r->Q/C_MEV, r->filename);
-        } else {
+        } else if(r->type == REACTION_PLUGIN) {
+            jabs_message(MSG_INFO, f, "Plugin %s filename \"%s\"\n", r->plugin->name, r->filename);
+        } else{
             jabs_message(MSG_INFO, f, " %s cross sections (built-in).", jibal_cross_section_name(r->cs));
             if(r->E_max < E_MAX || r->E_min > 0.0) {
                 jabs_message(MSG_INFO, f, " E = [%g keV, %g keV]", r->E_min/C_KEV, r->E_max/C_KEV);
@@ -58,8 +60,8 @@ const char *reaction_name(const reaction *r) {
             return "ERD";
         case REACTION_FILE:
             return "FILE";
-        case REACTION_ARB:
-            return "ARB";
+        case REACTION_PLUGIN:
+            return "PLUGIN";
         default:
             return "???";
     }
@@ -76,6 +78,8 @@ reaction_type reaction_type_from_string(const char *s) {
         return REACTION_ERD;
     if(strcmp(s, "FILE") == 0)
         return REACTION_FILE;
+    if(strcmp(s, "PLUGIN") == 0)
+        return REACTION_PLUGIN;
 #ifdef DEBUG
     fprintf(stderr, "Reaction type string %s is not valid.\n", s);
 #endif
@@ -111,6 +115,8 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     r->filename = NULL;
     r->cs_table = NULL;
     r->n_cs_table = 0;
+    r->plugin = NULL;
+    r->plugin_r = NULL;
     r->E_min = 0.0;
     r->E_max = E_MAX;
     r->Q = 0.0;
@@ -247,6 +253,10 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
         }
     }
     return r;
+}
+
+reaction *plugin_reaction(jabs_plugin *plugin) {
+
 }
 
 int reaction_compare(const void *a, const void *b) {
