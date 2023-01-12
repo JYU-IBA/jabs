@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 Jaakko Julin
+    Copyright (C) 2021 - 2023 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -47,8 +47,10 @@ typedef struct reaction {
     jibal_cross_section_type cs; /* Cross section model to use (e.g. screening corrections) */
     char *filename; /* for REACTION_FILE and REACTION_PLUGIN */
     struct reaction_point *cs_table; /* for REACTION_FILE */
+#ifdef PLUGINS
     jabs_plugin *plugin; /* for REACTION_PLUGIN */
     jabs_plugin_reaction *plugin_r; /* for REACTION_PLUGIN */
+#endif
     size_t n_cs_table;
     double theta; /* For REACTION_FILE */
     double Q;

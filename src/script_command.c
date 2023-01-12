@@ -1153,10 +1153,11 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_help->subcommands, script_command_new("commands", "List of commands.", 0, &script_help_commands));
     script_command_list_add_command(&c_help->subcommands, script_command_new("version", "Help on (show) version.", 0, &script_help_version));
 
+#ifdef PLUGINS
     script_command *c_identify = script_command_new("identify", "Identify something.", 0, NULL);
     script_command_list_add_command(&head, c_identify);
     script_command_list_add_command(&c_identify->subcommands, script_command_new("plugin", "Identify plugin.", 0, &script_identify_plugin));
-
+#endif
 
     script_command *c_set = script_command_new("set", "Set something.", 0, NULL);
     c_set->f_var = &script_set_var;
@@ -1263,7 +1264,9 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_load->subcommands, script_command_new("sample", "Load a sample.", 0, &script_load_sample));
     script_command *c_reaction = script_command_new("reaction", "Load a reaction from R33 file.", 0, &script_load_reaction);
     script_command_list_add_command(&c_load->subcommands, c_reaction);
+#ifdef PLUGINS
     script_command_list_add_command(&c_reaction->subcommands, script_command_new("plugin", "Load a reaction from a plugin.", 0, &script_load_reaction_plugin));
+#endif
     script_command_list_add_command(&c_load->subcommands, script_command_new("roughness", "Load layer thickness table (roughness) from a file.", 0, &script_load_roughness));
 
     script_command *c_show = script_command_new("show", "Show information on things.", 0, NULL);
@@ -1523,51 +1526,6 @@ script_command_status script_load_reaction(script_session *s, int argc, char *co
     } else {
         return 1;
     }
-}
-
-script_command_status script_load_reaction_plugin(script_session *s, int argc, char *const *argv) {
-    const int argc_orig = argc;
-    struct fit_data *fit = s->fit;
-    if(argc < 2) {
-        jabs_message(MSG_ERROR, stderr, "Usage: load reaction plugin <file> <target> ...\n");
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    const jibal_isotope *target = jibal_isotope_find(s->jibal->isotopes, argv[1], 0, 0);
-    if(!target) {
-        jabs_message(MSG_ERROR, stderr, "Could not find isotope matching \"%s\".\n", argv[1]);
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    const char *filename = argv[0];
-    jabs_plugin *plugin = jabs_plugin_open(filename);
-    if(!plugin) {
-        jabs_message(MSG_ERROR, stderr, "Could not load plugin from file \"%s\".\n", filename);
-        return EXIT_FAILURE;
-    }
-    reaction *r = reaction_make(fit->sim->beam_isotope, target, REACTION_PLUGIN, JIBAL_CS_NONE);
-    if(!r) {
-        jabs_message(MSG_ERROR, stderr, "Could not make a new reaction.\n");
-        jabs_plugin_close(plugin);
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    r->plugin = plugin;
-    argc += 2;
-    argv -= 2;
-    jabs_plugin_reaction *pr = jabs_plugin_reaction_init(plugin, fit->sim->beam_isotope, target, &argc, &argv);
-    if(!pr) {
-        jabs_message(MSG_ERROR, stderr, "Plugin failed to initialize.\n");
-        reaction_free(r);
-        jabs_plugin_close(plugin);
-        return SCRIPT_COMMAND_FAILURE;
-
-    }
-    r->plugin_r = pr;
-    r->product = pr->product;
-    r->product_nucleus = pr->product_heavy;
-    r->E_min = pr->E_min;
-    r->E_max = pr->E_max;
-    r->filename = strdup(plugin->filename);
-    sim_reactions_add_reaction(fit->sim, r);
-    return argc_orig; /* TODO: always consumes all arguments */
 }
 
 script_command_status script_load_roughness(script_session *s, int argc, char *const *argv) {
@@ -2326,6 +2284,7 @@ script_command_status script_help_commands(script_session *s, int argc, char *co
     }
     return SCRIPT_COMMAND_NOT_FOUND;
 }
+#ifdef PLUGINS
 
 script_command_status script_identify_plugin(struct script_session *s, int argc, char * const *argv) {
     if(argc < 1) {
@@ -2341,6 +2300,52 @@ script_command_status script_identify_plugin(struct script_session *s, int argc,
     jabs_plugin_close(plugin);
     return 1;
 }
+
+script_command_status script_load_reaction_plugin(script_session *s, int argc, char *const *argv) {
+    const int argc_orig = argc;
+    struct fit_data *fit = s->fit;
+    if(argc < 2) {
+        jabs_message(MSG_ERROR, stderr, "Usage: load reaction plugin <file> <target> ...\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    const jibal_isotope *target = jibal_isotope_find(s->jibal->isotopes, argv[1], 0, 0);
+    if(!target) {
+        jabs_message(MSG_ERROR, stderr, "Could not find isotope matching \"%s\".\n", argv[1]);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    const char *filename = argv[0];
+    jabs_plugin *plugin = jabs_plugin_open(filename);
+    if(!plugin) {
+        jabs_message(MSG_ERROR, stderr, "Could not load plugin from file \"%s\".\n", filename);
+        return EXIT_FAILURE;
+    }
+    reaction *r = reaction_make(fit->sim->beam_isotope, target, REACTION_PLUGIN, JIBAL_CS_NONE);
+    if(!r) {
+        jabs_message(MSG_ERROR, stderr, "Could not make a new reaction.\n");
+        jabs_plugin_close(plugin);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    r->plugin = plugin;
+    argc += 2;
+    argv -= 2;
+    jabs_plugin_reaction *pr = jabs_plugin_reaction_init(plugin, fit->sim->beam_isotope, target, &argc, &argv);
+    if(!pr) {
+        jabs_message(MSG_ERROR, stderr, "Plugin failed to initialize.\n");
+        reaction_free(r);
+        jabs_plugin_close(plugin);
+        return SCRIPT_COMMAND_FAILURE;
+
+    }
+    r->plugin_r = pr;
+    r->product = pr->product;
+    r->product_nucleus = pr->product_heavy;
+    r->E_min = pr->E_min;
+    r->E_max = pr->E_max;
+    r->filename = strdup(plugin->filename);
+    sim_reactions_add_reaction(fit->sim, r);
+    return argc_orig; /* TODO: always consumes all arguments */
+}
+#endif
 
 script_command_status script_cwd(struct script_session *s, int argc, char *const *argv) {
     (void) s;

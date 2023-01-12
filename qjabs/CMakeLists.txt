@@ -1,3 +1,14 @@
+#
+#    Jaakko's Backscattering Simulator (JaBS)
+#    Copyright (C) 2021 - 2023 Jaakko Julin
+#
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+#   See LICENSE.txt for the full license.
+#
+
 cmake_minimum_required(VERSION 3.19)
 if(WIN32 AND DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
@@ -90,9 +101,7 @@ set(PROJECT_SOURCES
         ../src/calibration.h
         ../src/prob_dist.h
         ../src/prob_dist.c
-        ../src/plugin.c
-        ../src/plugin.h
-        ../src/plugin_interface.h
+        "$<$<BOOL:${PLUGINS}>:plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui
        fitdialog.cpp fitdialog.h fitdialog.ui

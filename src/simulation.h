@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 Jaakko Julin
+    Copyright (C) 2021 - 2023 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -157,7 +157,9 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r);
 void sim_reaction_reset_bricks(sim_reaction *sim_r);
 double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);
 double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E);
+#ifdef PLUGINS
 double sim_reaction_cross_section_plugin(const sim_reaction *sim_r, double E);
+#endif
 double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);
 void sim_sort_reactions(const simulation *sim);
 void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident);

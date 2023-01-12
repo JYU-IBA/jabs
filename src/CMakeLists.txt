@@ -1,6 +1,6 @@
 #
 #    Jaakko's Backscattering Simulator (JaBS)
-#    Copyright (C) 2021 Jaakko Julin
+#    Copyright (C) 2021 - 2023 Jaakko Julin
 #
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -25,7 +25,9 @@ add_executable(jabs main.c sample.c sample.h brick.c ion.c ion.h simulation.c si
         options.c options.h spectrum.c spectrum.h fit.c fit.h rotate.c rotate.h detector.c detector.h jabs.c jabs.h
         roughness.c roughness.h script.c script.h generic.c generic.h message.c message.h aperture.c aperture.h
         geostragg.c geostragg.h script_command.c script_command.h script_session.c script_session.h script_file.c
-        script_file.h calibration.c calibration.h script_generic.h prob_dist.c prob_dist.h plugin.c plugin.h)
+        script_file.h calibration.c calibration.h script_generic.h prob_dist.c prob_dist.h
+        "$<$<BOOL:${PLUGINS}>:plugin.c>"
+        )
 
 target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
 
