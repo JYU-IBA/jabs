@@ -66,13 +66,29 @@ const char *jabs_plugin_type_name(const jabs_plugin *plugin) {
 
 const char *jabs_plugin_type_string(jabs_plugin_type type) {
     switch(type) {
-        case PLUGIN_NONE:
+        case JABS_PLUGIN_NONE:
             return "none";
-        case PLUGIN_CS:
+        case JABS_PLUGIN_CS:
             return "cs";
-        case PLUGIN_SPECTRUM_READER:
+        case JABS_PLUGIN_SPECTRUM_READER:
             return "spectrumreader";
         default:
             return "unknown";
     }
+}
+
+jabs_plugin_reaction *jabs_plugin_reaction_init(const jabs_plugin *plugin, int argc,  char * const *argv) {
+    if(!plugin) {
+        return NULL;
+    }
+    if(plugin->type != JABS_PLUGIN_CS) {
+        return NULL;
+    }
+    jabs_plugin_reaction *(*initf)(int argc, char * const *argv);
+    initf = dlsym(plugin->handle, "reaction_init");
+    if(!initf) {
+        return NULL;
+    }
+    jabs_plugin_reaction *r = initf(argc, argv);
+    return r;
 }

@@ -1,9 +1,9 @@
 #include <jibal_masses.h>
 
 typedef enum jabs_plugin_type {
-    PLUGIN_NONE = 0,
-    PLUGIN_CS = 1, /* Cross section evaluation plugin */
-    PLUGIN_SPECTRUM_READER = 2 /* Spectrum reader plugin */
+    JABS_PLUGIN_NONE = 0,
+    JABS_PLUGIN_CS = 1, /* Cross section evaluation plugin */
+    JABS_PLUGIN_SPECTRUM_READER = 2 /* Spectrum reader plugin */
 } jabs_plugin_type;
 
 typedef struct jabs_plugin_reaction {
