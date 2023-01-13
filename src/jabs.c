@@ -441,9 +441,8 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             continue;
         r->last_brick = 0;
         r->stop = FALSE;
-        r->theta = g.scatter_theta;
         ion_set_angle(&r->p, g.theta_product, g.phi_product);
-        sim_reaction_recalculate_internal_variables(r);
+        sim_reaction_recalculate_internal_variables(r, g.scatter_theta, ws->emin, ion1.E);
         if(r->stop) {
             r->max_depth = 0.0;
             continue;

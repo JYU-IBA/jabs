@@ -88,6 +88,9 @@ geostragg_vars geostragg_vars_calculate(const sim_workspace *ws, const ion *inci
     ion_print(stderr, incident);
     fprintf(stderr, "Reaction product angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.\n", g.theta_product/C_DEG, g.phi_product/C_DEG, beta/C_DEG);
 #endif
+    if(!ws->params->geostragg) { /* If geometric straggling is disabled, we have already calculated everything necessary */
+        return g;
+    }
     g.x.direction = 'x';
     g.y.direction = 'y';
     geostragg_vars_dir *gds[] = {&g.x, &g.y, NULL};

@@ -684,7 +684,7 @@ void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
     }
 }
 
-void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
+void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double theta, double E_min, double E_max) {
     /* Calculate variables for Rutherford (and Andersen) cross sections. This is done for all reactions, even if they are not RBS or ERD reactions! */
     if(!sim_r || !sim_r->r)
         return;
@@ -693,10 +693,16 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
     const jibal_isotope *product = sim_r->r->product;
     sim_r->E_cm_ratio = target->mass / (incident->mass + target->mass);
     sim_r->mass_ratio = incident->mass / target->mass;
-    sim_r->K = reaction_product_energy(sim_r->r, sim_r->theta, 1.0);
+    sim_r->theta = theta;
+    if(sim_r->r->Q == 0.0) {
+        sim_r->K = reaction_product_energy(sim_r->r, sim_r->theta, 1.0);
+    } else {
+        sim_r->K = 0.0;
+    }
     sim_r->cs_constant = 0.0;
-    sim_r->theta_cm = 0.0;
-    if(product == incident) { /* RBS */
+    sim_r->theta_cm = 0.0; /* Will be recalculated, if possible */
+    reaction_type type = sim_r->r->type;
+    if(type == REACTION_RBS || type == REACTION_RBS_ALT) {
         if(incident->mass >= target->mass && sim_r->theta > asin(target->mass / incident->mass)) {
 #ifdef DEBUG
             fprintf(stderr, "RBS with %s is not possible (theta %g deg > %g deg)\n", target->name, sim_r->theta/C_DEG, asin(target->mass / incident->mass)/C_DEG);
@@ -704,8 +710,8 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
             sim_r->stop = TRUE;
             return;
         }
-        if(sim_r->r->type == REACTION_RBS_ALT) {
-            if(target->mass < incident->mass) {
+        if(type == REACTION_RBS_ALT) {
+            if(incident->mass > target->mass) {
                 sim_r->theta_cm = C_PI - (asin(sim_r->mass_ratio * sin(sim_r->theta)) - sim_r->theta);
             } else {
 #ifdef DEBUG
@@ -713,13 +719,13 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
 #endif
                 sim_r->stop = TRUE;
             }
-        } else {
+        } else { /* REACTION_RBS */
             sim_r->theta_cm = sim_r->theta + asin(sim_r->mass_ratio * sin(sim_r->theta));
         }
         sim_r->cs_constant = fabs((pow2(sin(sim_r->theta_cm))) / (pow2(sin(sim_r->theta)) * cos(sim_r->theta_cm - sim_r->theta)) *
                              pow2((incident->Z * C_E * target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) *
                              pow4(1.0 / sin(sim_r->theta_cm / 2.0)) * (1.0 / 16.0));
-    } else if(product == target) { /* ERD */
+    } else if(type == REACTION_ERD) { /* ERD */
         if(sim_r->theta > C_PI/2.0) {
 #ifdef DEBUG
             fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)\n", target->name, sim_r->theta/C_DEG);
@@ -730,8 +736,10 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r) {
         sim_r->theta_cm = C_PI - 2.0 * sim_r->theta;
         sim_r->cs_constant = pow2(incident->Z * C_E * target->Z * C_E / (8 * C_PI * C_EPSILON0)) * pow2(1.0 + incident->mass / target->mass) * pow(cos(sim_r->theta), -3.0) * pow2(sim_r->E_cm_ratio);
     }
-    sim_r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0)); /* Factors for Andersen correction */
-    sim_r->r_VE_factor2 = pow2(0.5 / sin(sim_r->theta_cm / 2.0));
+    if(sim_r->r->cs == JIBAL_CS_ANDERSEN) {
+        sim_r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0)); /* Factors for Andersen correction */
+        sim_r->r_VE_factor2 = pow2(0.5 / sin(sim_r->theta_cm / 2.0));
+    }
 #ifdef DEBUG
     fprintf(stderr, "Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g (valid for RBS and ERD). Q = %g MeV.\n", sim_r->theta/C_DEG, sim_r->theta_cm/C_DEG, sim_r->K, sim_r->r->Q / C_MEV);
 #endif

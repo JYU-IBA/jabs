@@ -153,7 +153,7 @@ void sim_print(const simulation *sim);
 void sim_workspace_histograms_reset(sim_workspace *ws);
 void sim_workspace_histograms_calculate(sim_workspace *ws);
 void sim_workspace_histograms_scale(sim_workspace *ws, double scale);
-void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r);
+void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double theta, double E_min, double E_max);
 void sim_reaction_reset_bricks(sim_reaction *sim_r);
 double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);
 double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E);
