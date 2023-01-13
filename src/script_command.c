@@ -2326,8 +2326,8 @@ script_command_status script_load_reaction_plugin(script_session *s, int argc, c
         return SCRIPT_COMMAND_FAILURE;
     }
     r->plugin = plugin;
-    argc += 2;
-    argv -= 2;
+    argc -= 2;
+    argv += 2;
     jabs_plugin_reaction *pr = jabs_plugin_reaction_init(plugin, s->jibal->isotopes, fit->sim->beam_isotope, target, &argc, &argv);
     if(!pr) {
         jabs_message(MSG_ERROR, stderr, "Plugin failed to initialize.\n");
@@ -2342,6 +2342,7 @@ script_command_status script_load_reaction_plugin(script_session *s, int argc, c
     r->E_min = pr->E_min;
     r->E_max = pr->E_max;
     r->filename = strdup(plugin->filename);
+    r->Q = pr->Q;
     sim_reactions_add_reaction(fit->sim, r);
     return argc_orig; /* TODO: always consumes all arguments */
 }

@@ -115,17 +115,25 @@ depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, de
     depth.i = depth_next.i; /* depth may have the right depth (.x), but the index can be old. We need to cross the depth range somewhere, and it happens to be here. All calculations after this take place inside the same depth range (index depth.i). */
     /* k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
     E = incident->E;
-    k1 = stop_sample(ws, incident, sample, ws->stopping_type, depth, E);
-    if(k1 < 0.001 * C_EV_TFU) { /* Fail on positive values, zeroes (e.g. due to zero concentrations) and too small negative values */
+    if(incident->Z == 0) {
+        k1 = 0.0;
+    } else {
+        k1 = stop_sample(ws, incident, sample, ws->stopping_type, depth, E);
+    }
+    double h_max = h_max_perp * incident->inverse_cosine_theta; /*  we can take bigger steps since we are going sideways. Note that inverse_cosine_theta can be negative and in this case h_max should also be negative so h_max is always positive! */
+    double h = (step / k1); /* (energy) step should always be positive, as well as k1, so depth step h (not perpendicular, but "real" depth) is always positive  */
+    if(k1 < STOP_STEP_MINIMUM_STOPPING) { /* We are (almost) dividing by zero if there is no or very little stopping. Assume stopping is zero and make a jump. */
 #ifdef DEBUG_STOP_STEP
         fprintf(stderr, "stop_step returns no progress, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)\n", k1/C_EV_TFU, depth.x/C_TFU, E/C_KEV);
 #endif
+        h = STOP_STEP_DEPTH_FALLBACK;
+        if(h > h_max_perp) {
+            return depth_next;
+        }
+        depth.x += h;
         return depth;
     }
-    double h_max = h_max_perp *
-                   incident->inverse_cosine_theta; /*  we can take bigger steps since we are going sideways. Note that inverse_cosine_theta can be negative and in this case h_max should also be negative so h_max is always positive! */
     assert(h_max >= 0.0);
-    double h = (step / k1); /* (energy) step should always be positive, as well as k1, so depth step h (not perpendicular, but "real" depth) is always positive  */
     assert(h > 0.0);
     struct depth halfdepth;
     struct depth fulldepth;
@@ -834,10 +842,10 @@ int print_bricks(const char *filename, const sim_workspace *ws) {
         if(r->r->filename) {
             fprintf(f, "#Filename: %s\n", r->r->filename);
         }
-        fprintf(f, "#i  brick  depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo) sigma*conc        Q\n");
+        fprintf(f, "#i  brick    depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo) sigma*conc        Q\n");
         for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
-            fprintf(f, "%2lu %4lu %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %8e\n",
+            fprintf(f, "%2lu %4lu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %8e\n",
                     i, j, b->d.x / C_TFU, b->thick / C_TFU,
                     b->E_0 / C_KEV, C_FWHM * sqrt(b->S_0) / C_KEV,
                     b->E_r / C_KEV, C_FWHM * sqrt(b->S_r) / C_KEV,

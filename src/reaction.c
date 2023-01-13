@@ -136,9 +136,11 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
             r->product = incident;
             r->product_nucleus = target;
             break;
+        case REACTION_FILE:
+        case REACTION_PLUGIN:
         default:
-            fprintf(stderr, "Warning, reaction product is null.\n");
             r->product = NULL;
+            r->product_nucleus = NULL;
             break;
     }
     return r;
@@ -294,17 +296,14 @@ int reaction_compare(const void *a, const void *b) {
 double reaction_product_energy(const reaction *r, double theta, double E) { /* Hint: call with E == 1.0 to get kinematic factor */
     const double Q = r->Q;
     if(Q == 0.0) {
-        if(r->product == r->incident) { /* RBS */
+        if(r->type == REACTION_RBS || r->type == REACTION_RBS_ALT) {
             if(r->type == REACTION_RBS_ALT) {
                 return jibal_kin_rbs(r->incident->mass, r->target->mass, theta, '-') * E;
             } else {
                 return jibal_kin_rbs(r->incident->mass, r->target->mass, theta, '+') * E;
             }
-        }  else if(r->product == r->target) {
+        }  else if(r->type == REACTION_ERD) {
             return jibal_kin_erd(r->incident->mass, r->target->mass, theta)*E;
-        } else {
-            jabs_message(MSG_WARNING, stderr, "Warning: Reaction Q value is zero for reaction \"%s\" but based on incident %s, target %s and product %s I don't know what to do.\n", r->incident->name, r->target->name, r->product->name);
-            return 0.0;
         }
     }
     const double m1 = r->incident->mass;

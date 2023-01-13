@@ -211,7 +211,7 @@ int sim_reactions_add_reaction(simulation *sim, reaction *r) {
     sim->n_reactions++;
     sim->reactions = realloc(sim->reactions, sim->n_reactions*sizeof(reaction *));
     sim->reactions[sim->n_reactions - 1] = r;
-    jabs_message(MSG_INFO, stderr, "Added reaction %zu (%s), %s(%s,%s)%s.\n", sim->n_reactions, reaction_name(r), r->target->name, r->incident->name, r->product->name, r->product_nucleus->name);
+    jabs_message(MSG_INFO, stderr, "Added reaction %zu (%s), %s(%s,%s)%s, Q = %g keV\n", sim->n_reactions, reaction_name(r), r->target->name, r->incident->name, r->product->name, r->product_nucleus->name, r->Q / C_KEV);
     return EXIT_SUCCESS;
 }
 
@@ -460,17 +460,12 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
                 n_bricks = (int) ceil(sim->beam_E / (ws->params->stop_step_fudge_factor*sqrt(detector_resolution(ws->det, sim->beam_isotope, sim->beam_E))) + ws->sample->n_ranges);
             } else {
                 n_bricks = (int) ceil(sim->beam_E / ws->params->stop_step_incident + ws->sample->n_ranges); /* This is conservative */
+                fprintf(stderr, "n_bricks = %zu\n", n_bricks);
             }
         } /* TODO: other detectors? */
-        if(n_bricks > 10000) {
-            jabs_message(MSG_WARNING, stderr,  "Caution: large number of bricks will be used in the simulation (%zu).\n", n_bricks);
-        }
-        if(n_bricks > 100000) {
-            jabs_message(MSG_WARNING, stderr,  "Number of bricks limited to 100000.\n", n_bricks);
-            n_bricks = 100000;
-        }
-        if(n_bricks < 1000) {
-            n_bricks = 1000;
+        if(n_bricks > BRICKS_MAX) {
+            n_bricks = BRICKS_MAX;
+            jabs_message(MSG_WARNING, stderr,  "Number of bricks limited to %zu.\n", n_bricks);
         }
     }
 #ifdef DEBUG
