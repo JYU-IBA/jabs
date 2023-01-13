@@ -28,5 +28,6 @@ typedef struct jabs_plugin_reaction {
     const jibal_isotope *product_heavy;
     double (*cs)(const struct jabs_plugin_reaction *r, double theta, double E);
     double E_min, E_max;
+    void *plugin_data; /* Pointer for the plugin to store reaction specific data in. */
 } jabs_plugin_reaction;
 #endif //JABS_PLUGIN_INTERFACE_H

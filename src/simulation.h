@@ -157,7 +157,7 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double the
 void sim_reaction_reset_bricks(sim_reaction *sim_r);
 double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);
 double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E);
-#ifdef PLUGINS
+#ifdef JABS_PLUGINS
 double sim_reaction_cross_section_plugin(const sim_reaction *sim_r, double E);
 #endif
 double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);

@@ -47,7 +47,7 @@ typedef struct reaction {
     jibal_cross_section_type cs; /* Cross section model to use (e.g. screening corrections) */
     char *filename; /* for REACTION_FILE and REACTION_PLUGIN */
     struct reaction_point *cs_table; /* for REACTION_FILE */
-#ifdef PLUGINS
+#ifdef JABS_PLUGINS
     jabs_plugin *plugin; /* for REACTION_PLUGIN */
     jabs_plugin_reaction *plugin_r; /* for REACTION_PLUGIN */
 #endif

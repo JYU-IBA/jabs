@@ -13,7 +13,7 @@
  */
 #ifndef JABS_PLUGIN_H
 #define JABS_PLUGIN_H
-#ifdef JABS_PLUGIN_SUPPORT
+#ifdef JABS_PLUGINS
 #include <dlfcn.h> /* TODO: Windows? */
 #include "plugin_interface.h"
 
@@ -31,7 +31,7 @@ void jabs_plugin_close(jabs_plugin *plugin);
 const char *jabs_plugin_type_name(const jabs_plugin *plugin);
 const char *jabs_plugin_type_string(jabs_plugin_type type);
 
-jabs_plugin_reaction *jabs_plugin_reaction_init(const jabs_plugin *plugin, const jibal_isotope *incident, const jibal_isotope *target, int *argc, char * const **argv);
+jabs_plugin_reaction *jabs_plugin_reaction_init(const jabs_plugin *plugin, const jibal_isotope *isotopes, const jibal_isotope *incident, const jibal_isotope *target, int *argc, char * const **argv);
 void jabs_plugin_reaction_free(const jabs_plugin *plugin, jabs_plugin_reaction *reaction);
 #endif // JABS_PLUGIN_SUPPORT
 #endif //JABS_PLUGIN_H

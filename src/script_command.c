@@ -1153,7 +1153,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_help->subcommands, script_command_new("commands", "List of commands.", 0, &script_help_commands));
     script_command_list_add_command(&c_help->subcommands, script_command_new("version", "Help on (show) version.", 0, &script_help_version));
 
-#ifdef PLUGINS
+#ifdef JABS_PLUGINS
     script_command *c_identify = script_command_new("identify", "Identify something.", 0, NULL);
     script_command_list_add_command(&head, c_identify);
     script_command_list_add_command(&c_identify->subcommands, script_command_new("plugin", "Identify plugin.", 0, &script_identify_plugin));
@@ -2284,7 +2284,7 @@ script_command_status script_help_commands(script_session *s, int argc, char *co
     }
     return SCRIPT_COMMAND_NOT_FOUND;
 }
-#ifdef PLUGINS
+#ifdef JABS_PLUGINS
 
 script_command_status script_identify_plugin(struct script_session *s, int argc, char * const *argv) {
     if(argc < 1) {
@@ -2328,7 +2328,7 @@ script_command_status script_load_reaction_plugin(script_session *s, int argc, c
     r->plugin = plugin;
     argc += 2;
     argv -= 2;
-    jabs_plugin_reaction *pr = jabs_plugin_reaction_init(plugin, fit->sim->beam_isotope, target, &argc, &argv);
+    jabs_plugin_reaction *pr = jabs_plugin_reaction_init(plugin, s->jibal->isotopes, fit->sim->beam_isotope, target, &argc, &argv);
     if(!pr) {
         jabs_message(MSG_ERROR, stderr, "Plugin failed to initialize.\n");
         reaction_free(r);

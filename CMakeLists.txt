@@ -36,12 +36,12 @@ if(DEBUG_MODE)
     endif()
 endif()
 
-option(PLUGINS "Support for plugins" OFF)
-if(PLUGINS)
+option(JABS_PLUGINS "Support for plugins" OFF)
+if(JABS_PLUGINS)
     if (MSVC)
         #No Windows support in the first phase
     else()
-        add_compile_options(-DJABS_PLUGIN_SUPPORT)
+        add_compile_options(-DJABS_PLUGINS)
     endif()
 endif()
 
@@ -49,4 +49,6 @@ add_subdirectory(gitwatcher)
 
 add_subdirectory(src)
 
-add_subdirectory(plugins)
+if(JABS_PLUGINS)
+    add_subdirectory(plugins)
+endif()

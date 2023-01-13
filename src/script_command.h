@@ -61,7 +61,7 @@ script_command_status script_fit(struct script_session *s, int argc, char * cons
 script_command_status script_help(struct script_session *s, int argc, char * const *argv);
 script_command_status script_help_version(struct script_session *s, int argc, char *const *argv);
 script_command_status script_help_commands(script_session *s, int argc, char *const *argv);
-#ifdef PLUGINS
+#ifdef JABS_PLUGINS
 script_command_status script_identify_plugin(struct script_session *s, int argc, char * const *argv);
 script_command_status script_load_reaction_plugin(script_session *s, int argc, char *const *argv);
 #endif

@@ -15,7 +15,7 @@ jabs_plugin_type type() {
     return JABS_PLUGIN_CS;
 }
 
-jabs_plugin_reaction *reaction_init(const jibal_isotope *incident, const jibal_isotope *target, int *argc, char * const **argv) {
+jabs_plugin_reaction *reaction_init(const jibal_isotope *isotopes, const jibal_isotope *incident, const jibal_isotope *target, int *argc, char * const **argv) {
     jabs_plugin_reaction *r = malloc(sizeof(jabs_plugin_reaction));
     r->incident = incident;
     r->target = target;

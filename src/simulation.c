@@ -514,7 +514,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
             ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes); /* This allocates memory. We could share (like with RBS) in some cases, but that's not necessarily convenient. */
             r->cross_section = sim_reaction_cross_section_tabulated;
         }
-#ifdef PLUGINS
+#ifdef JABS_PLUGINS
         else if(r->r->type == REACTION_PLUGIN) {
             ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes);
             r->cross_section = sim_reaction_cross_section_plugin;
@@ -808,7 +808,7 @@ double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E)
     return t[lo].sigma+((t[lo+1].sigma-t[lo].sigma)/(t[lo+1].E-t[lo].E))*(E-t[lo].E);
 }
 
-#ifdef PLUGINS
+#ifdef JABS_PLUGINS
 double sim_reaction_cross_section_plugin(const sim_reaction *sim_r, double E) {
     jabs_plugin_reaction *r = sim_r->r->plugin_r;
     return r->cs(r, sim_r->theta, E);

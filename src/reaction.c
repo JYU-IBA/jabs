@@ -35,7 +35,7 @@ void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) 
         if(r->type == REACTION_FILE) {
             jabs_message(MSG_INFO, f, " Incident = %s, Theta = %g deg, E = [%g keV, %g keV]. Q = %g MeV. Data from file \"%s\".\n", r->incident->name, r->theta/C_DEG, r->E_min/C_KEV, r->E_max/C_KEV, r->Q/C_MEV, r->filename);
         }
-#ifdef PLUGINS
+#ifdef JABS_PLUGINS
         else if(r->type == REACTION_PLUGIN) {
             jabs_message(MSG_INFO, f, " Plugin \"%s\" filename \"%s\"\n", r->plugin->name, r->filename);
         }
@@ -119,7 +119,7 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     r->filename = NULL;
     r->cs_table = NULL;
     r->n_cs_table = 0;
-#ifdef PLUGINS
+#ifdef JABS_PLUGINS
     r->plugin = NULL;
     r->plugin_r = NULL;
 #endif
@@ -179,7 +179,7 @@ reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incid
 void reaction_free(reaction *r) {
     if(!r)
         return;
-#ifdef PLUGINS
+#ifdef JABS_PLUGINS
     jabs_plugin_reaction_free(r->plugin, r->plugin_r);
     jabs_plugin_close(r->plugin);
 #endif
