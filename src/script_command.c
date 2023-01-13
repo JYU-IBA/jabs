@@ -1264,7 +1264,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_load->subcommands, script_command_new("sample", "Load a sample.", 0, &script_load_sample));
     script_command *c_reaction = script_command_new("reaction", "Load a reaction from R33 file.", 0, &script_load_reaction);
     script_command_list_add_command(&c_load->subcommands, c_reaction);
-#ifdef PLUGINS
+#ifdef JABS_PLUGINS
     script_command_list_add_command(&c_reaction->subcommands, script_command_new("plugin", "Load a reaction from a plugin.", 0, &script_load_reaction_plugin));
 #endif
     script_command_list_add_command(&c_load->subcommands, script_command_new("roughness", "Load layer thickness table (roughness) from a file.", 0, &script_load_roughness));
