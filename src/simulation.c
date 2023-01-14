@@ -462,7 +462,9 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
                 n_bricks = (int) ceil(sim->beam_E / ws->params->stop_step_incident + ws->sample->n_ranges); /* This is conservative */
                 fprintf(stderr, "n_bricks = %zu\n", n_bricks);
             }
-        } /* TODO: other detectors? */
+        } else { /* TODO: maybe something more clever is needed here */
+            n_bricks = BRICKS_DEFAULT;
+        }
         if(n_bricks > BRICKS_MAX) {
             n_bricks = BRICKS_MAX;
             jabs_message(MSG_WARNING, stderr,  "Number of bricks limited to %zu.\n", n_bricks);
