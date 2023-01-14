@@ -45,6 +45,7 @@
 #define STOP_STEP_ADD (0.2 * C_KEV) /* Default for a value that is added to calculated stop step */
 #define STOP_STEP_DEPTH_FALLBACK (100.0 * C_TFU) /* If stop step can't be determined using stopping reliable, do a maximum of this */
 #define STOP_STEP_MINIMUM_STOPPING (0.1 * C_EV_TFU) /* Stopping below this is suspicious */
+#define BRICKS_DEFAULT (1000)
 #define BRICKS_MAX (10000)
 #define SIMULATE_WARNING_LIMIT 10 /* Allowed number of non-critical warnings for each run of simulate() */
 /* Other constants */
