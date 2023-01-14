@@ -32,7 +32,7 @@ if(DEBUG_MODE)
     if (MSVC)
         add_compile_options(/W4 /WX /DDEBUG)
     else()
-        add_compile_options(-Wall -Wextra -pedantic -DDEBUG)
+        add_compile_options(-g -O0 -Wall -Wextra -pedantic -DDEBUG)
     endif()
 endif()
 
