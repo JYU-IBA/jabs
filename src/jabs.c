@@ -564,7 +564,6 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             b->d = d_after;
             b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
             b->S_0 = ion1.S;
-            assert(r->p.E > 0.0);
 
 #ifdef DEBUG_REACTION
             fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
@@ -574,6 +573,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
                 b->S_geo_y = geostragg(ws, sample, r, &g.y, d_after, ion1.E);
             }
             sim_reaction_product_energy_and_straggling(r, &ion1);
+            assert(r->p.E > 0.0);
             b->E_r = r->p.E;
             b->S_r = r->p.S;
             post_scatter_exit(&r->p, d_after, ws, sample);
