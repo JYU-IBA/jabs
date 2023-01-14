@@ -209,10 +209,12 @@ thick_prob_dist *thickness_probability_table_copy(const thick_prob_dist *tpd) {
 }
 
 int roughness_reset(roughness *r) {
+    if(r->model == ROUGHNESS_FILE) {
+        roughness_file_free(r->file);
+    }
     r->model = ROUGHNESS_NONE;
     r->x = 0.0;
     r->n = 0;
-    roughness_file_free(r->file);
     r->file = NULL;
     return EXIT_SUCCESS;
 }
