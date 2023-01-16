@@ -75,7 +75,7 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Basic RBS spectrum simulation with Rutherford and Andersen cross-sections.
  - Atomic data, electronic stopping and straggling given by [JIBAL](https://github.com/JYU-IBA/jibal).
  - Automatic simulation of recoil spectra when working in forward angles (ERDA) and simulation of both solutions (+/-) for RBS when possible
- - Arbitrary cross sections and reactions from R33 files. Both EBS (Q-value is zero) as well as p-p NRA are implemented. 
+ - Arbitrary cross sections and reactions from R33 files. Both EBS (Q-value is zero) and p-p NRA are implemented. 
  - Point-by-point and layered sample models
  - Roughness using a gamma distribution and arbitrary roughness using files (weight and thickness tables)
  - Arbitrary geometry, detector and sample tilt can be expressed in arbitrary spherical coordinates
