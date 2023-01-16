@@ -249,7 +249,10 @@ int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_typ
     if(!sim || !sim->beam_isotope || !sm) {
         return -1;
     }
-    if(type == REACTION_NONE || cs ==  JIBAL_CS_NONE) {
+    if(type != REACTION_RBS && type != REACTION_RBS_ALT && type != REACTION_ERD) {
+        return 0;
+    }
+    if(cs == JIBAL_CS_NONE) {
         return 0;
     }
     struct sample *sample = sample_from_sample_model(sm);
