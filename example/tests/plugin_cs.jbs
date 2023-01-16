@@ -16,6 +16,7 @@ reset reactions
 
 identify plugin libtestplugin.dylib
 load reaction plugin libtestplugin.dylib 197Au
+show reactions
 simulate
 save spectra "plugin_cs_out.csv"
 test roi [1825:1865] 8364.4 5e-5

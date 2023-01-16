@@ -37,7 +37,7 @@ void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) 
         }
 #ifdef JABS_PLUGINS
         else if(r->type == REACTION_PLUGIN) {
-            jabs_message(MSG_INFO, f, " Plugin \"%s\" filename \"%s\"\n", r->plugin->name, r->filename);
+            jabs_message(MSG_INFO, f, " Plugin \"%s\" filename \"%s\". Q = %g MeV.\n", r->plugin->name, r->filename, r->Q / C_MEV);
         }
 #endif
         else {
