@@ -41,7 +41,7 @@ void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) 
         }
 #endif
         else {
-            jabs_message(MSG_INFO, f, " %s cross sections (built-in).", jibal_cross_section_name(r->cs));
+            jabs_message(MSG_INFO, f, " %s cross sections (built-in).", jabs_reaction_cs_to_string(r->cs));
             if(r->E_max < E_MAX || r->E_min > 0.0) {
                 jabs_message(MSG_INFO, f, " E = [%g keV, %g keV]", r->E_min/C_KEV, r->E_max/C_KEV);
             }
@@ -94,7 +94,7 @@ reaction_type reaction_type_from_string(const char *s) {
     return REACTION_NONE;
 }
 
-reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs) {
+reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jabs_reaction_cs cs) {
     if(!target || !incident) {
         return NULL;
     }
@@ -165,7 +165,7 @@ reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incid
         jabs_message(MSG_ERROR, stderr, "This is not a valid isotope: \"%s\".\n", (*argv)[1]);
         return NULL;
     }
-    reaction *r = reaction_make(incident, target, type, JIBAL_CS_NONE); /* Warning: JIBAL_CS_NONE used here, something sane must be supplied after this somewhere! */
+    reaction *r = reaction_make(incident, target, type, JABS_CS_NONE); /* Warning: JABS_CS_NONE used here, something sane must be supplied after this somewhere! */
     (*argc) -= 2;
     (*argv) += 2;
     while ((*argc) >= 2) {
@@ -221,7 +221,7 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
 
 
     reaction *r = malloc(sizeof(reaction));
-    r->cs = JIBAL_CS_NONE;
+    r->cs = JABS_CS_NONE;
     r->type = REACTION_FILE;
 #ifdef R33_IGNORE_REACTION_STRING
     r->incident = nuclei[0];
@@ -309,4 +309,33 @@ double reaction_product_energy(const reaction *r, double theta, double E) { /* H
     }
     double E_out = E_total * a13 * pow2(cos(theta) + sqrt(a24/a13 - pow2(sin(theta)))); /* Solution with '-' is ignored. */
     return E_out;
+}
+
+const char *jabs_reaction_cs_to_string(jabs_reaction_cs cs) {
+    switch(cs) {
+        case JABS_CS_NONE:
+            return "none";
+        case JABS_CS_RUTHERFORD:
+            return "Rutherford";
+        case JABS_CS_ANDERSEN:
+            return "Andersen";
+        default:
+            return "???";
+    }
+}
+
+jabs_reaction_cs jabs_reaction_cs_from_jibal_cs(jibal_cross_section_type jcs) {
+    switch(jcs) {
+        case JIBAL_CS_NONE:
+            return JABS_CS_NONE;
+        case JIBAL_CS_RUTHERFORD:
+            return JABS_CS_RUTHERFORD;
+        case JIBAL_CS_ANDERSEN:
+            return JABS_CS_ANDERSEN;
+        default:
+#ifdef DEBUG
+            fprintf(stderr, "Unknown JIBAL cs type: %i\n", jcs);
+#endif
+            return JABS_CS_NONE;
+    }
 }

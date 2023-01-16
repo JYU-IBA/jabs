@@ -75,8 +75,8 @@ typedef struct {
     sim_calc_params *params;
     int erd; /* Add ERD reactions */
     int rbs; /* Add RBS reactions */
-    jibal_cross_section_type cs_rbs;
-    jibal_cross_section_type cs_erd;
+    jabs_reaction_cs cs_rbs;
+    jabs_reaction_cs cs_erd;
 } simulation;
 
 typedef struct sim_reaction {
@@ -134,10 +134,10 @@ void sim_calc_params_copy(const sim_calc_params *p_src, sim_calc_params *p_dst);
 void sim_calc_params_update(sim_calc_params *p); /* Computes variables that can be computed from other variables */
 void sim_calc_params_ds(sim_calc_params *p, int ds); /* if ds is TRUE, set DS parameters, otherwise no action is taken */
 void sim_calc_params_print(const sim_calc_params *params);
-jibal_cross_section_type sim_cs(const simulation *sim, reaction_type type);
+jabs_reaction_cs sim_cs(const simulation *sim, reaction_type type);
 int sim_reactions_add_reaction(simulation *sim, reaction *r);
 int sim_reactions_remove_reaction(simulation *sim, size_t i);
-int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jibal_cross_section_type cs); /* Add RBS or ERD reactions automagically */
+int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jabs_reaction_cs cs); /* Add RBS or ERD reactions automagically */
 int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, const char *filename);
 void sim_reactions_free(simulation *sim); /* Free reactions and reset the number of reactions to zero */
 int sim_sanity_check(const simulation *sim);

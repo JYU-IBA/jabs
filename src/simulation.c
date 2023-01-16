@@ -39,8 +39,8 @@ simulation *sim_init(jibal *jibal) {
     sim->params = sim_calc_params_defaults(NULL);
     sim->rbs = TRUE;
     sim->erd = TRUE;
-    sim->cs_rbs =  jibal->config->cs_rbs;
-    sim->cs_erd =  jibal->config->cs_erd;
+    sim->cs_rbs = jabs_reaction_cs_from_jibal_cs(jibal->config->cs_rbs);
+    sim->cs_erd =  jabs_reaction_cs_from_jibal_cs(jibal->config->cs_erd);
     sim_det_add(sim, detector_default(NULL));
     return sim;
 }
@@ -197,12 +197,12 @@ void sim_calc_params_print(const sim_calc_params *params) {
     }
 }
 
-jibal_cross_section_type sim_cs(const simulation *sim, const reaction_type type) {
+jabs_reaction_cs sim_cs(const simulation *sim, const reaction_type type) {
     if(type == REACTION_RBS ||type == REACTION_RBS_ALT)
         return sim->cs_rbs;
     if(type == REACTION_ERD)
         return sim->cs_erd;
-    return JIBAL_CS_NONE;
+    return JABS_CS_NONE;
 }
 
 int sim_reactions_add_reaction(simulation *sim, reaction *r) {
@@ -245,7 +245,7 @@ int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, 
     return EXIT_SUCCESS;
 }
 
-int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jibal_cross_section_type cs) { /* Note that sim->ion needs to be set! */
+int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jabs_reaction_cs cs) { /* Note that sim->ion needs to be set! */
     if(!sim || !sim->beam_isotope || !sm) {
         return -1;
     }
@@ -268,7 +268,7 @@ int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_typ
         }
         reaction *r_new = reaction_make(sim->beam_isotope, isotope, type, cs);
         if (!r_new) {
-            jabs_message(MSG_ERROR, stderr, "Failed to make an %s reaction with isotope %zu (%s)\n", jibal_cross_section_name(cs), i, isotope->name);
+            jabs_message(MSG_ERROR, stderr, "Failed to make an %s reaction with %s cross sections for isotope %zu (%s)\n", reaction_type_to_string(type), jabs_reaction_cs_to_string(cs), i, isotope->name);
             continue;
         }
         sim_reactions_add_reaction(sim, r_new);

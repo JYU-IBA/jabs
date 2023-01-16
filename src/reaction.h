@@ -37,6 +37,12 @@ struct reaction_point {
     double sigma;
 };
 
+typedef enum jabs_reaction_cs {
+    JABS_CS_NONE = 0,
+    JABS_CS_RUTHERFORD = 1,
+    JABS_CS_ANDERSEN = 2
+} jabs_reaction_cs;
+
 typedef struct reaction {
     reaction_type type;
     /* Reactions are like this: target(incident,product)product_nucleus */
@@ -44,13 +50,13 @@ typedef struct reaction {
     const jibal_isotope *target;
     const jibal_isotope *product;
     const jibal_isotope *product_nucleus; /* Typically the "heavy" reaction product (of limited interest) */
-    jibal_cross_section_type cs; /* Cross section model to use (e.g. screening corrections) */
+    jabs_reaction_cs cs; /* Cross section model to use (e.g. screening corrections) */
     char *filename; /* for REACTION_FILE and REACTION_PLUGIN */
-    struct reaction_point *cs_table; /* for REACTION_FILE */
 #ifdef JABS_PLUGINS
     jabs_plugin *plugin; /* for REACTION_PLUGIN */
     jabs_plugin_reaction *plugin_r; /* for REACTION_PLUGIN */
 #endif
+    struct reaction_point *cs_table; /* for REACTION_FILE */
     size_t n_cs_table;
     double theta; /* For REACTION_FILE */
     double Q;
@@ -60,7 +66,7 @@ typedef struct reaction {
 
 
 void reactions_print(FILE *f, reaction * const *reactions, size_t n_reactions);
-reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jibal_cross_section_type cs);
+reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jabs_reaction_cs cs);
 reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incident, int *argc, char * const **argv);
 const char *reaction_name(const reaction *r);
 const char *reaction_type_to_string(reaction_type type);
@@ -69,4 +75,6 @@ void reaction_free(reaction *r);
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile);
 int reaction_compare(const void *a, const void *b);
 double reaction_product_energy(const reaction *r, double theta, double E); /* Hint: call with E == 1.0 to get kinematic factor */
+const char *jabs_reaction_cs_to_string(jabs_reaction_cs cs);
+jabs_reaction_cs jabs_reaction_cs_from_jibal_cs(jibal_cross_section_type jcs);
 #endif //JABS_REACTION_H

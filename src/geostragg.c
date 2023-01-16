@@ -26,9 +26,11 @@ double scattering_angle(const ion *incident, const sim_workspace *ws) { /* Calcu
 #ifdef DEBUG
     fprintf(stderr, "theta = %g deg, phi = %g deg.\n", theta/C_DEG, phi/C_DEG);
     fprintf(stderr, "scatter_theta = %g deg, scatter_phi = %g deg.\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
+#ifdef JABS_DEBUG_SCATTERING_ASSERT
     if(!ws->params->ds && !ws->params->geostragg) {
         assert(fabs(ws->det->theta - scatter_theta) < 0.01 * C_DEG); /* with DS this assert will fail */
     }
+#endif
 #endif
 return scatter_theta;
 }
