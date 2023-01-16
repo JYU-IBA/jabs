@@ -55,7 +55,6 @@ double aperture_width_shape_product(const aperture *a, const char direction) {
 }
 
 aperture *aperture_set_from_argv(const jibal *jibal, aperture *a, int * const argc, char * const ** const argv) {
-    int found = 0;
     if(*argc < 1) {
         return a;
     }

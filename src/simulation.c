@@ -683,11 +683,12 @@ void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
 
 void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double theta, double E_min, double E_max) {
     /* Calculate variables for Rutherford (and Andersen) cross sections. This is done for all reactions, even if they are not RBS or ERD reactions! */
+    (void) E_min; /* Energy range could be used to set something (in the future) */
+    (void) E_max;
     if(!sim_r || !sim_r->r)
         return;
     const jibal_isotope *incident = sim_r->r->incident;
     const jibal_isotope *target = sim_r->r->target;
-    const jibal_isotope *product = sim_r->r->product;
     sim_r->E_cm_ratio = target->mass / (incident->mass + target->mass);
     sim_r->mass_ratio = incident->mass / target->mass;
     sim_r->theta = theta;

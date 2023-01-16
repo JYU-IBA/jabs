@@ -208,6 +208,7 @@ char *calibration_to_string(const calibration *c) { /* Note that this does not i
 }
 
 char *calibration_param_name(calibration_type type, calibration_param_type i) {
+    (void) type; /* We could use the calibration type to give different names for different parameters */
     char *s = NULL;
     switch(i) {
         case CALIBRATION_PARAM_RESOLUTION:

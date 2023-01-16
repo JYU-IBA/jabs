@@ -769,7 +769,7 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
 #endif
             if(c->f) {
 #ifdef DEBUG
-                fprintf(stderr, "Debug: There is a function %p in command %s. Calling it with %i arguments.\n", (void *) c->f, c->name, argc);
+                fprintf(stderr, "Debug: There is a function in command %s. Calling it with %i arguments.\n", c->name, argc);
 #endif
                 script_command_status status = c->f(s, argc, argv);
                 if(status > 0) { /* Positive numbers indicate number of arguments consumed */
@@ -804,7 +804,7 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                     return SCRIPT_COMMAND_FAILURE;
                 }
 #ifdef DEBUG
-                fprintf(stderr, "Debug: Using function f_var()=%p in %s. %i arguments. Arguments start with: %s\n", (void *)c_parent->f_var, c_parent->name, argc, argc?argv[0]:"(no arguments)");
+                fprintf(stderr, "Debug: Using function in %s. %i arguments. Arguments start with: %s\n", c_parent->name, argc, argc?argv[0]:"(no arguments)");
 #endif
                 script_command_status status = c_parent->f_var(s, c->var, argc, argv);
                 if(status >= 0) { /* Positive numbers indicate number of arguments consumed */
@@ -827,7 +827,7 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                     return SCRIPT_COMMAND_FAILURE;
                 }
 #ifdef DEBUG
-                fprintf(stderr, "Debug: Using function f_val()=%p in %s. %i arguments. Arguments start with: %s\n", (void *)c_parent->f_val, c_parent->name, argc, argc?argv[0]:"(no arguments)");
+                fprintf(stderr, "Debug: Using function in %s. %i arguments. Arguments start with: %s\n", c_parent->name, argc, argc?argv[0]:"(no arguments)");
 #endif
                 script_command_status status = c_parent->f_val(s, c->val, argc, argv);
                 if(status >= 0) { /* Positive numbers indicate number of arguments consumed */
