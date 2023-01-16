@@ -118,6 +118,7 @@ typedef struct {
     double emin;
     gsl_integration_workspace *w_int_cs; /* Integration workspace for conc * cross section product */
     gsl_integration_workspace *w_int_cs_stragg;
+    size_t n_bricks; /* same as r->n_bricks in each reaction */
 } sim_workspace;
 
 

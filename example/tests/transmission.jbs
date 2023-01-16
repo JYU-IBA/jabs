@@ -1,0 +1,9 @@
+#!/usr/bin/env jabs
+set sample Au 3000tfu
+set ion a
+set alpha 0deg
+set det theta 40deg
+set det calib slope 1keV
+simulate
+save spectra "transmission_out.csv"
+test roi [1450:1700] 2.0928e+09 1e-5

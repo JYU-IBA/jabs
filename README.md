@@ -79,6 +79,7 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Point-by-point and layered sample models
  - Roughness using a gamma distribution and arbitrary roughness using files (weight and thickness tables)
  - Arbitrary geometry, detector and sample tilt can be expressed in arbitrary spherical coordinates
+ - Transmission geometry
  - Non-linear detector calibration (polynomial of arbitrary degree) and constant detector energy resolution or timing resolution (for ToF detectors)
  - Different calibrations are possible for different elements (Z-specific calibration).
  - Multilayer foil in front of detector

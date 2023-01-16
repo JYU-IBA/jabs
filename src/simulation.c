@@ -473,6 +473,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
             jabs_message(MSG_WARNING, stderr,  "Number of bricks limited to %zu.\n", n_bricks);
         }
     }
+    ws->n_bricks = n_bricks;
 #ifdef DEBUG
     fprintf(stderr, "Number of bricks: %zu\n", n_bricks);
 #endif
