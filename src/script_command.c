@@ -2125,11 +2125,11 @@ script_command_status script_add_reaction(script_session *s, int argc, char *con
         return SCRIPT_COMMAND_FAILURE;
     }
     if(r->cs == JIBAL_CS_NONE) {
-        jibal_cross_section_type cs = sim_cs(fit->sim, r->type);
+        jabs_reaction_cs cs = sim_cs(fit->sim, r->type);
         r->cs = cs;
         jabs_message(MSG_VERBOSE, stderr,
                      "Reaction cross section not given or not valid, assuming default for %s: %s.\n",
-                     reaction_name(r), jibal_cs_types[cs].s);
+                     reaction_name(r), jabs_reaction_cs_to_string(cs));
     }
     if(sim_reactions_add_reaction(fit->sim, r)) {
         return SCRIPT_COMMAND_FAILURE;
@@ -2288,6 +2288,7 @@ script_command_status script_help_commands(script_session *s, int argc, char *co
 
 #ifdef JABS_PLUGINS
 script_command_status script_identify_plugin(struct script_session *s, int argc, char * const *argv) {
+    (void) s;
     if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: identify plugin <path>\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -2320,7 +2321,7 @@ script_command_status script_load_reaction_plugin(script_session *s, int argc, c
         jabs_message(MSG_ERROR, stderr, "Could not load plugin from file \"%s\".\n", filename);
         return EXIT_FAILURE;
     }
-    reaction *r = reaction_make(fit->sim->beam_isotope, target, REACTION_PLUGIN, JIBAL_CS_NONE);
+    reaction *r = reaction_make(fit->sim->beam_isotope, target, REACTION_PLUGIN, JABS_CS_NONE);
     if(!r) {
         jabs_message(MSG_ERROR, stderr, "Could not make a new reaction.\n");
         jabs_plugin_close(plugin);
