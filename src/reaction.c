@@ -53,7 +53,11 @@ void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) 
 const char *reaction_name(const reaction *r) {
     if(!r)
         return "NULL";
-    switch (r->type) {
+    return reaction_type_to_string(r->type);
+}
+
+const char *reaction_type_to_string(reaction_type type) {
+    switch (type) {
         case REACTION_NONE:
             return "NONE";
         case REACTION_RBS:
@@ -187,22 +191,6 @@ void reaction_free(reaction *r) {
 #endif
     free(r->cs_table);
     free(r->filename);
-}
-
-int reaction_is_same(const reaction *r1, const reaction *r2) {
-    if(!r1 || !r2)
-        return FALSE;
-    if(r1->incident != r2->incident)
-        return FALSE;
-    if(r1->target != r2->target)
-        return FALSE;
-    if(r1->product != r2->product)
-        return FALSE;
-#if 0 /* TODO: support for multiple detectors and multiple reactions from files? */
-    if(fabs(r1->theta - r2->theta) > 0.01*C_DEG)
-        return FALSE;
-#endif
-    return TRUE;
 }
 
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile) {

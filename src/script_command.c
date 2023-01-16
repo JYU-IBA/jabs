@@ -2146,14 +2146,15 @@ script_command_status script_add_reactions(script_session *s, int argc, char *co
         return SCRIPT_COMMAND_FAILURE;
     }
     if(argc > 0) {
-        if(strcmp(argv[0], "RBS") == 0) {
-            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim, REACTION_RBS));
-        } else if(strcmp(argv[0], "RBS-") == 0) {
-            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS_ALT, sim_cs(fit->sim, REACTION_RBS_ALT));
-        } else if(strcmp(argv[0], "ERD") == 0) {
-            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_ERD, sim_cs(fit->sim, REACTION_ERD));
+        reaction_type type = reaction_type_from_string(argv[0]);
+        if(type == REACTION_NONE) {
+            jabs_message(MSG_ERROR, stderr, "Could not determine what reaction type %s is? Did you mean \"RBS\"?\n", argv[0]);
+            return SCRIPT_COMMAND_FAILURE;
+        }
+        if(type == REACTION_RBS || type == REACTION_RBS_ALT || type == REACTION_ERD) {
+            sim_reactions_add_auto(fit->sim, fit->sm, type, sim_cs(fit->sim, type));
         } else {
-            jabs_message(MSG_ERROR, stderr, "What is %s anyways? Did you mean \"RBS\" or \"ERD\"?\n", argv[0]);
+            jabs_message(MSG_ERROR, stderr, "Adding reactions of type %s is either not implemented or it is done by another command.\n", reaction_type_to_string(type));
             return SCRIPT_COMMAND_FAILURE;
         }
         return 1;
@@ -2284,8 +2285,8 @@ script_command_status script_help_commands(script_session *s, int argc, char *co
     }
     return SCRIPT_COMMAND_NOT_FOUND;
 }
-#ifdef JABS_PLUGINS
 
+#ifdef JABS_PLUGINS
 script_command_status script_identify_plugin(struct script_session *s, int argc, char * const *argv) {
     if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: identify plugin <path>\n");
@@ -2332,7 +2333,6 @@ script_command_status script_load_reaction_plugin(script_session *s, int argc, c
     if(!pr) {
         jabs_message(MSG_ERROR, stderr, "Plugin failed to initialize.\n");
         reaction_free(r);
-        jabs_plugin_close(plugin);
         return SCRIPT_COMMAND_FAILURE;
 
     }

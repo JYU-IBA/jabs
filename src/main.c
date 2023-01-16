@@ -142,7 +142,7 @@ int main(int argc, char * const *argv) {
             sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_RBS, sim_cs(fit_data->sim, REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
             sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_RBS_ALT, sim_cs(fit_data->sim, REACTION_RBS_ALT));
         }
-        if(fit_data->sim->erd) {
+        if(sim_do_we_need_erd(fit_data->sim)) {
             sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_ERD, sim_cs(fit_data->sim, REACTION_ERD));
         }
         for(size_t i = 0; i < cmd_opt->n_reaction_filenames; i++) {
