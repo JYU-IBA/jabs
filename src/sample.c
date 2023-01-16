@@ -347,6 +347,7 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
     sample_print(NULL, s, 0);
 #endif
     free(sm_copy);
+    sample_thickness_recalculate(s);
     return s;
 }
 
@@ -447,6 +448,13 @@ size_t sample_model_number_of_range_with_non_zero_density(const sample_model *sm
             n++;
     }
     return n;
+}
+
+void sample_thickness_recalculate(sample *sample) {
+    if(!sample || sample->n_ranges == 0) {
+        return;
+    }
+    sample->thickness = sample->ranges[sample->n_ranges - 1].x;
 }
 
 sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
@@ -772,6 +780,7 @@ sample *sample_copy(const sample *s_in) {
 #ifdef DEBUG
         fprintf(stderr, "Made a sample copy with %zu ranges and %zu isotopes.\n", s_out->n_ranges, s_out->n_isotopes);
 #endif
+    s_out->thickness = s_in->thickness;
     return s_out;
 }
 

@@ -48,6 +48,7 @@ typedef struct sample {
     const jibal_isotope **isotopes; /* table, size is n_isotopes */
     sample_range *ranges; /* size is n_ranges */
     double *cbins; /* 2D-table: size is n_isotopes * n_ranges  */
+    double thickness;
 } sample;
 
 typedef struct sample_model {
@@ -76,6 +77,7 @@ int sample_model_print(const char *filename, const sample_model *sm);
 size_t sample_model_number_of_rough_ranges(const sample_model *sm);
 size_t sample_model_number_of_ranges_with_non_unity_corrections(const sample_model *sm);
 size_t sample_model_number_of_range_with_non_zero_density(const sample_model *sm);
+void sample_thickness_recalculate(sample *sample);
 
 depth depth_seek(const sample *sample, double x);
 inline double depth_diff(const depth a, const depth b) {
