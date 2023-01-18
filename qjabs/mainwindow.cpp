@@ -10,6 +10,7 @@ extern "C" {
 #include "script.h"
 #include "script_session.h"
 #include "script_command.h"
+#include "idf2jbs.h"
 int fit_iter_callback(fit_stats stats);
 }
 
@@ -667,5 +668,28 @@ void MainWindow::on_actionPreferences_triggered()
     dialog->setModal(true);
     connect(dialog, &PreferencesDialog::settingsSaved, this, &MainWindow::readSettings);
     dialog->open();
+}
+
+
+void MainWindow::on_actionIDF_triggered()
+{
+    if(!MainWindow::askToSave())
+        return;
+    QMessageBox::StandardButton reply;
+    QString filename = QFileDialog::getOpenFileName(this, "Import IDF file", "", tr("IDF files (*.xml;*.idf)"));
+    if(filename.isEmpty()) {
+        return;
+    }
+    QString question = QString("The program will now convert the IDF file %1 to a JaBS script (file extension .jbs) and a spectrum (if applicable; extension .dat).\n\nThese files, if they already exist, may be overwritten.\n\nContinue?").arg(filename);
+    reply = QMessageBox::question(this, "Possible overwrite", question, QMessageBox::Ok|QMessageBox::Cancel);
+    if(reply != QMessageBox::Ok) {
+        return;
+    }
+    char *filename_out = nullptr;
+    if(idf_parse(qPrintable(filename), &filename_out) == IDF2JBS_SUCCESS) {
+        openFile(filename_out);
+    } else {
+        QMessageBox::critical(this, "Error", QString("Could not import file %1.\nCheck that you have write permissions in the directory.\n").arg(filename));
+    }
 }
 

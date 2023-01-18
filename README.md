@@ -98,9 +98,10 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Two-phase fitting, where faster physics model is used in the beginning and more accurate (user configurable) model is turned on after the first phase is starting to converge. User can skip the faster fitting phase.
  - Testing of areal sum (counts) and residuals. Some test cases are run by the developer to check sanity and accuracy of simulations for every new release.
  - Higher accuracy mode using adaptive integration for more accurate handling of sharp peaks in cross sections (resonances) and accurate weighting of cross sections by (Gaussian) straggling.
+ - Conversion tool from IDF to JaBS script (caveats; partial support)
 
 ### Not (yet) implemented, but planned
- - Support for more input and output data formats (CSV, IDF, ...)
+ - Support for more input and output data formats (CSV, ...)
  - Multiple scattering (small angle)
  - Simulation of pile-up and dead time
  - Simulation of time-of-flight spectra

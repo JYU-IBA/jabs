@@ -45,6 +45,9 @@ endif()
 
 find_package(GSL 2.6 REQUIRED)
 find_package(Jibal 0.3.8 REQUIRED)
+find_package(LibXml2 REQUIRED)
+
+
 if(WIN32)
     find_path(GETOPT_INCLUDE_DIR getopt.h)
     find_library(GETOPT_LIBRARY getopt)
@@ -101,6 +104,12 @@ set(PROJECT_SOURCES
         ../src/calibration.h
         ../src/prob_dist.h
         ../src/prob_dist.c
+        ../src/idf2jbs.c
+         ../src/idf2jbs.h
+        ../src/idfelementparsers.c
+        ../src/idfelementparsers.h
+        ../src/idfparse.c
+        ../src/idfparse.h
         "$<$<BOOL:${PLUGINS}>:plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui
@@ -150,6 +159,7 @@ target_link_libraries(qjabs
     PRIVATE Qt6::Svg
     PRIVATE jibal
     PRIVATE GSL::gsl
+    PRIVATE LibXml2::LibXml2
     PRIVATE "$<$<BOOL:${UNIX}>:m>"
     ${GETOPT_LIBRARY}
     gitwatcher

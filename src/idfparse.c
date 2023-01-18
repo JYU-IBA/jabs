@@ -138,7 +138,7 @@ idf_error idf_write_simple_data_to_file(const char *filename, const char *x, con
     return IDF2JBS_SUCCESS;
 }
 
-idf_error idf_output_printf(idf_parser *idf, const char * restrict format, ...) {
+idf_error idf_output_printf(idf_parser *idf, const char *format, ...) {
     va_list argp;
     va_start(argp, format);
     if(idf->pos_write + IDF_BUF_MSG_MAX >= idf->buf_size) {
@@ -241,6 +241,7 @@ idf_error idf_write_buf_to_file(const idf_parser *idf, char **filename_out) {
     } else {
         free(filename);
     }
+    fclose(f);
     return IDF2JBS_SUCCESS;
 }
 

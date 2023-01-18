@@ -87,6 +87,8 @@ private slots:
 
     void postInit();
 
+    void on_actionIDF_triggered();
+
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);

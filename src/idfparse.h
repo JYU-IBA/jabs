@@ -56,7 +56,7 @@ double idf_node_content_to_double(const xmlNode *node);
 double idf_unit_string_to_SI(xmlChar *unit);
 int idf_stringeq(const void *a, const void *b);
 idf_error idf_write_simple_data_to_file(const char *filename, const char *x, const char *y);
-idf_error idf_output_printf(idf_parser *idf, const char * restrict format, ...);
+idf_error idf_output_printf(idf_parser *idf, const char *format, ...);
 idf_error idf_buffer_realloc(idf_parser *idf);
 idf_parser *idf_file_read(const char *filename);
 void idf_file_free(idf_parser *idf);

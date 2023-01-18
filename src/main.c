@@ -41,9 +41,11 @@
 #include "idf2jbs.h"
 
 int idf2jbs(int argc, char * const *argv) {
+    char *filename_out = NULL;
     if(argc == 1) {
-        if(idffile_parse(argv[0]) == IDF2JBS_SUCCESS) {
-            fprintf(stderr, "Success.\n");
+        if(idf_parse(argv[0], &filename_out) == IDF2JBS_SUCCESS) {
+            fprintf(stderr, "Success. Wrote script to file \"%s\"\n", filename_out);
+            free(filename_out);
             return EXIT_SUCCESS;
         } else {
             fprintf(stderr, "Failure.\n");
