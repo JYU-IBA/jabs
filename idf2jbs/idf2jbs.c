@@ -1,35 +1,24 @@
-#include <string.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include "idfparse.h"
 #include "idfelementparsers.h"
 #include "idf2jbs.h"
 
-int idffile_parse(const char *filename) {
-    xmlDoc *doc = NULL;
-    xmlNode *root_element = NULL;
-    if(!filename) {
-        return IDF2JBS_FAILURE_COULD_NOT_READ;
+idf_error idffile_parse(const char *filename) {
+    idf_parser *idf = idf_file_read(filename);
+    if(!idf) {
+        return IDF2JBS_FAILURE;
     }
-    doc = xmlReadFile(filename, NULL, 0);
-    if(!doc) {
-        return IDF2JBS_FAILURE_COULD_NOT_READ;
+    idf_foreach(idf, idf->root_element, "sample", idf_parse_sample);
+    idf_output_printf(idf, "simulate\n");
+    char *filename_out = NULL;
+    idf_write_buf_to_file(idf,  &filename_out);
+    free(filename_out);
+#ifdef DEBUG
+    if(filename_out) {
+        fprintf(stderr, "Wrote file %s\n", filename_out);
     }
-    root_element = xmlDocGetRootElement(doc);
-    if(!idf_stringeq(root_element->name, "idf")) {
-        return IDF2JBS_FAILURE_NOT_IDF_FILE;
-    }
-    idfparser *idf = malloc(sizeof(idfparser));
-    idf->doc = doc;
-    idf->root_element = root_element;
-    idf->filename = strdup(filename);
-    idf->buf = NULL;
-    idf_buffer_realloc(idf);
-    idf_foreach(idf, root_element, "sample", idf_parse_sample);
-    xmlFreeDoc(doc);
-    free(idf->filename);
-    fputs(idf->buf, stdout);
-    free(idf->buf);
-    free(idf);
+#endif
+    idf_file_free(idf);
     return IDF2JBS_SUCCESS;
 }

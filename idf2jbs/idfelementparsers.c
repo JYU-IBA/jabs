@@ -1,6 +1,6 @@
 #include "idfelementparsers.h"
 
-int idf_parse_sample(idfparser *idf, xmlNode *sample) {
+int idf_parse_sample(idf_parser *idf, xmlNode *sample) {
     xmlNode *spectra_node = findnode(sample, "spectra");
     if(spectra_node) {
         idf_parse_spectra(idf, spectra_node);
@@ -12,7 +12,7 @@ int idf_parse_sample(idfparser *idf, xmlNode *sample) {
     return IDF2JBS_SUCCESS;
 }
 
-int idf_parse_layerelement(idfparser *idf, xmlNode *element) {
+int idf_parse_layerelement(idf_parser *idf, xmlNode *element) {
     if(!element) {
         return IDF2JBS_FAILURE;
     }
@@ -33,19 +33,19 @@ int idf_parse_layerelement(idfparser *idf, xmlNode *element) {
     return IDF2JBS_SUCCESS;
 }
 
-int idf_parse_layerelements(idfparser *idf, xmlNode *elements) {
+int idf_parse_layerelements(idf_parser *idf, xmlNode *elements) {
     idf_output_printf(idf, " ");
     return idf_foreach(idf, elements, "layerelement", idf_parse_layerelement);
 }
 
-int idf_parse_layer(idfparser *idf, xmlNode *layer) {
+int idf_parse_layer(idf_parser *idf, xmlNode *layer) {
     idf_parse_layerelements(idf, findnode(layer, "layerelements"));
-    idf_output_printf(idf, " thick %gtfu", idf_node_content_to_double(findnode(layer, "layerthickness"))/C_TFU);
+    idf_output_printf(idf, " %gtfu", idf_node_content_to_double(findnode(layer, "layerthickness"))/C_TFU);
     return IDF2JBS_SUCCESS;
 }
 
 
-int idf_parse_energycalibrations(idfparser *idf, xmlNode *energycalibrations) {
+int idf_parse_energycalibrations(idf_parser *idf, xmlNode *energycalibrations) {
     xmlNode *energycalibration = findnode(energycalibrations, "energycalibration");
     if(!energycalibration) {
         fprintf(stderr, "No energy calibration in energycalibrations.\n");
@@ -95,18 +95,21 @@ int idf_parse_energycalibrations(idfparser *idf, xmlNode *energycalibrations) {
     return IDF2JBS_SUCCESS;
 }
 
-int idf_parse_simple_data(idfparser *idf, xmlNode *simple_data) {
+int idf_parse_simple_data(idf_parser *idf, xmlNode *simple_data) {
     if(!simple_data) {
         return IDF2JBS_FAILURE;
     }
     char *x_raw = idf_node_content_to_str(findnode(simple_data, "x"));
     char *y_raw = idf_node_content_to_str(findnode(simple_data, "y"));
-    idf_write_simple_data_to_file("out.dat", x_raw, y_raw); /* TODO: figure out the spectrum output filename */
+    char *filename = idf_file_name_with_suffix(idf, SPECTRUM_FILE_SUFFIX);
+    idf_write_simple_data_to_file(filename, x_raw, y_raw);
+    idf_output_printf(idf, "load exp \"%s\"\n", filename);
+    free(filename);
     return IDF2JBS_SUCCESS;
 }
 
 
-int idf_parse_spectrum(idfparser *idf, xmlNode *spectrum) {
+int idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum) {
 #ifdef DEBUG
     fprintf(stderr, "parse spectrum called.\n");
 #endif
@@ -169,18 +172,18 @@ int idf_parse_spectrum(idfparser *idf, xmlNode *spectrum) {
     return IDF2JBS_SUCCESS;
 }
 
-int idf_parse_spectra(idfparser *idf, xmlNode *spectra) {
+int idf_parse_spectra(idf_parser *idf, xmlNode *spectra) {
     return idf_foreach(idf, spectra, "spectrum", idf_parse_spectrum);
 }
 
-int idf_parse_layers(idfparser *idf, xmlNode *layers) {
+int idf_parse_layers(idf_parser *idf, xmlNode *layers) {
     idf_output_printf(idf, "set sample");
     idf_foreach(idf, layers, "layer", idf_parse_layer);
     idf_output_printf(idf, "\n");
     return IDF2JBS_SUCCESS;
 }
 
-int idf_parse_detector(idfparser *idf, xmlNode *detector) {
+int idf_parse_detector(idf_parser *idf, xmlNode *detector) {
     if(!detector) {
         return IDF2JBS_FAILURE;
     }

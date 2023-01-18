@@ -1,3 +1,2 @@
-#include <libxml/tree.h>
-
-int idffile_parse(const char *filename);
+#include "idfparse.h"
+idf_error idffile_parse(const char *filename);

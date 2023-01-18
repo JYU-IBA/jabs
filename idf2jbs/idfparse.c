@@ -1,7 +1,6 @@
 #include <string.h>
 #include "idfparse.h"
 
-
 xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next) {
 #ifdef DEBUG
     fprintf(stderr, "findnode_deeper called with path = \"%s\".\n", path);
@@ -51,7 +50,7 @@ xmlNode *findnode(xmlNode *root, const char *path) {
     return node;
 }
 
-int idf_foreach(idfparser *idf, xmlNode *node, const char *name, int (*f)(idfparser *idf, xmlNode *node)) {
+idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, int (*f)(idf_parser *idf, xmlNode *node)) {
     xmlNode *cur = NULL;
     int n = 0;
     for (cur = node->children; cur; cur = cur->next) {
@@ -105,7 +104,7 @@ double idf_node_content_to_double(const xmlNode *node) {
 }
 
 double idf_unit_string_to_SI(xmlChar *unit) {
-    for(const idfunit *u = idfunits; u->unit; u++) {
+    for(const idf_unit *u = idf_units; u->unit; u++) {
         if(xmlStrEqual(unit, idf_xmlstr(u->unit))) {
             return u->factor;
         }
@@ -119,7 +118,7 @@ int idf_stringeq(const void *a, const void *b) {
     return (strcmp(a,b) == 0);
 }
 
-int idf_write_simple_data_to_file(const char *filename, const char *x, const char *y) {
+idf_error idf_write_simple_data_to_file(const char *filename, const char *x, const char *y) {
     FILE *f = fopen(filename, "w");
     if(!f) {
         return IDF2JBS_FAILURE;
@@ -139,7 +138,7 @@ int idf_write_simple_data_to_file(const char *filename, const char *x, const cha
     return IDF2JBS_SUCCESS;
 }
 
-int idf_output_printf(idfparser *idf, const char * restrict format, ...) {
+idf_error idf_output_printf(idf_parser *idf, const char * restrict format, ...) {
     va_list argp;
     va_start(argp, format);
     if(idf->pos_write + IDF_BUF_MSG_MAX >= idf->buf_size) {
@@ -158,7 +157,7 @@ int idf_output_printf(idfparser *idf, const char * restrict format, ...) {
     return IDF2JBS_SUCCESS;
 }
 
-int idf_buffer_realloc(idfparser *idf) {
+idf_error idf_buffer_realloc(idf_parser *idf) {
     size_t size_new;
     if(!idf->buf) {
         idf->buf_size = 0;
@@ -176,5 +175,83 @@ int idf_buffer_realloc(idfparser *idf) {
         return IDF2JBS_FAILURE;
     }
     idf->buf_size = size_new;
+    idf->buf[idf->pos_write] = '\0'; /* Terminating the string is necessary only after the initial allocation, but this doesn't hurt much. */
     return IDF2JBS_SUCCESS;
+}
+
+idf_parser *idf_file_read(const char *filename) {
+    idf_parser *idf = calloc(1, sizeof(idf_parser));
+    if(!filename) {
+        idf->error = IDF2JBS_FAILURE_COULD_NOT_READ;
+        return idf;
+    }
+    size_t l = strlen(filename);
+    if(l < 4) {
+        fprintf(stderr, "Filename %s is suspiciously short.\n", filename);
+        idf->error = IDF2JBS_FAILURE_COULD_NOT_READ;
+        return idf;
+    }
+    const char *extension = filename + l - 4;
+    if(!idf_stringeq(extension, ".xml") && !idf_stringeq(extension, ".idf")) {
+#ifdef DEBUG
+        fprintf(stderr, "Extension %s is not valid.\n", extension);
+#endif
+        idf->error = IDF2JBS_FAILURE_COULD_NOT_READ;
+        return idf;
+    }
+    idf->doc = xmlReadFile(filename, NULL, 0);
+    if(!idf->doc) {
+        idf->error = IDF2JBS_FAILURE_COULD_NOT_READ;
+        return idf;
+    }
+    idf->root_element = xmlDocGetRootElement(idf->doc);
+    if(!idf_stringeq(idf->root_element->name, "idf")) {
+        idf->error = IDF2JBS_FAILURE_NOT_IDF_FILE;
+        return idf;
+    }
+    idf->filename = strdup(filename);
+    idf->basename = strndup(filename, l - 4);
+    idf->buf = NULL;
+    idf_buffer_realloc(idf);
+    return idf;
+}
+void idf_file_free(idf_parser *idf) {
+    if(!idf) {
+        return;
+    }
+    xmlFreeDoc(idf->doc);
+    free(idf->filename);
+    free(idf->basename);
+    free(idf->buf);
+    free(idf);
+}
+
+idf_error idf_write_buf_to_file(const idf_parser *idf, char **filename_out) {
+    char *filename = idf_file_name_with_suffix(idf, JABS_FILE_SUFFIX);
+    FILE *f = fopen(filename, "w");
+    if(!f) {
+        free(filename);
+        return IDF2JBS_FAILURE;
+    }
+    if(idf_write_buf(idf, f)) {
+       return IDF2JBS_FAILURE;
+    }
+    if(filename_out) {
+        *filename_out = filename;
+    } else {
+        free(filename);
+    }
+    return IDF2JBS_SUCCESS;
+}
+
+idf_error idf_write_buf(const idf_parser *idf, FILE *f) {
+    return (fputs(idf->buf, f) == EOF) ? IDF2JBS_FAILURE : IDF2JBS_SUCCESS;
+}
+
+char *idf_file_name_with_suffix(const idf_parser *idf, const char *suffix) {
+    size_t len = strlen(idf->basename) + strlen(suffix) + 1;
+    char *fn = malloc(sizeof(char) * len);
+    strcpy(fn, idf->basename);
+    strlcat(fn, suffix, len);
+    return fn;
 }

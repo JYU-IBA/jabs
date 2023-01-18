@@ -4,12 +4,12 @@
 
 #define CALIB_PARAMS_MAX (10)
 
-int idf_parse_sample(idfparser *idf, xmlNode *sample);
-int idf_parse_layerelement(idfparser *idf, xmlNode *elements);
-int idf_parse_layerelements(idfparser *idf, xmlNode *elements);
-int idf_parse_layer(idfparser *idf, xmlNode *layer);
-int idf_parse_layers(idfparser *idf, xmlNode *layers);
-int idf_parse_spectrum(idfparser *idf, xmlNode *spectrum);
-int idf_parse_spectra(idfparser *idf, xmlNode *spectra);
-int idf_parse_detector(idfparser *idf, xmlNode *spectra);
+idf_error idf_parse_sample(idf_parser *idf, xmlNode *sample);
+idf_error idf_parse_layerelement(idf_parser *idf, xmlNode *elements);
+idf_error idf_parse_layerelements(idf_parser *idf, xmlNode *elements);
+idf_error idf_parse_layer(idf_parser *idf, xmlNode *layer);
+idf_error idf_parse_layers(idf_parser *idf, xmlNode *layers);
+idf_error idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum);
+idf_error idf_parse_spectra(idf_parser *idf, xmlNode *spectra);
+idf_error idf_parse_detector(idf_parser *idf, xmlNode *spectra);
 #endif //IDFELEMENTPARSERS_H
