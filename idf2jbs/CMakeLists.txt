@@ -17,7 +17,7 @@ endif()
 find_package(LibXml2 REQUIRED)
 find_package(Jibal REQUIRED)
 
-add_executable(idf2jbs main.c idf2jbs.c)
+add_executable(idf2jbs main.c idf2jbs.c idfelementparsers.c idfparse.c)
 
 target_link_libraries(idf2jbs PRIVATE LibXml2::LibXml2 PRIVATE jibal)
 
