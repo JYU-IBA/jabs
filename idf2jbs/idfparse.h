@@ -8,6 +8,8 @@
 #define IDF2JBS_FAILURE_COULD_NOT_READ (-2)
 #define IDF2JBS_FAILURE_NOT_IDF_FILE (-3)
 
+#define IDF_BUF_MSG_MAX (1024)
+#define IDF_BUF_SIZE_INITIAL (8*IDF_BUF_MSG_MAX)
 typedef struct {
     const char *unit;
     double factor;
@@ -25,12 +27,16 @@ static const idfunit idfunits[] = {
         {"MeV", C_MEV},
         {"mm", C_MM},
         {"us", C_US},
+        {"msr", C_MSR},
         {0, 0}};
 
 typedef struct idfparser {
     char *filename;
     xmlDoc *doc;
     xmlNode *root_element;
+    char *buf;
+    size_t buf_size;
+    size_t pos_write;
 } idfparser;
 
 xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next); /* Called by findnode(), goes one step deeper in path */
@@ -43,4 +49,6 @@ double idf_node_content_to_double(const xmlNode *node);
 double idf_unit_string_to_SI(xmlChar *unit);
 int idf_stringeq(const void *a, const void *b);
 int idf_write_simple_data_to_file(const char *filename, const char *x, const char *y);
+int idf_output_printf(idfparser *idf, const char * restrict format, ...);
+int idf_buffer_realloc(idfparser *idf);
 #endif // IDFPARSER_H

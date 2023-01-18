@@ -22,9 +22,9 @@ int idf_parse_layerelement(idfparser *idf, xmlNode *element) {
         xmlChar *name_str = xmlNodeGetContent(name);
         double conc = idf_node_content_to_double(concentration);
         if(conc == 1.0) {
-            fprintf(stdout, "%s", name_str);
+            idf_output_printf(idf, "%s", name_str);
         } else {
-            fprintf(stdout, "%s%g", name_str, conc);
+            idf_output_printf(idf, "%s%g", name_str, conc);
         }
         free(name_str);
     } else {
@@ -34,13 +34,13 @@ int idf_parse_layerelement(idfparser *idf, xmlNode *element) {
 }
 
 int idf_parse_layerelements(idfparser *idf, xmlNode *elements) {
-    fprintf(stdout, " ");
+    idf_output_printf(idf, " ");
     return idf_foreach(idf, elements, "layerelement", idf_parse_layerelement);
 }
 
 int idf_parse_layer(idfparser *idf, xmlNode *layer) {
     idf_parse_layerelements(idf, findnode(layer, "layerelements"));
-    fprintf(stdout, " thick %gtfu", idf_node_content_to_double(findnode(layer, "layerthickness"))/C_TFU);
+    idf_output_printf(idf, " thick %gtfu", idf_node_content_to_double(findnode(layer, "layerthickness"))/C_TFU);
     return IDF2JBS_SUCCESS;
 }
 
@@ -85,11 +85,11 @@ int idf_parse_energycalibrations(idfparser *idf, xmlNode *energycalibrations) {
         n_params--;
     }
     if(n_params == 2) {
-        fprintf(stdout, "set det calib linear slope %gkeV offset %gkeV\n", params[1]/C_KEV, params[0]/C_KEV);
+        idf_output_printf(idf, "set det calib linear slope %gkeV offset %gkeV\n", params[1]/C_KEV, params[0]/C_KEV);
     } else {
-        fprintf(stdout, "set det calib poly %i", n_params - 1);
+        idf_output_printf(idf, "set det calib poly %i", n_params - 1);
         for(int i = 0; i < n_params; i++) {
-            fprintf(stdout, " %gkeV", params[i] / C_KEV);
+            idf_output_printf(idf, " %gkeV", params[i] / C_KEV);
         }
     }
     return IDF2JBS_SUCCESS;
@@ -116,16 +116,16 @@ int idf_parse_spectrum(idfparser *idf, xmlNode *spectrum) {
         fprintf(stderr, "There is beam.\n");
 #endif
         char *particle = idf_node_content_to_str(findnode(beam, "beamparticle"));
-        fprintf(stdout, "set ion %s\n", particle);
+        idf_output_printf(idf, "set ion %s\n", particle);
         free(particle);
         double energy = idf_node_content_to_double(findnode(beam, "beamenergy"));
-        fprintf(stdout, "set energy %gkeV\n", energy/C_KEV);
+        idf_output_printf(idf, "set energy %gkeV\n", energy/C_KEV);
         double energyspread = idf_node_content_to_double(findnode(beam, "beamenergyspread"));
         if(energyspread > 0.0) {
-            fprintf(stdout, "set energy_broad %gkeV\n", energyspread / C_KEV);
+            idf_output_printf(idf, "set energy_broad %gkeV\n", energyspread / C_KEV);
         }
         double fluence = idf_node_content_to_double(findnode(beam, "beamfluence"));
-        fprintf(stdout, "set fluence %e\n", fluence);
+        idf_output_printf(idf, "set fluence %e\n", fluence);
     }
     xmlNode *geometry = findnode(spectrum, "geometry");
     if(geometry) {
@@ -140,9 +140,9 @@ int idf_parse_spectrum(idfparser *idf, xmlNode *spectrum) {
         }
         free(geotype);
         double incidenceangle = idf_node_content_to_double(findnode(geometry, "incidenceangle"));
-        fprintf(stdout, "set alpha %gdeg\n", incidenceangle/C_DEG);
+        idf_output_printf(idf, "set alpha %gdeg\n", incidenceangle/C_DEG);
         double scatteringangle = idf_node_content_to_double(findnode(geometry, "scatteringangle"));
-        fprintf(stdout, "set det theta %gdeg\n", scatteringangle/C_DEG);
+        idf_output_printf(idf, "set det theta %gdeg\n", scatteringangle/C_DEG);
     }
     xmlNode *calibrations = findnode(spectrum, "calibrations");
     if(calibrations) {
@@ -152,9 +152,12 @@ int idf_parse_spectrum(idfparser *idf, xmlNode *spectrum) {
         idf_parse_energycalibrations(idf, findnode(calibrations, "energycalibrations"));
         double resolution = idf_node_content_to_double(findnode(calibrations, "detectorresolutions/detectorresolution/resolutionparameters/resolutionparameter"));
         if(resolution > 0.0) {
-            fprintf(stdout, "set det resolution %gkeV\n", resolution / C_KEV);
+            idf_output_printf(idf, "set det resolution %gkeV\n", resolution / C_KEV);
         }
     }
+
+    idf_parse_detector(idf, findnode(spectrum, "detection/detector"));
+
     /* TODO: parse reactions */
 
 
@@ -171,8 +174,25 @@ int idf_parse_spectra(idfparser *idf, xmlNode *spectra) {
 }
 
 int idf_parse_layers(idfparser *idf, xmlNode *layers) {
-    fprintf(stdout, "set sample");
+    idf_output_printf(idf, "set sample");
     idf_foreach(idf, layers, "layer", idf_parse_layer);
-    fprintf(stdout, "\n");
+    idf_output_printf(idf, "\n");
+    return IDF2JBS_SUCCESS;
+}
+
+int idf_parse_detector(idfparser *idf, xmlNode *detector) {
+    if(!detector) {
+        return IDF2JBS_FAILURE;
+    }
+    char *type = idf_node_content_to_str(findnode(detector, "detectortype"));
+    if(idf_stringeq(type, "SSB")) {
+#if 0
+        idf_output_printf(idf, "set detector type energy\n");
+#endif
+    }
+    double solid = idf_node_content_to_double(findnode(detector, "solidangle"));
+    if(solid > 0.0) {
+        idf_output_printf(idf, "set det solid %gmsr\n", solid / C_MSR);
+    }
     return IDF2JBS_SUCCESS;
 }

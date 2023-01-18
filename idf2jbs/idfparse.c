@@ -120,12 +120,10 @@ int idf_stringeq(const void *a, const void *b) {
 }
 
 int idf_write_simple_data_to_file(const char *filename, const char *x, const char *y) {
-#if 0
     FILE *f = fopen(filename, "w");
     if(!f) {
         return IDF2JBS_FAILURE;
     }
-#endif
     while(1) {
         char *x_end, *y_end;
         double x_dbl = strtod(x, &x_end);
@@ -133,12 +131,50 @@ int idf_write_simple_data_to_file(const char *filename, const char *x, const cha
         if(y == y_end || x == x_end)  { /* No conversion */
             break;
         }
-        fprintf(stderr, "%g %g\n", floor(x_dbl), y_dbl);
+        fprintf(f, "%g %g\n", floor(x_dbl), y_dbl);
         y = y_end;
         x = x_end;
     }
-#if 0
     fclose(f);
+    return IDF2JBS_SUCCESS;
+}
+
+int idf_output_printf(idfparser *idf, const char * restrict format, ...) {
+    va_list argp;
+    va_start(argp, format);
+    if(idf->pos_write + IDF_BUF_MSG_MAX >= idf->buf_size) {
+        idf_buffer_realloc(idf); /* We trust that there is now enough space... */
+    }
+    if(!idf->buf) {
+        return IDF2JBS_FAILURE;
+    }
+    size_t n = vsnprintf(idf->buf + idf->pos_write, IDF_BUF_MSG_MAX, format, argp);
+    if(n >= IDF_BUF_MSG_MAX) {
+        fprintf(stderr, "Output truncated.\n");
+        n = IDF_BUF_MSG_MAX - 1;
+    }
+    idf->pos_write += n;
+    va_end(argp);
+    return IDF2JBS_SUCCESS;
+}
+
+int idf_buffer_realloc(idfparser *idf) {
+    size_t size_new;
+    if(!idf->buf) {
+        idf->buf_size = 0;
+        idf->pos_write = 0;
+        size_new = IDF_BUF_SIZE_INITIAL;
+    } else {
+        size_new = idf->buf_size * 2; /* TODO: good strategy? */
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Buffer will be reallocated. New size: %zu, old size: %zu\n", size_new, idf->buf_size);
 #endif
+    idf->buf = realloc(idf->buf, size_new);
+    if(!idf->buf) {
+        idf->buf_size = 0;
+        return IDF2JBS_FAILURE;
+    }
+    idf->buf_size = size_new;
     return IDF2JBS_SUCCESS;
 }

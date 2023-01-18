@@ -11,4 +11,5 @@ int idf_parse_layer(idfparser *idf, xmlNode *layer);
 int idf_parse_layers(idfparser *idf, xmlNode *layers);
 int idf_parse_spectrum(idfparser *idf, xmlNode *spectrum);
 int idf_parse_spectra(idfparser *idf, xmlNode *spectra);
+int idf_parse_detector(idfparser *idf, xmlNode *spectra);
 #endif //IDFELEMENTPARSERS_H

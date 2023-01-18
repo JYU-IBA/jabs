@@ -23,9 +23,13 @@ int idffile_parse(const char *filename) {
     idf->doc = doc;
     idf->root_element = root_element;
     idf->filename = strdup(filename);
+    idf->buf = NULL;
+    idf_buffer_realloc(idf);
     idf_foreach(idf, root_element, "sample", idf_parse_sample);
     xmlFreeDoc(doc);
     free(idf->filename);
+    fputs(idf->buf, stdout);
+    free(idf->buf);
     free(idf);
     return IDF2JBS_SUCCESS;
 }
