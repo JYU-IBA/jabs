@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(id2jbs
+project(idf2jbs
     VERSION 0.0.1
     DESCRIPTION "IDF to JaBS converter"
     LANGUAGES C

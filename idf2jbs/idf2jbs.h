@@ -13,7 +13,7 @@ typedef struct {
     double factor;
 } idfunit;
 
-static idfunit idfunits[] = {
+static const idfunit idfunits[] = {
         {"fraction", 1.0},
         {"degree", C_DEG},
         {"1e15at/cm2", C_TFU},
@@ -27,9 +27,16 @@ static idfunit idfunits[] = {
         {"us", C_US},
         {0, 0}};
 
+typedef struct idfparser {
+    int tmp;
+} idfparser;
+
 int parse_xml(const char *filename);
 xmlNode *findnode(xmlNode *root, const char *path);
 int nodename_equals(const xmlNode *node, const char *s);
+double unit_string_to_SI(xmlChar *unit);
+xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next);
+xmlNode *findnode(xmlNode *root, const char *path);
 double node_content_to_double(const xmlNode *node); /* Performs conversion to SI if possible and unit is defined */
 char *node_content_to_str(const xmlNode *node);
 const xmlChar *xmlstr(const char *s); /* The purpose of this function is to reduce compiler warnings. It's just a recast. */

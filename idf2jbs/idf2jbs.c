@@ -17,7 +17,7 @@ int nodename_equals(const xmlNode *node, const char *s) {
 }
 
 double unit_string_to_SI(xmlChar *unit) {
-    for(idfunit *u = idfunits; u->unit; u++) {
+    for(const idfunit *u = idfunits; u->unit; u++) {
         if(xmlStrEqual(unit, xmlstr(u->unit))) {
             return u->factor;
         }
@@ -52,17 +52,20 @@ const xmlChar *xmlstr(const char *s) {
     return (const xmlChar *)s;
 }
 
-xmlNode *findnode(xmlNode *root, const char *path) {
+
+xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next) {
 #ifdef DEBUG
-    fprintf(stderr, "findnode called with path = \"%s\".\n", path);
+    fprintf(stderr, "findnode_deeper called with path = \"%s\".\n", path);
 #endif
-    size_t offset = strcspn(path, "/"); /* We use strcspn to tokenize because we don't have to mutilate path */
+    size_t offset = strcspn(path, "/"); /* We use strcspn to tokenize because we don't have to mutilate path by inserting '\0' in it */
     if(offset == 0) {
         fprintf(stderr, "Weirdness. Offset is zero.\n");
         return NULL;
     }
     int last = (path[offset] == '\0');
-    const char *next_path = path + offset + 1;
+    if(path_next) {
+        *path_next = path + offset + (last ? 0 : 1);
+    }
     xmlNode *cur_node = NULL;
 #ifdef DEBUG
     fprintf(stderr, "Should find %.*s in %s\n", (int)offset, path, root->name);
@@ -73,17 +76,7 @@ xmlNode *findnode(xmlNode *root, const char *path) {
             if(len != offset) /* Prevents partial matches in strncmp */
                 continue;
             if(strncmp((char *)cur_node->name, path, offset) == 0) {
-#ifdef DEBUG
-                fprintf(stderr, "Found something.\n");
-#endif
-                if(last) {
-#ifdef DEBUG
-                    fprintf(stderr, "Found the last one.\n");
-#endif
-                    return cur_node;
-                } else {
-                    return findnode(cur_node, next_path);
-                }
+                return cur_node;
             }
         }
     }
@@ -93,16 +86,14 @@ xmlNode *findnode(xmlNode *root, const char *path) {
     return NULL;
 }
 
-void parse_idf(xmlNode *idfnode) {
-#ifdef DEBUG
-    fprintf(stderr, "Parsing root node.\n");
-#endif
-    xmlNode *cur_node = NULL;
-    for (cur_node = idfnode->children; cur_node; cur_node = cur_node->next) {
-        if(cur_node->type == XML_ELEMENT_NODE) {
-
-        }
-    }
+xmlNode *findnode(xmlNode *root, const char *path) {
+    const char *path_remains = NULL;
+    xmlNode *node = root;
+    do {
+        node = findnode_deeper(node, path, &path_remains);
+        path = path_remains;
+    } while(node && path_remains && *path_remains != '\0');
+    return node;
 }
 
 void parse_layerelements(xmlNode *elements) {
@@ -154,6 +145,7 @@ int write_simple_data_to_file(const char *filename, const char *x, const char *y
 #if 0
     fclose(f);
 #endif
+    return IDF2JBS_SUCCESS;
 }
 
 void parse_simple_data(xmlNode *simple_data) {
@@ -332,18 +324,20 @@ int parse_xml(const char *filename) {
     if(!doc) {
         return IDF2JBS_FAILURE;
     }
+    int ret = IDF2JBS_SUCCESS;
     root_element = xmlDocGetRootElement(doc);
     if(stringeq(root_element->name, "idf")) {
-        parse_idf(root_element);
-    }
-    for (cur = root_element->children; cur; cur = cur->next) {
-        if(cur->type == XML_ELEMENT_NODE) {
-            if(stringeq(cur->name, "sample")) {
-                parse_sample(cur); /* TODO: multiple samples? */
+        for(cur = root_element->children; cur; cur = cur->next) {
+            if(cur->type == XML_ELEMENT_NODE) {
+                if(stringeq(cur->name, "sample")) {
+                    parse_sample(cur); /* TODO: multiple samples? */
+                }
             }
         }
+    } else {
+        ret = IDF2JBS_FAILURE;
     }
     xmlFreeDoc(doc);
     xmlCleanupParser();
-    return IDF2JBS_SUCCESS;
+    return ret;
 }
