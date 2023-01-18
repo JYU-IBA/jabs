@@ -9,6 +9,9 @@ idf_error idffile_parse(const char *filename) {
     if(!idf) {
         return IDF2JBS_FAILURE;
     }
+    if(idf->error) {
+        return IDF2JBS_FAILURE;
+    }
     idf_foreach(idf, idf->root_element, "sample", idf_parse_sample);
     idf_output_printf(idf, "simulate\n");
     char *filename_out = NULL;

@@ -38,12 +38,32 @@
 #include "script.h"
 #include "script_session.h"
 #include "script_command.h"
+#include "idf2jbs.h"
 
-#include "prob_dist.h"
+int idf2jbs(int argc, char * const *argv) {
+    if(argc == 1) {
+        if(idffile_parse(argv[0]) == IDF2JBS_SUCCESS) {
+            fprintf(stderr, "Success.\n");
+            return EXIT_SUCCESS;
+        } else {
+            fprintf(stderr, "Failure.\n");
+            return EXIT_FAILURE;
+        }
+    } else {
+        fprintf(stderr, "Usage (idf2jbs): jabs idf2jbs <idf file>\nNote that idf file must have suffix .xml or .idf.\nOn successful run .jbs (simulation script) and .dat (spectrum) files will be created.\n");
+        return EXIT_FAILURE;
+    }
+}
+
 int main(int argc, char * const *argv) {
 #ifdef DEBUG
     fprintf(stderr, "Note: this is a debug build!\n");
 #endif
+    if(argc >= 2 && strcmp(argv[1], "idf2jbs") == 0) {
+        argc -= 2;
+        argv += 2;
+        return idf2jbs(argc, argv);
+    }
     int script_files = FALSE;
     jibal *jibal = jibal_init(NULL);
     if(jibal->error) {
