@@ -4,7 +4,7 @@
 #include <libxml/tree.h>
 #include "idf2jbs.h"
 
-int stringeq(const void *a, const void *b) {
+int idf_stringeq(const void *a, const void *b) {
     if(!a || !b)
         return -1;
     return (strcmp(a,b) == 0);
@@ -89,6 +89,12 @@ xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next
 xmlNode *findnode(xmlNode *root, const char *path) {
     const char *path_remains = NULL;
     xmlNode *node = root;
+    if(!root || !path) {
+        return NULL;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "findnode(node name = %s, path = %s) called.\n", root->name, path);
+#endif
     do {
         node = findnode_deeper(node, path, &path_remains);
         path = path_remains;
@@ -190,7 +196,7 @@ void parse_energycalibrations(xmlNode *energycalibrations) {
     double params[CALIB_PARAMS_MAX]; /* First CALIB_PARAMS_MAX parameters are stored here */
     for (cur = calibrationparameters->children; cur; cur = cur->next) {
         if(cur->type == XML_ELEMENT_NODE) {
-            if(stringeq(cur->name, "calibrationparameter")) {
+            if(idf_stringeq(cur->name, "calibrationparameter")) {
                 double param = node_content_to_double(cur);
                 if(n_params < 3) {
                     params[n_params] = param;
@@ -248,9 +254,9 @@ void parse_spectrum(xmlNode *spectrum) {
         fprintf(stderr, "There is geometry.\n");
 #endif
         char *geotype = node_content_to_str(findnode(geometry, "geometrytype"));
-        if(stringeq(geotype, "IBM")) {
+        if(idf_stringeq(geotype, "IBM")) {
             /* do nothing */
-        } else if(stringeq(geotype, "Cornell")) {
+        } else if(idf_stringeq(geotype, "Cornell")) {
             /* TODO: do something */
         }
         free(geotype);
@@ -285,7 +291,7 @@ void parse_spectra(xmlNode *spectra) {
     xmlNode *cur_node = NULL;
     for(cur_node = spectra->children; cur_node; cur_node = cur_node->next) {
         if(cur_node->type == XML_ELEMENT_NODE) {
-            if(stringeq(cur_node->name, "spectrum")) {
+            if(idf_stringeq(cur_node->name, "spectrum")) {
                 parse_spectrum(cur_node);
             }
         }
@@ -297,7 +303,7 @@ void parse_layers(xmlNode *layers) {
     fprintf(stdout, "set sample");
     for (cur_node = layers->children; cur_node; cur_node = cur_node->next) {
         if(cur_node->type == XML_ELEMENT_NODE) {
-            if(stringeq(cur_node->name, "layer")) {
+            if(idf_stringeq(cur_node->name, "layer")) {
                 parse_layer(cur_node);
             }
         }
@@ -305,7 +311,27 @@ void parse_layers(xmlNode *layers) {
     fprintf(stdout, "\n");
 }
 
-void parse_sample(xmlNode *sample) {
+
+int idffile_foreach(idfparser *idf, xmlNode *node, const char *name, int (*f)(idfparser *idf, xmlNode *node)) {
+    xmlNode *cur = NULL;
+    int n = 0;
+    for (cur = node->children; cur; cur = cur->next) {
+        if(cur->type == XML_ELEMENT_NODE) {
+            if(idf_stringeq(cur->name, name)) {
+#ifdef DEBUG
+                fprintf(stderr, "Found sample.\n");
+#endif
+                if(f(idf, cur)) {
+                    return IDF2JBS_FAILURE;
+                }
+                n++;
+            }
+        }
+    }
+    return n;
+}
+
+int parse_sample(idfparser *idf, xmlNode *sample) {
     xmlNode *spectra_node = findnode(sample, "spectra");
     if(spectra_node) {
         parse_spectra(spectra_node);
@@ -314,30 +340,24 @@ void parse_sample(xmlNode *sample) {
     if(layers_node) {
         parse_layers(layers_node);
     }
+    return IDF2JBS_SUCCESS;
 }
 
-int parse_xml(const char *filename) {
+int idffile_parse(const char *filename) {
     xmlDoc *doc = NULL;
     xmlNode *root_element = NULL;
-    xmlNode *cur = NULL;
     doc = xmlReadFile(filename, NULL, 0);
     if(!doc) {
-        return IDF2JBS_FAILURE;
+        return IDF2JBS_FAILURE_COULD_NOT_READ;
     }
-    int ret = IDF2JBS_SUCCESS;
     root_element = xmlDocGetRootElement(doc);
-    if(stringeq(root_element->name, "idf")) {
-        for(cur = root_element->children; cur; cur = cur->next) {
-            if(cur->type == XML_ELEMENT_NODE) {
-                if(stringeq(cur->name, "sample")) {
-                    parse_sample(cur); /* TODO: multiple samples? */
-                }
-            }
-        }
-    } else {
-        ret = IDF2JBS_FAILURE;
+    if(!idf_stringeq(root_element->name, "idf")) {
+        return IDF2JBS_FAILURE_NOT_IDF_FILE;
     }
+    idfparser *idf = malloc(sizeof(idfparser));
+    idf->doc = doc;
+    idf->root_element = root_element;
+    idffile_foreach(idf, root_element, "sample", parse_sample);
     xmlFreeDoc(doc);
-    xmlCleanupParser();
-    return ret;
+    return IDF2JBS_SUCCESS;
 }

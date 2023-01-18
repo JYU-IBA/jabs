@@ -1,7 +1,9 @@
 #include <libxml/tree.h>
 #include <jibal_units.h>
 #define IDF2JBS_SUCCESS (0)
-#define IDF2JBS_FAILURE (1)
+#define IDF2JBS_FAILURE (-1)
+#define IDF2JBS_FAILURE_COULD_NOT_READ (-2)
+#define IDF2JBS_FAILURE_NOT_IDF_FILE (-3)
 
 #define CALIB_PARAMS_MAX (10)
 
@@ -28,10 +30,11 @@ static const idfunit idfunits[] = {
         {0, 0}};
 
 typedef struct idfparser {
-    int tmp;
+    char *filename;
+    xmlDoc *doc;
+    xmlNode *root_element;
 } idfparser;
 
-int parse_xml(const char *filename);
 xmlNode *findnode(xmlNode *root, const char *path);
 int nodename_equals(const xmlNode *node, const char *s);
 double unit_string_to_SI(xmlChar *unit);
@@ -41,3 +44,5 @@ double node_content_to_double(const xmlNode *node); /* Performs conversion to SI
 char *node_content_to_str(const xmlNode *node);
 const xmlChar *xmlstr(const char *s); /* The purpose of this function is to reduce compiler warnings. It's just a recast. */
 int write_simple_data_to_file(const char *filename, const char *x, const char *y);
+int idffile_foreach(idfparser *idf, xmlNode *node, const char *name, int (*f)(idfparser *idf, xmlNode *node)); /* Runs f(parser,child_node) for each child element of node element name "name" */
+int idffile_parse(const char *filename);

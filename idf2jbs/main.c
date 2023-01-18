@@ -9,6 +9,6 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     const char *filename = argv[1];
-    int ret = parse_xml(filename);
+    int ret = idffile_parse(filename);
     return ret;
 }
