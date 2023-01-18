@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <string.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
@@ -9,6 +8,9 @@
 int idffile_parse(const char *filename) {
     xmlDoc *doc = NULL;
     xmlNode *root_element = NULL;
+    if(!filename) {
+        return IDF2JBS_FAILURE_COULD_NOT_READ;
+    }
     doc = xmlReadFile(filename, NULL, 0);
     if(!doc) {
         return IDF2JBS_FAILURE_COULD_NOT_READ;
@@ -20,7 +22,10 @@ int idffile_parse(const char *filename) {
     idfparser *idf = malloc(sizeof(idfparser));
     idf->doc = doc;
     idf->root_element = root_element;
+    idf->filename = strdup(filename);
     idf_foreach(idf, root_element, "sample", idf_parse_sample);
     xmlFreeDoc(doc);
+    free(idf->filename);
+    free(idf);
     return IDF2JBS_SUCCESS;
 }

@@ -5,7 +5,8 @@
 #define CALIB_PARAMS_MAX (10)
 
 int idf_parse_sample(idfparser *idf, xmlNode *sample);
-void idf_parse_layerelements(idfparser *idf, xmlNode *elements);
+int idf_parse_layerelement(idfparser *idf, xmlNode *elements);
+int idf_parse_layerelements(idfparser *idf, xmlNode *elements);
 int idf_parse_layer(idfparser *idf, xmlNode *layer);
 int idf_parse_layers(idfparser *idf, xmlNode *layers);
 int idf_parse_spectrum(idfparser *idf, xmlNode *spectrum);

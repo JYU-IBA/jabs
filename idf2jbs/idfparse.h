@@ -27,14 +27,11 @@ static const idfunit idfunits[] = {
         {"us", C_US},
         {0, 0}};
 
-
-
 typedef struct idfparser {
     char *filename;
     xmlDoc *doc;
     xmlNode *root_element;
 } idfparser;
-
 
 xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next); /* Called by findnode(), goes one step deeper in path */
 xmlNode *findnode(xmlNode *root, const char *path); /* Finds the first node with given path. Path should look "like/this/thing" */

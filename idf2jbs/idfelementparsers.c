@@ -12,48 +12,35 @@ int idf_parse_sample(idfparser *idf, xmlNode *sample) {
     return IDF2JBS_SUCCESS;
 }
 
-
-void idf_parse_layerelements(idfparser *idf, xmlNode *elements) {
-    if(!elements)
-        return;
-    xmlNode *cur = NULL;
-    fprintf(stdout, " ");
-    for (cur = elements->children; cur; cur = cur->next) {
-        if(cur->type == XML_ELEMENT_NODE) {
-            if(idf_nodename_equals(cur, "layerelement")) {
-                double conc = 0.0;
-                xmlNode *name = findnode(cur, "name");
-                xmlNode *concentration = findnode(cur, "concentration");
-                if(name && concentration) {
-                    xmlChar *name_str = xmlNodeGetContent(name);
-                    conc = idf_node_content_to_double(concentration);
-                    if(conc == 1.0) {
-                        fprintf(stdout, "%s", name_str);
-                    } else {
-                        fprintf(stdout, "%s%g", name_str, conc);
-                    }
-                    free(name_str);
-                } else {
-                    fprintf(stderr, "Layer ignored.\n");
-                }
-            }
-        }
+int idf_parse_layerelement(idfparser *idf, xmlNode *element) {
+    if(!element) {
+        return IDF2JBS_FAILURE;
     }
+    xmlNode *name = findnode(element, "name");
+    xmlNode *concentration = findnode(element, "concentration");
+    if(name && concentration) {
+        xmlChar *name_str = xmlNodeGetContent(name);
+        double conc = idf_node_content_to_double(concentration);
+        if(conc == 1.0) {
+            fprintf(stdout, "%s", name_str);
+        } else {
+            fprintf(stdout, "%s%g", name_str, conc);
+        }
+        free(name_str);
+    } else {
+        fprintf(stderr, "Layer ignored.\n");
+    }
+    return IDF2JBS_SUCCESS;
+}
+
+int idf_parse_layerelements(idfparser *idf, xmlNode *elements) {
+    fprintf(stdout, " ");
+    return idf_foreach(idf, elements, "layerelement", idf_parse_layerelement);
 }
 
 int idf_parse_layer(idfparser *idf, xmlNode *layer) {
-    xmlNode *cur = NULL;
-    double thickness = 0.0;
     idf_parse_layerelements(idf, findnode(layer, "layerelements"));
-
-    for (cur = layer->children; cur; cur = cur->next) {
-        if(cur->type == XML_ELEMENT_NODE) {
-            if(idf_nodename_equals(cur, "layerthickness")) {
-                thickness = idf_node_content_to_double(cur);
-            }
-        }
-    }
-    fprintf(stdout, " thick %gtfu", thickness/C_TFU);
+    fprintf(stdout, " thick %gtfu", idf_node_content_to_double(findnode(layer, "layerthickness"))/C_TFU);
     return IDF2JBS_SUCCESS;
 }
 
@@ -180,27 +167,12 @@ int idf_parse_spectrum(idfparser *idf, xmlNode *spectrum) {
 }
 
 int idf_parse_spectra(idfparser *idf, xmlNode *spectra) {
-    xmlNode *cur = NULL;
-    for(cur = spectra->children; cur; cur = cur->next) {
-        if(cur->type == XML_ELEMENT_NODE) {
-            if(idf_stringeq(cur->name, "spectrum")) {
-                idf_parse_spectrum(idf, cur);
-            }
-        }
-    }
-    return IDF2JBS_SUCCESS;
+    return idf_foreach(idf, spectra, "spectrum", idf_parse_spectrum);
 }
 
 int idf_parse_layers(idfparser *idf, xmlNode *layers) {
-    xmlNode *cur_node = NULL;
     fprintf(stdout, "set sample");
-    for (cur_node = layers->children; cur_node; cur_node = cur_node->next) {
-        if(cur_node->type == XML_ELEMENT_NODE) {
-            if(idf_stringeq(cur_node->name, "layer")) {
-                idf_parse_layer(idf, cur_node);
-            }
-        }
-    }
+    idf_foreach(idf, layers, "layer", idf_parse_layer);
     fprintf(stdout, "\n");
     return IDF2JBS_SUCCESS;
 }
