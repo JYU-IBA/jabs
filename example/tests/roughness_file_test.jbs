@@ -9,6 +9,7 @@ set sample Au 0 roughnessfile "roughness.txt" Si 20000tfu
 ##We can also load roughness after setting the sample. This is useful if you load the sample from a file, since the data contained in the roughness file is not included in the sample file (see output)
 #load roughness 1 "roughness.txt"
 add reactions RBS
+show sample
 set fluence 1e14
 set det solid 10msr
 set det reso 10keV

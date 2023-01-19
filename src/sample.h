@@ -105,5 +105,5 @@ inline double *sample_conc_bin(const sample *s, size_t i_range, size_t i_isotope
 void sample_sort_isotopes(sample *sample); /* Sort isotopes. Note that you can screw up concentrations tables if you call this at the wrong time! */
 void sample_sort_and_remove_duplicate_isotopes(sample *s);
 int isotope_compar(const void *, const void *); /* compares jibal_isotopes */
-
+void sample_range_copy(sample_range *dst, const sample_range *src);
 #endif /* JABS_SAMPLE_H */

@@ -76,7 +76,7 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
     sm->n_materials = n_materials;
     sm->materials = calloc(n_materials, sizeof(jibal_material *));
     sm->cbins = calloc( n_ranges * n_materials, sizeof(double));
-    sm->ranges = malloc(n_ranges*sizeof(struct sample_range));
+    sm->ranges = calloc(n_ranges, sizeof(struct sample_range));
     return sm;
 }
 
@@ -181,13 +181,8 @@ sample_model *sample_model_split_elements(const sample_model *sm) {
         }
     }
     for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
-        out->ranges[i_range] = sm->ranges[i_range];
-        sample_range *r = &out->ranges[i_range];
-        if(r->rough.model == ROUGHNESS_FILE) {
-            if(r->rough.file) {
-                r->rough.file = roughness_file_copy(r->rough.file);
-            }
-        }
+        fprintf(stderr, "i_range = %zu, copying ranges as part of sample_model_split_elements()\n", i_range);
+        sample_range_copy(&out->ranges[i_range], &sm->ranges[i_range]);
     }
     return out;
 }
@@ -207,7 +202,7 @@ sample_model *sample_model_to_point_by_point(const sample_model *sm) { /* Conver
         for(size_t i = 0; i < sm->n_materials; i++) {
             sm_out->materials[i] = jibal_material_copy(sm->materials[i]);
         }
-        for(size_t i = sm->n_ranges; i--;) {
+        for(size_t i = 0; i < sm->n_ranges; i++) {
             sm_out->ranges[2*i] = sm->ranges[i];
             sm_out->ranges[2*i+1] = sm->ranges[i];
             for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
@@ -216,15 +211,17 @@ sample_model *sample_model_to_point_by_point(const sample_model *sm) { /* Conver
             }
         }
         for(size_t i = 0; i < sm_out->n_ranges; i += 2) {
-            sm_out->ranges[i].rough.x = 0.0; /* First points are not rough, the second point carries this information */
+            if(i) {
+                sm_out->ranges[i].x = sm_out->ranges[i - 1].x; /* In layer models, the first point has the same depth as the second point of previous layer */
+            } else { /* i == 0 */
+                sm_out->ranges[i].x = 0.0; /* Surface */
+            }
+            sm_out->ranges[i+1].x += sm_out->ranges[i].x; /* The second point is naturally deeper by thickness. This thickness accumulates => depth. */
+            sm_out->ranges[i].rough.x = 0.0; /* First points are not rough, the second point carries this information (thickness variation) */
             sm_out->ranges[i].rough.model = ROUGHNESS_NONE;
             sm_out->ranges[i].rough.n = 0;
-            if(i) {
-                sm_out->ranges[i].x = sm_out->ranges[i-1].x; /* In layer models, the first point has the same depth as the second point of previous layer */
-                sm_out->ranges[i+1].x += sm_out->ranges[i].x; /* And the second point is naturally deeper by thickness, which was stored as "depth" temporarily */
-            } else {
-                sm_out->ranges[i].x = 0.0;
-            }
+            sm_out->ranges[i].rough.file = NULL;
+            sm_out->ranges[i+1].rough.file = roughness_file_copy(sm_out->ranges[i+1].rough.file); /* Deep copy of roughness file */
         }
         sm_out->type = SAMPLE_MODEL_LAYERED; /* Yes, this is odd. */
     }
@@ -248,6 +245,7 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
     }
 #endif
     sample *s = malloc(sizeof(sample));
+    const sample_model *sm_orig = sm;
     sample_model *sm_copy = NULL;
     if(sm->type == SAMPLE_MODEL_LAYERED) {
         sm_copy = sample_model_to_point_by_point(sm);
@@ -304,6 +302,9 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
     s->ranges = malloc(s->n_ranges * sizeof(struct sample_range));
     s->cbins = calloc(s->n_ranges * s->n_isotopes, sizeof(double));
     memcpy(s->ranges, sm->ranges, sizeof (struct sample_range) * sm->n_ranges);
+    for(i = 0; i < sm->n_ranges; i++) {
+        sample_range_copy(&s->ranges[i], &sm->ranges[i]);
+    }
 
     for(i = 0; i < s->n_isotopes; i++) { /* Build table of isotopic concentrations by looping over all isotopes in all elements in all materials and ranges*/
         for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
@@ -328,25 +329,13 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
             fprintf(stderr, "Range %zu roughness is gamma, number of steps is automatic and set to %zu\n", i_range, r->rough.n);
 #endif
         }
-        if(r->rough.model == ROUGHNESS_FILE) {
-            if(r->rough.file) {
-                r->rough.file = roughness_file_copy(r->rough.file);
-            } else {
-#ifdef DEBUG
-                fprintf(stderr, "Roughness model of range %zu is supposed to be file, but there is no file pointer.\n", i_range);
-#endif
-                roughness_reset(&r->rough);
-            }
-        } else {
-            r->rough.file = NULL;
-        }
         roughness_reset_if_below_tolerance(&r->rough);
     }
 
 #ifdef DEBUG
     sample_print(NULL, s, 0);
 #endif
-    free(sm_copy);
+    sample_model_free(sm_copy);
     sample_thickness_recalculate(s);
     return s;
 }
@@ -374,7 +363,7 @@ int sample_model_print(const char *filename, const sample_model *sm) {
             break;
     }
     if(n_rl) {
-        jabs_message(MSG_INFO, f, "        rough");
+        jabs_message(MSG_INFO, f, "          rough");
         jabs_message(MSG_INFO, f, " n_rough");
     }
     if(n_nonzero_density) {
@@ -394,9 +383,9 @@ int sample_model_print(const char *filename, const sample_model *sm) {
         jabs_message(MSG_INFO, f, "%12.3lf", r->x / C_TFU);
         if(n_rl) {
             if(r->rough.model == ROUGHNESS_FILE) {
-                jabs_message(MSG_INFO, f, "         file");
+                jabs_message(MSG_INFO, f, " %14s", r->rough.file->filename);
             } else {
-                jabs_message(MSG_INFO, f, " %12.3lf", r->rough.x / C_TFU);
+                jabs_message(MSG_INFO, f, " %14.3lf", r->rough.x / C_TFU);
             }
             jabs_message(MSG_INFO, f, " %7zu", r->rough.n);
         }
@@ -534,6 +523,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 r->bragg = 1.0;
                 r->stragg = 1.0;
                 r->density = 0.0;
+                r->rough.model = ROUGHNESS_NONE;
                 roughness_reset(&r->rough);
                 sm->n_ranges++;
 #ifdef DEBUG
@@ -590,7 +580,9 @@ void sample_model_free(sample_model *sm) {
         jibal_material_free(sm->materials[i]);
     }
     for(size_t i = 0; i < sm->n_ranges; i++) {
-        roughness_file_free(sm->ranges[i].rough.file);
+        sample_range *range = &sm->ranges[i];
+
+        roughness_file_free(range->rough.file);
     }
     free(sm->ranges);
     free(sm->materials);
@@ -675,6 +667,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             range->yield = 1.0;
             range->stragg = 1.0;
             range->density = 0.0;
+            range->rough.model = ROUGHNESS_NONE;
             roughness_reset(&range->rough);
             sm->n_ranges++;
             sm->n_materials++;
@@ -705,7 +698,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
         sm = sm2;
 #ifdef DEBUG
         fprintf(stderr, "Sample model after splitting elements:\n");
-        sample_model_print(NULL, sm2);
+        sample_model_print(NULL, sm);
 #endif
     }
     return sm;
@@ -775,7 +768,7 @@ sample *sample_copy(const sample *s_in) {
     memcpy(s_out->ranges, s_in->ranges, sizeof (struct sample_range) * s_out->n_ranges);
     memcpy(s_out->cbins, s_in->cbins, sizeof (double) * s_out->n_isotopes * s_out->n_ranges);
     for(size_t i = 0; i < s_in->n_ranges; i++) {
-        s_out->ranges[i].rough.file = roughness_file_copy(s_in->ranges[i].rough.file);
+        sample_range_copy(&s_out->ranges[i], &s_in->ranges[i]);
     }
 #ifdef DEBUG
         fprintf(stderr, "Made a sample copy with %zu ranges and %zu isotopes.\n", s_out->n_ranges, s_out->n_isotopes);
@@ -935,4 +928,15 @@ int isotope_compar(const void *a, const void *b) {
     } else {
         return isotope_a->Z - isotope_b->Z;
     }
+}
+
+void sample_range_copy(sample_range *dst, const sample_range *src) {
+    *dst = *src;
+    assert(src->rough.model == ROUGHNESS_FILE && src->rough.file != NULL || src->rough.model != ROUGHNESS_FILE); /* checks that file is NOT null */
+    dst->rough.file = roughness_file_copy(src->rough.file);
+#ifdef DEBUG
+    if(src->rough.file || dst->rough.file) {
+        fprintf(stderr, "Made a deep copy of roughness file %p, new file %p\n", (void *) src->rough.file, (void *) dst->rough.file);
+    }
+#endif
 }

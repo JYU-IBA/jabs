@@ -263,12 +263,18 @@ roughness_file *roughness_file_copy(const roughness_file *rf) {
     roughness_file *rf_out = malloc(sizeof(roughness_file));
     rf_out->tpd = thickness_probability_table_copy(rf->tpd);
     rf_out->filename = strdup_non_null(rf->filename);
+#ifdef DEBUG
+    fprintf(stderr, "Made a deep copy of roughness file = %p (filename: %s)\n", (void *)rf, rf_out->filename);
+#endif
     return rf_out;
 }
 
 void roughness_file_free(roughness_file *rf) {
     if(!rf)
         return;
+#ifdef DEBUG
+    fprintf(stderr, "Freeing roughness file %p\n", (void *)rf);
+#endif
     free(rf->filename);
     thickness_probability_table_free(rf->tpd);
     free(rf);
