@@ -113,7 +113,7 @@ typedef struct {
     size_t n_channels; /* in histograms */
     gsl_histogram *histo_sum;
     ion ion;
-    sim_reaction *reactions;
+    sim_reaction **reactions; /* table of reaction pointers, size n_reactions */
     const jibal_isotope *isotopes;
     sim_calc_params *params;
     double emin;
@@ -148,7 +148,7 @@ detector *sim_det_from_string(const simulation *sim, const char *s);
 int sim_det_add(simulation *sim, detector *det);
 int sim_det_set(simulation *sim, detector *det, size_t i_det); /* Will free existing detector (can be NULL too) */
 sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det);
-void sim_workspace_init_reactions(const jibal *jibal, sim_workspace *ws); /* used by sim_workspace_init(), ws->sim and ws->n_bricks should be set before calling */
+void sim_workspace_init_reactions(sim_workspace *ws); /* used by sim_workspace_init(), ws->sim and ws->n_bricks should be set before calling */
 void sim_workspace_calculate_number_of_bricks(sim_workspace *ws);
 void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);
@@ -157,6 +157,8 @@ void sim_print(const simulation *sim);
 void sim_workspace_histograms_reset(sim_workspace *ws);
 void sim_workspace_histograms_calculate(sim_workspace *ws);
 void sim_workspace_histograms_scale(sim_workspace *ws, double scale);
+sim_reaction *sim_reaction_init(sim_workspace *ws, const reaction *r); /* ws->sample, ws->det and ws->ion need to be set */
+void sim_reaction_free(sim_reaction *sim_r);
 void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double theta, double E_min, double E_max);
 void sim_reaction_reset_bricks(sim_reaction *sim_r);
 void sim_reaction_set_cross_section_by_type(sim_reaction *sim_r);

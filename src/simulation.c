@@ -378,41 +378,11 @@ int sim_det_set(simulation *sim, detector *det, size_t i_det) {
     return EXIT_SUCCESS;
 }
 
-void sim_workspace_init_reactions(const jibal *jibal, sim_workspace *ws) {
+void sim_workspace_init_reactions(sim_workspace *ws) {
     const simulation *sim = ws->sim;
-    ws->reactions = calloc(sim->n_reactions, sizeof (sim_reaction));
+    ws->reactions = calloc(sim->n_reactions, sizeof (sim_reaction *));
     for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-        sim_reaction *r = &ws->reactions[ws->n_reactions];
-        r->r = sim->reactions[i_reaction];
-        if(!r->r) { /* No reaction, this will not be valid */
-            continue;
-        }
-        assert(r->r->product);
-        ion *p = &r->p;
-        ion_reset(p);
-        r->max_depth = 0.0;
-        r->i_isotope = ws->sample->n_isotopes; /* Intentionally not valid */
-
-        for(size_t i_isotope = 0; i_isotope < ws->sample->n_isotopes; i_isotope++) {
-            if(ws->sample->isotopes[i_isotope] == r->r->target) {
-#ifdef DEBUG
-                fprintf(stderr, "Reaction %zu target isotope %s is isotope number %zu in sample.\n", i_reaction, r->r->target->name, i_isotope);
-#endif
-                r->i_isotope = i_isotope;
-            }
-        }
-        r->histo = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
-        spectrum_set_calibration(r->histo, ws->det, r->r->product->Z); /* Setting histogram with Z-specific (or as fallback, default) calibration. */
-        gsl_histogram_reset(r->histo);
-        r->n_bricks = ws->n_bricks;
-        r->bricks = calloc(r->n_bricks, sizeof(brick));
-        ion_set_isotope(p, r->r->product);
-        if(p->isotope == ws->ion.isotope) {
-            p->nucl_stop = nuclear_stopping_shared_copy(ws->ion.nucl_stop);
-        } else {
-            p->nucl_stop = nuclear_stopping_new(p->isotope, jibal->isotopes);
-        }
-        sim_reaction_set_cross_section_by_type(r);
+        ws->reactions[i_reaction] = sim_reaction_init(ws, sim->reactions[i_reaction]);
         ws->n_reactions++;
     }
 }
@@ -511,7 +481,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     gsl_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
 
     sim_workspace_calculate_number_of_bricks(ws);
-    sim_workspace_init_reactions(jibal, ws);
+    sim_workspace_init_reactions(ws);
 
     if(ws->params->cs_n_steps == 0) { /* Actually integrate, allocate workspace for this */
         ws->w_int_cs = gsl_integration_workspace_alloc(ws->params->int_cs_max_intervals);
@@ -531,16 +501,7 @@ void sim_workspace_free(sim_workspace *ws) {
         return;
     sim_calc_params_free(ws->params);
     for(size_t i = 0; i < ws->n_reactions; i++) {
-        sim_reaction *r = &ws->reactions[i];
-        if(r->histo) {
-            gsl_histogram_free(r->histo);
-            r->histo = NULL;
-        }
-        if(r->bricks) {
-            free(r->bricks);
-            r->bricks = NULL;
-        }
-        nuclear_stopping_free(r->p.nucl_stop);
+        sim_reaction_free(ws->reactions[i]);
     }
     free(ws->reactions);
     gsl_integration_workspace_free(ws->w_int_cs);
@@ -578,8 +539,8 @@ void sim_workspace_calculate_sum_spectra(sim_workspace *ws) {
     for(size_t i = 0; i < ws->histo_sum->n; i++) {
         sum = 0.0;
         for(size_t j = 0; j < ws->n_reactions; j++) {
-            if(ws->reactions[j].histo && i < ws->reactions[j].histo->n)
-                sum += ws->reactions[j].histo->bin[i];
+            if(ws->reactions[j]->histo && i < ws->reactions[j]->histo->n)
+                sum += ws->reactions[j]->histo->bin[i];
         }
         ws->histo_sum->bin[i] = sum;
     }
@@ -639,7 +600,7 @@ void sim_print(const simulation *sim) {
 }
 void sim_workspace_histograms_reset(sim_workspace *ws) {
     for(size_t i = 0; i < ws->n_reactions; i++) {
-        sim_reaction *r = &ws->reactions[i];
+        sim_reaction *r = ws->reactions[i];
         if(!r)
             continue;
 #ifdef DEBUG_VERBOSE
@@ -652,7 +613,7 @@ void sim_workspace_histograms_reset(sim_workspace *ws) {
 
 void sim_workspace_histograms_calculate(sim_workspace *ws) {
     for(size_t i = 0; i < ws->n_reactions; i++) {
-        sim_reaction *r = &ws->reactions[i];
+        sim_reaction *r = ws->reactions[i];
         if(!r)
             continue;
 #ifdef DEBUG_VERBOSE
@@ -665,7 +626,7 @@ void sim_workspace_histograms_calculate(sim_workspace *ws) {
 
 void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
     for(size_t i = 0; i < ws->n_reactions; i++) {
-        sim_reaction *r = &ws->reactions[i];
+        sim_reaction *r = ws->reactions[i];
         if(!r)
             continue;
 #ifdef DEBUG_VERBOSE
@@ -675,6 +636,56 @@ void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
     }
 }
 
+sim_reaction *sim_reaction_init(sim_workspace *ws, const reaction *r) {
+    if(!r) {
+        return NULL;
+    }
+    assert(r->product);
+    sim_reaction *sim_r = malloc(sizeof(sim_reaction));
+    sim_r->r = r;
+    ion *p = &sim_r->p;
+    ion_reset(p);
+    sim_r->max_depth = 0.0;
+    sim_r->i_isotope = ws->sample->n_isotopes; /* Intentionally not valid */
+
+    for(size_t i_isotope = 0; i_isotope < ws->sample->n_isotopes; i_isotope++) {
+        if(ws->sample->isotopes[i_isotope] == r->target) {
+#ifdef DEBUG
+            fprintf(stderr, "Reaction target isotope %s is isotope number %zu in sample.\n", r->target->name, i_isotope);
+#endif
+            sim_r->i_isotope = i_isotope;
+        }
+    }
+    sim_r->histo = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
+    spectrum_set_calibration(sim_r->histo, ws->det, r->product->Z); /* Setting histogram with Z-specific (or as fallback, default) calibration. */
+    gsl_histogram_reset(sim_r->histo);
+    sim_r->n_bricks = ws->n_bricks;
+    sim_r->bricks = calloc(sim_r->n_bricks, sizeof(brick));
+    ion_set_isotope(p, r->product);
+    if(p->isotope == ws->ion.isotope) {
+        p->nucl_stop = nuclear_stopping_shared_copy(ws->ion.nucl_stop);
+    } else {
+        p->nucl_stop = nuclear_stopping_new(p->isotope, ws->isotopes);
+    }
+    sim_reaction_set_cross_section_by_type(sim_r);
+    return sim_r;
+}
+
+void sim_reaction_free(sim_reaction *sim_r) {
+    if(!sim_r) {
+        return;
+    }
+    if(sim_r->histo) {
+        gsl_histogram_free(sim_r->histo);
+        sim_r->histo = NULL;
+    }
+    if(sim_r->bricks) {
+        free(sim_r->bricks);
+        sim_r->bricks = NULL;
+    }
+    nuclear_stopping_free(sim_r->p.nucl_stop);
+    free(sim_r);
+}
 
 void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double theta, double E_min, double E_max) {
     /* Calculate variables for Rutherford (and Andersen) cross sections. This is done for all reactions, even if they are not RBS or ERD reactions! */

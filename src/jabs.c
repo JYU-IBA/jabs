@@ -434,13 +434,6 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     size_t i_depth;
     ion ion1 = *incident; /* Shallow copy of the incident ion */
     geostragg_vars g = geostragg_vars_calculate(ws, incident);
-#ifdef NO_TRANSMISSION_SUPPORT
-    if(g.theta_product < 90.0 * C_DEG) {
-        jabs_message(MSG_ERROR, stderr, "Transmission geometry not supported, reaction product will not exit sample (angles in sample %g deg, %g deg).\n", g.theta_product / C_DEG,
-                     g.phi_product / C_DEG);
-        return EXIT_FAILURE;
-    }
-#endif
 #ifdef DEBUG
     fprintf(stderr, "Simulate from depth %g tfu (index %zu), detector theta = %g deg, calculated theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->det->theta/C_DEG, g.scatter_theta/C_DEG, ws->n_reactions);
     fprintf(stderr, "Ion energy at start %g keV, straggling %g keV FWHM.\n", incident->E/C_KEV, C_FWHM * sqrt(incident->S) / C_KEV);
@@ -450,27 +443,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
 #ifdef DEBUG
         fprintf(stderr, "Initializing reaction %zu\n", i);
 #endif
-        sim_reaction *r = &ws->reactions[i];
-        if(!r->r)
-            continue;
-        r->last_brick = 0;
-        r->stop = FALSE;
-        ion_set_angle(&r->p, g.theta_product, g.phi_product);
-        sim_reaction_recalculate_internal_variables(r, g.scatter_theta, ws->emin, ion1.E);
-        if(r->stop) {
-            r->max_depth = 0.0;
-            continue;
-        }
-        r->max_depth = sample_isotope_max_depth(sample, r->i_isotope);
-        sim_reaction_reset_bricks(r);
-        if(r->i_isotope >= sample->n_isotopes) { /* No target isotope for reaction. */
-            r->stop = TRUE;
-        }
-#ifdef DEBUG
-        fprintf(stderr, "Simulation reaction %zu: %s %s. Max depth %g tfu. i_isotope=%zu, stop = %i.\n\n",
-                i, reaction_name(r->r), r->r->target->name, r->max_depth / C_TFU, r->i_isotope, r->stop);
-        ion_print(stderr, &r->p);
-#endif
+        simulate_init_reaction(ws->reactions[i], sample, &g, ws->emin, ion1.E);
     }
     if(fabs(ion1.cosine_theta) < 1e-6) {
 #ifdef DEBUG
@@ -535,7 +508,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
 #endif
         int alive = 0;
         for(size_t i = 0; i < ws->n_reactions; i++) {
-            sim_reaction *r = &ws->reactions[i];
+            sim_reaction *r = ws->reactions[i];
             if(r->stop)
                 continue;
 #ifdef N_BRICKS_REDUNDANT_CHECK
@@ -616,6 +589,31 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     }
     sim_workspace_histograms_calculate(ws);
     return EXIT_SUCCESS;
+}
+
+void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const geostragg_vars *g, double E_min, double E_max) {
+    if(!sim_r) {
+        fprintf(stderr, "Simulation reaction is NULL\n");
+        return;
+    }
+    sim_r->last_brick = 0;
+    sim_r->stop = FALSE;
+    ion_set_angle(&sim_r->p, g->theta_product, g->phi_product);
+    sim_reaction_recalculate_internal_variables(sim_r, g->scatter_theta, E_min, E_max);
+    if(sim_r->stop) {
+        sim_r->max_depth = 0.0;
+        return;
+    }
+    sim_r->max_depth = sample_isotope_max_depth(sample, sim_r->i_isotope);
+    sim_reaction_reset_bricks(sim_r);
+    if(sim_r->i_isotope >= sample->n_isotopes) { /* No target isotope for reaction. */
+        sim_r->stop = TRUE;
+    }
+#ifdef DEBUG
+    fprintf(stderr, "Simulation reaction: %s %s. Max depth %g tfu. i_isotope=%zu, stop = %i.\n\n"
+            , reaction_name(sim_r->r), sim_r->r->target->name, sim_r->max_depth / C_TFU, sim_r->i_isotope, sim_r->stop);
+    ion_print(stderr, &sim_r->p);
+#endif
 }
 
 int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) { /* Assigns stopping and straggling (GSTO) for given Z2. Goes through all possible Z1s (beam and reaction products). */
@@ -717,7 +715,7 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
                 fprintf(f, ",\"Experimental\"");
             }
             for(size_t j = 0; j < ws->n_reactions; j++) {
-                const reaction *r = ws->reactions[j].r;
+                const reaction *r = ws->reactions[j]->r;
                 fprintf(f, ",\"%s (%s)\"", r->target->name, reaction_name(r));
             }
             fprintf(f, "\n");
@@ -739,10 +737,11 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
             }
         }
         for(size_t j = 0; j < ws->n_reactions; j++) {
-            if(i >= ws->reactions[j].histo->n || ws->reactions[j].histo->bin[i] == 0.0) {
+            gsl_histogram *histo = ws->reactions[j]->histo;
+            if(i >= histo->n || histo->bin[i] == 0.0) {
                 fprintf(f, "%c0", sep);
             } else {
-                fprintf(f, "%c%e", sep, ws->reactions[j].histo->bin[i]);
+                fprintf(f, "%c%e", sep, histo->bin[i]);
             }
         }
         fprintf(f, "\n");
@@ -833,7 +832,7 @@ int print_bricks(const char *filename, const sim_workspace *ws) {
     if(!f)
         return EXIT_FAILURE;
     for(size_t i = 0; i < ws->n_reactions; i++) {
-        const sim_reaction *r = &ws->reactions[i];
+        const sim_reaction *r = ws->reactions[i];
         fprintf(f, "#Reaction %zu: %s %s\n", i+1, reaction_name(r->r), r->r->target->name);
         if(r->r->filename) {
             fprintf(f, "#Filename: %s\n", r->r->filename);
