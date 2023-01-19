@@ -108,7 +108,7 @@ typedef struct sim_workspace {
     const detector *det;
     const sample *sample; /* Note that simulate() can be passed a sample explicitly, but in most cases it should be this. Also this should be exactly the same as sim->sample. */
     size_t n_reactions;
-    jibal_gsto *gsto;
+    const jibal_gsto *gsto;
     gsto_stopping_type stopping_type;
     size_t n_channels; /* in histograms */
     gsl_histogram *histo_sum;
