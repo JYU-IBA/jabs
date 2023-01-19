@@ -211,7 +211,8 @@ int sim_reactions_add_reaction(simulation *sim, reaction *r) {
     sim->n_reactions++;
     sim->reactions = realloc(sim->reactions, sim->n_reactions*sizeof(reaction *));
     sim->reactions[sim->n_reactions - 1] = r;
-    jabs_message(MSG_INFO, stderr, "Added reaction %zu (%s), %s(%s,%s)%s, Q = %g keV\n", sim->n_reactions, reaction_name(r), r->target->name, r->incident->name, r->product->name, r->product_nucleus->name, r->Q / C_KEV);
+    jabs_message(MSG_INFO, stderr, "Added reaction %zu (%s), %s(%s,%s)%s, E = [%g keV, %g keV], Q = %g keV\n",
+                 sim->n_reactions, reaction_name(r), r->target->name, r->incident->name, r->product->name, r->product_nucleus->name, r->E_min / C_KEV, r->E_max / C_KEV, r->Q / C_KEV);
     return EXIT_SUCCESS;
 }
 
