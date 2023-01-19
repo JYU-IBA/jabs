@@ -58,7 +58,7 @@ double stop_sample(const sim_workspace *ws, const ion *incident, const sample *s
                     #ifdef NUCLEAR_STOPPING_FROM_JIBAL
                     + jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, target->Z, target->mass)
                     #else
-                    + ion_nuclear_stop(incident, target, ws->isotopes, ws->params->nucl_stop_accurate)
+                    + ion_nuclear_stop(incident, target, ws->params->nucl_stop_accurate)
 #endif
             );
         } else {

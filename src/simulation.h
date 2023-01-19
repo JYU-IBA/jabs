@@ -148,6 +148,8 @@ detector *sim_det_from_string(const simulation *sim, const char *s);
 int sim_det_add(simulation *sim, detector *det);
 int sim_det_set(simulation *sim, detector *det, size_t i_det); /* Will free existing detector (can be NULL too) */
 sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det);
+void sim_workspace_init_reactions(const jibal *jibal, sim_workspace *ws); /* used by sim_workspace_init(), ws->sim and ws->n_bricks should be set before calling */
+void sim_workspace_calculate_number_of_bricks(sim_workspace *ws);
 void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);
 void sim_workspace_calculate_sum_spectra(sim_workspace *ws);
@@ -157,6 +159,7 @@ void sim_workspace_histograms_calculate(sim_workspace *ws);
 void sim_workspace_histograms_scale(sim_workspace *ws, double scale);
 void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double theta, double E_min, double E_max);
 void sim_reaction_reset_bricks(sim_reaction *sim_r);
+void sim_reaction_set_cross_section_by_type(sim_reaction *sim_r);
 double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);
 double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E);
 #ifdef JABS_PLUGINS

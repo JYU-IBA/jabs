@@ -100,7 +100,7 @@ int script_prepare_sim_or_fit(script_session *s) {
     sim_calc_params_update(fit->sim->params);
     sim_print(fit->sim);
 
-    sim_prepare_ion(&fit->sim->ion, fit->sim, NULL);
+    sim_prepare_ion(&fit->sim->ion, fit->sim, fit->jibal->isotopes);
 
     s->start = clock();
     return 0;
@@ -115,7 +115,7 @@ int script_finish_sim_or_fit(script_session *s) {
 #endif
 
     struct fit_data *fit = s->fit;
-
+    nuclear_stopping_free(fit->sim->ion.nucl_stop);
     if(fit->sim->n_det == 1) { /* TODO: This is primarily used for command line mode, but multidetector mode could be supported. */
         size_t i_det = 0;
         sim_workspace *ws = fit_data_ws(fit, i_det);

@@ -29,8 +29,7 @@ void ion_reset(ion *ion) {
     ion->cosine_phi = 1.0;
     ion->inverse_cosine_theta = 1.0; /* These need to be set matching to the angles */
     ion->inverse_cosine_phi = 1.0;
-    ion->nucl_stop_isotopes = 0;
-    ion->nucl_stop = NULL;
+    ion->nucl_stop = NULL; /* Be careful, memory could leak */
 }
 
 void ion_set_isotope(ion *ion, const jibal_isotope *isotope) {
@@ -60,44 +59,24 @@ void ion_set_angle(ion *ion, double theta, double phi) {
     ion->inverse_cosine_phi = 1.0/ion->cosine_phi;
 }
 
-double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, const jibal_isotope *isotopes, int accurate) {
-    size_t i = (isotope-isotopes);
-    assert(i < ion->nucl_stop_isotopes);
-    const double epsilon = ion->nucl_stop[i].eps0 * ion->E;
+double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, int accurate) {
+#ifdef DEBUG
+    assert(isotope->i < ion->nucl_stop->n_isotopes);
+    assert(ion->nucl_stop->t[isotope->i].target == isotope);
+#endif
+    nucl_stop_pair x = ion->nucl_stop->t[isotope->i];
+    const double epsilon = x.eps0 * ion->E;
     if(accurate) {
         if(epsilon <= 30.0) {
-            return ion->nucl_stop[i].k * log(1 + 1.1383 * epsilon) / (2 * (epsilon + 0.01321 * pow(epsilon, 0.21226) + 0.19593 * pow(epsilon, 0.5)));
+            return x.k * log(1 + 1.1383 * epsilon) / (2 * (epsilon + 0.01321 * pow(epsilon, 0.21226) + 0.19593 * sqrt(epsilon)));
         }
     } else {
         if (epsilon <= M_E) {
-            return ion->nucl_stop[i].k / (2.0 * M_E); /* Below the maximum (of the else-branch) return maximum. The approximation is bad, but better than nothing. */
+            return x.k / (2.0 * M_E); /* Below the maximum (of the else-branch) return maximum. The approximation is bad, but better than nothing. */
         }
     }
-    return ion->nucl_stop[i].k*log(epsilon)/(2.0*epsilon);
+    return (x.k * log(epsilon) / (2.0 * epsilon));
 }
-
-void ion_nuclear_stop_fill_params(ion *ion, const jibal_isotope *isotopes) {
-    const jibal_isotope *isotope;
-    int i = 0;
-    size_t n_isotopes = jibal_isotopes_n(isotopes);
-    ion->nucl_stop = malloc(n_isotopes * sizeof (nucl_stop_pair ));
-    for(isotope=isotopes; isotope->A != 0 && i < n_isotopes; isotope++) {
-        int Z1 = ion->isotope->Z;
-        int Z2 = isotope->Z;
-        double m1 = ion->isotope->mass;
-        double m2 = isotope->mass;
-        double a_u=0.8854*C_BOHR_RADIUS/(pow(Z1, 0.23)+pow(Z2, 0.23));
-        double gamma = 4.0*m1*m2/pow(m1+m2, 2.0);
-        double eps0 = (1.0/C_KEV)*32.53*m2/(Z1*Z2*(m1+m2)*(pow(Z1, 0.23)+pow(Z2, 0.23)));
-        double k = C_PI * (a_u * a_u) * gamma/eps0;
-        ion->nucl_stop[i].eps0 = eps0;
-        ion->nucl_stop[i].k = k;
-        i++;
-    }
-    ion->nucl_stop_isotopes = n_isotopes; /* This is somewhat redundant, but it is there to remind us. */
-}
-
-
 
 void ion_rotate(ion *ion, double theta2, double phi2) { /* Wrapper for rotate() */
     double theta, phi;
@@ -107,5 +86,5 @@ void ion_rotate(ion *ion, double theta2, double phi2) { /* Wrapper for rotate() 
 
 void ion_print(FILE *f, const ion *ion) {
     fprintf(f, "ion %s (Z=%i, mass=%.3lf u), E = %.3lf keV, theta = %.3lf deg (cos_theta = %.3lf, 1/cos_theta = %.3lf), phi = %.3lf deg. Nuclear stopping isotopes %zu.\n",
-            ion->isotope->name, ion->Z, ion->mass/C_U, ion->E/C_KEV,  ion->theta/C_DEG, ion->cosine_theta, ion->inverse_cosine_theta, ion->phi/C_DEG, ion->nucl_stop_isotopes);
+            ion->isotope->name, ion->Z, ion->mass/C_U, ion->E/C_KEV,  ion->theta/C_DEG, ion->cosine_theta, ion->inverse_cosine_theta, ion->phi/C_DEG, ion->nucl_stop->n_isotopes);
 }

@@ -12,6 +12,7 @@
 
  */
 
+#include <assert.h>
 #include "nuclear_stopping.h"
 
 nuclear_stopping *nuclear_stopping_new(const jibal_isotope *incident, const jibal_isotope *isotopes) {
@@ -20,32 +21,55 @@ nuclear_stopping *nuclear_stopping_new(const jibal_isotope *incident, const jiba
         return NULL;
     }
     size_t n_isotopes = jibal_isotopes_n(isotopes);
+    assert(n_isotopes > 0);
+    ns->t = calloc(n_isotopes, sizeof(nucl_stop_pair));
     size_t i = 0;
+    ns->incident = incident;
+    int Z1 = incident->Z;
+    double m1 = incident->mass;
     for(const jibal_isotope *target = isotopes; target->A != 0 && i < n_isotopes; target++) {
-        int Z1 = incident->Z;
+
         int Z2 = target->Z;
-        double m1 = incident->mass;
         double m2 = target->mass;
-        double a_u=0.8854*C_BOHR_RADIUS/(pow(Z1, 0.23)+pow(Z2, 0.23));
-        double gamma = 4.0*m1*m2/pow(m1+m2, 2.0);
-        double eps0 = (1.0/C_KEV)*32.53*m2/(Z1*Z2*(m1+m2)*(pow(Z1, 0.23)+pow(Z2, 0.23)));
+        double zpower = 1.0/(pow(Z1, 0.23) + pow(Z2, 0.23));
+        double a_u = 0.8854*C_BOHR_RADIUS * zpower;
+        double gamma = 4.0 * m1 * m2/pow(m1 + m2, 2.0);
+        double eps0 = ((1.0/C_KEV) * 32.53 * m2/(Z1 * Z2 * (m1 + m2))) * zpower;
         double k = C_PI * (a_u * a_u) * gamma/eps0;
-        ns->nucl_stop[i].eps0 = eps0;
-        ns->nucl_stop[i].k = k;
+        ns->t[i].eps0 = eps0;
+        ns->t[i].k = k;
+#ifdef DEBUG
+        ns->t[i].target = target;
+#endif
         i++;
     }
-    ns->nucl_stop_isotopes = n_isotopes;
+    ns->n_isotopes = n_isotopes;
     ns->refcount = 1;
     return ns;
 }
 
-nuclear_stopping *nuclear_stopping_shallow_copy(nuclear_stopping *ns) {
+nuclear_stopping *nuclear_stopping_shared_copy(nuclear_stopping *ns) {
     if(!ns) {
         return NULL;
     }
 #ifdef DEBUG
-    fprintf(stderr, "Shallow copy of ns = %p made, refcount is %zu\n", (void *)ns, ns->refcount);
+    fprintf(stderr, "Shallow copy of ns = %p made (incident: %s), refcount is %i\n", (void *)ns, ns->incident->name, ns->refcount);
 #endif
     ns->refcount += 1;
     return ns;
+}
+
+void nuclear_stopping_free(nuclear_stopping *ns) {
+    if(!ns) {
+        return;
+    }
+    ns->refcount--;
+#ifdef DEBUG
+    fprintf(stderr, "nuclear_stopping_free(ns = %p), incident %s, called, refcount is now %i\n", (void *)ns, ns->incident->name, ns->refcount);
+#endif
+    assert(ns->refcount >= 0);
+    if(ns->refcount == 0) {
+        free(ns->t);
+        free(ns);
+    }
 }

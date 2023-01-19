@@ -72,6 +72,7 @@ const char *reaction_name(const reaction *r);
 const char *reaction_type_to_string(reaction_type type);
 reaction_type reaction_type_from_string(const char *s);
 void reaction_free(reaction *r);
+int reaction_is_possible(const reaction *r, double theta); /* If this returns FALSE, reaction r is not possible with lab angle theta. If it returns TRUE, it might be. */
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile);
 int reaction_compare(const void *a, const void *b);
 double reaction_product_energy(const reaction *r, double theta, double E); /* Hint: call with E == 1.0 to get kinematic factor */

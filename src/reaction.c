@@ -193,6 +193,34 @@ void reaction_free(reaction *r) {
     free(r->filename);
 }
 
+
+int reaction_is_possible(const reaction *r, double theta) {
+    reaction_type type = r->type;
+    const jibal_isotope *incident = r->incident;
+    const jibal_isotope *target = r->target;
+    if(type == REACTION_RBS || type == REACTION_RBS_ALT) {
+        if(incident->mass >= target->mass && theta > asin(target->mass / incident->mass)) {
+#ifdef DEBUG
+            fprintf(stderr, "RBS with %s is not possible (theta %g deg > %g deg)\n", target->name, r->theta/C_DEG, asin(target->mass / incident->mass)/C_DEG);
+#endif
+            return FALSE;
+        }
+        if(type == REACTION_RBS_ALT) {
+            if(incident->mass <= target->mass) {
+#ifdef DEBUG
+                fprintf(stderr, "RBS(-) with %s is not possible (target must be lighter than incident)\n", target->name);
+#endif
+                return FALSE;
+            }
+        }
+    } else if(type == REACTION_ERD) {
+        if(theta >= C_PI / 2.0) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile) {
     const jibal_isotope *nuclei[R33_N_NUCLEI];
     if(rfile->n_data < 2) {
@@ -281,7 +309,7 @@ int reaction_compare(const void *a, const void *b) {
     }
 }
 
-double reaction_product_energy(const reaction *r, double theta, double E) { /* Hint: call with E == 1.0 to get kinematic factor */
+double reaction_product_energy(const reaction *r, double theta, double E) { /* Hint: call with E == 1.0 to get kinematic factor. Note that this function does not check if reaction is possible and may return "nan". */
     const double Q = r->Q;
     if(Q == 0.0) {
         if(r->type == REACTION_RBS || r->type == REACTION_RBS_ALT) {

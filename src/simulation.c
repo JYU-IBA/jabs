@@ -378,6 +378,73 @@ int sim_det_set(simulation *sim, detector *det, size_t i_det) {
     return EXIT_SUCCESS;
 }
 
+void sim_workspace_init_reactions(const jibal *jibal, sim_workspace *ws) {
+    const simulation *sim = ws->sim;
+    ws->reactions = calloc(sim->n_reactions, sizeof (sim_reaction));
+    for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
+        sim_reaction *r = &ws->reactions[ws->n_reactions];
+        r->r = sim->reactions[i_reaction];
+        if(!r->r) { /* No reaction, this will not be valid */
+            continue;
+        }
+        assert(r->r->product);
+        ion *p = &r->p;
+        ion_reset(p);
+        r->max_depth = 0.0;
+        r->i_isotope = ws->sample->n_isotopes; /* Intentionally not valid */
+
+        for(size_t i_isotope = 0; i_isotope < ws->sample->n_isotopes; i_isotope++) {
+            if(ws->sample->isotopes[i_isotope] == r->r->target) {
+#ifdef DEBUG
+                fprintf(stderr, "Reaction %zu target isotope %s is isotope number %zu in sample.\n", i_reaction, r->r->target->name, i_isotope);
+#endif
+                r->i_isotope = i_isotope;
+            }
+        }
+        r->histo = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
+        spectrum_set_calibration(r->histo, ws->det, r->r->product->Z); /* Setting histogram with Z-specific (or as fallback, default) calibration. */
+        gsl_histogram_reset(r->histo);
+        r->n_bricks = ws->n_bricks;
+        r->bricks = calloc(r->n_bricks, sizeof(brick));
+        ion_set_isotope(p, r->r->product);
+        if(p->isotope == ws->ion.isotope) {
+            p->nucl_stop = nuclear_stopping_shared_copy(ws->ion.nucl_stop);
+        } else {
+            p->nucl_stop = nuclear_stopping_new(p->isotope, jibal->isotopes);
+        }
+        sim_reaction_set_cross_section_by_type(r);
+        ws->n_reactions++;
+    }
+}
+
+void sim_workspace_calculate_number_of_bricks(sim_workspace *ws) {
+    size_t n_bricks = 0;
+    const detector *det = ws->det;
+    const simulation *sim = ws->sim;
+    if(ws->params->depthsteps_max) {
+        n_bricks = ws->params->depthsteps_max;
+    } else {
+        if(det->type == DETECTOR_ENERGY) {
+            if(ws->params->stop_step_incident == 0.0) { /* Automatic incident step size */
+                n_bricks = (int) ceil(sim->beam_E / (ws->params->stop_step_fudge_factor*sqrt(detector_resolution(ws->det, sim->beam_isotope, sim->beam_E))) + ws->sample->n_ranges);
+            } else {
+                n_bricks = (int) ceil(sim->beam_E / ws->params->stop_step_incident + ws->sample->n_ranges); /* This is conservative */
+                fprintf(stderr, "n_bricks = %zu\n", n_bricks);
+            }
+        } else { /* TODO: maybe something more clever is needed here */
+            n_bricks = BRICKS_DEFAULT;
+        }
+        if(n_bricks > BRICKS_MAX) {
+            n_bricks = BRICKS_MAX;
+            jabs_message(MSG_WARNING, stderr,  "Number of bricks limited to %zu.\n", n_bricks);
+        }
+    }
+    ws->n_bricks = n_bricks;
+#ifdef DEBUG
+    fprintf(stderr, "Number of bricks: %zu\n", n_bricks);
+#endif
+}
+
 sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det) {
     if(!jibal || !sim || !det) {
         jabs_message(MSG_ERROR, stderr,  "No JIBAL, sim or det. Guru thinks: %p, %p %p.\n", jibal, sim, det);
@@ -443,81 +510,9 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     spectrum_set_calibration(ws->histo_sum, ws->det, JIBAL_ANY_Z); /* Calibration (assuming default calibration) can be set now. */
     gsl_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
 
-    size_t n_bricks = 0;
+    sim_workspace_calculate_number_of_bricks(ws);
+    sim_workspace_init_reactions(jibal, ws);
 
-    if(ws->params->depthsteps_max) {
-        n_bricks = ws->params->depthsteps_max;
-    } else {
-        if(det->type == DETECTOR_ENERGY) {
-            if(ws->params->stop_step_incident == 0.0) { /* Automatic incident step size */
-                n_bricks = (int) ceil(sim->beam_E / (ws->params->stop_step_fudge_factor*sqrt(detector_resolution(ws->det, sim->beam_isotope, sim->beam_E))) + ws->sample->n_ranges);
-            } else {
-                n_bricks = (int) ceil(sim->beam_E / ws->params->stop_step_incident + ws->sample->n_ranges); /* This is conservative */
-                fprintf(stderr, "n_bricks = %zu\n", n_bricks);
-            }
-        } else { /* TODO: maybe something more clever is needed here */
-            n_bricks = BRICKS_DEFAULT;
-        }
-        if(n_bricks > BRICKS_MAX) {
-            n_bricks = BRICKS_MAX;
-            jabs_message(MSG_WARNING, stderr,  "Number of bricks limited to %zu.\n", n_bricks);
-        }
-    }
-    ws->n_bricks = n_bricks;
-#ifdef DEBUG
-    fprintf(stderr, "Number of bricks: %zu\n", n_bricks);
-#endif
-    ws->reactions = calloc(sim->n_reactions, sizeof (sim_reaction));
-    for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-        sim_reaction *r = &ws->reactions[ws->n_reactions];
-        r->r = sim->reactions[i_reaction];
-        if(!r->r) { /* No reaction, this will not be valid */
-            continue;
-        }
-        assert(r->r->product);
-        ion *p = &r->p;
-        ion_reset(p);
-        r->max_depth = 0.0;
-        r->i_isotope = ws->sample->n_isotopes; /* Intentionally not valid */
-        for(size_t i_isotope = 0; i_isotope < ws->sample->n_isotopes; i_isotope++) {
-            if(ws->sample->isotopes[i_isotope] == r->r->target) {
-#ifdef DEBUG
-                fprintf(stderr, "Reaction %zu target isotope %s is isotope number %zu in sample.\n", i_reaction, r->r->target->name, i_isotope);
-#endif
-                r->i_isotope = i_isotope;
-            }
-        }
-        r->histo = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
-        spectrum_set_calibration(r->histo, ws->det, r->r->product->Z); /* Setting histogram with Z-specific (or as fallback, default) calibration. */
-        gsl_histogram_reset(r->histo);
-        r->n_bricks = n_bricks;
-        r->bricks = calloc(r->n_bricks, sizeof(brick));
-        ion_set_isotope(p, r->r->product);
-        if(r->r->type == REACTION_RBS || r->r->type == REACTION_RBS_ALT) {
-            assert(p->isotope == ws->ion.isotope);
-            p->nucl_stop_isotopes = ws->ion.nucl_stop_isotopes;
-            p->nucl_stop = ws->ion.nucl_stop; /* Shallow copy! Shared. */
-            r->cross_section = sim_reaction_cross_section_rutherford;
-        } else if(r->r->type == REACTION_ERD) {
-            ion_nuclear_stop_fill_params(p, jibal->isotopes); /* This allocates memory */
-            r->cross_section = sim_reaction_cross_section_rutherford;
-        } else if(r->r->type == REACTION_FILE) {
-            ion_nuclear_stop_fill_params(p, jibal->isotopes); /* This allocates memory. We could share (like with RBS) in some cases, but that's not necessarily convenient. */
-            r->cross_section = sim_reaction_cross_section_tabulated;
-        }
-#ifdef JABS_PLUGINS
-        else if(r->r->type == REACTION_PLUGIN) {
-            ion_nuclear_stop_fill_params(p, jibal->isotopes);
-            r->cross_section = sim_reaction_cross_section_plugin;
-        }
-#endif
-        else {
-            p->nucl_stop = NULL;
-            p->nucl_stop_isotopes = 0;
-            r->cross_section = NULL;
-        }
-        ws->n_reactions++;
-    }
     if(ws->params->cs_n_steps == 0) { /* Actually integrate, allocate workspace for this */
         ws->w_int_cs = gsl_integration_workspace_alloc(ws->params->int_cs_max_intervals);
     } else {
@@ -545,9 +540,7 @@ void sim_workspace_free(sim_workspace *ws) {
             free(r->bricks);
             r->bricks = NULL;
         }
-        if(r->r->type != REACTION_RBS && r->r->type != REACTION_RBS_ALT) {
-            free(r->p.nucl_stop); /* RBS ions share nuclear stopping table. Others needs to free the memory. */
-        }
+        nuclear_stopping_free(r->p.nucl_stop);
     }
     free(ws->reactions);
     gsl_integration_workspace_free(ws->w_int_cs);
@@ -559,12 +552,20 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
     size_t n_max = CHANNELS_ABSOLUTE_MIN; /* Always simulate at least CHANNELS_ABSOLUTE_MIN channels */
     for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
         const reaction *r = sim->reactions[i_reaction];
+        if(!reaction_is_possible(r, ws->det->theta)) {
+#ifdef DEBUG
+            fprintf(stderr, "Reaction %zu (target %s, type %s) is not possible when theta = %g deg. Skipping. \n", i_reaction + 1, r->target->name,
+                    reaction_type_to_string(r->type), ws->det->theta / C_DEG);
+#endif
+            continue;
+        }
         double E = reaction_product_energy(r, ws->det->theta, sim->beam_E);
         double E_safer = E + 3.0*sqrt(detector_resolution(ws->det, r->product, E)); /* Add 3x resolution sigma to max energy */
         E_safer *= 1.1; /* and 10% for good measure! */
         while(detector_calibrated(ws->det, JIBAL_ANY_Z, n_max) < E_safer && n_max <= CHANNELS_ABSOLUTE_MAX) {n_max++;} /* Increase number of channels until we hit this energy. TODO: this requires changes for ToF spectra. */
 #ifdef DEBUG
-        fprintf(stderr, "Reaction %zu, max E = %g keV -> %g keV after resolution and safety factor have been added, current n_max %zu (channels)\n", i_reaction + 1, E/C_KEV, E_safer/C_KEV, n_max);
+        fprintf(stderr, "Reaction %zu (target %s, type %s), max E = %g keV -> %g keV after resolution and safety factor have been added, current n_max %zu (channels)\n", i_reaction + 1, r->target->name,
+                reaction_type_to_string(r->type), E/C_KEV, E_safer/C_KEV, n_max);
 #endif
     }
     if(n_max == CHANNELS_ABSOLUTE_MAX)
@@ -674,6 +675,7 @@ void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
     }
 }
 
+
 void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double theta, double E_min, double E_max) {
     /* Calculate variables for Rutherford (and Andersen) cross sections. This is done for all reactions, even if they are not RBS or ERD reactions! */
     (void) E_min; /* Energy range could be used to set something (in the future) */
@@ -693,37 +695,26 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double the
     sim_r->cs_constant = 0.0;
     sim_r->theta_cm = 0.0; /* Will be recalculated, if possible */
     reaction_type type = sim_r->r->type;
-    if(type == REACTION_RBS || type == REACTION_RBS_ALT) {
-        if(incident->mass >= target->mass && sim_r->theta > asin(target->mass / incident->mass)) {
+
+    if(!reaction_is_possible(sim_r->r, theta)) {
+        sim_r->stop = TRUE;
 #ifdef DEBUG
-            fprintf(stderr, "RBS with %s is not possible (theta %g deg > %g deg)\n", target->name, sim_r->theta/C_DEG, asin(target->mass / incident->mass)/C_DEG);
+        fprintf(stderr, "Reaction not possible, returning.\n");
 #endif
-            sim_r->stop = TRUE;
-            return;
-        }
-        if(type == REACTION_RBS_ALT) {
-            if(incident->mass > target->mass) {
-                sim_r->theta_cm = C_PI - (asin(sim_r->mass_ratio * sin(sim_r->theta)) - sim_r->theta);
-            } else {
-#ifdef DEBUG
-                fprintf(stderr, "RBS(-) with %s is not possible (target must be lighter than incident)\n", target->name);
-#endif
-                sim_r->stop = TRUE;
-            }
-        } else { /* REACTION_RBS */
-            sim_r->theta_cm = sim_r->theta + asin(sim_r->mass_ratio * sin(sim_r->theta));
-        }
+        return;
+    }
+    if(type == REACTION_RBS) {
+        sim_r->theta_cm = sim_r->theta + asin(sim_r->mass_ratio * sin(sim_r->theta));
+    }
+    if(type == REACTION_RBS_ALT) {
+        sim_r->theta_cm = C_PI - (asin(sim_r->mass_ratio * sin(sim_r->theta)) - sim_r->theta);
+    }
+    if(type == REACTION_RBS || type ==REACTION_RBS_ALT) {
         sim_r->cs_constant = fabs((pow2(sin(sim_r->theta_cm))) / (pow2(sin(sim_r->theta)) * cos(sim_r->theta_cm - sim_r->theta)) *
-                             pow2((incident->Z * C_E * target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) *
-                             pow4(1.0 / sin(sim_r->theta_cm / 2.0)) * (1.0 / 16.0));
-    } else if(type == REACTION_ERD) { /* ERD */
-        if(sim_r->theta > C_PI/2.0) {
-#ifdef DEBUG
-            fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)\n", target->name, sim_r->theta/C_DEG);
-#endif
-            sim_r->stop = TRUE;
-            return;
-        }
+                                  pow2((incident->Z * C_E * target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) *
+                                  pow4(1.0 / sin(sim_r->theta_cm / 2.0)) * (1.0 / 16.0));
+    }
+     if(type == REACTION_ERD) { /* ERD */
         sim_r->theta_cm = C_PI - 2.0 * sim_r->theta;
         sim_r->cs_constant = pow2(incident->Z * C_E * target->Z * C_E / (8 * C_PI * C_EPSILON0)) * pow2(1.0 + incident->mass / target->mass) * pow(cos(sim_r->theta), -3.0) * pow2(sim_r->E_cm_ratio);
     }
@@ -738,6 +729,31 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double the
 
 void sim_reaction_reset_bricks(sim_reaction *sim_r) {
     memset(sim_r->bricks, 0, sizeof(brick) * sim_r->n_bricks);
+}
+
+void sim_reaction_set_cross_section_by_type(sim_reaction *sim_r) {
+    switch(sim_r->r->type) {
+        case REACTION_RBS:
+            /* Falls through */
+        case REACTION_RBS_ALT:
+            /* Falls through */
+        case REACTION_ERD:
+            sim_r->cross_section = sim_reaction_cross_section_rutherford;
+            break;
+        case REACTION_FILE:
+            sim_r->cross_section = sim_reaction_cross_section_tabulated;
+            break;
+#ifdef JABS_PLUGINS
+        case REACTION_PLUGIN:
+            sim_r->cross_section = sim_reaction_cross_section_plugin;
+            break;
+#endif
+        default:
+#ifdef DEBUG
+            fprintf(stderr, "Unknown reaction type %i, cross_section() function pointer is NULL!\n", sim_r->r->type);
+#endif
+            sim_r->cross_section = NULL;
+    }
 }
 
 double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm) {
@@ -863,5 +879,5 @@ void sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isoto
     ion_set_isotope(ion, sim->beam_isotope);
     ion->E = sim->beam_E;
     ion->S = sim->beam_E_broad;
-    ion_nuclear_stop_fill_params(ion, isotopes);
+    ion->nucl_stop = nuclear_stopping_new(ion->isotope, isotopes);
 }
