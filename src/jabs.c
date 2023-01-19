@@ -390,7 +390,7 @@ void post_scatter_exit(ion *p, const depth depth_start, const sim_workspace *ws,
     }
 }
 
-void foil_traverse(ion *p, const sample *foil, sim_workspace *ws) {
+void foil_traverse(ion *p, const sample *foil, const sim_workspace *ws) {
     if(!foil)
         return;
     depth d = {.i = 0, .x = 0.0};
@@ -432,7 +432,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     fprintf(stderr, "Sample thickness is %g\n", sample->thickness/C_TFU);
 #endif
     size_t i_depth;
-    ion ion1 = *incident; /* Shallow copy of the incident ion */
+    ion ion = *incident; /* Shallow copy of the incident ion */
     geostragg_vars g = geostragg_vars_calculate(ws, incident);
 #ifdef DEBUG
     fprintf(stderr, "Simulate from depth %g tfu (index %zu), detector theta = %g deg, calculated theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->det->theta/C_DEG, g.scatter_theta/C_DEG, ws->n_reactions);
@@ -443,39 +443,39 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
 #ifdef DEBUG
         fprintf(stderr, "Initializing reaction %zu\n", i);
 #endif
-        simulate_init_reaction(ws->reactions[i], sample, &g, ws->emin, ion1.E);
+        simulate_init_reaction(ws->reactions[i], sample, &g, ws->emin, ion.E);
     }
-    if(fabs(ion1.cosine_theta) < 1e-6) {
+    if(fabs(ion.cosine_theta) < 1e-6) {
 #ifdef DEBUG
         fprintf(stderr, "Ion was going sideways in the sample, we nudged it a little.\n");
 #endif
-        ion1.theta += 0.01 * C_DEG;
-        ion1.cosine_theta = cos(ion1.theta);
+        ion.theta += 0.01 * C_DEG;
+        ion.cosine_theta = cos(ion.theta);
     }
     for(i_depth = 0; i_depth < ws->n_bricks; i_depth++) {
 #ifdef DEBUG
-        fprintf(stderr, "\r %04zu %8.3lf keV %8.3lf tfu. ", i_depth, ion1.E/C_KEV, d_before.x / C_TFU);
+        fprintf(stderr, "\r %04zu %8.3lf keV %8.3lf tfu. ", i_depth, ion.E/C_KEV, d_before.x / C_TFU);
 #endif
         if(warnings > SIMULATE_WARNING_LIMIT) {
-            fprintf(stderr, "Warning limit reached. Won't calculate anything.\n");
+            jabs_message(MSG_ERROR, stderr, "Warning limit reached. Won't calculate anything.\n");
             break;
         }
         if(d_before.x >= sample->thickness) /* We're in too deep. */
             break;
-        if(ion1.inverse_cosine_theta < 0.0 && d_before.x < 0.001 * C_TFU) /* We're coming out of the sample and about to exit */
+        if(ion.inverse_cosine_theta < 0.0 && d_before.x < 0.001 * C_TFU) /* We're coming out of the sample and about to exit */
             break;
-        if(ion1.E < ws->emin) {
+        if(ion.E < ws->emin) {
 #ifdef DEBUG
-            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %lu.\n", ion1.E/C_KEV, ws->sim->emin/C_KEV, d_before.x/C_TFU, d_before.i);
+            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %lu.\n", ion.E/C_KEV, ws->sim->emin/C_KEV, d_before.x/C_TFU, d_before.i);
 #endif
             break;
         }
-        const double E_front = ion1.E;
-        const double S_front = ion1.S;
-        double E_step = stop_step_calculate(ws, &ion1);
+        const double E_front = ion.E;
+        const double S_front = ion.S;
+        double E_step = stop_step_calculate(ws, &ion);
         depth d_after;
         if(i_depth) {
-            d_after = stop_step(ws, &ion1, sample, d_before, E_step);
+            d_after = stop_step(ws, &ion, sample, d_before, E_step);
         } else {
             d_after = d_before;
         }
@@ -484,8 +484,8 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
 #endif
         const double d_diff = depth_diff(d_before, d_after);
         /* DEPTH BIN [x, x+d_diff) */
-        const double E_back = ion1.E;
-        const double S_back = ion1.S;
+        const double E_back = ion.E;
+        const double S_back = ion.S;
         if(i_depth && fabs(d_diff) < 0.001 * C_TFU && E_front - E_back < 0.001 * C_KEV) {
             jabs_message(MSG_WARNING, stderr,
                          "Warning: no or very little progress was made (E step (goal) %g keV, E from %g keV to E = %g keV, depth = %g tfu, d_diff = %g tfu), check stopping or step size.\n",
@@ -504,77 +504,17 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
 #endif
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
-                        E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ion1.S) / C_KEV);
+                        E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ion.S) / C_KEV);
 #endif
         int alive = 0;
         for(size_t i = 0; i < ws->n_reactions; i++) {
-            sim_reaction *r = ws->reactions[i];
-            if(r->stop)
-                continue;
-#ifdef N_BRICKS_REDUNDANT_CHECK
-            if(i_depth >= r->n_bricks) { /* This check is currently not necessary, since r->n_bricks == ws->n_bricks */
-                fprintf(stderr, "Too many bricks (%zu max). Data partial.\n", r->n_bricks);
-                r->stop = TRUE;
+            if(ws->reactions[i]->stop) {
                 continue;
             }
-#endif
-            brick *b = &r->bricks[i_depth];
-            if(!ws->params->ds && d_before.x >= r->max_depth) { /* Reactions stop when we are too deep in the sample, unless, of course, if DS is enabled. TODO: check optimizations for DS */
-#ifdef DEBUG
-                fprintf(stderr, "\nReaction %lu with %s stops, because maximum depth is reached at x = %.3lf tfu.\n",
-                        i, r->r->target->name, d_before.x / C_TFU); /* TODO: give reactions a name */
-#endif
-                b->Q = 0.0;
-                r->stop = TRUE;
-                continue;
+            simulate_reaction(ws->reactions[i], ws, sample, &g, i_depth, d_before, d_after, &ion, E_front, S_front, E_back, S_back, d_diff);
+            if(!ws->reactions[i]->stop) {
+                alive++;
             }
-            alive++;
-            b->d = d_after;
-            b->E_0 = ion1.E; /* Sort of energy just before the reaction. */
-            b->S_0 = ion1.S;
-
-#ifdef DEBUG_REACTION
-            fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
-#endif
-            if(ws->params->geostragg) {
-                b->S_geo_x = geostragg(ws, sample, r, &g.x, d_after, ion1.E);
-                b->S_geo_y = geostragg(ws, sample, r, &g.y, d_after, ion1.E);
-            }
-            sim_reaction_product_energy_and_straggling(r, &ion1);
-            assert(r->p.E > 0.0);
-            b->E_r = r->p.E;
-            b->S_r = r->p.S;
-            post_scatter_exit(&r->p, d_after, ws, sample);
-            foil_traverse(&r->p, ws->det->foil, ws);
-            b->E = r->p.E;
-            b->S = r->p.S;
-#ifdef DEBUG_VERBOSE
-            fprintf(stderr, "Reaction %2zu depth from %8.3lf tfu to %8.3lf tfu, E = %8.3lf keV, Straggling: eloss %7.3lf keV, geo %7.3lf keV\n", i, d_before.x/C_TFU, d_after.x/C_TFU, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo_x+b->S_geo_y)/C_KEV);
-#endif
-            if(r->p.E < ws->emin) {
-                r->stop = TRUE;
-                b->Q = 0.0;
-                continue;
-            }
-            double sigma_conc = cross_section_concentration_product(ws, sample, r, E_front, E_back, &d_before, &d_after, S_front,
-                                                                    S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
-            b->thick = d_diff;
-            if(sigma_conc > 0.0) {
-                if(d_after.i == sample->n_ranges - 2) {
-                    sigma_conc *= ws->sim->channeling_offset + ws->sim->channeling_slope * (E_front + E_back) / 2.0;
-                }
-                b->Q = ion1.inverse_cosine_theta * sigma_conc * b->thick;
-                b->sc = sigma_conc;
-                assert(b->Q >= 0.0);
-#ifdef DEBUG_VERBOSE
-                fprintf(stderr, "    %s: type=%i, E_front = %.3lf, E_back = %.3lf, E_out = %.3lf (sigma*conc = %g mb/sr, Q = %g (thickness = %.4lf tfu)\n",
-                        r->r->target->name, r->r->type, E_front/C_KEV, E_back/C_KEV, r->p.E/C_KEV, sigma_conc/C_MB_SR, b->Q, d_diff/C_TFU);
-#endif
-            } else {
-                b->Q = 0.0;
-                b->sc = 0.0;
-            }
-            r->last_brick = i_depth;
         }
         d_before = d_after;
         if(!alive) {
@@ -589,6 +529,70 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     }
     sim_workspace_histograms_calculate(ws);
     return EXIT_SUCCESS;
+}
+
+void simulate_reaction(sim_reaction *sim_r, const sim_workspace *ws, const sample *sample, const geostragg_vars *g, size_t i_depth, const depth d_before, const depth d_after, const ion *ion, double E_front, double S_front, double E_back, double S_back, double d_diff) {
+#ifdef N_BRICKS_REDUNDANT_CHECK
+    if(i_depth >= r->n_bricks) { /* This check is currently not necessary, since r->n_bricks == ws->n_bricks */
+                fprintf(stderr, "Too many bricks (%zu max). Data partial.\n", r->n_bricks);
+                r->stop = TRUE;
+                continue;
+            }
+#endif
+    brick *b = &sim_r->bricks[i_depth];
+    if(!ws->params->ds && d_before.x >= sim_r->max_depth) { /* Reactions stop when we are too deep in the sample, unless, of course, if DS is enabled. TODO: check optimizations for DS */
+#ifdef DEBUG
+        fprintf(stderr, "\nReaction with %s stops, because maximum depth is reached at x = %.3lf tfu.\n", sim_r->r->target->name, d_before.x / C_TFU); /* TODO: give reactions a name */
+#endif
+        b->Q = 0.0;
+        sim_r->stop = TRUE;
+        return;
+    }
+    b->d = d_before;
+    b->E_0 = ion->E; /* Sort of energy just before the reaction. */
+    b->S_0 = ion->S;
+
+#ifdef DEBUG_REACTION
+    fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
+#endif
+    if(ws->params->geostragg) {
+        b->S_geo_x = geostragg(ws, sample, sim_r, &(g->x), d_after, ion->E);
+        b->S_geo_y = geostragg(ws, sample, sim_r, &(g->y), d_after, ion->E);
+    }
+    sim_reaction_product_energy_and_straggling(sim_r, ion);
+    assert(sim_r->p.E > 0.0);
+    b->E_r = sim_r->p.E;
+    b->S_r = sim_r->p.S;
+    post_scatter_exit(&sim_r->p, d_after, ws, sample);
+    foil_traverse(&sim_r->p, ws->det->foil, ws);
+    b->E = sim_r->p.E;
+    b->S = sim_r->p.S;
+#ifdef DEBUG_VERBOSE
+    fprintf(stderr, "Reaction %2zu depth from %8.3lf tfu to %8.3lf tfu, E = %8.3lf keV, Straggling: eloss %7.3lf keV, geo %7.3lf keV\n", i, d_before.x/C_TFU, d_after.x/C_TFU, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo_x+b->S_geo_y)/C_KEV);
+#endif
+    if(sim_r->p.E < ws->emin) {
+        sim_r->stop = TRUE;
+        b->Q = 0.0;
+        return;
+    }
+    double sigma_conc = cross_section_concentration_product(ws, sample, sim_r, E_front, E_back, &d_before, &d_after, S_front, S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
+    b->thick = d_diff;
+    if(sigma_conc > 0.0) {
+        if(d_after.i == sample->n_ranges - 2) {
+            sigma_conc *= ws->sim->channeling_offset + ws->sim->channeling_slope * (E_front + E_back) / 2.0;
+        }
+        b->Q = ion->inverse_cosine_theta * sigma_conc * b->thick;
+        b->sc = sigma_conc;
+        assert(b->Q >= 0.0);
+#ifdef DEBUG_VERBOSE
+        fprintf(stderr, "    %s: type=%i, E_front = %.3lf, E_back = %.3lf, E_out = %.3lf (sigma*conc = %g mb/sr, Q = %g (thickness = %.4lf tfu)\n",
+                        r->r->target->name, r->r->type, E_front/C_KEV, E_back/C_KEV, r->p.E/C_KEV, sigma_conc/C_MB_SR, b->Q, d_diff/C_TFU);
+#endif
+    } else {
+        b->Q = 0.0;
+        b->sc = 0.0;
+    }
+    sim_r->last_brick = i_depth;
 }
 
 void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const geostragg_vars *g, double E_min, double E_max) {

@@ -27,7 +27,7 @@
 #include "prob_dist.h"
 
 
-typedef struct {
+typedef struct sim_calc_params {
     int ds; /* Dual scattering true/false */
     int ds_steps_azi;
     int ds_steps_polar;
@@ -56,7 +56,7 @@ typedef struct {
     double int_cs_stragg_accuracy; /* Accuracy of conc * straggling (gaussian) integration (not always relevant) */
 } sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
 
-typedef struct {
+typedef struct simulation {
     reaction **reactions;
     size_t n_reactions;
     detector **det; /* Array of n_det detector pointers */
@@ -102,7 +102,7 @@ typedef struct sim_reaction {
 } sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
 
 
-typedef struct {
+typedef struct sim_workspace {
     double fluence; /* With DS can be different from sim->fluence, otherwise the same */
     const simulation *sim;
     const detector *det;

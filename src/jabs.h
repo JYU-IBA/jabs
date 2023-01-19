@@ -26,9 +26,10 @@ double stop_sample(const sim_workspace *ws, const ion *incident, const sample *s
 depth next_crossing(const ion *incident, const sample *sample, const depth *d_from);
 depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, struct depth depth, double step);
 void post_scatter_exit(ion *p, depth depth_start, const sim_workspace *ws, const sample *sample);
-void foil_traverse(ion *p, const sample *foil, sim_workspace *ws);
+void foil_traverse(ion *p, const sample *foil, const sim_workspace *ws);
 double stop_step_calculate(const sim_workspace *ws, const ion *ion);
 int simulate(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample);
+void simulate_reaction(sim_reaction *sim_r, const sim_workspace *ws, const sample *sample, const geostragg_vars *g, size_t i_depth, depth d_before, depth d_after, const ion *ion, double E_front, double S_front, double E_back, double S_back, double d_diff);
 void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const geostragg_vars *g, double E_min, double E_max);
 int assign_stopping(jibal_gsto *gsto, const simulation *sim);
 int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2); /* Assigns stopping and straggling (GSTO) for given Z2. Goes through all possible Z1s (beam and reaction products). */
