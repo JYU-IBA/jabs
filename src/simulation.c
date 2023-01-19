@@ -506,6 +506,7 @@ void sim_workspace_free(sim_workspace *ws) {
     free(ws->reactions);
     gsl_integration_workspace_free(ws->w_int_cs);
     gsl_integration_workspace_free(ws->w_int_cs_stragg);
+    gsl_histogram_free(ws->histo_sum);
     free(ws);
 }
 
