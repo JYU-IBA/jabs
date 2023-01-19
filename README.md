@@ -4,7 +4,7 @@
 
 Simulates and fits RBS, EBS, ERD and NRA spectra rapidly.
     
-    Copyright (C) 2021 - 2022 Jaakko Julin
+    Copyright (C) 2021 - 2023 Jaakko Julin
     
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ Simulates and fits RBS, EBS, ERD and NRA spectra rapidly.
 Please see additional notes regarding copyrights of included open source code at the end of this document.
 
 ## Binary packages
-Some ready-to-use [binary packages](http://users.jyu.fi/~jaakjuli/jabs/binaries/) for Windows and macOS may be available. The Windows distribution includes two executables: jabs.exe (command line) and qjabs.exe (graphical interface).
+Some ready-to-use [binary packages](http://users.jyu.fi/~jaakjuli/jabs/binaries/) for Windows and macOS may be available. The Windows distribution includes two executables: `jabs.exe` (command line) and `qjabs.exe` (graphical interface). The macOS binary is a regular application bundle. All necessary data files (stopping etc.) are included in these distributions.
 
 See instructions below on how to compile JaBS from sources. Supported platforms are Windows, macOS and Linux.
 
@@ -47,8 +47,7 @@ One [example](example/) showing basic use is provided, along with more complex [
 
 ## Graphical user interface
 
-Simple Qt-based [GUI](qjabs/) is provided. Scripts can be edited and run, simulated spectra and experimental spectra are plotted (if available). Many GUI-specific features are missing, but the scripts themselves should work as described below. Currently some stopping forces and straggling data is not reloaded (from JIBAL) between runs and restarting the program may be necessary to reset these.
-
+Simple Qt-based [GUI](qjabs/) is provided. Scripts can be edited and run, simulated spectra and experimental spectra are plotted (if available).
       
 ## Interactive or scripted usage
 
@@ -112,18 +111,16 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Advanced fitting algorithms
  - Fitting of spectra from different measurements (different beam, fluence etc for each simulation)
  - Turing completeness of the scripting language
+
 ### Known issues
  - Saving a detector to a file is not supported. Calibrations can be saved as a script.
- - Transmission geometry is not supported
  - Ad-hoc channeling correction is the same for all detectors
  - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).
  - Dual scattering is benchmarked against SimNRA and is known to produce somewhat different results.
 
 ## Fitting
 
-There is a fitting feature, activated with the `--fit` or `-F` option or `fit` script command. The multidimensional nonlinear least-squares fitting is based on [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html). The accuracy and sanity of fits must be evaluated by the user.
-
-The command line interface for fitting is currently undocumented and may be removed in the future.
+The multidimensional nonlinear least-squares fitting is based on [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html).
 
 Interactive/script example:
 
