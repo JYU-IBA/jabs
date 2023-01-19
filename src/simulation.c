@@ -425,18 +425,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         jabs_message(MSG_WARNING, stderr,  "Manual exit angle is enabled in addition to geometric scattering. This is an unsupported combination. Geometric straggling calculation will be disabled.\n");
         ws->params->geostragg = FALSE;
     }
-    ion_reset(&ws->ion);
-    ion_set_isotope(&ws->ion, sim->beam_isotope);
-    ws->ion.E = ws->sim->beam_E;
-    ws->ion.S = ws->sim->beam_E_broad;
-
-    int n_isotopes=0; /* TODO: calculate this somewhere else */
-    jibal_isotope *isotope;
-    for(isotope=jibal->isotopes; isotope->A != 0; isotope++) {
-        n_isotopes++;
-    }
-
-    ion_nuclear_stop_fill_params(&ws->ion, jibal->isotopes, n_isotopes);
+    ws->ion = sim->ion; /* Shallow copy, but that is ok */
 
     ws->stopping_type = GSTO_STO_TOT;
 
@@ -510,15 +499,15 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
             p->nucl_stop = ws->ion.nucl_stop; /* Shallow copy! Shared. */
             r->cross_section = sim_reaction_cross_section_rutherford;
         } else if(r->r->type == REACTION_ERD) {
-            ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes); /* This allocates memory */
+            ion_nuclear_stop_fill_params(p, jibal->isotopes); /* This allocates memory */
             r->cross_section = sim_reaction_cross_section_rutherford;
         } else if(r->r->type == REACTION_FILE) {
-            ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes); /* This allocates memory. We could share (like with RBS) in some cases, but that's not necessarily convenient. */
+            ion_nuclear_stop_fill_params(p, jibal->isotopes); /* This allocates memory. We could share (like with RBS) in some cases, but that's not necessarily convenient. */
             r->cross_section = sim_reaction_cross_section_tabulated;
         }
 #ifdef JABS_PLUGINS
         else if(r->r->type == REACTION_PLUGIN) {
-            ion_nuclear_stop_fill_params(p, jibal->isotopes, n_isotopes);
+            ion_nuclear_stop_fill_params(p, jibal->isotopes);
             r->cross_section = sim_reaction_cross_section_plugin;
         }
 #endif
@@ -560,7 +549,6 @@ void sim_workspace_free(sim_workspace *ws) {
             free(r->p.nucl_stop); /* RBS ions share nuclear stopping table. Others needs to free the memory. */
         }
     }
-    free(ws->ion.nucl_stop);
     free(ws->reactions);
     gsl_integration_workspace_free(ws->w_int_cs);
     gsl_integration_workspace_free(ws->w_int_cs_stragg);
@@ -868,4 +856,12 @@ int sim_do_we_need_erd(const simulation *sim) {
         }
     }
     return forward_angles; /* If any detector is in forward angle, we might need ERD */
+}
+
+void sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes) {
+    ion_reset(ion);
+    ion_set_isotope(ion, sim->beam_isotope);
+    ion->E = sim->beam_E;
+    ion->S = sim->beam_E_broad;
+    ion_nuclear_stop_fill_params(ion, isotopes);
 }

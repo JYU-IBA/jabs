@@ -77,6 +77,7 @@ typedef struct {
     int rbs; /* Add RBS reactions */
     jabs_reaction_cs cs_rbs;
     jabs_reaction_cs cs_erd;
+    ion ion; /* This ion is not to be used in calculations, it is simply copied to ws->ion */
 } simulation;
 
 typedef struct sim_reaction {
@@ -167,4 +168,5 @@ void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *inci
 double sim_alpha_angle(const simulation *sim);
 double sim_exit_angle(const simulation *sim, const detector *det);
 int sim_do_we_need_erd(const simulation *sim);
+void sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes);
 #endif // JABS_SIMULATION_H

@@ -75,9 +75,11 @@ double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, const jiba
     }
     return ion->nucl_stop[i].k*log(epsilon)/(2.0*epsilon);
 }
-void ion_nuclear_stop_fill_params(ion *ion, const jibal_isotope *isotopes, int n_isotopes) {
+
+void ion_nuclear_stop_fill_params(ion *ion, const jibal_isotope *isotopes) {
     const jibal_isotope *isotope;
     int i = 0;
+    size_t n_isotopes = jibal_isotopes_n(isotopes);
     ion->nucl_stop = malloc(n_isotopes * sizeof (nucl_stop_pair ));
     for(isotope=isotopes; isotope->A != 0 && i < n_isotopes; isotope++) {
         int Z1 = ion->isotope->Z;
@@ -94,6 +96,8 @@ void ion_nuclear_stop_fill_params(ion *ion, const jibal_isotope *isotopes, int n
     }
     ion->nucl_stop_isotopes = n_isotopes; /* This is somewhat redundant, but it is there to remind us. */
 }
+
+
 
 void ion_rotate(ion *ion, double theta2, double phi2) { /* Wrapper for rotate() */
     double theta, phi;

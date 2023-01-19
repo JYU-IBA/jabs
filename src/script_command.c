@@ -99,6 +99,9 @@ int script_prepare_sim_or_fit(script_session *s) {
 #endif
     sim_calc_params_update(fit->sim->params);
     sim_print(fit->sim);
+
+    sim_prepare_ion(&fit->sim->ion, fit->sim, NULL);
+
     s->start = clock();
     return 0;
 }
