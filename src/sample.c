@@ -177,11 +177,11 @@ sample_model *sample_model_split_elements(const sample_model *sm) {
             for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
                 *sample_model_conc_bin(out, i_range, i) += *sample_model_conc_bin(sm, i_range, i_mat) * sm->materials[i_mat]->concs[i_elem];
             }
+            free(e);
             i++;
         }
     }
     for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
-        fprintf(stderr, "i_range = %zu, copying ranges as part of sample_model_split_elements()\n", i_range);
         sample_range_copy(&out->ranges[i_range], &sm->ranges[i_range]);
     }
     return out;
@@ -617,8 +617,8 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
 #ifdef DEBUG
             fprintf(stderr, "(Re)allocating space for up to %lu ranges.\n", n);
 #endif
-            sm->ranges = realloc(sm->ranges, n*sizeof(sample_range));
-            sm->materials = realloc(sm->materials, n*sizeof(jibal_material *));
+            sm->ranges = realloc(sm->ranges, n * sizeof(sample_range));
+            sm->materials = realloc(sm->materials, n * sizeof(jibal_material *));
             if(!sm->ranges)
                 return NULL;
         }

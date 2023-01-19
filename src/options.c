@@ -285,4 +285,5 @@ void cmdline_options_free(cmdline_options *cmd_opt) {
         }
     }
     free(cmd_opt->reaction_filenames);
+    free(cmd_opt);
 }

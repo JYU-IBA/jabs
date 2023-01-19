@@ -161,6 +161,7 @@ int detector_print(const jibal *jibal, const char *filename, const detector *det
     free(calib_str);
     char *reso_str = detector_resolution_to_string(det, JIBAL_ANY_Z);
     jabs_message(MSG_INFO, f, "resolution = %s\n", reso_str);
+    free(reso_str);
 
     for(int Z = 0; Z <= (int)det->cal_Z_max; Z++) {
         const calibration *c = detector_get_calibration(det, Z);

@@ -116,6 +116,9 @@ char **string_to_argv(const char *str, int *argc) { /* Returns allocated array o
         fprintf(stderr, "argv[%zu] = %s\n", i, out[i]);
 #endif
     }
+    if(n == 0) {
+        free(s); /* Passing the string that needs to be freed later as the first element and NULL terminating are not compatible if n == 0, unless we free the string already here. */
+    }
     out[n] = NULL;
     if(argc) {
         *argc = n;
