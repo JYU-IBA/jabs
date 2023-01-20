@@ -254,12 +254,12 @@ double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integra
 #ifdef SINGULARITIES
     gsl_integration_qags(&F, E_low, E_high, 0, accuracy, w->limit,w, &result, &error);
 #else
-    gsl_integration_qag(&F, E_low, E_high, 0, accuracy, w->limit, GSL_INTEG_GAUSS15, w, &result, &error);
+    gsl_integration_qag(&F, E_low, E_high, 1e-6 * C_MB_SR, accuracy, w->limit, GSL_INTEG_GAUSS15, w, &result, &error); /* For some reason 0 as epsabs doesn't work anymore so a very small number is used instead */
 #endif
     static const double inv_sqrt_2pi = 0.398942280401432703;
     result *= (inv_sqrt_2pi / params.sigma) * 1.000063346496191; /* Normalize gaussian. The 1.00006 accounts for tails outside +- 4 sigmas */
 #ifdef DEBUG_CS_VERBOSE
-    fprintf(stderr, "Integrated from %g keV to %g keV in %zu steps, got (%g +- %g) mb/sr\n", E_low/C_KEV, E_high/C_KEV, w->size, result/C_MB_SR, error/C_MB_SR);
+    fprintf(stderr, "Integrated from %g keV to %g keV in %zu steps (limit %zu), got (%g +- %g) mb/sr\n", E_low/C_KEV, E_high/C_KEV, w->size, w->limit, result/C_MB_SR, error/C_MB_SR);
 #endif
     return result;
 }
@@ -271,7 +271,7 @@ double cs_function(double x, void * params) {
     double sigma;
     double S = p->S_front + p->stragg_slope * (x - p->E_front);
 #ifdef DEBUG_CS_VERBOSE
-        fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
+        fprintf(stderr, "S = %g keV, E = %g keV\n", sqrt(S)/C_KEV, x/C_KEV);
 #endif
         sigma = cross_section_straggling(p->sim_r, p->w, p->stragg_int_accuracy, p->cs_stragg_pd, x, S);
 
@@ -548,10 +548,13 @@ void simulate_reaction(sim_reaction *sim_r, const sim_workspace *ws, const sampl
         sim_r->stop = TRUE;
         return;
     }
+#if 0
     if(ion->E + 3.0*sqrt(ion->S) < sim_r->r->E_min) { /* Beam average energy is three sigmas below reaction minimum, we can stop calculation (due to straggling weighted cross sections we can't stop immediately below E_min). */
         b->Q = 0.0;
         sim_r->stop = TRUE;
+        return;
     }
+#endif
     b->d = d_before;
     b->E_0 = ion->E; /* Sort of energy just before the reaction. */
     b->S_0 = ion->S;
@@ -579,8 +582,13 @@ void simulate_reaction(sim_reaction *sim_r, const sim_workspace *ws, const sampl
         b->Q = 0.0;
         return;
     }
-    double sigma_conc = cross_section_concentration_product(ws, sample, sim_r, E_front, E_back, &d_before, &d_after, S_front, S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
     b->thick = d_diff;
+    double sigma_conc;
+    if(i_depth) {
+        sigma_conc = cross_section_concentration_product(ws, sample, sim_r, E_front, E_back, &d_before, &d_after, S_front, S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
+    } else {
+        sigma_conc = 0.0;
+    }
     if(sigma_conc > 0.0) {
         if(d_after.i == sample->n_ranges - 2) {
             sigma_conc *= ws->sim->channeling_offset + ws->sim->channeling_slope * (E_front + E_back) / 2.0;

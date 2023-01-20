@@ -485,11 +485,17 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     sim_workspace_init_reactions(ws);
 
     if(ws->params->cs_n_steps == 0) { /* Actually integrate, allocate workspace for this */
+#ifdef DEBUG
+        fprintf(stderr, "cs_n_steps = 0, allocating integration workspace w_int_cs with %zu max intervals.\n", ws->params->int_cs_max_intervals);
+#endif
         ws->w_int_cs = gsl_integration_workspace_alloc(ws->params->int_cs_max_intervals);
     } else {
         ws->w_int_cs = NULL;
     }
     if(ws->params->cs_n_stragg_steps == 0) {
+#ifdef DEBUG
+        fprintf(stderr, "cs_n_stragg_steps = 0, allocating integration workspace w_int_cs_stragg with %zu max intervals.\n", ws->params->int_cs_stragg_max_intervals);
+#endif
         ws->w_int_cs_stragg = gsl_integration_workspace_alloc(ws->params->int_cs_stragg_max_intervals);
     } else {
         ws->w_int_cs_stragg = NULL;
