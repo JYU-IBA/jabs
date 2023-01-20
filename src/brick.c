@@ -24,8 +24,10 @@ void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, 
     }
 
     for(size_t i = 1; i <= last_brick; i++) {
-        const brick *b_high = &bricks[i-1];
         const brick *b_low = &bricks[i];
+        if(b_low->Q == 0.0)
+            continue;
+        const brick *b_high = &bricks[i-1];
         double E_cutoff_low = b_low->E - b_low->S_sum * sigmas_cutoff; /* Low energy cutoff (brick) */
         double E_cutoff_high = b_high->E + b_high->S_sum * sigmas_cutoff;
         double b_w_inv = 1.0/(b_high->E - b_low->E); /* inverse of brick width (in energy) */

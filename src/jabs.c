@@ -548,6 +548,10 @@ void simulate_reaction(sim_reaction *sim_r, const sim_workspace *ws, const sampl
         sim_r->stop = TRUE;
         return;
     }
+    if(ion->E + 3.0*sqrt(ion->S) < sim_r->r->E_min) { /* Beam average energy is three sigmas below reaction minimum, we can stop calculation (due to straggling weighted cross sections we can't stop immediately below E_min). */
+        b->Q = 0.0;
+        sim_r->stop = TRUE;
+    }
     b->d = d_before;
     b->E_0 = ion->E; /* Sort of energy just before the reaction. */
     b->S_0 = ion->S;

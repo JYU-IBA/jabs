@@ -183,6 +183,7 @@ void sim_calc_params_print(const sim_calc_params *params) {
     jabs_message(MSG_INFO, stderr, "accurate nuclear stopping = %s\n", params->nucl_stop_accurate?"true":"false");
     jabs_message(MSG_INFO, stderr, "depth steps max = %zu\n", params->depthsteps_max);
     jabs_message(MSG_INFO, stderr, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");
+    jabs_message(MSG_INFO, stderr, "geometric broadening = %s\n", params->geostragg?"true":"false");
     if(!params->mean_conc_and_energy) {
         if(params->cs_n_steps == 0) {
             jabs_message(MSG_INFO, stderr, "concentration * cross section steps integration accuracy = %g\n", params->int_cs_accuracy);

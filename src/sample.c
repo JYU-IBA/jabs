@@ -245,7 +245,6 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
     }
 #endif
     sample *s = malloc(sizeof(sample));
-    const sample_model *sm_orig = sm;
     sample_model *sm_copy = NULL;
     if(sm->type == SAMPLE_MODEL_LAYERED) {
         sm_copy = sample_model_to_point_by_point(sm);
