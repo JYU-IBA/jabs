@@ -404,10 +404,10 @@ void MainWindow::plotSpectrum(size_t i_det)
         gsl_histogram *histo = NULL;
         int colorindex = 0;
         for(int i = 0; i < session->fit->sim->n_reactions; ++i) {
-            sim_reaction *r = &ws->reactions[i];
-            sim_reaction *r_next = NULL;
+            const sim_reaction *r = ws->reactions[i];
+            const sim_reaction *r_next = NULL;
             if(i+1 < ws->n_reactions) {
-                r_next = &ws->reactions[i+1];
+                r_next = ws->reactions[i+1];
             }
             if(!r)
                 continue;

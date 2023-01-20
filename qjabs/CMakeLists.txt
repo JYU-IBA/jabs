@@ -110,6 +110,8 @@ set(PROJECT_SOURCES
         ../src/idfelementparsers.h
         ../src/idfparse.c
         ../src/idfparse.h
+        ../src/nuclear_stopping.c
+        ../src/nuclear_stopping.h
         "$<$<BOOL:${PLUGINS}>:plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui
