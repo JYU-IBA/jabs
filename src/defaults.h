@@ -37,12 +37,14 @@
 #define E_MIN (50.0*C_KEV)
 #define E_MAX (1000.0*C_MEV)
 #define ENERGY_SLOPE (1.0*C_KEV)
+#define DES_TABLE_INITIAL_ALLOC (1024)
 #define STOP_STEP_INCIDENT (0.0*C_KEV) /* Zero is automatic */
 #define STOP_STEP_EXITING (0.0*C_KEV) /* Zero is automatic */
 #define STOP_STEP_FUDGE_FACTOR (1.0) /* Factor to automatic incident step size. */
 #define STOP_STEP_MIN (0.0 * C_KEV) /* Minimum stopping step. Zero is automatic. */
+#define STOP_STEP_MAX (0.0 * C_KEV) /* Minimum stopping step. Zero is automatic. */
 #define STOP_STEP_MIN_FALLBACK (0.5 * C_KEV) /* Fallback for minimum stopping step in case we don't know what to guess. */
-#define STOP_STEP_ADD (0.2 * C_KEV) /* Default for a value that is added to calculated stop step */
+#define STOP_STEP_ADD (0.1 * C_KEV) /* Default for a value that is added to calculated stop step */
 #define STOP_STEP_DEPTH_FALLBACK (100.0 * C_TFU) /* If stop step can't be determined using stopping reliable, do a maximum of this */
 #define STOP_STEP_MINIMUM_STOPPING (0.1 * C_EV_TFU) /* Stopping below this is suspicious */
 #define BRICKS_DEFAULT (1000)

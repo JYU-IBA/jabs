@@ -22,12 +22,34 @@
 #include "reaction.h"
 #include "geostragg.h"
 
+typedef struct {
+    depth d;
+    double E;
+    double S;
+} des;
+
+typedef struct {
+    des *t;
+    size_t n;
+    size_t n_ranges;
+    size_t *depth_interval_index; /* table, size same as number of sample ranges (as given in des_table_compute()). Array stores location i of t[i].d.x == sample->range[i_range].x  */
+} des_table; /* Depth, energy, straggling table */
+
+int des_table_realloc(des_table *dt, size_t n);
+void des_table_free(des_table *dt);
+des_table *des_table_compute(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample);
+size_t des_table_size(const des_table *dt);
+des *des_table_element(const des_table *dt, size_t i);
+void des_table_rebuild_index(des_table *dt);
+void des_table_print(FILE *f, const des_table *dt);
+
 double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, depth depth, double E);
 depth next_crossing(const ion *incident, const sample *sample, const depth *d_from);
 depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, struct depth depth, double step);
 void post_scatter_exit(ion *p, depth depth_start, const sim_workspace *ws, const sample *sample);
 void foil_traverse(ion *p, const sample *foil, const sim_workspace *ws);
 double stop_step_calculate(const sim_workspace *ws, const ion *ion);
+double stop_step_calc_incident(const sim_workspace *ws, const ion *ion); /* New! */
 int simulate(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample);
 void simulate_reaction(sim_reaction *sim_r, const sim_workspace *ws, const sample *sample, const geostragg_vars *g, size_t i_depth, depth d_before, depth d_after, const ion *ion, double E_front, double S_front, double E_back, double S_back, double d_diff);
 void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const geostragg_vars *g, double E_min, double E_max);

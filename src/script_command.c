@@ -1243,6 +1243,7 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT,   "stop_step_exiting",           &sim->params->stop_step_exiting,           NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "stop_step_fudge",             &sim->params->stop_step_fudge_factor,      NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "stop_step_min",               &sim->params->stop_step_min,               NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "stop_step_add",               &sim->params->stop_step_max,               NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "stop_step_add",               &sim->params->stop_step_add,               NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "nucl_stop_accurate",          &sim->params->nucl_stop_accurate,          NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy",        &sim->params->mean_conc_and_energy,        NULL},

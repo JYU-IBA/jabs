@@ -35,6 +35,126 @@
 #include "message.h"
 #include "win_compat.h"
 
+des_table *des_table_init(size_t n) {
+    des_table *dt = malloc(sizeof(des_table));
+    dt->t = NULL;
+    dt->depth_interval_index = NULL;
+    dt->n = 0;
+    dt->n_ranges = 0;
+    if(des_table_realloc(dt, n)) {
+        free(dt);
+        return NULL;
+    }
+    return dt;
+}
+int des_table_realloc(des_table *dt, size_t n) {
+    fprintf(stderr, "Realloc to %zu\n", n);
+    dt->t = realloc(dt->t, n * sizeof(des));
+    if(dt->t) {
+        dt->n = n;
+        return 0;
+    } else {
+        dt->n = 0;
+        return -1;
+    }
+}
+
+void des_table_free(des_table *dt) {
+    if(!dt) {
+        return;
+    }
+    free(dt->t);
+    free(dt->depth_interval_index);
+    free(dt);
+}
+
+size_t des_table_size(const des_table *dt) {
+    if(!dt) {
+        return 0;
+    }
+    return dt->n;
+}
+
+des *des_table_element(const des_table *dt, size_t i) {
+    if(!dt) {
+        return NULL;
+    }
+    if(i > dt->n) {
+        return NULL;
+    }
+    return &(dt->t[i]);
+}
+
+void des_table_rebuild_index(des_table *dt) {
+    if(!dt->n)
+        return;
+    size_t n_ranges = dt->t[dt->n-1].d.i + 1;
+    assert(n_ranges > 0);
+    dt->n_ranges = n_ranges;
+    if(dt->depth_interval_index) {
+        free(dt->depth_interval_index);
+    }
+    dt->depth_interval_index = malloc(sizeof(size_t) * n_ranges);
+    size_t i_range_old = 0, i_range_new = 0;
+    /* NOTE: depth_start may have not been start of bin! This shouldn't matter if everything is ok...*/
+    dt->depth_interval_index[0] = 0;
+    for(size_t i = 1; i < dt->n; i++) {
+        const des *des = &(dt->t[i]);
+        if(des->d.i > i_range_old) {
+            i_range_new = des->d.i;
+            assert(i_range_new < n_ranges);
+            for(size_t i_range = i_range_old + 1; i_range < i_range_new; i_range++) { /* Handles indices stop_step skips over (no thickness between them) */
+                dt->depth_interval_index[i_range] = i - 1;
+            }
+            i_range_old = i_range_new;
+        }
+    }
+}
+
+void des_table_print(FILE *f, const des_table *dt) {
+    if(!dt) {
+        return;
+    }
+    for(size_t i = 0; i < dt->n; i++) {
+        const des *des = &(dt->t[i]);
+        fprintf(f, "DES %4zu %3zu %10.3lf %10.3lf %8.3lf\n", i, des->d.i, des->d.x / C_TFU, des->E / C_KEV, sqrt(des->S) / C_KEV);
+    }
+    for(size_t i = 0; i < dt->n_ranges; i++) {
+        fprintf(f, "DES INDEX %3zu %3zu\n", i, dt->depth_interval_index[i]);
+    }
+}
+
+des_table *des_table_compute(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample) {
+    ion ion = *incident;
+    des_table *dt = des_table_init(DES_TABLE_INITIAL_ALLOC);
+    size_t i = 0;
+    depth d_before;
+    depth d_after = depth_start;
+    do {
+        d_before = d_after;
+        des *des = &dt->t[i];
+        des->E = ion.E;
+        des->S = ion.S;
+        des->d = d_before;
+        if(d_before.x >= sample->thickness) {
+            break;
+        }
+
+        d_after = stop_step(ws, &ion, sample, d_before, stop_step_calc_incident(ws, &ion));
+        if(i == dt->n) {
+#ifdef DEBUG
+            fprintf(stderr, "DES table reallocation, size %zu reached.\n", dt->n);
+#endif
+            des_table_realloc(dt, dt->n * 2);
+        }
+        i++;
+    } while(ion.E > ws->emin);
+    des_table_realloc(dt, i); /* Shrinks to size */
+    des_table_rebuild_index(dt);
+    return dt;
+}
+
+
 double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
     const double em = E * incident->mass_inverse;
     double S1 = 0.0;
@@ -413,6 +533,20 @@ void foil_traverse(ion *p, const sample *foil, const sim_workspace *ws) {
     p->S = ion_foil.S;
 }
 
+double stop_step_calc_incident(const sim_workspace *ws, const ion *ion) {
+    if(ws->params->stop_step_incident > 0.0) {
+        return ws->params->stop_step_incident;
+    }
+    double step = sqrt(ion->S) + ws->params->stop_step_add;
+    if(step < STOP_STEP_MIN_FALLBACK) {
+        return STOP_STEP_MIN_FALLBACK;
+    }
+    if(ws->params->stop_step_max > 0.0 && step > ws->params->stop_step_max) {
+        return ws->params->stop_step_max;
+    }
+    return step;
+}
+
 double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calculate stop step to take */
     if(ws->params->stop_step_incident > 0) {
         return ws->params->stop_step_incident;
@@ -425,7 +559,23 @@ double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calcula
     return ws->params->stop_step_fudge_factor * broad; /* Fudge factor also affects the minimum stop step */
 }
 
-int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
+
+
+int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) {
+    geostragg_vars g = geostragg_vars_calculate(ws, incident);
+    des_table *dt = des_table_compute(incident, depth_start, ws, sample);
+#ifdef DEBUG
+    des_table_print(stdout, dt);
+#endif
+    for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
+
+    }
+    des_table_free(dt);
+    sim_workspace_histograms_calculate(ws);
+    return EXIT_SUCCESS;
+}
+
+int simulate_old(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
     assert(sample->n_ranges);
     int warnings = 0;
 #ifdef DEBUG
