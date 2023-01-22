@@ -1,4 +1,7 @@
 #include <string.h>
+#ifdef WIN32
+#include "win_compat.h"
+#endif
 #include "idfparse.h"
 
 xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next) {
