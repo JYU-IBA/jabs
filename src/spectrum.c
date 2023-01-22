@@ -42,7 +42,7 @@ gsl_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_
     size_t n_columns = 0; /* Number of columns (largest in file) */
     char **columns = NULL; /* Will be (re)allocated later */
 #ifdef DEBUG
-fprintf(stderr, "Reading experimental spectrum from file %s. Detector column is %lu and it can have up to %lu channels.\n", filename, column, channels_max);
+fprintf(stderr, "Reading experimental spectrum from file %s. Detector column is %zu and it can have up to %zu channels.\n", filename, column, channels_max);
 #endif
     while(getline(&line, &line_size, in) > 0) {
         lineno++;
@@ -68,7 +68,7 @@ fprintf(stderr, "Reading experimental spectrum from file %s. Detector column is 
             if(n == n_columns) {
                 n_columns++;
 #ifdef DEBUG
-                fprintf(stderr, "(Re)allocating columns. New number %lu.\n", n_columns);
+                fprintf(stderr, "(Re)allocating columns. New number %zu.\n", n_columns);
 #endif
                 columns = realloc(columns, n_columns*sizeof(char *));
                 if(!columns) {
@@ -86,26 +86,26 @@ fprintf(stderr, "Reading experimental spectrum from file %s. Detector column is 
         } else {
             ch = strtoul(columns[0], &end, 10);
             if(*end != '\0') {
-                jabs_message(MSG_ERROR, stderr, "Error converting %s to channel number (must be unsigned integer). Issue on line %lu of file %s.\n", columns[0], lineno, filename);
+                jabs_message(MSG_ERROR, stderr, "Error converting %s to channel number (must be unsigned integer). Issue on line %zu of file %s.\n", columns[0], lineno, filename);
                 error = TRUE;
                 break;
             }
         }
         if(column >= n) {
-            jabs_message(MSG_ERROR, stderr, "Not enough columns in experimental spectra on line %lu. Expected %lu, got %lu.\n", lineno, column, n);
+            jabs_message(MSG_ERROR, stderr, "Not enough columns in experimental spectra on line %zu. Expected %zu, got %zu.\n", lineno, column, n);
             error = TRUE;
             break;
         }
 
         if(ch >= channels_max) {
-            jabs_message(MSG_ERROR, stderr, "Channel %lu is too large (max %lu channels). Issue on line %lu of file %s.\n", ch, channels_max, lineno, filename);
+            jabs_message(MSG_ERROR, stderr, "Channel %zu is too large (max %zu channels). Issue on line %zu of file %s.\n", ch, channels_max, lineno, filename);
             error = TRUE;
             break;
         }
         ch /= compress;
         double y = strtod(columns[column], &end);
         if(*end != '\0') {
-            jabs_message(MSG_ERROR, stderr, "Error converting col %lu \"%s\" to histogram value (floating point). Issue on line %lu of file %s.\n", column, columns[column], lineno, filename);
+            jabs_message(MSG_ERROR, stderr, "Error converting col %zu \"%s\" to histogram value (floating point). Issue on line %zu of file %s.\n", column, columns[column], lineno, filename);
             error = TRUE;
             break;
         }
@@ -114,13 +114,13 @@ fprintf(stderr, "Reading experimental spectrum from file %s. Detector column is 
             h->n = ch;
     }
     if(h->n == 0 || error) {
-        jabs_message(MSG_ERROR, stderr, "Experimental spectrum could not be read from file \"%s\". Read %lu lines before stopping.\n", filename, lineno);
+        jabs_message(MSG_ERROR, stderr, "Experimental spectrum could not be read from file \"%s\". Read %zu lines before stopping.\n", filename, lineno);
         gsl_histogram_free(h);
         h = NULL;
     } else {
         h->n++;
 #ifdef DEBUG
-        fprintf(stderr, "Read %lu lines from \"%s\", probably %lu channels. Allocation of %lu channels.\n", lineno, filename, h->n, channels_max);
+        fprintf(stderr, "Read %zu lines from \"%s\", probably %zu channels. Allocation of %zu channels.\n", lineno, filename, h->n, channels_max);
 #endif
     }
     free(line);

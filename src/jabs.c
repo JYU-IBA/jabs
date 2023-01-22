@@ -501,7 +501,7 @@ void post_scatter_exit(ion *p, const depth depth_start, const sim_workspace *ws,
         if(p->E < ws->emin) {
 #ifdef DEBUG_REACTION
             fprintf(stderr,
-                            "  Reaction %lu with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
+                            "  Reaction %zu with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
                             i, r->r->target->name, d_after.x / C_TFU);
 #endif
             return;
@@ -616,7 +616,7 @@ int simulate_old(const ion *incident, const depth depth_start, sim_workspace *ws
             break;
         if(ion.E < ws->emin) {
 #ifdef DEBUG
-            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %lu.\n", ion.E/C_KEV, ws->sim->emin/C_KEV, d_before.x/C_TFU, d_before.i);
+            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %zu.\n", ion.E/C_KEV, ws->sim->emin/C_KEV, d_before.x/C_TFU, d_before.i);
 #endif
             break;
         }
@@ -888,7 +888,7 @@ int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histo
         }
     }
     for(size_t i = 0; i < ws->n_channels; i++) {
-        fprintf(f, "%lu%c%.3lf%c", i, sep, detector_calibrated(ws->det, JIBAL_ANY_Z, i) / C_KEV,
+        fprintf(f, "%zu%c%.3lf%c", i, sep, detector_calibrated(ws->det, JIBAL_ANY_Z, i) / C_KEV,
                 sep); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
         if(ws->histo_sum->bin[i] == 0.0) {
             fprintf(f, "0"); /* Tidier output with a clean zero sum */
@@ -1006,7 +1006,7 @@ int print_bricks(const char *filename, const sim_workspace *ws) {
         fprintf(f, "#i  brick    depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo) sigma*conc        Q\n");
         for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
-            fprintf(f, "%2lu %4lu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %8e\n",
+            fprintf(f, "%2zu %4zu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %8e\n",
                     i, j, b->d.x / C_TFU, b->thick / C_TFU,
                     b->E_0 / C_KEV, C_FWHM * sqrt(b->S_0) / C_KEV,
                     b->E_r / C_KEV, C_FWHM * sqrt(b->S_r) / C_KEV,

@@ -5,6 +5,7 @@
 #define W_OK 2
 #define R_OK 4
 char *strsep(char **, const char *);
+char *strndup(char *s1, size_t n);
 char *dirname(char *path);
 #endif
 #ifdef _MSC_VER

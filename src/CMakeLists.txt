@@ -14,7 +14,7 @@ set(CMAKE_C_STANDARD 99)
 
 configure_file(version.h.in version.h @ONLY)
 find_package(GSL 2.6 REQUIRED)
-find_package(Jibal 0.3.8 REQUIRED)
+find_package(Jibal 0.3.9 REQUIRED)
 find_package(LibXml2 REQUIRED)
 
 if(WIN32)
@@ -28,8 +28,10 @@ add_executable(jabs main.c sample.c sample.h brick.c ion.c ion.h simulation.c si
         geostragg.c geostragg.h script_command.c script_command.h script_session.c script_session.h script_file.c
         script_file.h calibration.c calibration.h script_generic.h prob_dist.c prob_dist.h
         idf2jbs.c idf2jbs.h idfelementparsers.c idfelementparsers.h idfparse.c idfparse.h
+        nuclear_stopping.c nuclear_stopping.h
         "$<$<BOOL:${JABS_PLUGINS}>:plugin.c>"
-        nuclear_stopping.c nuclear_stopping.h)
+        "$<$<BOOL:${WIN32}>:win_compat.c>"
+        )
 
 target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
 

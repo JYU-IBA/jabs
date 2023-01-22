@@ -1,6 +1,7 @@
 #include "win_compat.h"
 #ifdef WIN32
 #include <string.h>
+#include <stdlib.h>
 char *strsep(char **stringp, const char *delim) {
 	char *start= *stringp;
 	char *p;
@@ -14,6 +15,19 @@ char *strsep(char **stringp, const char *delim) {
 		*stringp=p+1;
 	}
 	return start;
+}
+
+char *strndup(char *s1, size_t n) {
+    char *buf = (char *) malloc(n + 1);
+    if(!buf) {
+        return 0;
+    }
+    size_t i;
+    for(i = 0; ((i < n) && (s1[i] != 0)); i++) {
+        buf[i] = s1[i];
+    }
+    buf[i] = 0;
+    return buf;
 }
 
 #include <stdlib.h>

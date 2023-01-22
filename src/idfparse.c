@@ -1,4 +1,7 @@
 #include <string.h>
+#ifdef WIN32
+#include "win_compat.h"
+#endif
 #include "idfparse.h"
 
 xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next) {
@@ -50,7 +53,7 @@ xmlNode *findnode(xmlNode *root, const char *path) {
     return node;
 }
 
-idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, int (*f)(idf_parser *idf, xmlNode *node)) {
+idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_error (*f)(idf_parser *idf, xmlNode *node)) {
     xmlNode *cur = NULL;
     int n = 0;
     for (cur = node->children; cur; cur = cur->next) {
@@ -253,6 +256,6 @@ char *idf_file_name_with_suffix(const idf_parser *idf, const char *suffix) {
     size_t len = strlen(idf->basename) + strlen(suffix) + 1;
     char *fn = malloc(sizeof(char) * len);
     strcpy(fn, idf->basename);
-    strlcat(fn, suffix, len);
+    strcat(fn, suffix);
     return fn;
 }

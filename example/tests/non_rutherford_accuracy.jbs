@@ -38,6 +38,5 @@ set sim accurate
 #set stop_step_incident 1keV
 simulate
 save spectra "non_rutherford_accuracy_accurate_out.csv"
-save bricks "bricks_out.dat"
 
 test roi [650:900] 207880 1e-5
