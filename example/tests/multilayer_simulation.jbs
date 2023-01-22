@@ -1,0 +1,5 @@
+set ion 4He
+set energy 2MeV
+set alpha 0deg
+set sample Au 100tfu SiO2 1000tfu W 1000tfu Si 30000tfu
+sim
