@@ -2,7 +2,7 @@ REM This script will make a standalone JaBS installation in qjabs\build\Release
 REM Install JIBAL first and run the bootstrap tool
 set JIBAL_DIR=C:\Program Files\jibal
 REM Qt6 must be installed too
-set QT6_DIR=C:\Qt\6.1.2
+set QT6_DIR=C:\Qt\6.4.2
 REM And vcpkg
 set VCPKG_DIR=C:\vcpkg
 REM Try to remove CMakeCache.txt files if your configuration (e.g. compiler) changes or you want to do a fresh build
