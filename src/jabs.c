@@ -88,8 +88,7 @@ des *des_table_element(const des_table *dt, size_t i) {
 void des_table_rebuild_index(des_table *dt) {
     if(!dt->n)
         return;
-    size_t n_ranges = dt->t[dt->n-1].d.i + 1;
-    assert(n_ranges > 0);
+    size_t n_ranges = dt->t[dt->n-1].d.i + 1; /* Number of ranges is one greater than the last index. Make sure the last element is nice and valid. */
     dt->n_ranges = n_ranges;
     if(dt->depth_interval_index) {
         free(dt->depth_interval_index);
@@ -103,7 +102,7 @@ void des_table_rebuild_index(des_table *dt) {
         if(des->d.i > i_range_old) {
             i_range_new = des->d.i;
             assert(i_range_new < n_ranges);
-            for(size_t i_range = i_range_old + 1; i_range < i_range_new; i_range++) { /* Handles indices stop_step skips over (no thickness between them) */
+            for(size_t i_range = i_range_old + 1; i_range <= i_range_new; i_range++) { /* Handles indices stop_step skips over (no thickness between them) */
                 dt->depth_interval_index[i_range] = i - 1;
             }
             i_range_old = i_range_new;
@@ -122,6 +121,14 @@ void des_table_print(FILE *f, const des_table *dt) {
     for(size_t i = 0; i < dt->n_ranges; i++) {
         fprintf(f, "DES INDEX %3zu %3zu\n", i, dt->depth_interval_index[i]);
     }
+}
+
+void des_table_set_ion_depth(const des_table *dt, ion *ion, depth d) {
+    size_t i_range = d.i;
+    size_t i_des = dt->depth_interval_index[d.i];
+#ifdef DEBUG
+    fprintf(stderr, "Depth %g = tfu, index = %zu. Probably in DES table after %zu.\n", d.x / C_TFU, d.i, i_des);
+#endif
 }
 
 des_table *des_table_compute(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample) {
@@ -565,8 +572,12 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     geostragg_vars g = geostragg_vars_calculate(ws, incident);
     des_table *dt = des_table_compute(incident, depth_start, ws, sample);
 #ifdef DEBUG
-    des_table_print(stdout, dt);
+    des_table_print(stderr, dt);
 #endif
+    ion ion = *incident;
+    depth d = depth_start;
+    des_table_set_ion_depth(dt, &ion, d);
+
     for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
 
     }
