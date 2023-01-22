@@ -4,7 +4,8 @@ citationfile="../CITATION.cff"
 versionfile="../version.txt"
 today=$(date "+%Y-%m-%d")
 read version < "$versionfile"
-echo "cff-version: 1.2.0
+cat <<END  > "$citationfile"
+cff-version: 1.2.0
 authors:
  - family-names: "Julin"
    given-names: "Jaakko"
@@ -14,4 +15,5 @@ repository-code: "https://github.com/JYU-IBA/jabs"
 license: GPL-2.0-or-later
 version: $version
 doi: 10.5281/zenodo.6362701
-date-released: $today" > "$citationfile"
+date-released: $today
+END
