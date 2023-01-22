@@ -706,7 +706,7 @@ int fit(struct fit_data *fit_data) {
 
     for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
         roi *range = &fit_data->fit_ranges[i];
-        jabs_message(MSG_INFO, stderr, "Fit range %zu [%lu:%lu]\n", i + 1, range->low, range->high);
+        jabs_message(MSG_INFO, stderr, "Fit range %zu [%zu:%zu]\n", i + 1, range->low, range->high);
     }
 
     fdf.f = &fit_function;

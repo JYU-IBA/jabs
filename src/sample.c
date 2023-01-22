@@ -614,7 +614,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
                 n *= 2;
             }
 #ifdef DEBUG
-            fprintf(stderr, "(Re)allocating space for up to %lu ranges.\n", n);
+            fprintf(stderr, "(Re)allocating space for up to %zu ranges.\n", n);
 #endif
             sm->ranges = realloc(sm->ranges, n * sizeof(sample_range));
             sm->materials = realloc(sm->materials, n * sizeof(jibal_material *));
