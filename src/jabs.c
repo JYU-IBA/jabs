@@ -707,9 +707,12 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
             E_deriv = 0.0;
             b->deriv = 0.0;
         } else {
-            if(b_prev->E_0 - b->E_0 < 1.0*C_KEV) { /* TODO: this shouldn't be used. Use something else when crossing into new layers. */
-                //fprintf(stderr, "AAAAargh!\n\n"); /* TODO: remove */
-                E_deriv = 10.0;
+            double E_diff = b_prev->E_0 - b->E_0;
+            if(E_diff < 1.0*C_KEV) { /* TODO: this shouldn't be used. Use something else when crossing into new layers. */
+#ifdef DEBUG
+                fprintf(stderr, "AAAAargh! %g keV is less than 1.0! crossed = %i, skipped = %i. Previous deriv = %g\n\n", E_diff/C_KEV, crossed, skipped, b_prev->deriv); /* TODO: remove */
+#endif
+                E_deriv = 10.0; /* This forces the next brick to be narrow. We don't want that. */
                 b->deriv = E_deriv;
             } else {
                 E_deriv = (b_prev->E - b->E) / (b_prev->E_0 - b->E_0); /* how many keVs does the reaction product energy change for each keV of incident ion energy change */
@@ -737,6 +740,11 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
                 E_deriv, get_conc(sample, d_after, sim_r->i_isotope) * 100.0, sigma_conc / C_MB_SR, b->Q, b->deriv);
 #endif
         if(!skipped && i_brick) {
+            if(E_deriv > 9.999) {
+#ifdef DEBUG
+                fprintf(stderr, "Using a high deriv.\n");
+#endif
+            }
             ion.E -= 2.0 * sqrt(detector_resolution(ws->det, sim_r->p.isotope, b->E) + b->S) / E_deriv;
         }
         assert(!isnan(ion.E));
