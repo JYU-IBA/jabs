@@ -653,7 +653,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         b = &sim_r->bricks[i_brick];
         d_before = d_after;
         d_after = des_table_find_depth(dt, &i_des, d_before, &ion);
-        if(i_brick == 0 || d_after.i > d_before.i) { /* There was a layer (depth range) crossing. If stop_step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
+        if(d_after.i > d_before.i) { /* There was a layer (depth range) crossing. If stop_step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
             double conc_start = *sample_conc_bin(sample, d_after.i, sim_r->i_isotope);
             double conc_stop = *sample_conc_bin(sample, d_after.i + 1, sim_r->i_isotope);
 #ifdef DEBUG
@@ -704,8 +704,8 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
 #ifdef DEBUG
             fprintf(stderr, "We just skipped, so don't trust the derivative.\n");
 #endif
-            E_deriv = 0.0;
-            b->deriv = 0.0;
+            E_deriv = 10.0;
+            b->deriv = 10.0;
         } else {
             double E_diff = b_prev->E_0 - b->E_0;
             if(E_diff < 1.0*C_KEV) { /* TODO: this shouldn't be used. Use something else when crossing into new layers. */
@@ -739,13 +739,15 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
                 b->E / C_KEV, sqrt(b->S) / C_KEV,
                 E_deriv, get_conc(sample, d_after, sim_r->i_isotope) * 100.0, sigma_conc / C_MB_SR, b->Q, b->deriv);
 #endif
-        if(!skipped && i_brick) {
+        if(!skipped) {
             if(E_deriv > 9.999) {
 #ifdef DEBUG
                 fprintf(stderr, "Using a high deriv.\n");
 #endif
             }
-            ion.E -= 2.0 * sqrt(detector_resolution(ws->det, sim_r->p.isotope, b->E) + b->S) / E_deriv;
+            double S_sigma = sqrt(detector_resolution(ws->det, sim_r->p.isotope, b->E) + b->S);
+            S_sigma = ceil(S_sigma/C_KEV)*C_KEV;
+            ion.E -= 2.0 * S_sigma / E_deriv;
         }
         assert(!isnan(ion.E));
         if(ion.E < ws->emin || b->E < ws->emin) {
