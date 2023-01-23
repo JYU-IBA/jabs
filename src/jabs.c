@@ -646,6 +646,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
     brick *b = NULL, *b_prev = NULL;
     int skipped, crossed;
     for(size_t i_brick = 0; i_brick < sim_r->n_bricks; i_brick++) {
+
         assert(ion.S >= 0.0);
         skipped = FALSE;
         crossed = FALSE;
@@ -660,26 +661,19 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
             fprintf(stderr, "Brick %zu crosses into range %zu, d_before = %g tfu.\n", i_brick, d_after.i, d_before.x / C_TFU);
             fprintf(stderr, "Concentration varies between %g%% and %g%%\n", conc_start * 100.0, conc_stop * 100.0);
 #endif
-            if(conc_start < CONC_TOLERANCE && conc_stop < CONC_TOLERANCE) {
-
-                depth d_skip = dt->t[dt->depth_interval_index[d_after.i + 1]].d;
-#ifdef DEBUG
-                fprintf(stderr, "This can be skipped! We could set d_after = %g tfu (range still %zu, same as %zu) and handle brick from %g tfu in a single step.\n", d_skip.x / C_TFU, d_skip.i, d_after.i, d_before.x / C_TFU);
-#endif
-                assert(d_skip.i == d_after.i);
-                d_after = d_skip;
-                des_table_set_ion_depth(dt, &ion, d_after);
-                //fprintf(stderr, "After skip E = %g keV\n", ion.E / C_KEV);
+            if(conc_start < CONC_TOLERANCE && conc_stop < CONC_TOLERANCE) { /* This isotope concentration is zero in this layer, skip to next one */
+                size_t i_des_skip = dt->depth_interval_index[d_after.i + 1];
+                des *des_skip = &(dt->t[i_des_skip]);
+                ion.E = des_skip->E;
+                ion.S = des_skip->S;
+                d_after = des_skip->d;
                 skipped = TRUE;
-
+#ifdef DEBUG
+                fprintf(stderr, "Skipped to %g.\n", d_after.x / C_TFU);
+#endif
             }
             d_before.i = d_after.i;
-#ifdef DEBUG
-            fprintf(stderr, "d_before set to %zu. E = %g keV.\n", d_before.i, ion.E / C_KEV);
-#endif
-#if 0 // TODO: this forces zero-thickness brick after crossing into new layer. Note that ion energy and straggling should also be set to correspond to d_after */
-            d_after.x = d_before.x;
-#endif
+            crossed = TRUE;
         }
         assert(ion.S >= 0.0);
         b->d = d_after;
@@ -740,14 +734,15 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
                 E_deriv, get_conc(sample, d_after, sim_r->i_isotope) * 100.0, sigma_conc / C_MB_SR, b->Q, b->deriv);
 #endif
         if(!skipped) {
-            if(E_deriv > 9.999) {
-#ifdef DEBUG
-                fprintf(stderr, "Using a high deriv.\n");
-#endif
-            }
             double S_sigma = sqrt(detector_resolution(ws->det, sim_r->p.isotope, b->E) + b->S);
             S_sigma = ceil(S_sigma/C_KEV)*C_KEV;
-            ion.E -= 2.0 * S_sigma / E_deriv;
+            double E_change = -2.0 * S_sigma / E_deriv;
+            ion.E += E_change;
+            if(E_deriv > 9.999) {
+#ifdef DEBUG
+                fprintf(stderr, "Using a high deriv energy changes by %g keV.\n", E_change/C_KEV);
+#endif
+            }
         }
         assert(!isnan(ion.E));
         if(ion.E < ws->emin || b->E < ws->emin) {
