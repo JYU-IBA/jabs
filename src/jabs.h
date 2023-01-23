@@ -26,10 +26,10 @@ typedef struct {
     depth d;
     double E;
     double S;
-} des;
+} des; /* depth should be increasing monotonously (but not strictly), E decreasing and S can do whatever it does */
 
 typedef struct {
-    des *t;
+    des *t; /* array, n elements */
     size_t n;
     size_t n_ranges;
     size_t *depth_interval_index; /* table, size same as number of sample ranges (as given in des_table_compute()). Array stores location i of t[i].d.x == sample->range[i_range].x  */
@@ -43,6 +43,7 @@ des *des_table_element(const des_table *dt, size_t i);
 void des_table_rebuild_index(des_table *dt); /* called by des_table_compute() after setting values to table and before any other function can be used */
 void des_table_print(FILE *f, const des_table *dt);
 void des_table_set_ion_depth(const des_table *dt, ion *ion, depth d); /* Sets ion energy and straggling for some depth, based on des_table */
+depth des_table_find_depth(const des_table *dt, size_t *i_des, ion *incident); /* Returns depth at given incident->E, or the next layer boundary, starting search from i_des in DES table. Updates i_des, incident->E and ->S. */
 
 double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, depth depth, double E);
 depth next_crossing(const ion *incident, const sample *sample, const depth *d_from);
