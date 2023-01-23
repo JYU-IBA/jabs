@@ -126,29 +126,29 @@ void des_table_print(FILE *f, const des_table *dt) {
     }
 }
 
-depth des_table_find_depth(const des_table *dt, size_t *i_des, ion *incident) {
+depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev, ion *incident) {
     size_t i;
     assert(dt);
     assert(dt->n > 0);
     double E = incident->E;
     for(i = *i_des; i < dt->n - 1; i++) {
         if(i + 1 < dt->n - 1 && dt->t[i].d.i != dt->t[i + 1].d.i) {
-#ifdef DEBUG
-            fprintf(stderr, "Layer boundary at %g tfu\n", dt->t[i].d.x / C_TFU);
-#endif
             E = dt->t[i].E;
             *i_des = i + 1; /* The +1 prevents stopping at this same layer boundary on the next call */
+#ifdef DEBUG
+            fprintf(stderr, "Layer boundary at %g tfu. Setting E = %g keV and i_des = %zu. index = %zu\n", dt->t[i].d.x / C_TFU, E / C_KEV, *i_des, dt->depth_interval_index[dt->t[i + 1].d.i]);
+#endif
             break;
         }
         if(dt->t[i].E < E) {/* i is the index of the first element in dt->t that has energy below E. So i-1 should have energy above E. */
             *i_des = i;
             break;
         }
-
     }
     assert(i > 0);
     const des *des_low = &dt->t[i - 1];
     const des *des_high = &dt->t[i];
+
     double E_diff = des_low->E - E; /* Positive, as energy decreases */
     double E_interval = des_low->E - des_high->E;
     double S_interval = des_low->S - des_high->S; /* Positive, if S increases as a function of depth */
@@ -158,7 +158,12 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, ion *incident) {
     assert(E_interval >= 0.0);
     assert(d_interval >= 0.0);
     depth d_out;
-    d_out.i = des_low->d.i;
+    if(depth_prev.i != des_high->d.i) {
+        fprintf(stderr, "Something!\n");
+        d_out.i = des_high->d.i;
+    } else {
+        d_out.i = des_low->d.i;
+    }
     d_out.x = des_low->d.x + frac * (d_interval); /* Linear interpolation */
     double S = des_low->S + frac * (S_interval);
     incident->E = E;
@@ -632,18 +637,17 @@ double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calcula
 }
 
 void simulate_reaction_new_routine(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
-    depth d = depth_start;
     ion ion = *incident; /* Shallow copy */
     des_table_set_ion_depth(dt, &ion, depth_start); /* TODO: is this necessary? */
     simulate_init_reaction(sim_r, sample, g, ws->emin, ion.E);
-    depth d_before = d, d_after = d;
-    size_t i_des = 0;
+    depth d_before, d_after = depth_start;
+    size_t i_des = 0, i_range = depth_start.i;
     brick *b = NULL, *b_prev = NULL;
     for(size_t i_brick = 0; i_brick < sim_r->n_bricks; i_brick++) {
         b_prev = b;
         b = &sim_r->bricks[i_brick];
         d_before = d_after;
-        d_after = des_table_find_depth(dt, &i_des, &ion);
+        d_after = des_table_find_depth(dt, &i_des, d_before, &ion);
         b->d = d_after;
         b->E_0 = ion.E;
         b->S_0 = ion.S;
@@ -669,7 +673,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         double sigma_conc;
         double d_diff;
         if(b_prev) {
-            sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E, b->E, &d_before, &d_after, b_prev->S, b->S); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
+            sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
             d_diff = depth_diff(b_prev->d, b->d);
         } else {
             sigma_conc = 0.0;
@@ -679,12 +683,12 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         b->Q = ion.inverse_cosine_theta * sigma_conc * b->thick;
         b->sc = sigma_conc;
 #ifdef DEBUG
-        fprintf(stderr, "%12s %3zu %10.3lf %10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3e\n",
-                sim_r->r->target->name, i_brick, d_before.x / C_TFU, d_after.x / C_TFU, i_des,
+        fprintf(stderr, "%12s %3zu %3zu:%10.3lf %3zu:%10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %.3lf %10.3e\n",
+                sim_r->r->target->name, i_brick, d_before.i, d_before.x / C_TFU, d_after.i, d_after.x / C_TFU, i_des,
                 b->E_0 / C_KEV, sqrt(b->S_0) / C_KEV,
                 b->E_r / C_KEV, sqrt(b->S_r) / C_KEV,
                 b->E / C_KEV, sqrt(b->S) / C_KEV,
-                E_deriv, sigma_conc / C_MB_SR, b->Q);
+                E_deriv, get_conc(sample, d_after, sim_r->i_isotope), sigma_conc / C_MB_SR, b->Q);
 #endif
         ion.E -= 10.0 * C_KEV / E_deriv; /* TODO: do an intelligent choice */
         if(ion.E < ws->emin || b->E < ws->emin) {
