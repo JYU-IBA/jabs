@@ -132,7 +132,7 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     assert(dt->n > 0);
     double E = incident->E;
     for(i = *i_des; i < dt->n - 1; i++) {
-        if(i + 1 < dt->n - 1 && dt->t[i].d.i != dt->t[i + 1].d.i) {
+        if(i + 1 < dt->n - 1 && dt->t[i].d.i != dt->t[i + 1].d.i) { /* This means last point of this layer */
             E = dt->t[i].E;
             *i_des = i + 1; /* The +1 prevents stopping at this same layer boundary on the next call */
 #ifdef DEBUG
@@ -158,8 +158,7 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     assert(E_interval >= 0.0);
     assert(d_interval >= 0.0);
     depth d_out;
-    if(depth_prev.i != des_high->d.i) {
-        fprintf(stderr, "Something!\n");
+    if(depth_prev.i != des_high->d.i) { /* First point after crossing layer */
         d_out.i = des_high->d.i;
     } else {
         d_out.i = des_low->d.i;
@@ -648,10 +647,19 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         b = &sim_r->bricks[i_brick];
         d_before = d_after;
         d_after = des_table_find_depth(dt, &i_des, d_before, &ion);
+        if(d_after.i != d_before.i) { /* There was a layer (depth range) crossing. If stop_step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
+#ifdef DEBUG_VERBOSE
+            fprintf(stderr, "Brick %zu crosses into range %zu, d_before = %g tfu.\n", i_brick, d_after.i, d_before.x / C_TFU);
+#endif
+            d_before.i = d_after.i;
+        }
         b->d = d_after;
         b->E_0 = ion.E;
         b->S_0 = ion.S;
-
+        if(ws->params->geostragg) {
+            b->S_geo_x = geostragg(ws, sample, sim_r, &(g->x), d_after, b->E_0);
+            b->S_geo_y = geostragg(ws, sample, sim_r, &(g->y), d_after, b->E_0);
+        }
         sim_reaction_product_energy_and_straggling(sim_r, &ion); /* sets sim_r->p */
         b->E_r = sim_r->p.E;
         b->S_r = sim_r->p.S;
@@ -667,7 +675,10 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         } else {
             E_deriv = 2.0; /* This should be calculated based on stopping powers and geometry. It's not always two :) */
         }
-        if(E_deriv < 0.1) {
+        if(E_deriv < 0.1) { /* Sanity check. */
+#ifdef DEBUG
+            fprintf(stderr, "Derivative is acting up!\n");
+#endif
             E_deriv = 10.0;
         }
         double sigma_conc;
@@ -690,7 +701,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
                 b->E / C_KEV, sqrt(b->S) / C_KEV,
                 E_deriv, get_conc(sample, d_after, sim_r->i_isotope), sigma_conc / C_MB_SR, b->Q);
 #endif
-        ion.E -= 10.0 * C_KEV / E_deriv; /* TODO: do an intelligent choice */
+        ion.E -= 2.0*sqrt(detector_resolution(ws->det, sim_r->p.isotope, b->E) + b->S) / E_deriv;
         if(ion.E < ws->emin || b->E < ws->emin) {
 #ifdef DEBUG
             fprintf(stderr, "Energy minimum.\n");
