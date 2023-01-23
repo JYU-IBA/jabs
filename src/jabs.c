@@ -655,6 +655,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         d_before = d_after;
         d_after = des_table_find_depth(dt, &i_des, d_before, &ion);
         if(d_after.i > d_before.i) { /* There was a layer (depth range) crossing. If stop_step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
+#ifndef NO_SKIP_EMPTY_RANGES
             double conc_start = *sample_conc_bin(sample, d_after.i, sim_r->i_isotope);
             double conc_stop = *sample_conc_bin(sample, d_after.i + 1, sim_r->i_isotope);
 #ifdef DEBUG
@@ -672,6 +673,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
                 fprintf(stderr, "Skipped to %g.\n", d_after.x / C_TFU);
 #endif
             }
+#endif // NO_SKIP_EMPTY_RANGES
             d_before.i = d_after.i;
             crossed = TRUE;
         }
@@ -694,34 +696,23 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         b->S = sim_r->p.S;
 
         double E_deriv;
-        if(skipped || i_brick == 0) {
-#ifdef DEBUG
-            fprintf(stderr, "We just skipped, so don't trust the derivative.\n");
-#endif
-            E_deriv = 10.0;
-            b->deriv = 10.0;
-        } else {
-            double E_diff = b_prev->E_0 - b->E_0;
-            if(E_diff < 1.0*C_KEV) { /* TODO: this shouldn't be used. Use something else when crossing into new layers. */
-#ifdef DEBUG
-                fprintf(stderr, "AAAAargh! %g keV is less than 1.0! crossed = %i, skipped = %i. Previous deriv = %g\n\n", E_diff/C_KEV, crossed, skipped, b_prev->deriv); /* TODO: remove */
-#endif
-                E_deriv = 10.0; /* This forces the next brick to be narrow. We don't want that. */
-                b->deriv = E_deriv;
-            } else {
-                E_deriv = (b_prev->E - b->E) / (b_prev->E_0 - b->E_0); /* how many keVs does the reaction product energy change for each keV of incident ion energy change */
-                b->deriv = E_deriv;
-            }
-        }
         double sigma_conc;
         double d_diff;
         if(b_prev) {
             sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
             d_diff = depth_diff(d_before, d_after);
-        } else {
+            if(d_diff == 0) { /* Zero thickness brick, so no energy change either */
+                E_deriv = 5.0;
+                fprintf(stderr, "Zero thickness brick (after skip?):\n");
+            } else {
+                E_deriv = (b_prev->E - b->E) / (b_prev->E_0 - b->E_0); /* how many keVs does the reaction product energy change for each keV of incident ion energy change */
+            }
+        } else { /* First brick */
             sigma_conc = 0.0;
             d_diff = 0.0;
+            E_deriv = 10.0;
         }
+        b->deriv = E_deriv;
         b->thick = d_diff;
         b->Q = ion.inverse_cosine_theta * sigma_conc * b->thick;
         b->sc = sigma_conc;
@@ -1204,12 +1195,14 @@ int print_bricks(const char *filename, const sim_workspace *ws) {
         fprintf(f, "#i  brick    depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo) sigma*conc        Q\n");
         for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
-            fprintf(f, "%2zu %4zu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %8e\n",
+            fprintf(f, "%2zu %4zu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %8e %6.3lf\n",
                     i, j, b->d.x / C_TFU, b->thick / C_TFU,
                     b->E_0 / C_KEV, C_FWHM * sqrt(b->S_0) / C_KEV,
                     b->E_r / C_KEV, C_FWHM * sqrt(b->S_r) / C_KEV,
                     b->E / C_KEV, C_FWHM * sqrt(b->S) / C_KEV,
-                    C_FWHM * sqrt(b->S_geo_x + b->S_geo_y) / C_KEV, b->sc / C_MB_SR, b->Q * ws->fluence * ws->det->solid);
+                    C_FWHM * sqrt(b->S_geo_x + b->S_geo_y) / C_KEV, b->sc / C_MB_SR, b->Q * ws->fluence * ws->det->solid,
+                    b->deriv
+                    );
         }
         fprintf(f, "\n\n");
     }
