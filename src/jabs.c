@@ -665,7 +665,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
             if(conc_start < CONC_TOLERANCE && conc_stop < CONC_TOLERANCE) { /* This isotope concentration is zero in this layer, skip to next one */
                 size_t i_des_skip = dt->depth_interval_index[d_after.i + 1];
                 des *des_skip = &(dt->t[i_des_skip]);
-                ion.E = des_skip->E;
+                ion.E = des_skip->E; /* TODO: long skips may make E_deriv calculation below inaccurate */
                 ion.S = des_skip->S;
                 d_after = des_skip->d;
                 skipped = TRUE;
@@ -698,19 +698,28 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         double E_deriv;
         double sigma_conc;
         double d_diff;
+
         if(b_prev) {
             sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
             d_diff = depth_diff(d_before, d_after);
             if(d_diff == 0) { /* Zero thickness brick, so no energy change either */
-                E_deriv = 5.0;
-                fprintf(stderr, "Zero thickness brick (after skip?):\n");
+                E_deriv = b_prev->deriv * 1.5; /* TODO: Can't calculate, assume. The 1.5 is a safety factor.  */
+#ifdef DEBUG
+                fprintf(stderr, "Zero thickness brick (after skip?)\n");
+#endif
+
             } else {
                 E_deriv = (b_prev->E - b->E) / (b_prev->E_0 - b->E_0); /* how many keVs does the reaction product energy change for each keV of incident ion energy change */
             }
         } else { /* First brick */
             sigma_conc = 0.0;
             d_diff = 0.0;
-            E_deriv = 10.0;
+            double k_incident = stop_sample(ws, &ion, sample, ws->stopping_type, d_after, b->E_0);
+            double k_exiting = stop_sample(ws, &sim_r->p, sample, ws->stopping_type, d_after, b->E_r);
+            E_deriv = (reaction_product_energy(sim_r->r, sim_r->theta, b->E_0)/b->E_0 * k_incident * ion.inverse_cosine_theta - k_exiting * sim_r->p.inverse_cosine_theta)/(k_incident * ion.inverse_cosine_theta); /* TODO: NaN if reaction is not possible */
+#ifdef DEBUG
+            fprintf(stderr, "should deriv be %g\n?", E_deriv); /* TODO: this is accurate only near surface */
+#endif
         }
         b->deriv = E_deriv;
         b->thick = d_diff;
