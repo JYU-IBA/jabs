@@ -848,6 +848,8 @@ void sim_sort_reactions(const simulation *sim) {
 
 void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident) {
     if(r->r->Q == 0.0) {
+        assert(r->K > 0 && r->K <= 1.0);
+        assert(incident->E > 1.0 * C_EV && incident->E < 1000.0 * C_MEV);
         r->p.E = incident->E * r->K;
         r->p.S = incident->S * pow2(r->K);
 #ifdef DEBUG_VERBOSE

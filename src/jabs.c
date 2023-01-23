@@ -146,12 +146,12 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
         }
     }
     assert(i > 0);
-    const des *des_low = &dt->t[i - 1];
-    const des *des_high = &dt->t[i];
+    const des *des_low = &dt->t[i - 1]; /* Closer to surface, higher energy */
+    const des *des_high = &dt->t[i]; /* Deeper, lower energy */
 
     double E_diff = des_low->E - E; /* Positive, as energy decreases */
     double E_interval = des_low->E - des_high->E;
-    double S_interval = des_low->S - des_high->S; /* Positive, if S increases as a function of depth */
+    double S_interval = des_high->S - des_low->S; /* Positive, if S increases as a function of depth */
     double d_interval = depth_diff(des_low->d, des_high->d); /* Positive, as depth increases */
     double frac = (E_diff/E_interval); /* zero if close to low bin (high energy, closer to surface), 1.0 if close to high bin (low energy, deeper) */
     assert(E_diff >= 0.0);
@@ -167,6 +167,7 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     double S = des_low->S + frac * (S_interval);
     incident->E = E;
     incident->S = S;
+    assert(S >= 0.0);
     return d_out;
 }
 
@@ -194,6 +195,7 @@ void des_table_set_ion_depth(const des_table *dt, ion *ion, depth d) {
     assert(depth_diff >= 0.0);
     ion->E = E;
     ion->S = S;
+    assert(S >= 0.0);
 #ifdef DEBUG_VERBOSE
     fprintf(stderr, "lo = %zu, mi = %zu, hi = %zu, depth_diff = %g tfu, depth_interval = %g tfu, frac = %lf, E = %g keV, S = %g keV\n",
             lo, mi, hi, depth_diff / C_TFU, depth_interval / C_TFU, frac, E / C_KEV, sqrt(S) / C_KEV);
@@ -642,17 +644,44 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
     depth d_before, d_after = depth_start;
     size_t i_des = 0, i_range = depth_start.i;
     brick *b = NULL, *b_prev = NULL;
+    int skipped, crossed;
     for(size_t i_brick = 0; i_brick < sim_r->n_bricks; i_brick++) {
+        assert(ion.S >= 0.0);
+        skipped = FALSE;
+        crossed = FALSE;
         b_prev = b;
         b = &sim_r->bricks[i_brick];
         d_before = d_after;
         d_after = des_table_find_depth(dt, &i_des, d_before, &ion);
-        if(d_after.i != d_before.i) { /* There was a layer (depth range) crossing. If stop_step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
-#ifdef DEBUG_VERBOSE
+        if(i_brick == 0 || d_after.i > d_before.i) { /* There was a layer (depth range) crossing. If stop_step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
+            double conc_start = *sample_conc_bin(sample, d_after.i, sim_r->i_isotope);
+            double conc_stop = *sample_conc_bin(sample, d_after.i + 1, sim_r->i_isotope);
+#ifdef DEBUG
             fprintf(stderr, "Brick %zu crosses into range %zu, d_before = %g tfu.\n", i_brick, d_after.i, d_before.x / C_TFU);
+            fprintf(stderr, "Concentration varies between %g%% and %g%%\n", conc_start * 100.0, conc_stop * 100.0);
 #endif
+            if(conc_start < CONC_TOLERANCE && conc_stop < CONC_TOLERANCE) {
+
+                depth d_skip = dt->t[dt->depth_interval_index[d_after.i + 1]].d;
+#ifdef DEBUG
+                fprintf(stderr, "This can be skipped! We could set d_after = %g tfu (range still %zu, same as %zu) and handle brick from %g tfu in a single step.\n", d_skip.x / C_TFU, d_skip.i, d_after.i, d_before.x / C_TFU);
+#endif
+                assert(d_skip.i == d_after.i);
+                d_after = d_skip;
+                des_table_set_ion_depth(dt, &ion, d_after);
+                //fprintf(stderr, "After skip E = %g keV\n", ion.E / C_KEV);
+                skipped = TRUE;
+
+            }
             d_before.i = d_after.i;
+#ifdef DEBUG
+            fprintf(stderr, "d_before set to %zu. E = %g keV.\n", d_before.i, ion.E / C_KEV);
+#endif
+#if 0 // TODO: this forces zero-thickness brick after crossing into new layer. Note that ion energy and straggling should also be set to correspond to d_after */
+            d_after.x = d_before.x;
+#endif
         }
+        assert(ion.S >= 0.0);
         b->d = d_after;
         b->E_0 = ion.E;
         b->S_0 = ion.S;
@@ -661,6 +690,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
             b->S_geo_y = geostragg(ws, sample, sim_r, &(g->y), d_after, b->E_0);
         }
         sim_reaction_product_energy_and_straggling(sim_r, &ion); /* sets sim_r->p */
+        assert(sim_r->p.S >= 0.0);
         b->E_r = sim_r->p.E;
         b->S_r = sim_r->p.S;
 
@@ -670,22 +700,27 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         b->S = sim_r->p.S;
 
         double E_deriv;
-        if(b_prev) {
-            E_deriv = (b_prev->E - b->E) / (b_prev->E_0 - b->E_0); /* how many keVs does the reaction product energy change for each keV of incident ion energy change */
-        } else {
-            E_deriv = 2.0; /* This should be calculated based on stopping powers and geometry. It's not always two :) */
-        }
-        if(E_deriv < 0.1) { /* Sanity check. */
+        if(skipped || i_brick == 0) {
 #ifdef DEBUG
-            fprintf(stderr, "Derivative is acting up!\n");
+            fprintf(stderr, "We just skipped, so don't trust the derivative.\n");
 #endif
-            E_deriv = 10.0;
+            E_deriv = 0.0;
+            b->deriv = 0.0;
+        } else {
+            if(b_prev->E_0 - b->E_0 < 1.0*C_KEV) { /* TODO: this shouldn't be used. Use something else when crossing into new layers. */
+                //fprintf(stderr, "AAAAargh!\n\n"); /* TODO: remove */
+                E_deriv = 10.0;
+                b->deriv = E_deriv;
+            } else {
+                E_deriv = (b_prev->E - b->E) / (b_prev->E_0 - b->E_0); /* how many keVs does the reaction product energy change for each keV of incident ion energy change */
+                b->deriv = E_deriv;
+            }
         }
         double sigma_conc;
         double d_diff;
         if(b_prev) {
             sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
-            d_diff = depth_diff(b_prev->d, b->d);
+            d_diff = depth_diff(d_before, d_after);
         } else {
             sigma_conc = 0.0;
             d_diff = 0.0;
@@ -694,14 +729,17 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         b->Q = ion.inverse_cosine_theta * sigma_conc * b->thick;
         b->sc = sigma_conc;
 #ifdef DEBUG
-        fprintf(stderr, "%12s %3zu %3zu:%10.3lf %3zu:%10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %.3lf %10.3e\n",
+        fprintf(stderr, "%12s %3zu %3zu:%10.3lf %3zu:%10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %.3lf %10.3e %8.3lf\n",
                 sim_r->r->target->name, i_brick, d_before.i, d_before.x / C_TFU, d_after.i, d_after.x / C_TFU, i_des,
                 b->E_0 / C_KEV, sqrt(b->S_0) / C_KEV,
                 b->E_r / C_KEV, sqrt(b->S_r) / C_KEV,
                 b->E / C_KEV, sqrt(b->S) / C_KEV,
-                E_deriv, get_conc(sample, d_after, sim_r->i_isotope), sigma_conc / C_MB_SR, b->Q);
+                E_deriv, get_conc(sample, d_after, sim_r->i_isotope) * 100.0, sigma_conc / C_MB_SR, b->Q, b->deriv);
 #endif
-        ion.E -= 2.0*sqrt(detector_resolution(ws->det, sim_r->p.isotope, b->E) + b->S) / E_deriv;
+        if(!skipped && i_brick) {
+            ion.E -= 2.0 * sqrt(detector_resolution(ws->det, sim_r->p.isotope, b->E) + b->S) / E_deriv;
+        }
+        assert(!isnan(ion.E));
         if(ion.E < ws->emin || b->E < ws->emin) {
 #ifdef DEBUG
             fprintf(stderr, "Energy minimum.\n");
