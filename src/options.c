@@ -239,7 +239,7 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
                 sim->beam_E = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 'B':
-                sim->beam_E_broad = pow2(jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg) / C_FWHM);
+                sim->beam_E_broad = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 'I':
                 sim->beam_isotope = jibal_isotope_find(jibal->isotopes, optarg, 0, 0);
