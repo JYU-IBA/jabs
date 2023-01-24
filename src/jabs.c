@@ -1033,28 +1033,32 @@ int simulate_with_ds(sim_workspace *ws) {
                     cs += jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar_sub) / (DUAL_SCATTER_POLAR_SUBSTEPS * 1.0);
                 }
                 cs_sum += c * cs;
-            }
-            double fluence_tot = cs_sum * thick_step * ion1.inverse_cosine_theta * (2.0 * C_PI) * ds_polar_step; /* TODO: check calculation after moving from p_sr to fluence!*/
-            p_sum += fluence_tot;
-            double fluence_azi = fluence_tot / (1.0 * (ds_steps_azi));
-            for(int i_azi = 0; i_azi < ds_steps_azi; i_azi++) {
-                ion2 = ion1;
-                double ds_azi = C_2PI * (1.0 * i_azi) / (ds_steps_azi * 1.0);
-                ion_rotate(&ion2, ds_polar, ds_azi); /* Dual scattering: first scattering to some angle (scattering angle: ds_polar). Note that this does not follow SimNRA conventions. */
-                ws->fluence = fluence_azi * fluence;
+
+                double fluence_tot = cs_sum * thick_step * ion1.inverse_cosine_theta * (2.0 * C_PI) * ds_polar_step; /* TODO: check calculation after moving from p_sr to fluence!*/
+                p_sum += fluence_tot;
+                double fluence_azi = fluence_tot / (1.0 * (ds_steps_azi));
+                for(int i_azi = 0; i_azi < ds_steps_azi; i_azi++) {
+                    ion2 = ion1;
+                    double K = jibal_kin_rbs(incident->mass, target->mass, ds_polar, '+');
+                    ion2.E *= K;
+                    ion2.S *= pow2(K);
+                    double ds_azi = C_2PI * (1.0 * i_azi) / (ds_steps_azi * 1.0);
+                    ion_rotate(&ion2, ds_polar, ds_azi); /* Dual scattering: first scattering to some angle (scattering angle: ds_polar). Note that this does not follow SimNRA conventions. */
+                    ws->fluence = fluence_azi * fluence;
 #ifdef DEBUG
-                if(d_before.x == 0.0) {
+                    if(d_before.x == 0.0) {
                     fprintf(stderr, "DS polar %.3lf, azi %.3lf, scatter %.3lf\n", ds_polar/C_DEG, ds_azi/C_DEG, scattering_angle(&ion2, ws)/C_DEG);
                 }
 #endif
-                if(scattering_angle(&ion2, ws) > 19.99999 * C_DEG) {
-                    if(simulate(&ion2, d_halfdepth, ws, ws->sample)) {
-                        return EXIT_FAILURE;
+                    if(scattering_angle(&ion2, ws) > 19.99999 * C_DEG) {
+                        if(simulate(&ion2, d_halfdepth, ws, ws->sample)) {
+                            return EXIT_FAILURE;
+                        }
                     }
                 }
             }
         }
-        fluence -= p_sum * fluence;
+        //fluence -= p_sum * fluence;
         if(ws->sample->ranges[ws->sample->n_ranges - 1].x - d_after.x < 0.01 * C_TFU)
             break;
         d_before = d_after;

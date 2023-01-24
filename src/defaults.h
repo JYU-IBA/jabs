@@ -56,9 +56,9 @@
 #define ROUGHNESS_SUBSPECTRA_MAXIMUM 99
 #define CS_CONC_STEPS 3 /* Minimum 1, odd numbers preferred */
 #define CS_STRAGG_STEPS 7 /* Number of steps used when weighting cross section by straggling. Odd numbers preferred. */
-#define DUAL_SCATTER_POLAR_STEPS 15
+#define DUAL_SCATTER_POLAR_STEPS 21
 #define DUAL_SCATTER_POLAR_SUBSTEPS 9
-#define DUAL_SCATTER_AZI_STEPS 12
+#define DUAL_SCATTER_AZI_STEPS 15
 #define FIT_ITERS_MAX 100
 #define FIT_XTOL (1e-7)
 #define FIT_FAST_XTOL_MULTIPLIER (1.0e3)
