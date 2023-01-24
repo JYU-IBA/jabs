@@ -566,7 +566,7 @@ void sim_print(const simulation *sim) {
         jabs_message(MSG_INFO, stderr, "ion = None\n");
     }
     jabs_message(MSG_INFO, stderr, "E = %.3lf keV\n", sim->beam_E/C_KEV);
-    jabs_message(MSG_INFO, stderr, "E_broad = %.3lf keV FWHM\n", sqrt(sim->beam_E_broad)*C_FWHM/C_KEV);
+    jabs_message(MSG_INFO, stderr, "E_broad = %.3lf keV FWHM\n", sim->beam_E_broad / C_KEV);
     jabs_message(MSG_INFO, stderr, "E_min = %.3lf keV\n", sim->emin/C_KEV);
     jabs_message(MSG_INFO, stderr, "alpha = %.3lf deg\n", sim_alpha_angle(sim)/C_DEG);
     jabs_message(MSG_INFO, stderr, "sample tilt (horizontal) = %.3lf deg\n", angle_tilt(sim->sample_theta, sim->sample_phi, 'x')/C_DEG);
@@ -901,6 +901,6 @@ void sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isoto
     ion_reset(ion);
     ion_set_isotope(ion, sim->beam_isotope);
     ion->E = sim->beam_E;
-    ion->S = sim->beam_E_broad;
+    ion->S = pow2(sim->beam_E_broad / C_FWHM);
     ion->nucl_stop = nuclear_stopping_new(ion->isotope, isotopes);
 }
