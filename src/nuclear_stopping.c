@@ -64,7 +64,7 @@ void nuclear_stopping_free(nuclear_stopping *ns) {
         return;
     }
     ns->refcount--;
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
     fprintf(stderr, "nuclear_stopping_free(ns = %p), incident %s, called, refcount is now %i\n", (void *)ns, ns->incident->name, ns->refcount);
 #endif
     assert(ns->refcount >= 0);
