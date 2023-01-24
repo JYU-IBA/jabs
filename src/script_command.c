@@ -1238,6 +1238,7 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_SIZE,   "depthsteps_max",              &sim->params->depthsteps_max,              NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "ds",                          &sim->params->ds,                          NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "rk4",                         &sim->params->rk4,                         NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "brick_width_sigmas",          &sim->params->brick_width_sigmas,          NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "sigmas_cutoff",               &sim->params->sigmas_cutoff,               NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "stop_step_incident",          &sim->params->stop_step_incident,          NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "stop_step_exiting",           &sim->params->stop_step_exiting,           NULL},

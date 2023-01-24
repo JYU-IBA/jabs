@@ -38,6 +38,7 @@
 #define E_MAX (1000.0*C_MEV)
 #define ENERGY_SLOPE (1.0*C_KEV)
 #define DES_TABLE_INITIAL_ALLOC (1024)
+#define BRICK_WIDTH_SIGMAS_DEFAULT (2.0) /* Attempt to make bricks width energy difference equal to this many times the detector resolution and straggling sigmas combined (in quadrature (variances)) */
 #define STOP_STEP_INCIDENT (0.0*C_KEV) /* Zero is automatic */
 #define STOP_STEP_EXITING (0.0*C_KEV) /* Zero is automatic */
 #define STOP_STEP_FUDGE_FACTOR (1.0) /* Factor to automatic incident step size. */

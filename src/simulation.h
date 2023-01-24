@@ -49,6 +49,7 @@ typedef struct sim_calc_params {
     double stop_step_min; /* TODO: automatic */
     double stop_step_max; /* TODO: automatic */
     double stop_step_add; /* This is added to stop step */
+    double brick_width_sigmas;
     double rough_layer_multiplier; /* Multiply given (or default) number of subspectra when calculating rough layers. */
     double sigmas_cutoff; /* Number of (+-) sigmas to consider when turning bricks to spectra */
     size_t int_cs_max_intervals;

@@ -736,7 +736,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         if(!skipped) {
             double S_sigma = sqrt(detector_resolution(ws->det, sim_r->p.isotope, b->E) + b->S);
             S_sigma = ceil(S_sigma/C_KEV)*C_KEV;
-            double E_change = -2.0 * S_sigma / E_deriv;
+            double E_change = -ws->params->brick_width_sigmas * S_sigma / E_deriv;
             ion.E += E_change;
             if(E_deriv > 9.999) {
 #ifdef DEBUG

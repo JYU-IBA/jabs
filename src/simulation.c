@@ -75,6 +75,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->stop_step_min = STOP_STEP_MIN;
     p->stop_step_max = STOP_STEP_MAX;
     p->stop_step_add = STOP_STEP_ADD;
+    p->brick_width_sigmas = BRICK_WIDTH_SIGMAS_DEFAULT;
     p->depthsteps_max = 0; /* automatic */
     p->geostragg = FALSE;
     p->beta_manual  = FALSE;
