@@ -98,8 +98,10 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Testing of areal sum (counts) and residuals. Some test cases are run by the developer to check sanity and accuracy of simulations for every new release.
  - Higher accuracy mode using adaptive integration for more accurate handling of sharp peaks in cross sections (resonances) and accurate weighting of cross sections by (Gaussian) straggling.
  - Conversion tool from IDF to JaBS script (caveats; partial support)
+ - Simulation of large angle plural scattering (dual scattering model), with the assumption that first scattering is RBS (not ERD). DS in JaBS 0.6.7 and older is broken.
 
-### Not (yet) implemented, but planned
+### Not implemented, but planned or being worked on
+ - Rewrite of core simulation routine to reduce amount of ad-hoc parameters and guaranteeing numerical accuracy even outside typical usage scenarios
  - Support for more input and output data formats (CSV, ...)
  - Multiple scattering (small angle)
  - Simulation of pile-up and dead time
@@ -115,8 +117,7 @@ Detector and sample can be read from files. The file formats are simple and huma
 ### Known issues
  - Saving a detector to a file is not supported. Calibrations can be saved as a script.
  - Ad-hoc channeling correction is the same for all detectors
- - Dual scattering assumes first scattering is RBS (not ERD). Cross sections are not calculated accurately (must use integrated cross sections instead of approximating using differential cross sections since solid angles involved are large).
- - Dual scattering is benchmarked against SimNRA and is known to produce somewhat different results.
+ - Import of IDF is partial at best and exporting is not implemented
 
 ## Fitting
 
