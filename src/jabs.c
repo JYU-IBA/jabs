@@ -997,7 +997,6 @@ int simulate_with_ds(sim_workspace *ws) {
 
         jabs_message(MSG_VERBOSE, stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x / C_TFU, d_after.x / C_TFU, E_front / C_KEV,
                      E_back / C_KEV, fluence);
-        double p_sum = 0.0;
         for(int i_polar = 0; i_polar < ds_steps_polar; i_polar++) {
             const double ds_polar_min = 20.0 * C_DEG;
             const double ds_polar_max = 180.0 * C_DEG;
@@ -1021,7 +1020,6 @@ int simulate_with_ds(sim_workspace *ws) {
                 cs_sum += c * cs;
 
                 double fluence_tot = cs_sum * thick_step * ion1.inverse_cosine_theta * (2.0 * C_PI) * ds_polar_step; /* TODO: check calculation after moving from p_sr to fluence!*/
-                p_sum += fluence_tot;
                 double fluence_azi = fluence_tot / (1.0 * (ds_steps_azi));
                 for(int i_azi = 0; i_azi < ds_steps_azi; i_azi++) {
                     ion2 = ion1;
@@ -1044,7 +1042,6 @@ int simulate_with_ds(sim_workspace *ws) {
                 }
             }
         }
-        //fluence -= p_sum * fluence;
         if(ws->sample->ranges[ws->sample->n_ranges - 1].x - d_after.x < 0.01 * C_TFU)
             break;
         d_before = d_after;
@@ -1052,5 +1049,3 @@ int simulate_with_ds(sim_workspace *ws) {
     sim_workspace_calculate_sum_spectra(ws);
     return EXIT_SUCCESS;
 }
-
-
