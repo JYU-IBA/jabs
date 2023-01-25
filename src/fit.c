@@ -10,7 +10,7 @@
  */
 
 /*
- * This file is based a mostly around the GSL examples for nonlinear least-squares fitting. See e.g.
+ * This file is based partially based around the GSL examples for nonlinear least-squares fitting. See e.g.
  * https://www.gnu.org/software/gsl/doc/html/nls.html . Please note that GSL (https://www.gnu.org/software/gsl/) is
  * is distributed under the terms of the GNU General Public License (GPL).
  */
@@ -200,70 +200,6 @@ void fit_iter_stats_print(const struct fit_stats *stats) {
                  stats->iter, 1.0 / stats->rcond, stats->norm,
                  stats->chisq_dof, stats->n_evals, stats->cputime_cumul,
                  1000.0 * stats->cputime_iter / stats->n_evals_iter);
-}
-
-fit_params *fit_params_new() {
-    fit_params *p = malloc(sizeof(fit_params));
-    p->n = 0;
-    p->n_active = 0;
-    p->vars = NULL;
-    return p;
-}
-
-int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor) {
-    if(!value || !name) {
-#ifdef DEBUG
-        fprintf(stderr, "Didn't add a fit parameter since a NULL pointer was passed. Value = %p, name = %p (%s).\n", (void *)value, (void *)name, name);
-#endif
-        return EXIT_FAILURE;
-    }
-    for(size_t i = 0; i < p->n; i++) {
-        if(p->vars[i].value == value) {
-#ifdef DEBUG
-            fprintf(stderr, "Didn't add fit parameter %s that points to value %p since it already exists.\n", name, (void *)value);
-#endif
-            return EXIT_SUCCESS; /* Parameter already exists, don't add. */ /* TODO: maybe this requirement could be relaxed? */
-        }
-    }
-    p->n++;
-    p->vars = realloc(p->vars, sizeof(fit_variable) * p->n);
-    fit_variable *var = &(p->vars[p->n - 1]);
-    var->value = value;
-    var->name = strdup(name);
-    var->unit = unit;
-    var->unit_factor = unit_factor;
-    var->active = FALSE;
-#ifdef DEBUG
-    fprintf(stderr, "Fit parameter %s added successfully (total %zu).\n", var->name, p->n);
-#endif
-    return EXIT_SUCCESS;
-}
-
-void fit_params_free(fit_params *p) {
-    if(!p)
-        return;
-    for(size_t i = 0; i < p->n; i++) {
-        free(p->vars[i].name); /* This should be fit_variable_free(), but then p->vars should probably be an array of pointers, too). */
-    }
-    free(p->vars);
-    free(p);
-}
-
-void fit_params_update(fit_params *p) {
-    if(!p)
-        return;
-
-    /* TODO: check if some ACTIVE parameters are duplicates. We don't care about inactive ones. */
-
-    p->n_active = 0;
-    for(size_t i = 0; i < p->n; i++) {
-        if(p->vars[i].active) {
-            p->vars[i].i_v = p->n_active;
-            p->n_active++;
-        } else {
-            p->vars[i].i_v = p->n; /* Intentionally invalid index */
-        }
-    }
 }
 
 void fit_stats_print(FILE *f, const struct fit_stats *stats) {
@@ -632,37 +568,6 @@ void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspac
 }
 
 
-void fit_parameters_update(const fit_data *fit, const gsl_multifit_nlinear_workspace *w, const gsl_matrix *covar) {
-    const fit_params *fit_params = fit->fit_params;
-    double c = GSL_MAX_DBL(1, sqrt(fit->stats.chisq_dof));
-    for(size_t i = 0; i < fit_params->n; i++) { /* Update final fitted values to the table (same as used for initial guess) */
-        fit_variable *var = &(fit_params->vars[i]);
-        if(!var->active)
-            continue;
-        assert(var->i_v < fit_params->n_active);
-        var->value_final = gsl_vector_get(w->x, var->i_v);
-        *(var->value) = var->value_final;
-        var->err = c * sqrt(gsl_matrix_get(covar, var->i_v, var->i_v));
-        var->err_rel = fabs(var->err / var->value_final);
-        var->sigmas = fabs(var->value_final - var->value_orig) / var->value_orig / var->err_rel;
-    }
-}
-
-void fit_parameters_update_changed(const fit_data *fit) {
-    const fit_params *fit_params = fit->fit_params;
-    for(size_t i = 0; i < fit_params->n; i++) {
-        fit_variable *var = &(fit_params->vars[i]);
-        if(!var->active)
-            continue;
-        if(*(var->value) != var->value_final) { /* Values changed by something (renormalization) */
-            double scale = *(var->value) / var->value_final;
-            var->value_final = (*var->value);
-            var->err *= scale;
-            /* var->err_rel stays the same */
-        }
-    }
-}
-
 void fit_covar_print(const gsl_matrix *covar) {
     jabs_message(MSG_INFO, stderr, "\nCorrelation coefficients matrix:\n       | ");
     for(size_t i = 0; i < covar->size1; i++) {
@@ -832,9 +737,9 @@ int fit(struct fit_data *fit_data) {
         gsl_blas_ddot(f, f, &fit_data->stats.chisq);
         fit_data->stats.chisq_dof = fit_data->stats.chisq / fit_data->dof;
 
-        fit_parameters_update(fit_data, w, covar);
+        fit_parameters_update(fit_params, w, covar, fit_data->stats.chisq_dof);
         sample_model_renormalize(fit_data->sm);
-        fit_parameters_update_changed(fit_data); /* sample_model_renormalize() can and will change concentration values, this will recompute error (assuming relative error stays the same) */
+        fit_parameters_update_changed(fit_params); /* sample_model_renormalize() can and will change concentration values, this will recompute error (assuming relative error stays the same) */
         fit_params_print_final(fit_params);
         fit_covar_print(covar);
 

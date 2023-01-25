@@ -42,8 +42,5 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
 double cross_section_straggling(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, const prob_dist *pd, double E, double S);
 double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S);
 double cross_section_straggling_adaptive(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, double E, double S);
-fit_params *fit_params_all(fit_data *fit);
-void fit_params_print(const fit_params *params, int active, const char *pattern); /* if active is TRUE print only active variables. pattern can be NULL to bypass matching. */
-void fit_params_print_final(const fit_params *params);
-size_t fit_params_enable(fit_params *params, const char *s, int enable); /* Enable/disable one or more variables matching pattern s. Returns number of matches. */
+
 #endif // JABS_JABS_H
