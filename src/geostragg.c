@@ -155,13 +155,13 @@ double geostragg(const sim_workspace *ws, const sample *sample, const sim_reacti
     ion_set_angle(&ion, gd->theta_product_plus, gd->phi_product_plus);
     ion.E = reaction_product_energy(r->r, gd->theta_plus, E_0);
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
-    post_scatter_exit(&ion, d, ws, sample);
+    exit_from_sample(&ion, d, ws, sample);
     double Eplus = ion.E;
     ion = r->p;
     ion_set_angle(&ion, gd->theta_product_minus, gd->phi_product_minus);
     ion.E = reaction_product_energy(r->r, gd->theta_minus, E_0);
     ion.S = 0.0; /* We don't need straggling for anything, might as well reset it */
-    post_scatter_exit(&ion, d, ws, sample);
+    exit_from_sample(&ion, d, ws, sample);
     double Eminus = ion.E;
     double result = pow2(Eplus - Eminus);
 #ifdef DEBUG_VERBOSE

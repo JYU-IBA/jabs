@@ -24,28 +24,7 @@
 #include "simulation.h"
 #include "detector.h"
 #include "sample.h"
-
-typedef struct fit_variable {
-    double *value; /* Pointer to a value. This is not allocated or free'd by fitting related methods. */
-    double value_orig;
-    double value_final;
-    double value_iter;
-    double err; /* Error estimate of fit will be stored here. */
-    double err_rel; /* Relative error */
-    double sigmas; /* Change, relative to error */
-    char *name;
-    const char *unit;
-    double unit_factor;
-    int active; /* Set to FALSE by default, if this variable is to be used it should be set to TRUE */
-    size_t i_v; /* Index in fit */
-} fit_variable;
-
-typedef struct fit_params {
-    size_t n; /* Number of function parameters */
-    size_t n_active; /* Recalculated by fit_params_update() */
-    fit_variable *vars; /* Note that this is NOT an array of pointers. It has n elements. */
-} fit_params;
-
+#include "fit_params.h"
 #include "simulation.h"
 #include "reaction.h"
 #include "sample.h"
@@ -120,6 +99,7 @@ void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct r
 gsl_histogram *fit_data_exp(const struct fit_data *fit_data, size_t i_det);
 gsl_histogram *fit_data_sim(const struct fit_data *fit_data, size_t i_det);
 void fit_data_exp_free(struct fit_data *fit_data);
+fit_params *fit_params_all(fit_data *fit);
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename);
 void fit_data_histo_sum_free(struct fit_data *fit_data);
 void fit_data_histo_sum_store(struct fit_data *fit_data);
@@ -131,18 +111,13 @@ void fit_data_workspaces_free(struct fit_data *fit_data); /* Also sets workspace
 struct fit_stats fit_stats_init();
 int fit(struct fit_data *fit_data);
 void fit_covar_print(const gsl_matrix *covar);
-void fit_parameters_update(const fit_data *fit, const gsl_multifit_nlinear_workspace *w, const gsl_matrix *covar); /* Updates values in fit_params, computes errors */
-void fit_parameters_update_changed(const fit_data *fit); /* Checks if values have changed since fit_parameters_update(), computes new error */
+
 int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x); /* Updates values in fit params as they are varied by the fit algorithm. */
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 int fit_scale_by_variable(struct fit_data *fit, const fit_variable *var);
 int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f);
 void fit_iter_stats_update(struct fit_data *params, const gsl_multifit_nlinear_workspace *w);
 void fit_iter_stats_print(const struct fit_stats *stats);
-fit_params *fit_params_new();
-int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor); /* Pointer to parameter to be fitted (value) is accessed during fitting (read, write). No guarantees that it stays accessible after the fit is over and user decides to change something! */
-void fit_params_free(fit_params *p);
-void fit_params_update(fit_params *p);
 void fit_stats_print(FILE *f, const struct fit_stats *stats);
 int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range); /* Makes a deep copy */
 void fit_data_fit_ranges_free(struct fit_data *fit_data);

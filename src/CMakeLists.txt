@@ -22,13 +22,14 @@ if(WIN32)
     find_library(GETOPT_LIBRARY getopt)
 endif()
 
-add_executable(jabs main.c sample.c sample.h brick.c ion.c ion.h simulation.c simulation.h reaction.c reaction.h
-        options.c options.h spectrum.c spectrum.h fit.c fit.h rotate.c rotate.h detector.c detector.h jabs.c jabs.h
-        roughness.c roughness.h script.c script.h generic.c generic.h message.c message.h aperture.c aperture.h
-        geostragg.c geostragg.h script_command.c script_command.h script_session.c script_session.h script_file.c
-        script_file.h calibration.c calibration.h script_generic.h prob_dist.c prob_dist.h
-        idf2jbs.c idf2jbs.h idfelementparsers.c idfelementparsers.h idfparse.c idfparse.h
-        nuclear_stopping.c nuclear_stopping.h
+add_executable(jabs
+        main.c
+        sample.c brick.c ion.c simulation.c reaction.c options.c
+        spectrum.c fit.c fit_params.c rotate.c detector.c jabs.c
+        roughness.c  script.c  generic.c message.c aperture.c
+        geostragg.c  script_command.c script_session.c script_file.c
+        calibration.c prob_dist.c idf2jbs.c idfelementparsers.c
+        idfparse.c nuclear_stopping.c
         "$<$<BOOL:${JABS_PLUGINS}>:plugin.c>"
         "$<$<BOOL:${WIN32}>:win_compat.c>"
         )
