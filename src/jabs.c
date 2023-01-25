@@ -726,10 +726,17 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
             double k_incident = stop_sample(ws, &ion1, sample, ws->stopping_type, d_after, b->E_0);
             double k_exiting = stop_sample(ws, &sim_r->p, sample, ws->stopping_type, d_after, b->E_r);
             double K = reaction_product_energy(sim_r->r, sim_r->theta, b->E_0) / b->E_0;
-            E_deriv = (K * k_incident * fabs(ion1.inverse_cosine_theta) + k_exiting * fabs(sim_r->p.inverse_cosine_theta)) / (k_incident * fabs(ion1.inverse_cosine_theta)); /* TODO: NaN if reaction is not possible */
+            double k_incident_eff = k_incident * ion1.inverse_cosine_theta;
+            double k_exiting_eff = k_exiting * sim_r->p.inverse_cosine_theta;
+
+            E_deriv = fabs((K * k_incident * ion1.inverse_cosine_theta - k_exiting * sim_r->p.inverse_cosine_theta) / (k_incident * ion1.inverse_cosine_theta)); /* TODO: NaN if reaction is not possible */
 #ifdef DEBUG
-            fprintf(stderr, "should deriv be %g? (calculated using stopping powers and kinematics)\n", E_deriv); /* TODO: this is accurate only near surface */
+            fprintf(stderr, "should deriv be %g? (calculated using stopping powers and kinematics: %g eV/tfu and %g eV/tfu)\n", E_deriv, k_incident_eff / C_EV_TFU, k_exiting_eff / C_EV_TFU); /* TODO: this is accurate only near surface */
 #endif
+
+        }
+        if(E_deriv < ENERGY_DERIVATIVE_MIN) {
+            E_deriv = ENERGY_DERIVATIVE_MIN;
         }
         b->deriv = E_deriv;
         b->thick = d_diff;
@@ -1221,15 +1228,16 @@ int print_bricks(const char *filename, const sim_workspace *ws) {
         if(r->r->filename) {
             fprintf(f, "#Filename: %s\n", r->r->filename);
         }
-        fprintf(f, "#i  brick    depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo) sigma*conc        Q\n");
+        fprintf(f, "#i  brick    depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo)    S(sum) sigma*conc            Q  dE(det)/dE_0\n");
         for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
-            fprintf(f, "%2zu %4zu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %8e %6.3lf\n",
+            fprintf(f, "%2zu %4zu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %10.3lf %12.6g %8.3lf\n",
                     i, j, b->d.x / C_TFU, b->thick / C_TFU,
                     b->E_0 / C_KEV, C_FWHM * sqrt(b->S_0) / C_KEV,
                     b->E_r / C_KEV, C_FWHM * sqrt(b->S_r) / C_KEV,
                     b->E / C_KEV, C_FWHM * sqrt(b->S) / C_KEV,
-                    C_FWHM * sqrt(b->S_geo_x + b->S_geo_y) / C_KEV, b->sc / C_MB_SR, b->Q * ws->fluence * ws->det->solid,
+                    C_FWHM * sqrt(b->S_geo_x + b->S_geo_y) / C_KEV, C_FWHM * b->S_sum / C_KEV,
+                    b->sc / C_MB_SR, b->Q * ws->fluence * ws->det->solid,
                     b->deriv
                     );
         }
@@ -1381,7 +1389,6 @@ int simulate_with_ds(sim_workspace *ws) {
 
         jabs_message(MSG_VERBOSE, stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x / C_TFU, d_after.x / C_TFU, E_front / C_KEV,
                      E_back / C_KEV, fluence);
-        double p_sum = 0.0;
         for(int i_polar = 0; i_polar < ds_steps_polar; i_polar++) {
             const double ds_polar_min = 20.0 * C_DEG;
             const double ds_polar_max = 180.0 * C_DEG;
@@ -1428,7 +1435,6 @@ int simulate_with_ds(sim_workspace *ws) {
                 }
             }
         }
-        //fluence -= p_sum * fluence;
         if(ws->sample->ranges[ws->sample->n_ranges - 1].x - d_after.x < 0.01 * C_TFU)
             break;
         d_before = d_after;
