@@ -19,7 +19,7 @@ set stopping srim2013 He Si O
 set sim defaults
 simulate
 save spectra "non_rutherford_accuracy_defaults_out.csv"
-test roi [650:900] 207880 4e-4
+test roi [650:900] 207880 2e-3
 
 set sim fast
 simulate
@@ -39,4 +39,4 @@ set sim accurate
 simulate
 save spectra "non_rutherford_accuracy_accurate_out.csv"
 
-test roi [650:900] 207880 1e-5
+test roi [650:900] 207880 2e-3

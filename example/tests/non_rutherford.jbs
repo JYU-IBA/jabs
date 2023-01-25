@@ -24,7 +24,8 @@ load reaction "sigmacalc_16O_alpha_alpha_16O_160deg.r33"
 simulate
 add fit range [254:926] [1338:1424]
 
-#set fit slow
+#We skip the fast fit phase, since the lower accuracy simulation is counterproductive */
+set fit slow
 
 fit *calib*,fluence,energy,yield3
 save spectra "non_rutherford_out.csv"
