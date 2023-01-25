@@ -148,7 +148,7 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     if(i == dt->n - 1) {
         if(E < dt->t[i].E) {
 #ifdef DEBUG
-            fprintf(stderr, "Energy is below last point in table.\n");
+            fprintf(stderr, "Energy %g keV is below last point in table (%g keV).\n", E / C_KEV, dt->t[i].E / C_KEV);
 #endif
             E = dt->t[i].E;
         }
@@ -712,20 +712,23 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
 
             } else {
                 assert(b_prev->E_0 > b->E_0);
-                if(b_prev->E <= b->E) {
-                    fprintf(stderr, "For some reason, previous brick E = %g keV (E_0 = %g keV) and this brick E = %g keV (E_0 = %g keV). Energy should be reducing.\n", b_prev->E / C_KEV, b_prev->E_0 / C_KEV, b->E / C_KEV, b->E_0 / C_KEV);
-                    abort();
-                }
-                E_deriv = (b_prev->E - b->E) / (b_prev->E_0 - b->E_0); /* how many keVs does the reaction product energy change for each keV of incident ion1 energy change */
+                double E0_diff = b_prev->E_0 - b->E_0;
+                double E_diff = b_prev->E - b->E;
+                E_deriv = fabs(E_diff / E0_diff); /* how many keVs does the reaction product energy change for each keV of incident ion1 energy change */
+#ifdef DEBUG
+                fprintf(stderr, "should deriv be %g? (based on difference to previous brick in incident energy %g keV and detector energy %g keV)\n", E_deriv, E0_diff / C_KEV, E_diff / C_KEV); /* TODO: this is accurate only near surface */
+#endif
+                assert(E_deriv > 0.0);
             }
         } else { /* First brick */
             sigma_conc = 0.0;
             d_diff = 0.0;
             double k_incident = stop_sample(ws, &ion1, sample, ws->stopping_type, d_after, b->E_0);
             double k_exiting = stop_sample(ws, &sim_r->p, sample, ws->stopping_type, d_after, b->E_r);
-            E_deriv = (reaction_product_energy(sim_r->r, sim_r->theta, b->E_0) / b->E_0 * k_incident * ion1.inverse_cosine_theta - k_exiting * sim_r->p.inverse_cosine_theta) / (k_incident * ion1.inverse_cosine_theta); /* TODO: NaN if reaction is not possible */
+            double K = reaction_product_energy(sim_r->r, sim_r->theta, b->E_0) / b->E_0;
+            E_deriv = (K * k_incident * fabs(ion1.inverse_cosine_theta) + k_exiting * fabs(sim_r->p.inverse_cosine_theta)) / (k_incident * fabs(ion1.inverse_cosine_theta)); /* TODO: NaN if reaction is not possible */
 #ifdef DEBUG
-            fprintf(stderr, "should deriv be %g?\n", E_deriv); /* TODO: this is accurate only near surface */
+            fprintf(stderr, "should deriv be %g? (calculated using stopping powers and kinematics)\n", E_deriv); /* TODO: this is accurate only near surface */
 #endif
         }
         b->deriv = E_deriv;
@@ -753,7 +756,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
             }
         }
         assert(!isnan(ion1.E));
-        if(ion1.E < ws->emin || b->E < ws->emin) {
+        if(ion1.E < ws->emin) {
 #ifdef DEBUG
             fprintf(stderr, "Energy minimum.\n");
 #endif
