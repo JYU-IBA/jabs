@@ -364,7 +364,7 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
     return 0.0;
 }
 
-void post_scatter_exit(ion *p, const depth depth_start, const sim_workspace *ws, const sample *sample) {
+void exit_from_sample(ion *p, const depth depth_start, const sim_workspace *ws, const sample *sample) {
     depth d = depth_start;
     while(1) { /* Exit from sample (hopefully) */
 #ifdef DEBUG_REACTION
@@ -388,29 +388,6 @@ void post_scatter_exit(ion *p, const depth depth_start, const sim_workspace *ws,
         }
         d = d_after;
     }
-}
-
-void foil_traverse(ion *p, const sample *foil, const sim_workspace *ws) {
-    if(!foil)
-        return;
-    depth d = {.i = 0, .x = 0.0};
-    ion ion_foil = *p;
-    ion_set_angle(&ion_foil, 0.0, 0.0); /* Foils are not tilted. We use a temporary copy of "p" to do this step. */
-    size_t i = 0;
-    while(1) {
-        i++;
-        if(foil->ranges[foil->n_ranges - 1].x - d.x < DEPTH_TOLERANCE) {
-            break;
-        }
-        depth d_after = stop_step(ws, &ion_foil, foil, d,
-                                  ws->params->stop_step_exiting == 0.0 ? ws->params->stop_step_fudge_factor * (p->E * 0.05 + sqrt(p->S) + 1.0 * C_KEV) : ws->params->stop_step_exiting);
-        if(ion_foil.E < ws->emin) {
-            break;
-        }
-        d = d_after;
-    }
-    p->E = ion_foil.E;
-    p->S = ion_foil.S;
 }
 
 double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calculate stop step to take */
@@ -531,7 +508,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     return EXIT_SUCCESS;
 }
 
-void simulate_reaction(sim_reaction *sim_r, const sim_workspace *ws, const sample *sample, const geostragg_vars *g, size_t i_depth, const depth d_before, const depth d_after, const ion *ion, double E_front, double S_front, double E_back, double S_back, double d_diff) {
+void simulate_reaction(sim_reaction *sim_r, const sim_workspace *ws, const sample *sample, const geostragg_vars *g, size_t i_depth, const depth d_before, const depth d_after, const ion *incident, double E_front, double S_front, double E_back, double S_back, double d_diff) {
 #ifdef N_BRICKS_REDUNDANT_CHECK
     if(i_depth >= r->n_bricks) { /* This check is currently not necessary, since r->n_bricks == ws->n_bricks */
                 fprintf(stderr, "Too many bricks (%zu max). Data partial.\n", r->n_bricks);
@@ -549,31 +526,40 @@ void simulate_reaction(sim_reaction *sim_r, const sim_workspace *ws, const sampl
         return;
     }
 #if 0
-    if(ion->E + 3.0*sqrt(ion->S) < sim_r->r->E_min) { /* Beam average energy is three sigmas below reaction minimum, we can stop calculation (due to straggling weighted cross sections we can't stop immediately below E_min). */
+    if(incident->E + 3.0*sqrt(incident->S) < sim_r->r->E_min) { /* Beam average energy is three sigmas below reaction minimum, we can stop calculation (due to straggling weighted cross sections we can't stop immediately below E_min). */
         b->Q = 0.0;
         sim_r->stop = TRUE;
         return;
     }
 #endif
     b->d = d_before;
-    b->E_0 = ion->E; /* Sort of energy just before the reaction. */
-    b->S_0 = ion->S;
+    b->E_0 = incident->E; /* Sort of energy just before the reaction. */
+    b->S_0 = incident->S;
 
 #ifdef DEBUG_REACTION
     fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
 #endif
     if(ws->params->geostragg) {
-        b->S_geo_x = geostragg(ws, sample, sim_r, &(g->x), d_after, ion->E);
-        b->S_geo_y = geostragg(ws, sample, sim_r, &(g->y), d_after, ion->E);
+        b->S_geo_x = geostragg(ws, sample, sim_r, &(g->x), d_after, incident->E);
+        b->S_geo_y = geostragg(ws, sample, sim_r, &(g->y), d_after, incident->E);
     }
-    sim_reaction_product_energy_and_straggling(sim_r, ion);
+    sim_reaction_product_energy_and_straggling(sim_r, incident);
     assert(sim_r->p.E > 0.0);
     b->E_r = sim_r->p.E;
     b->S_r = sim_r->p.S;
-    post_scatter_exit(&sim_r->p, d_after, ws, sample);
-    foil_traverse(&sim_r->p, ws->det->foil, ws);
-    b->E = sim_r->p.E;
-    b->S = sim_r->p.S;
+    exit_from_sample(&sim_r->p, d_after, ws, sample);
+
+    if(ws->det->foil) { /* Energy loss in detector foil */
+        depth d_foil = {.i = 0, .x = 0.0};
+        ion ion_foil = *&sim_r->p;
+        ion_set_angle(&ion_foil, 0.0, 0.0); /* Foils are not tilted. We use a temporary copy of "p" to do this step. */
+        exit_from_sample(&ion_foil, d_foil, ws, ws->det->foil);
+        b->E = ion_foil.E;
+        b->S = ion_foil.S;
+    } else {
+        b->E = sim_r->p.E;
+        b->S = sim_r->p.S;
+    }
 #ifdef DEBUG_VERBOSE
     fprintf(stderr, "Reaction %2zu depth from %8.3lf tfu to %8.3lf tfu, E = %8.3lf keV, Straggling: eloss %7.3lf keV, geo %7.3lf keV\n", i, d_before.x/C_TFU, d_after.x/C_TFU, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo_x+b->S_geo_y)/C_KEV);
 #endif
@@ -593,7 +579,7 @@ void simulate_reaction(sim_reaction *sim_r, const sim_workspace *ws, const sampl
         if(d_after.i == sample->n_ranges - 2) {
             sigma_conc *= ws->sim->channeling_offset + ws->sim->channeling_slope * (E_front + E_back) / 2.0;
         }
-        b->Q = ion->inverse_cosine_theta * sigma_conc * b->thick;
+        b->Q = incident->inverse_cosine_theta * sigma_conc * b->thick;
         b->sc = sigma_conc;
         assert(b->Q >= 0.0);
 #ifdef DEBUG_VERBOSE
