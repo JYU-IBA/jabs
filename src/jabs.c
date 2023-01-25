@@ -1412,7 +1412,6 @@ int simulate_with_ds(sim_workspace *ws) {
                 cs_sum += c * cs;
 
                 double fluence_tot = cs_sum * thick_step * ion1.inverse_cosine_theta * (2.0 * C_PI) * ds_polar_step; /* TODO: check calculation after moving from p_sr to fluence!*/
-                p_sum += fluence_tot;
                 double fluence_azi = fluence_tot / (1.0 * (ds_steps_azi));
                 for(int i_azi = 0; i_azi < ds_steps_azi; i_azi++) {
                     ion2 = ion1;
@@ -1442,5 +1441,3 @@ int simulate_with_ds(sim_workspace *ws) {
     sim_workspace_calculate_sum_spectra(ws);
     return EXIT_SUCCESS;
 }
-
-
