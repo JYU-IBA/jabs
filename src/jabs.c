@@ -132,7 +132,7 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     assert(dt->n > 0);
     double E = incident->E;
     for(i = *i_des; i < dt->n - 1; i++) {
-        if(i + 1 < dt->n - 1 && dt->t[i].d.i != dt->t[i + 1].d.i) { /* This means last point of this layer */
+        if(dt->t[i].d.i != dt->t[i + 1].d.i) { /* This means last point of this layer */
             E = dt->t[i].E;
             *i_des = i + 1; /* The +1 prevents stopping at this same layer boundary on the next call */
 #ifdef DEBUG
@@ -143,6 +143,14 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
         if(dt->t[i].E < E) {/* i is the index of the first element in dt->t that has energy below E. So i-1 should have energy above E. */
             *i_des = i;
             break;
+        }
+    }
+    if(i == dt->n - 1) {
+        if(E < dt->t[i].E) {
+#ifdef DEBUG
+            fprintf(stderr, "Energy is below last point in table.\n");
+#endif
+            E = dt->t[i].E;
         }
     }
     assert(i > 0);
@@ -157,31 +165,23 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     double S_interval = des_high->S - des_low->S;
     double d_interval = depth_diff(des_low->d, des_high->d);
     double frac = (E_diff/E_interval); /* zero if close to low bin */
-    if(frac > 1.0) {
-#ifdef DEBUG
-        fprintf(stderr, "Enforcing interpolation, instead of extrapolation.\n");
-#endif
-        frac = 1.0;
-    }
-    assert(frac >= 0.0);
+    assert(frac >= 0.0 && frac <= 1.0);
     depth d_out;
     if(depth_prev.i != des_high->d.i) { /* First point after crossing layer */
         d_out.i = des_high->d.i;
-#ifdef DEBUG
-        fprintf(stderr, "d_out.i = %zu (from des_high)\n", d_out.i);
-#endif
     } else {
         d_out.i = depth_prev.i;
-#ifdef DEBUG
-        fprintf(stderr, "d_out.i = %zu (from depth_prev)\n", d_out.i);
-#endif
     }
     d_out.x = des_low->d.x + frac * (d_interval); /* Linear interpolation */
-#ifdef DEBUG
-    fprintf(stderr, "d_out = %g tfu (i = %zu)\n", d_out.x / C_TFU, d_out.i);
-#endif
+#if 0
     incident->E = des_low->E + frac * E_interval;
+#else
+    incident->E = E;
+#endif
     incident->S = des_low->S + frac * S_interval;
+#ifdef DEBUG
+    fprintf(stderr, "d_out = %g tfu (i = %zu), E = %g keV, S = %g keV\n", d_out.x / C_TFU, d_out.i, incident->E / C_KEV, sqrt(incident->S) * C_FWHM / C_KEV);
+#endif
     return d_out;
 }
 
