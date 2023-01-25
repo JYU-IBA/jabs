@@ -557,6 +557,53 @@ double cross_section_concentration_product_fixed(const sim_workspace *ws, const 
     return sample->ranges[d.i].yield * sum / (ws->params->cs_n_steps * 1.0);
 }
 
+double cross_section_concentration_product_new(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
+    const int type = 1; /* TODO: pick either adaptive or something else */
+    const double E_step_nominal = -10.0 * C_KEV;
+    double sigma;
+    double c; /* Concentration (but only if constant!) */
+    if(sample->no_conc_gradients) {
+        c = *sample_conc_bin(sample, d_before->i, sim_r->i_isotope); /* Concentration weighting was not done inside the loop */
+        if(c < CONC_TOLERANCE) {
+            return 0.0;
+        }
+    }
+    depth d = *d_before;
+    if(type == 0) {
+        sigma = cross_section_concentration_product_adaptive(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
+    } else {
+        double E_diff = E_back - E_front;
+        size_t n_steps = ceil((E_diff)/E_step_nominal);
+        double frac = 1.0/(1.0*(n_steps+1));
+        const double x_step = (d_after->x - d_before->x) * frac;
+        const double E_step = (E_back - E_front) * frac;
+        const double S_step = (S_back - S_front) * frac;
+#ifdef DEBUG
+        fprintf(stderr, "E_step_nominal = %g keV, E = %g ... %g keV, actual E_step = %g keV\n", E_step_nominal / C_KEV, E_front / C_KEV, E_back / C_KEV, E_step / C_KEV);
+#endif
+        double sum = 0.0;
+        for(size_t i = 1; i <= n_steps; i++) { /* Compute cross section and concentration product in several "sub-steps" */
+            double E = E_front + E_step * i;
+            double S = S_front + S_step * i;
+            d.x = d_before->x + x_step * i;
+            double sigma_partial = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, E, S);
+            if(!sample->no_conc_gradients) { /* We have concentration gradient */
+                double c = get_conc(sample, d, sim_r->i_isotope);
+                sigma_partial *= c;
+            }
+            sum += sigma_partial;
+#ifdef DEBUG
+            fprintf(stderr, "i = %zu, E = %g keV, (E_front = %g keV, E_back = %g keV), sigma = %g mb/sr\n", i, E/C_KEV, E_front/C_KEV, E_back/C_KEV, sigma_partial / C_MB_SR);
+#endif
+        }
+        sigma = sum / n_steps;
+        if(sample->no_conc_gradients) {
+            sigma *= c; /* Concentration weighting was not done inside the loop */
+        }
+    }
+    return sample->ranges[d.i].yield * sigma;
+}
+
 double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after,
                                            double S_front, double S_back) {
     if(ws->params->mean_conc_and_energy) { /* This if-branch is fast and also serves as a testing branch, since it is a lot easier to understand... */
@@ -634,7 +681,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
     des_table_set_ion_depth(dt, &ion1, depth_start); /* TODO: is this necessary? */
     simulate_init_reaction(sim_r, sample, g, ws->emin, ion1.E);
     depth d_before, d_after = depth_start;
-    size_t i_des = 0, i_range = depth_start.i;
+    size_t i_des = 0;
     brick *b = NULL, *b_prev = NULL;
     int skipped, crossed;
     for(size_t i_brick = 0; i_brick < sim_r->n_bricks; i_brick++) {
@@ -645,6 +692,13 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         b = &sim_r->bricks[i_brick];
         d_before = d_after;
         d_after = des_table_find_depth(dt, &i_des, d_before, &ion1);
+        if(ion1.E < ws->emin) {
+#ifdef DEBUG
+            fprintf(stderr, "Energy minimum.\n");
+#endif
+            sim_r->last_brick = i_brick - 1;
+            break;
+        }
         if(i_brick == 0 || d_after.i > d_before.i) { /* There was a layer (depth range) crossing. If stop_step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
 #ifndef NO_SKIP_EMPTY_RANGES
             double conc_start = *sample_conc_bin(sample, d_after.i, sim_r->i_isotope);
@@ -697,12 +751,17 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
             b->S = sim_r->p.S;
         }
 
+        if(b->E < ws->emin) {
+            sim_r->last_brick = i_brick - 1;
+            break;
+        }
+
         double E_deriv;
         double sigma_conc;
         double d_diff;
 
         if(b_prev) {
-            sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
+            sigma_conc = cross_section_concentration_product_new(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
             d_diff = depth_diff(d_before, d_after);
             if(d_diff == 0) { /* Zero thickness brick, so no energy change either */
                 E_deriv = b_prev->deriv * 1.5; /* TODO: Can't calculate, assume. The 1.5 is a safety factor. TODO: may lead to exponential growth...  */
@@ -750,6 +809,12 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
                 b->E / C_KEV, sqrt(b->S) / C_KEV,
                 E_deriv, get_conc(sample, d_after, sim_r->i_isotope) * 100.0, sigma_conc / C_MB_SR, b->Q, b->deriv);
 #endif
+
+        assert(!isnan(ion1.E));
+        if(d_after.x >= sim_r->max_depth) {
+            sim_r->last_brick = i_brick;
+            break;
+        }
         if(!skipped) {
             double S_sigma = sqrt(detector_resolution(ws->det, sim_r->p.isotope, b->E) + b->S);
             assert(S_sigma > 0.0);
@@ -761,18 +826,6 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
                 fprintf(stderr, "Using a high deriv energy changes by %g keV.\n", E_change/C_KEV);
 #endif
             }
-        }
-        assert(!isnan(ion1.E));
-        if(ion1.E < ws->emin) {
-#ifdef DEBUG
-            fprintf(stderr, "Energy minimum.\n");
-#endif
-            sim_r->last_brick = i_brick;
-            break;
-        }
-        if(d_after.x >= sim_r->max_depth) {
-            sim_r->last_brick = i_brick;
-            break;
         }
     }
 }

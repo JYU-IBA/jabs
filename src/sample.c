@@ -42,7 +42,9 @@ extern inline double *sample_model_conc_bin(const sample_model *sm, size_t i_ran
 double get_conc(const sample *s, const depth depth, size_t i_isotope) {
     assert(i_isotope < s->n_isotopes);
     size_t i_range = depth.i;
-    double x = depth.x;
+    if(s->no_conc_gradients) {
+        return *sample_conc_bin(s, i_range, i_isotope);
+    }
     assert(i_range < s->n_ranges-1);
 #ifdef RANGE_PEDANTIC
     assert(x >= s->ranges[i_range].x);
@@ -51,6 +53,7 @@ double get_conc(const sample *s, const depth depth, size_t i_isotope) {
     size_t i = i_range * s->n_isotopes + i_isotope;
     if(s->ranges[i_range+1].x - s->ranges[i_range].x == 0) /* Zero width. Return value of left side. */
         return s->cbins[i];
+    const double x = depth.x;
     return s->cbins[i] + ((s->cbins[i+s->n_isotopes] - s->cbins[i])/(s->ranges[i_range+1].x - s->ranges[i_range].x)) * (x - s->ranges[i_range].x);
 }
 

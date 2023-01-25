@@ -60,6 +60,7 @@ int assign_stopping_Z1_Z2(jibal_gsto *gsto, int Z1, int Z2);
 int print_spectra(const char *filename, const sim_workspace *ws, const gsl_histogram *exp);
 int print_bricks(const char *filename, const sim_workspace *ws);
 int simulate_with_ds(sim_workspace *ws);
+double cross_section_concentration_product_new(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back);
 double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back);
 double cross_section_concentration_product_fixed(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back);
 double cross_section_concentration_product_adaptive(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back);
