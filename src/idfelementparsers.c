@@ -102,8 +102,9 @@ int idf_parse_simple_data(idf_parser *idf, xmlNode *simple_data) {
     char *x_raw = idf_node_content_to_str(findnode(simple_data, "x"));
     char *y_raw = idf_node_content_to_str(findnode(simple_data, "y"));
     char *filename = idf_file_name_with_suffix(idf, SPECTRUM_FILE_SUFFIX);
-    idf_write_simple_data_to_file(filename, x_raw, y_raw);
-    idf_output_printf(idf, "load exp \"%s\"\n", filename);
+    if(idf_write_simple_data_to_file(filename, x_raw, y_raw) == IDF2JBS_SUCCESS) {
+        idf_output_printf(idf, "load exp \"%s\"\n", filename);
+    }
     free(filename);
     return IDF2JBS_SUCCESS;
 }
