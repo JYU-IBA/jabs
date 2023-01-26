@@ -559,7 +559,11 @@ double cross_section_concentration_product_fixed(const sim_workspace *ws, const 
 
 double cross_section_concentration_product_new(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
     const int type = 1; /* TODO: pick either adaptive or something else */
-    const double E_step_nominal = -10.0 * C_KEV;
+    const double E_step_max = 10.0 * C_KEV;
+    const double depth_step_max = 100.0 * C_TFU;
+    const double S_avg_FWHM = C_FWHM * sqrt((S_front + S_back)/2.0); /* units of energy... instread of C_FWHM we should have a configurable "fudge factor" here */
+    const double E_step_nominal = -1.0 * GSL_MIN_DBL(E_step_max, S_avg_FWHM); /* Actual step is negative */
+    const double d_diff = d_after->x - d_before->x;
     double sigma;
     double c; /* Concentration (but only if constant!) */
     if(sample->no_conc_gradients) {
@@ -573,13 +577,13 @@ double cross_section_concentration_product_new(const sim_workspace *ws, const sa
         sigma = cross_section_concentration_product_adaptive(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
     } else {
         double E_diff = E_back - E_front;
-        size_t n_steps = ceil((E_diff)/E_step_nominal);
+        size_t n_steps = GSL_MAX(ceil((E_diff)/E_step_nominal), ceil(d_diff/depth_step_max));
         double frac = 1.0/(1.0*(n_steps+1));
         const double x_step = (d_after->x - d_before->x) * frac;
         const double E_step = (E_back - E_front) * frac;
         const double S_step = (S_back - S_front) * frac;
 #ifdef DEBUG
-        fprintf(stderr, "E_step_nominal = %g keV, E = %g ... %g keV, actual E_step = %g keV\n", E_step_nominal / C_KEV, E_front / C_KEV, E_back / C_KEV, E_step / C_KEV);
+        fprintf(stderr, "E_step_nominal = %g keV, n_steps = %zu, S_avg %g keV, E = %g ... %g keV, actual E_step = %g keV\n", E_step_nominal / C_KEV, n_steps, S_avg_FWHM / C_KEV, E_front / C_KEV, E_back / C_KEV, E_step / C_KEV);
 #endif
         double sum = 0.0;
         for(size_t i = 1; i <= n_steps; i++) { /* Compute cross section and concentration product in several "sub-steps" */
@@ -593,7 +597,7 @@ double cross_section_concentration_product_new(const sim_workspace *ws, const sa
             }
             sum += sigma_partial;
 #ifdef DEBUG
-            fprintf(stderr, "i = %zu, E = %g keV, (E_front = %g keV, E_back = %g keV), sigma = %g mb/sr\n", i, E/C_KEV, E_front/C_KEV, E_back/C_KEV, sigma_partial / C_MB_SR);
+            fprintf(stderr, "i = %zu, E = %g keV, S = %g keV, (E_front = %g keV, E_back = %g keV), sigma = %g mb/sr\n", i, E/C_KEV, C_FWHM * sqrt(S)/C_KEV, E_front/C_KEV, E_back/C_KEV, sigma_partial / C_MB_SR);
 #endif
         }
         sigma = sum / n_steps;
@@ -761,15 +765,15 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         double d_diff;
 
         if(b_prev) {
-            sigma_conc = cross_section_concentration_product_new(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
             d_diff = depth_diff(d_before, d_after);
             if(d_diff == 0) { /* Zero thickness brick, so no energy change either */
                 E_deriv = b_prev->deriv * 1.5; /* TODO: Can't calculate, assume. The 1.5 is a safety factor. TODO: may lead to exponential growth...  */
 #ifdef DEBUG
                 fprintf(stderr, "Zero thickness brick (after skip?)\n");
 #endif
-
+                sigma_conc = 0.0;
             } else {
+                sigma_conc = cross_section_concentration_product_new(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
                 assert(b_prev->E_0 > b->E_0);
                 double E0_diff = b_prev->E_0 - b->E_0;
                 double E_diff = b_prev->E - b->E;
