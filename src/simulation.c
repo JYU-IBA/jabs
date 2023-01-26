@@ -644,6 +644,7 @@ void sim_workspace_histograms_calculate(sim_workspace *ws) {
 #ifdef DEBUG_VERBOSE
         fprintf(stderr, "Reaction %i:\n", i);
 #endif
+        assert(r->last_brick < r->n_bricks);
         bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
         bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->params->gaussian_accurate);
     }

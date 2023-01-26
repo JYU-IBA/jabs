@@ -117,6 +117,7 @@ void des_table_print(FILE *f, const des_table *dt) {
     if(!dt) {
         return;
     }
+    fprintf(f, "DES    i d.i        d.x        d.E      d.S\n");
     for(size_t i = 0; i < dt->n; i++) {
         const des *des = &(dt->t[i]);
         fprintf(f, "DES %4zu %3zu %10.3lf %10.3lf %8.3lf\n", i, des->d.i, des->d.x / C_TFU, des->E / C_KEV, sqrt(des->S) / C_KEV);
@@ -135,7 +136,7 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
         if(dt->t[i].d.i != dt->t[i + 1].d.i) { /* This means last point of this layer */
             E = dt->t[i].E;
             *i_des = i + 1; /* The +1 prevents stopping at this same layer boundary on the next call */
-#ifdef DEBUG
+#ifdef JABS_DEBUG_DES
             fprintf(stderr, "Layer boundary at %g tfu. Setting E = %g keV and i_des = %zu. index = %zu\n", dt->t[i].d.x / C_TFU, E / C_KEV, *i_des, dt->depth_interval_index[dt->t[i + 1].d.i]);
 #endif
             break;
@@ -147,7 +148,7 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     }
     if(i == dt->n - 1) {
         if(E < dt->t[i].E) {
-#ifdef DEBUG
+#ifdef JABS_DEBUG_DES
             fprintf(stderr, "Energy %g keV is below last point in table (%g keV).\n", E / C_KEV, dt->t[i].E / C_KEV);
 #endif
             E = dt->t[i].E;
@@ -156,7 +157,7 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     assert(i > 0);
     const des *des_low = &dt->t[i - 1]; /* Closer to surface, higher energy */
     const des *des_high = &dt->t[i]; /* Deeper, lower energy */
-#ifdef DEBUG
+#ifdef JABS_DEBUG_DES
     fprintf(stderr, "des_low = %g tfu (i = %zu), des_high = %g tfu (i = %zu), depth_prev = %g tfu (i = %zu)\n", des_low->d.x / C_TFU, des_low->d.i, des_high->d.x / C_TFU, des_high->d.i, depth_prev.x / C_TFU, depth_prev.i);
 #endif
 
@@ -179,7 +180,7 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     incident->E = E;
 #endif
     incident->S = des_low->S + frac * S_interval;
-#ifdef DEBUG
+#ifdef JABS_DEBUG_DES
     fprintf(stderr, "d_out = %g tfu (i = %zu), E = %g keV, S = %g keV\n", d_out.x / C_TFU, d_out.i, incident->E / C_KEV, sqrt(incident->S) * C_FWHM / C_KEV);
 #endif
     return d_out;
@@ -584,7 +585,7 @@ double cross_section_concentration_product_new(const sim_workspace *ws, const sa
         const double x_step = (d_after->x - d_before->x) * frac;
         const double E_step = (E_back - E_front) * frac;
         const double S_step = (S_back - S_front) * frac;
-#ifdef DEBUG
+#ifdef JABS_DEBUG_CS
         fprintf(stderr, "E_step_nominal = %g keV, n_steps = %zu, S_avg %g keV, E = %g ... %g keV, actual E_step = %g keV\n", E_step_nominal / C_KEV, n_steps, S_avg_FWHM / C_KEV, E_front / C_KEV, E_back / C_KEV, E_step / C_KEV);
 #endif
         double sum = 0.0;
@@ -598,7 +599,7 @@ double cross_section_concentration_product_new(const sim_workspace *ws, const sa
                 sigma_partial *= c;
             }
             sum += sigma_partial;
-#ifdef DEBUG
+#ifdef JABS_DEBUG_CS
             fprintf(stderr, "i = %zu, E = %g keV, S = %g keV, (E_front = %g keV, E_back = %g keV), sigma = %g mb/sr\n", i, E/C_KEV, C_FWHM * sqrt(S)/C_KEV, E_front/C_KEV, E_back/C_KEV, sigma_partial / C_MB_SR);
 #endif
         }
@@ -690,6 +691,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
     size_t i_des = 0;
     brick *b = NULL, *b_prev = NULL;
     int skipped, crossed;
+    sim_r->last_brick = 0;
     for(size_t i_brick = 0; i_brick < sim_r->n_bricks; i_brick++) {
         assert(ion1.S >= 0.0);
         skipped = FALSE;
@@ -709,7 +711,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
 #ifndef NO_SKIP_EMPTY_RANGES
             double conc_start = *sample_conc_bin(sample, d_after.i, sim_r->i_isotope);
             double conc_stop = *sample_conc_bin(sample, d_after.i + 1, sim_r->i_isotope);
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
             fprintf(stderr, "Brick %zu crosses into range %zu, d_before = %g tfu.\n", i_brick, d_after.i, d_before.x / C_TFU);
             fprintf(stderr, "Concentration varies between %g%% and %g%%\n", conc_start * 100.0, conc_stop * 100.0);
 #endif
@@ -720,7 +722,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
                 ion1.S = des_skip->S;
                 d_after = des_skip->d;
                 skipped = TRUE;
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
                 fprintf(stderr, "Skipped to %g.\n", d_after.x / C_TFU);
 #endif
             }
@@ -770,9 +772,6 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
             d_diff = depth_diff(d_before, d_after);
             if(d_diff == 0) { /* Zero thickness brick, so no energy change either */
                 E_deriv = b_prev->deriv * 1.5; /* TODO: Can't calculate, assume. The 1.5 is a safety factor. TODO: may lead to exponential growth...  */
-#ifdef DEBUG
-                fprintf(stderr, "Zero thickness brick (after skip?)\n");
-#endif
                 sigma_conc = 0.0;
             } else {
                 sigma_conc = cross_section_concentration_product_new(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
@@ -780,42 +779,35 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
                 double E0_diff = b_prev->E_0 - b->E_0;
                 double E_diff = b_prev->E - b->E;
                 E_deriv = fabs(E_diff / E0_diff); /* how many keVs does the reaction product energy change for each keV of incident ion1 energy change */
-#ifdef DEBUG
-                fprintf(stderr, "should deriv be %g? (based on difference to previous brick in incident energy %g keV and detector energy %g keV)\n", E_deriv, E0_diff / C_KEV, E_diff / C_KEV); /* TODO: this is accurate only near surface */
-#endif
                 assert(E_deriv > 0.0);
             }
         } else { /* First brick */
             sigma_conc = 0.0;
             d_diff = 0.0;
-            double k_incident = stop_sample(ws, &ion1, sample, ws->stopping_type, d_after, b->E_0);
-            double k_exiting = stop_sample(ws, &sim_r->p, sample, ws->stopping_type, d_after, b->E_r);
+            double stop_incident = stop_sample(ws, &ion1, sample, ws->stopping_type, d_after, b->E_0) * ion1.inverse_cosine_theta;
+            double stop_exiting = stop_sample(ws, &sim_r->p, sample, ws->stopping_type, d_after, b->E_r) * sim_r->p.inverse_cosine_theta;
             double K = reaction_product_energy(sim_r->r, sim_r->theta, b->E_0) / b->E_0;
-            double k_incident_eff = k_incident * ion1.inverse_cosine_theta;
-            double k_exiting_eff = k_exiting * sim_r->p.inverse_cosine_theta;
-
-            E_deriv = fabs((K * k_incident * ion1.inverse_cosine_theta - k_exiting * sim_r->p.inverse_cosine_theta) / (k_incident * ion1.inverse_cosine_theta)); /* TODO: NaN if reaction is not possible */
-#ifdef DEBUG
-            fprintf(stderr, "should deriv be %g? (calculated using stopping powers and kinematics: %g eV/tfu and %g eV/tfu)\n", E_deriv, k_incident_eff / C_EV_TFU, k_exiting_eff / C_EV_TFU); /* TODO: this is accurate only near surface */
-#endif
-
+            E_deriv = fabs((K * stop_incident - stop_exiting ) / (stop_incident)); /* TODO: NaN if reaction is not possible */
         }
-        if(E_deriv < ENERGY_DERIVATIVE_MIN) {
-            E_deriv = ENERGY_DERIVATIVE_MIN;
-        }
+        E_deriv = GSL_MAX_DBL(E_deriv, ENERGY_DERIVATIVE_MIN);
+        E_deriv = GSL_MIN_DBL(E_deriv, ENERGY_DERIVATIVE_MAX);
         b->deriv = E_deriv;
         b->thick = d_diff;
         b->Q = ion1.inverse_cosine_theta * sigma_conc * b->thick;
         b->sc = sigma_conc;
 #ifdef DEBUG
-        fprintf(stderr, "%12s %3zu %3zu:%10.3lf %3zu:%10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %.3lf %10.3e %8.3lf\n",
-                sim_r->r->target->name, i_brick, d_before.i, d_before.x / C_TFU, d_after.i, d_after.x / C_TFU, i_des,
+        fprintf(stderr, "%12s %6s %3zu %3zu:%10.3lf %3zu:%10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %8.3lf %10.3e %8.3lf %2i\n",
+                sim_r->r->target->name, reaction_type_to_string(sim_r->r->type), i_brick,
+                d_before.i, d_before.x / C_TFU,
+                d_after.i, d_after.x / C_TFU,
+                i_des,
                 b->E_0 / C_KEV, sqrt(b->S_0) / C_KEV,
                 b->E_r / C_KEV, sqrt(b->S_r) / C_KEV,
                 b->E / C_KEV, sqrt(b->S) / C_KEV,
-                E_deriv, get_conc(sample, d_after, sim_r->i_isotope) * 100.0, sigma_conc / C_MB_SR, b->Q, b->deriv);
+                E_deriv, get_conc(sample, d_after, sim_r->i_isotope) * 100.0, sigma_conc / C_MB_SR, b->Q, b->deriv,
+                crossed + skipped
+                );
 #endif
-
         assert(!isnan(ion1.E));
         if(d_after.x >= sim_r->max_depth) {
             sim_r->last_brick = i_brick;
@@ -843,7 +835,17 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     des_table_print(stderr, dt);
 #endif
     for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
-        simulate_reaction_new_routine(incident, depth_start, ws, sample, dt, &g, ws->reactions[i_reaction]);
+        sim_reaction *sim_r = ws->reactions[i_reaction];
+#ifdef DEBUG
+        fprintf(stderr, "Simulating reaction i_reaction = %zu type %s target %s (i_isotope = %zu, i_jibal = %zu) product %s (i_jibal = %zu)\n",
+                i_reaction, reaction_type_to_string(sim_r->r->type),
+                sim_r->r->target->name, sim_r->i_isotope, sim_r->r->target->i,
+                sim_r->r->product->name, sim_r->r->product->i);
+#endif
+        simulate_reaction_new_routine(incident, depth_start, ws, sample, dt, &g, sim_r);
+#ifdef DEBUG
+        fprintf(stderr, "Finished. sim_r->last_brick = %zu (%zu/%zu). depth = %g tfu\n\n", sim_r->last_brick, sim_r->last_brick + 1, sim_r->n_bricks, sim_r->bricks[sim_r->last_brick].d.x / C_TFU);
+#endif
     }
     des_table_free(dt);
     sim_workspace_histograms_calculate(ws);
@@ -1060,7 +1062,7 @@ void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const geo
         sim_r->stop = TRUE;
     }
 #ifdef DEBUG
-    fprintf(stderr, "Simulation reaction: %s %s. Max depth %g tfu. i_isotope=%zu, stop = %i.\n\n"
+    fprintf(stderr, "Simulation reaction %s %s initialized. Max depth %g tfu. i_isotope=%zu, stop = %i.\n"
             , reaction_name(sim_r->r), sim_r->r->target->name, sim_r->max_depth / C_TFU, sim_r->i_isotope, sim_r->stop);
     ion_print(stderr, &sim_r->p);
 #endif
