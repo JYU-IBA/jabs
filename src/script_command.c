@@ -1257,7 +1257,10 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_accuracy",             &sim->params->int_cs_accuracy,             NULL},
             {JIBAL_CONFIG_VAR_SIZE,   "int_cs_stragg_max_intervals", &sim->params->int_cs_stragg_max_intervals, NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_stragg_accuracy",      &sim->params->int_cs_stragg_accuracy,      NULL},
-            {JIBAL_CONFIG_VAR_NONE, NULL, NULL,                                                                 NULL}
+            {JIBAL_CONFIG_VAR_UNIT,   "cs_energy_step_max",          &sim->params->cs_energy_step_max,          NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "cs_depth_step_max",           &sim->params->cs_depth_step_max,           NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "cs_stragg_step_fudge_factor", &sim->params->cs_stragg_step_fudge_factor, NULL},
+            {JIBAL_CONFIG_VAR_NONE,   NULL,                          NULL,                                      NULL}
     };
     c = script_command_list_from_vars_array(vars, 0);
     script_command_list_add_command(&c_set->subcommands, c);

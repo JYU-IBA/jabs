@@ -559,11 +559,13 @@ double cross_section_concentration_product_fixed(const sim_workspace *ws, const 
 
 double cross_section_concentration_product_new(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
     const int type = 1; /* TODO: pick either adaptive or something else */
-    const double E_step_max = 10.0 * C_KEV;
-    const double depth_step_max = 100.0 * C_TFU;
-    const double S_avg_FWHM = C_FWHM * sqrt((S_front + S_back)/2.0); /* units of energy... instread of C_FWHM we should have a configurable "fudge factor" here */
+    const double E_step_max = ws->params->cs_energy_step_max;
+    const double depth_step_max = ws->params->cs_depth_step_max;
+    const double S_avg_FWHM = ws->params->cs_stragg_step_fudge_factor * sqrt((S_front + S_back)/2.0);
     const double E_step_nominal = -1.0 * GSL_MIN_DBL(E_step_max, S_avg_FWHM); /* Actual step is negative */
     const double d_diff = d_after->x - d_before->x;
+    assert(d_diff > 0);
+    assert(E_step_nominal < 0.0);
     double sigma;
     double c; /* Concentration (but only if constant!) */
     if(sample->no_conc_gradients) {
@@ -577,7 +579,7 @@ double cross_section_concentration_product_new(const sim_workspace *ws, const sa
         sigma = cross_section_concentration_product_adaptive(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
     } else {
         double E_diff = E_back - E_front;
-        size_t n_steps = GSL_MAX(ceil((E_diff)/E_step_nominal), ceil(d_diff/depth_step_max));
+        size_t n_steps = ceil(GSL_MAX_DBL(E_diff/E_step_nominal, d_diff/depth_step_max)); /* Choose the bigger of two evils. Should not be possible to take zero steps since d_diff should always be greater than zero. */
         double frac = 1.0/(1.0*(n_steps+1));
         const double x_step = (d_after->x - d_before->x) * frac;
         const double E_step = (E_back - E_front) * frac;

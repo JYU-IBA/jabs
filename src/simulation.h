@@ -56,6 +56,9 @@ typedef struct sim_calc_params {
     double int_cs_accuracy; /* Accuracy of conc*cross section integration (not always relevant) */
     size_t int_cs_stragg_max_intervals;
     double int_cs_stragg_accuracy; /* Accuracy of conc * straggling (gaussian) integration (not always relevant) */
+    double cs_energy_step_max; /* Largest energy step (incident beam, mean) between cross section * concentration evaluation. Weight by straggling happens inside this step (finer stepping).*/
+    double cs_depth_step_max /* Largest depth step for section * concentration evaluation. Also see cs_energy_step_max. */ ;
+    double cs_stragg_step_fudge_factor; /*  Cross section * concentration evaluation straggling step multiplier. Step is standard deviation times this. Maximum step may also be limited by cs_depth_step_max, cs_energy_step_max  */
 } sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
 
 typedef struct simulation {

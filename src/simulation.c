@@ -94,6 +94,9 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->int_cs_accuracy = CS_CONC_INTEGRATION_ACCURACY;
     p->int_cs_stragg_max_intervals = CS_STRAGG_MAX_INTEGRATION_INTERVALS;
     p->int_cs_stragg_accuracy = CS_STRAGG_INTEGRATION_ACCURACY;
+    p->cs_energy_step_max = CS_ENERGY_STEP_MAX_DEFAULT;
+    p->cs_depth_step_max = CS_DEPTH_STEP_MAX_DEFAULT;
+    p->cs_stragg_step_fudge_factor = CS_STRAGG_STEP_FUDGE_FACTOR_DEFAULT;
 #ifdef DEBUG
     fprintf(stderr, "New calc params created.\n");
 #endif
@@ -112,6 +115,9 @@ sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
     p->geostragg = FALSE;
     p->rough_layer_multiplier = 0.5;
     p->sigmas_cutoff = SIGMAS_FAST_CUTOFF;
+    p->cs_energy_step_max *= 2.0;
+    p->cs_depth_step_max *= 2.0;
+    p->cs_stragg_step_fudge_factor = 1.5;
     return p;
 }
 
@@ -122,6 +128,9 @@ sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
     p->stop_step_fudge_factor *= 0.5;
     p->sigmas_cutoff += 1.0;
     p->gaussian_accurate = TRUE;
+    p->cs_energy_step_max *= 0.75; /* TODO: not used? */
+    p->cs_depth_step_max *= 0.5; /* TODO: not used? */
+    p->cs_stragg_step_fudge_factor *= 0.75; /* TODO: not used? */
     return p;
 }
 
@@ -131,6 +140,9 @@ sim_calc_params *sim_calc_params_defaults_brisk(sim_calc_params *p) {
     p->stop_step_fudge_factor *= 1.25;
     p->stop_step_add *= 2.0;
     p->sigmas_cutoff -= 1.0;
+    p->cs_energy_step_max *= 1.5;
+    p->cs_depth_step_max *= 1.5;
+    p->cs_stragg_step_fudge_factor = 1.25;
     return p;
 }
 
@@ -141,6 +153,9 @@ sim_calc_params *sim_calc_params_defaults_improved(sim_calc_params *p) {
     p->stop_step_fudge_factor *= 0.75;
     p->sigmas_cutoff += 0.5;
     p->gaussian_accurate = TRUE;
+    p->cs_energy_step_max *= 0.75;
+    p->cs_depth_step_max *= 0.75;
+    p->cs_stragg_step_fudge_factor = 0.75;
     return p;
 }
 
