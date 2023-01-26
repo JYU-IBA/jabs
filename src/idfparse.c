@@ -60,7 +60,7 @@ idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_erro
         if(cur->type == XML_ELEMENT_NODE) {
             if(idf_stringeq(cur->name, name)) {
 #ifdef DEBUG
-                fprintf(stderr, "Found sample.\n");
+                fprintf(stderr, "foreach found %s.\n", name);
 #endif
                 if(f(idf, cur)) {
                     return IDF2JBS_FAILURE;
@@ -126,6 +126,7 @@ idf_error idf_write_simple_data_to_file(const char *filename, const char *x, con
     if(!f) {
         return IDF2JBS_FAILURE;
     }
+    size_t n = 0;
     while(1) {
         char *x_end, *y_end;
         double x_dbl = strtod(x, &x_end);
@@ -136,9 +137,14 @@ idf_error idf_write_simple_data_to_file(const char *filename, const char *x, con
         fprintf(f, "%g %g\n", floor(x_dbl), y_dbl);
         y = y_end;
         x = x_end;
+        n++;
     }
     fclose(f);
-    return IDF2JBS_SUCCESS;
+    if(n > 1) { /* At least two successfull conversions should be performed before we can call it a spectrum */
+        return IDF2JBS_SUCCESS;
+    } else {
+        return IDF2JBS_FAILURE;
+    }
 }
 
 idf_error idf_output_printf(idf_parser *idf, const char *format, ...) {
