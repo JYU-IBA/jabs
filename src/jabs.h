@@ -45,7 +45,8 @@ void des_table_rebuild_index(des_table *dt); /* called by des_table_compute() af
 void des_table_print(FILE *f, const des_table *dt);
 void des_table_set_ion_depth(const des_table *dt, ion *ion, depth d); /* Sets ion energy and straggling for some depth, based on des_table */
 depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev, ion *incident); /* Returns depth at given incident->E, or the next layer boundary, starting search from i_des in DES table. Updates i_des, incident->E and ->S. */
-inline double des_table_min_energy(const des_table *dt) {return dt->t[dt->n - 1].E;}
+inline const des *des_table_min_energy_bin(const des_table *dt) {return &(dt->t[dt->n - 1]);}
+void des_set_ion(const des *des, ion *ion);
 double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, depth depth, double E);
 depth next_crossing(const ion *incident, const sample *sample, const depth *d_from);
 depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, struct depth depth, double step);

@@ -35,7 +35,7 @@
 #include "message.h"
 #include "win_compat.h"
 
-extern inline double des_table_min_energy(const des_table *dt);
+extern inline const des *des_table_min_energy_bin(const des_table *dt);
 
 des_table *des_table_init(size_t n) {
     des_table *dt = malloc(sizeof(des_table));
@@ -145,7 +145,7 @@ void des_table_print(FILE *f, const des_table *dt) {
     fprintf(f, "DES DEPTH INCREASES: %s\n", dt->depth_increases?"TRUE":"FALSE");
     if(dt->depth_interval_index) {
         for(size_t i = 0; i < dt->n_ranges; i++) {
-            fprintf(f, "DES INDEX %3zu [%3zu,%3zu]\n", i, dt->depth_interval_index[i], dt->depth_interval_index[i + 1]);
+            fprintf(f, "DES INDEX %3zu [%4zu, %4zu]\n", i, dt->depth_interval_index[i], dt->depth_interval_index[i + 1]);
         }
     } else {
         fprintf(f, "DES INDEX DOES NOT EXIST\n");
@@ -198,14 +198,20 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     const des *des_low = &dt->t[i - 1]; /* Closer to surface, higher energy */
     const des *des_high = &dt->t[i]; /* Deeper, lower energy */
 #ifdef JABS_DEBUG_DES
-    fprintf(stderr, "des_low = %g tfu (i = %zu), des_high = %g tfu (i = %zu), depth_prev = %g tfu (i = %zu)\n", des_low->d.x / C_TFU, des_low->d.i, des_high->d.x / C_TFU, des_high->d.i, depth_prev.x / C_TFU, depth_prev.i);
+    fprintf(stderr, "dt->t[%zu] = %g tfu (i = %zu), dt->t[%zu] = %g tfu (i = %zu), depth_prev = %g tfu (i = %zu)\n",
+            i - 1,  des_low->d.x / C_TFU, des_low->d.i, i, des_high->d.x / C_TFU, des_high->d.i, depth_prev.x / C_TFU, depth_prev.i);
 #endif
 
     double E_diff = E - des_low->E;
     double E_interval = des_high->E - des_low->E;
     double S_interval = des_high->S - des_low->S;
     double d_interval = depth_diff(des_low->d, des_high->d);
-    double frac = (E_diff/E_interval); /* zero if close to low bin */
+    double frac;
+    if(fabs(E_interval) < 0.1 * C_EV) { /* Prevent div by zero */
+        frac = 0.0;
+    } else {
+        frac = (E_diff / E_interval); /* zero if close to low bin */
+    }
     assert(frac >= 0.0 && frac <= 1.0);
     depth d_out;
     if(depth_prev.i != des_high->d.i) { /* First point after crossing layer */
@@ -314,6 +320,10 @@ des_table *des_table_compute(const ion *incident, depth depth_start, sim_workspa
     }
 }
 
+void des_set_ion(const des *des, ion *ion) {
+    ion->E = des->E;
+    ion->S = des->S;
+}
 
 double stop_sample(const sim_workspace *ws, const ion *incident, const sample *sample, gsto_stopping_type type, const depth depth, double E) {
     const double em = E * incident->mass_inverse;
@@ -760,8 +770,9 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
     depth d_before, d_after = depth_start;
     size_t i_des = 0;
     brick *b = NULL, *b_prev = NULL;
-    int skipped, crossed;
+    int skipped, crossed, last = FALSE;
     sim_r->last_brick = 0;
+    const des *des_min = des_table_min_energy_bin(dt);
     for(size_t i_brick = 0; i_brick < sim_r->n_bricks; i_brick++) {
         assert(ion1.S >= 0.0);
         skipped = FALSE;
@@ -772,14 +783,15 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
 #ifdef DEBUG
         fprintf(stderr, "E = %g keV (incident)\n", ion1.E / C_KEV);
 #endif
-        d_after = des_table_find_depth(dt, &i_des, d_before, &ion1); /* Does this handle E below min? */
-        if(ion1.E < des_table_min_energy(dt)) { /* since DES table minimum should be above ws->emin, we don't need to check for that */
+        if(ion1.E < des_min->E) {
 #ifdef DEBUG
-            fprintf(stderr, "Incident energy below table minimum (%g keV).\n", des_table_min_energy(dt) / C_KEV);
+            fprintf(stderr, "E = %g keV (incident) is below %g keV. Changing energy. This will be the last brick!\n", ion1.E / C_KEV, des_min->E / C_KEV);
 #endif
-            sim_r->last_brick = i_brick - 1;
-            break;
+            des_set_ion(des_min, &ion1);
+            d_after = des_min->d;
+            last = TRUE;
         }
+        d_after = des_table_find_depth(dt, &i_des, d_before, &ion1); /* Does this handle E below min? */
         if(i_brick == 0 || d_after.i > d_before.i) { /* There was a layer (depth range) crossing. If stop_step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
 #ifndef NO_SKIP_EMPTY_RANGES
             double conc_start = *sample_conc_bin(sample, d_after.i, sim_r->i_isotope);
@@ -906,6 +918,12 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
 #endif
             break;
         }
+        if(last) {
+#ifdef DEBUG
+            fprintf(stderr, "It was already decided earlier that this should be the last brick.\n");
+            sim_r->last_brick = i_brick;
+#endif
+        }
         if(!skipped) {
             double S_sigma = sqrt(detector_resolution(ws->det, sim_r->p.isotope, b->E) + b->S);
             assert(S_sigma > 0.0);
@@ -918,6 +936,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
 #endif
             }
         }
+
     }
     assert(sim_r->last_brick < sim_r->n_bricks);
 }
