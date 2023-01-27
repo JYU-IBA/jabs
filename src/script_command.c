@@ -1250,7 +1250,6 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy",        &sim->params->mean_conc_and_energy,        NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "geostragg",                   &sim->params->geostragg,                   NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",                 &sim->params->beta_manual,                 NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "cs_n_steps",                  &sim->params->cs_n_steps,                  NULL},
             {JIBAL_CONFIG_VAR_SIZE,   "cs_n_stragg_steps",           &sim->params->cs_n_stragg_steps,           NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "gaussian_accurate",           &sim->params->gaussian_accurate,           NULL},
             {JIBAL_CONFIG_VAR_SIZE,   "int_cs_max_intervals",        &sim->params->int_cs_max_intervals,        NULL},

@@ -232,43 +232,6 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     return d_out;
 }
 
-void des_table_set_ion_depth(const des_table *dt, ion *ion, depth d) {
-    size_t lo, mi, hi;
-    if(dt->depth_increases) {
-        lo = dt->depth_interval_index[d.i];
-        hi = dt->depth_interval_index[d.i + 1];
-    } else {
-        lo = dt->depth_interval_index[d.i + 1];
-        hi = dt->depth_interval_index[d.i];
-    }
-
-#ifdef DEBUG_VERBOSE
-    fprintf(stderr, "Depth %g = tfu, index = %zu. Probably in DES table between %zu and %zu.\n", d.x / C_TFU, d.i, lo, hi);
-#endif
-    while (hi - lo > 1) {
-        mi = (hi + lo) / 2;
-        if (d.x >= dt->t[mi].d.x) {
-            lo = mi;
-        } else {
-            hi = mi;
-        }
-    }
-    double depth_diff = d.x - dt->t[lo].d.x; /* Positive */
-    double depth_interval = dt->t[hi].d.x - dt->t[lo].d.x;
-    double frac = depth_diff/depth_interval; /* zero at low bin, 1.0 at high bin */
-    double frac_inv = 1.0 - frac;
-    double E = dt->t[lo].E * frac_inv + dt->t[hi].E * frac;
-    double S = dt->t[lo].S * frac_inv + dt->t[hi].S * frac;
-    assert(depth_diff >= 0.0);
-    ion->E = E;
-    ion->S = S;
-    assert(S >= 0.0);
-#ifdef DEBUG_VERBOSE
-    fprintf(stderr, "lo = %zu, mi = %zu, hi = %zu, depth_diff = %g tfu, depth_interval = %g tfu, frac = %lf, E = %g keV, S = %g keV\n",
-            lo, mi, hi, depth_diff / C_TFU, depth_interval / C_TFU, frac, E / C_KEV, sqrt(S) / C_KEV);
-#endif
-}
-
 des_table *des_table_compute(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample) {
     ion ion = *incident;
     des_table *dt = des_table_init(DES_TABLE_INITIAL_ALLOC);
@@ -609,33 +572,7 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
     return final;
 }
 
-double cross_section_concentration_product_fixed(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after,
-                                           double S_front, double S_back) {
-    depth d;
-    d.i = d_after->i;
-    const double x_step = (d_after->x - d_before->x) * ws->params->cs_frac;
-    const double E_step = (E_back - E_front) * ws->params->cs_frac;
-    const double S_step = (S_back - S_front) * ws->params->cs_frac;
-    double sum = 0.0;
-    for(size_t i = 1; i <= ws->params->cs_n_steps; i++) { /* Compute cross section and concentration product in several "sub-steps" */
-        d.x = d_before->x + x_step * i;
-        double E = E_front + E_step * i;
-#ifdef DEBUG_CS_VERBOSE
-        fprintf(stderr, "i = %zu, E = %g keV, (E_front = %g keV, E_back = %g keV)\n", i, E/C_KEV, E_front/C_KEV, E_back/C_KEV);
-#endif
-        double c = get_conc(sample, d, sim_r->i_isotope);
-        double S = S_front + S_step * i;
-        double sigma = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, E, S);
-#ifdef DEBUG_CS_VERBOSE
-        fprintf(stderr, "S = %g, E = %g keV\n", S, E/C_KEV);
-#endif
-        sum += sigma * c;
-    }
-    return sample->ranges[d.i].yield * sum / (ws->params->cs_n_steps * 1.0);
-}
-
-double cross_section_concentration_product_new(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
-    const int type = 1; /* TODO: pick either adaptive or something else */
+double cross_section_concentration_product_stepping(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
     const double E_step_max = ws->params->cs_energy_step_max;
     const double depth_step_max = ws->params->cs_depth_step_max;
     const double S_avg_FWHM = ws->params->cs_stragg_step_fudge_factor * sqrt((S_front + S_back)/2.0);
@@ -652,59 +589,60 @@ double cross_section_concentration_product_new(const sim_workspace *ws, const sa
         }
     }
     depth d = *d_before;
-    if(type == 0) {
-        sigma = cross_section_concentration_product_adaptive(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
-    } else {
-        double E_diff = E_back - E_front;
-        size_t n_steps = ceil(GSL_MAX_DBL(E_diff/E_step_nominal, d_diff/depth_step_max)); /* Choose the bigger of two evils. Should not be possible to take zero steps since d_diff should always be greater than zero. */
-        double frac = 1.0/(1.0*(n_steps+1));
-        const double x_step = (d_after->x - d_before->x) * frac;
-        const double E_step = (E_back - E_front) * frac;
-        const double S_step = (S_back - S_front) * frac;
+    double E_diff = E_back - E_front;
+    size_t n_steps = ceil(GSL_MAX_DBL(E_diff/E_step_nominal, d_diff/depth_step_max)); /* Choose the bigger of two evils. Should not be possible to take zero steps since d_diff should always be greater than zero. */
+    double frac = 1.0/(1.0*(n_steps+1));
+    const double x_step = (d_after->x - d_before->x) * frac;
+    const double E_step = (E_back - E_front) * frac;
+    const double S_step = (S_back - S_front) * frac;
 #ifdef JABS_DEBUG_CS
-        fprintf(stderr, "E_step_nominal = %g keV, n_steps = %zu, S_avg %g keV, E = %g ... %g keV, actual E_step = %g keV\n", E_step_nominal / C_KEV, n_steps, S_avg_FWHM / C_KEV, E_front / C_KEV, E_back / C_KEV, E_step / C_KEV);
+    fprintf(stderr, "E_step_nominal = %g keV, n_steps = %zu, S_avg %g keV, E = %g ... %g keV, actual E_step = %g keV\n", E_step_nominal / C_KEV, n_steps, S_avg_FWHM / C_KEV, E_front / C_KEV, E_back / C_KEV, E_step / C_KEV);
 #endif
-        double sum = 0.0;
-        for(size_t i = 1; i <= n_steps; i++) { /* Compute cross section and concentration product in several "sub-steps" */
-            double E = E_front + E_step * i;
-            double S = S_front + S_step * i;
-            d.x = d_before->x + x_step * i;
-            double sigma_partial = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, E, S);
-            if(!sample->no_conc_gradients) { /* We have concentration gradient */
-                double c = get_conc(sample, d, sim_r->i_isotope);
-                sigma_partial *= c;
-            }
-            sum += sigma_partial;
+    double sum = 0.0;
+    for(size_t i = 1; i <= n_steps; i++) { /* Compute cross section and concentration product in several "sub-steps" */
+        double E = E_front + E_step * i;
+        double S = S_front + S_step * i;
+        d.x = d_before->x + x_step * i;
+        double sigma_partial = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, E, S);
+        if(!sample->no_conc_gradients) { /* We have concentration gradient */
+            double c = get_conc(sample, d, sim_r->i_isotope);
+            sigma_partial *= c;
+        }
+        sum += sigma_partial;
 #ifdef JABS_DEBUG_CS
-            fprintf(stderr, "i = %zu, E = %g keV, S = %g keV, (E_front = %g keV, E_back = %g keV), sigma = %g mb/sr\n", i, E/C_KEV, C_FWHM * sqrt(S)/C_KEV, E_front/C_KEV, E_back/C_KEV, sigma_partial / C_MB_SR);
+        fprintf(stderr, "i = %zu, E = %g keV, S = %g keV, (E_front = %g keV, E_back = %g keV), sigma = %g mb/sr\n", i, E/C_KEV, C_FWHM * sqrt(S)/C_KEV, E_front/C_KEV, E_back/C_KEV, sigma_partial / C_MB_SR);
 #endif
-        }
-        sigma = sum / n_steps;
-        if(sample->no_conc_gradients) {
-            sigma *= c; /* Concentration weighting was not done inside the loop */
-        }
     }
-    return sample->ranges[d.i].yield * sigma;
+    sigma = sum / n_steps;
+    if(sample->no_conc_gradients) {
+        sigma *= c; /* Concentration weighting was not done inside the loop */
+    }
+    return sigma;
 }
 
-double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after,
-                                           double S_front, double S_back) {
-    if(ws->params->mean_conc_and_energy) { /* This if-branch is fast and also serves as a testing branch, since it is a lot easier to understand... */
-        const depth d_halfdepth = {.x = (d_before->x + d_after->x) /
-                                        2.0, .i = d_after->i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
-        double c = get_conc(sample, d_halfdepth, sim_r->i_isotope);
-        if(c < ABUNDANCE_THRESHOLD)
+
+double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
+    double sigmaconc;
+    if(ws->params->mean_conc_and_energy) {
+        double c;
+        if(sample->no_conc_gradients) {
+            c = *sample_conc_bin(sample, d_before->i, sim_r->i_isotope);
+        } else {
+            depth d;
+            d.i = d_before->i;
+            d.x = (d_before->x + d_after->x) / 2.0;
+            c = get_conc(sample, d, sim_r->i_isotope);
+        }
+        if(c < CONC_TOLERANCE) {
             return 0.0;
-        const double E_mean = (E_front + E_back) / 2.0;
-        assert(sim_r->cross_section);
-        double sigma = sim_r->cross_section(sim_r, E_mean);
-        return sigma * c * sample->ranges[d_halfdepth.i].yield;
-    } else if(ws->params->cs_n_steps == 0) {
-        return cross_section_concentration_product_adaptive(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
+        }
+        sigmaconc = sim_r->cross_section(sim_r, (E_front + E_back)/2.0) * c;
+    } else if(ws->params->cs_adaptive) {
+        sigmaconc = cross_section_concentration_product_adaptive(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
     } else {
-        return cross_section_concentration_product_fixed(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
+        sigmaconc = cross_section_concentration_product_stepping(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
     }
-    return 0.0;
+    return sample->ranges[d_before->i].yield * sigmaconc;
 }
 
 void exit_from_sample(ion *p, const depth depth_start, const sim_workspace *ws, const sample *sample) {
@@ -759,7 +697,7 @@ double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calcula
     return ws->params->stop_step_fudge_factor * broad; /* Fudge factor also affects the minimum stop step */
 }
 
-void simulate_reaction_new_routine(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
+void simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
     ion ion1 = *incident; /* Shallow copy */
     //des_table_set_ion_depth(dt, &ion1, depth_start); /* TODO: is this necessary? */
     simulate_init_reaction(sim_r, sample, g, ws->emin, ion1.E);
@@ -856,7 +794,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
                 E_deriv = b_prev->deriv * 1.5; /* TODO: Can't calculate, assume. The 1.5 is a safety factor. TODO: may lead to exponential growth...  */
                 sigma_conc = 0.0;
             } else {
-                sigma_conc = cross_section_concentration_product_new(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
+                sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
                 assert(b_prev->E_0 > b->E_0);
                 double E0_diff = b_prev->E_0 - b->E_0;
                 double E_diff = b_prev->E - b->E;
@@ -964,7 +902,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
                 sim_r->r->target->name, sim_r->i_isotope, sim_r->r->target->i,
                 sim_r->r->product->name, sim_r->r->product->i);
 #endif
-        simulate_reaction_new_routine(incident, depth_start, ws, sample, dt, &g, sim_r);
+        simulate_reaction(incident, depth_start, ws, sample, dt, &g, sim_r);
 #ifdef DEBUG
         fprintf(stderr, "Finished. sim_r->last_brick = %zu (%zu/%zu). depth = %g tfu\n\n", sim_r->last_brick, sim_r->last_brick + 1, sim_r->n_bricks, sim_r->bricks[sim_r->last_brick].d.x / C_TFU);
 #endif
@@ -972,197 +910,6 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     des_table_free(dt);
     sim_workspace_histograms_calculate(ws);
     return EXIT_SUCCESS;
-}
-
-int simulate_old(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) { /* Ion is expected to be in the sample coordinate system at starting depth. Also note that sample may be slightly different (e.g. due to roughness) to ws->sim->sample */
-    assert(sample->n_ranges);
-    int warnings = 0;
-#ifdef DEBUG
-    fprintf(stderr, "Sample thickness is %g\n", sample->thickness/C_TFU);
-#endif
-    size_t i_depth;
-    ion ion = *incident; /* Shallow copy of the incident ion */
-    geostragg_vars g = geostragg_vars_calculate(ws, incident);
-#ifdef DEBUG
-    fprintf(stderr, "Simulate from depth %g tfu (index %zu), detector theta = %g deg, calculated theta = %g deg. %zu reactions.\n", depth_start.x/C_TFU, depth_start.i, ws->det->theta/C_DEG, g.scatter_theta/C_DEG, ws->n_reactions);
-    fprintf(stderr, "Ion energy at start %g keV, straggling %g keV FWHM.\n", incident->E/C_KEV, C_FWHM * sqrt(incident->S) / C_KEV);
-#endif
-    depth d_before = depth_start;
-    for(size_t i = 0; i < ws->n_reactions; i++) {
-#ifdef DEBUG
-        fprintf(stderr, "Initializing reaction %zu\n", i);
-#endif
-        simulate_init_reaction(ws->reactions[i], sample, &g, ws->emin, ion.E);
-    }
-    if(fabs(ion.cosine_theta) < 1e-6) {
-#ifdef DEBUG
-        fprintf(stderr, "Ion was going sideways in the sample, we nudged it a little.\n");
-#endif
-        ion.theta += 0.01 * C_DEG;
-        ion.cosine_theta = cos(ion.theta);
-    }
-    for(i_depth = 0; i_depth < ws->n_bricks; i_depth++) {
-#ifdef DEBUG
-        fprintf(stderr, "\r %04zu %8.3lf keV %8.3lf tfu. ", i_depth, ion.E/C_KEV, d_before.x / C_TFU);
-#endif
-        if(warnings > SIMULATE_WARNING_LIMIT) {
-            jabs_message(MSG_ERROR, stderr, "Warning limit reached. Won't calculate anything.\n");
-            break;
-        }
-        if(d_before.x >= sample->thickness) /* We're in too deep. */
-            break;
-        if(ion.inverse_cosine_theta < 0.0 && d_before.x < 0.001 * C_TFU) /* We're coming out of the sample and about to exit */
-            break;
-        if(ion.E < ws->emin) {
-#ifdef DEBUG
-            fprintf(stderr, "Break due to low energy (%.3lf keV < %.3lf keV), x = %.3lf, i_range = %zu.\n", ion.E/C_KEV, ws->sim->emin/C_KEV, d_before.x/C_TFU, d_before.i);
-#endif
-            break;
-        }
-        const double E_front = ion.E;
-        const double S_front = ion.S;
-        double E_step = stop_step_calculate(ws, &ion);
-        depth d_after;
-        if(i_depth) {
-            d_after = stop_step(ws, &ion, sample, d_before, E_step);
-        } else {
-            d_after = d_before;
-        }
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "After:  %g tfu in range %zu\n", d_after.x/C_TFU, d_after.i);
-#endif
-        const double d_diff = depth_diff(d_before, d_after);
-        /* DEPTH BIN [x, x+d_diff) */
-        const double E_back = ion.E;
-        const double S_back = ion.S;
-        if(i_depth && fabs(d_diff) < 0.001 * C_TFU && E_front - E_back < 0.001 * C_KEV) {
-            jabs_message(MSG_WARNING, stderr,
-                         "Warning: no or very little progress was made (E step (goal) %g keV, E from %g keV to E = %g keV, depth = %g tfu, d_diff = %g tfu), check stopping or step size.\n",
-                         E_step / C_KEV, E_front / C_KEV, E_back / C_KEV, d_before.x / C_TFU, d_diff / C_TFU);
-            //sample_print(stderr, sample, FALSE);
-            //d_before.x += incident->inverse_cosine_theta*0.0001*C_TFU;
-            d_before = d_after;
-            d_before.x += 0.002 * C_TFU;
-            warnings++;
-            continue;
-        }
-
-#ifdef DEBUG_VERBOSE
-        double E_diff = E_front-E_back;
-        fprintf(stderr, "x = %8.3lf, x+h = %6g, E = %8.3lf keV to  %8.3lf keV (diff %6.4lf keV)\n", x/C_TFU, (x+h)/C_TFU, E_front/C_KEV, ws->ion.E/C_KEV, E_diff/C_KEV);
-#endif
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "For incident beam: E_front = %g MeV, E_back = %g MeV,  E_mean = %g MeV, sqrt(S) = %g keV\n",
-                        E_front / C_MEV, E_back / C_MEV, E_mean / C_MEV, sqrt(ion.S) / C_KEV);
-#endif
-        int alive = 0;
-        for(size_t i = 0; i < ws->n_reactions; i++) {
-            if(ws->reactions[i]->stop) {
-                continue;
-            }
-            simulate_reaction(ws->reactions[i], ws, sample, &g, i_depth, d_before, d_after, &ion, E_front, S_front, E_back, S_back, d_diff);
-            if(!ws->reactions[i]->stop) {
-                alive++;
-            }
-        }
-        d_before = d_after;
-        if(!alive) {
-#ifdef DEBUG
-            fprintf(stderr, "\nAll reactions have ceased by depth %g.\n", d_before.x/C_TFU);
-#endif
-            break;
-        }
-    }
-    if(i_depth == ws->n_bricks - 1) {
-        jabs_message(MSG_WARNING, stderr, "Warning: used all allocated bricks (%zu), reached depth of %g tfu. Simulated spectra may be partial.\n", ws->n_bricks, d_before.x / C_TFU);
-    }
-    sim_workspace_histograms_calculate(ws);
-    return EXIT_SUCCESS;
-}
-
-void simulate_reaction(sim_reaction *sim_r, const sim_workspace *ws, const sample *sample, const geostragg_vars *g, size_t i_depth, const depth d_before, const depth d_after, const ion *incident, double E_front, double S_front, double E_back, double S_back, double d_diff) {
-#ifdef N_BRICKS_REDUNDANT_CHECK
-    if(i_depth >= r->n_bricks) { /* This check is currently not necessary, since r->n_bricks == ws->n_bricks */
-                fprintf(stderr, "Too many bricks (%zu max). Data partial.\n", r->n_bricks);
-                r->stop = TRUE;
-                continue;
-            }
-#endif
-    brick *b = &sim_r->bricks[i_depth];
-    if(!ws->params->ds && d_before.x >= sim_r->max_depth) { /* Reactions stop when we are too deep in the sample, unless, of course, if DS is enabled. TODO: check optimizations for DS */
-#ifdef DEBUG
-        fprintf(stderr, "\nReaction with %s stops, because maximum depth is reached at x = %.3lf tfu.\n", sim_r->r->target->name, d_before.x / C_TFU); /* TODO: give reactions a name */
-#endif
-        b->Q = 0.0;
-        sim_r->stop = TRUE;
-        return;
-    }
-#if 0
-    if(incident->E + 3.0*sqrt(incident->S) < sim_r->r->E_min) { /* Beam average energy is three sigmas below reaction minimum, we can stop calculation (due to straggling weighted cross sections we can't stop immediately below E_min). */
-        b->Q = 0.0;
-        sim_r->stop = TRUE;
-        return;
-    }
-#endif
-    b->d = d_before;
-    b->E_0 = incident->E; /* Sort of energy just before the reaction. */
-    b->S_0 = incident->S;
-
-#ifdef DEBUG_REACTION
-    fprintf(stderr, "Reaction %s (%zu): %s\n", reaction_name(r->r), i, r->r->target->name);
-#endif
-    if(ws->params->geostragg) {
-        b->S_geo_x = geostragg(ws, sample, sim_r, &(g->x), d_after, incident->E);
-        b->S_geo_y = geostragg(ws, sample, sim_r, &(g->y), d_after, incident->E);
-    }
-    sim_reaction_product_energy_and_straggling(sim_r, incident);
-    assert(sim_r->p.E > 0.0);
-    b->E_r = sim_r->p.E;
-    b->S_r = sim_r->p.S;
-    exit_from_sample(&sim_r->p, d_after, ws, sample);
-
-    if(ws->det->foil) { /* Energy loss in detector foil */
-        depth d_foil = {.i = 0, .x = 0.0};
-        ion ion_foil = *&sim_r->p;
-        ion_set_angle(&ion_foil, 0.0, 0.0); /* Foils are not tilted. We use a temporary copy of "p" to do this step. */
-        exit_from_sample(&ion_foil, d_foil, ws, ws->det->foil);
-        b->E = ion_foil.E;
-        b->S = ion_foil.S;
-    } else {
-        b->E = sim_r->p.E;
-        b->S = sim_r->p.S;
-    }
-#ifdef DEBUG_VERBOSE
-    fprintf(stderr, "Reaction %2zu depth from %8.3lf tfu to %8.3lf tfu, E = %8.3lf keV, Straggling: eloss %7.3lf keV, geo %7.3lf keV\n", i, d_before.x/C_TFU, d_after.x/C_TFU, b->E/C_KEV, sqrt(b->S)/C_KEV, sqrt(b->S_geo_x+b->S_geo_y)/C_KEV);
-#endif
-    if(sim_r->p.E < ws->emin) {
-        sim_r->stop = TRUE;
-        b->Q = 0.0;
-        return;
-    }
-    b->thick = d_diff;
-    double sigma_conc;
-    if(i_depth) {
-        sigma_conc = cross_section_concentration_product(ws, sample, sim_r, E_front, E_back, &d_before, &d_after, S_front, S_back); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
-    } else {
-        sigma_conc = 0.0;
-    }
-    if(sigma_conc > 0.0) {
-        if(d_after.i == sample->n_ranges - 2) {
-            sigma_conc *= ws->sim->channeling_offset + ws->sim->channeling_slope * (E_front + E_back) / 2.0;
-        }
-        b->Q = incident->inverse_cosine_theta * sigma_conc * b->thick;
-        b->sc = sigma_conc;
-        assert(b->Q >= 0.0);
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "    %s: type=%i, E_front = %.3lf, E_back = %.3lf, E_out = %.3lf (sigma*conc = %g mb/sr, Q = %g (thickness = %.4lf tfu)\n",
-                        r->r->target->name, r->r->type, E_front/C_KEV, E_back/C_KEV, r->p.E/C_KEV, sigma_conc/C_MB_SR, b->Q, d_diff/C_TFU);
-#endif
-    } else {
-        b->Q = 0.0;
-        b->sc = 0.0;
-    }
-    sim_r->last_brick = i_depth;
 }
 
 void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const geostragg_vars *g, double E_min, double E_max) {

@@ -86,7 +86,6 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->nucl_stop_accurate = TRUE;
     p->mean_conc_and_energy = FALSE;
     p->cs_n_stragg_steps = CS_STRAGG_STEPS;
-    p->cs_n_steps = CS_CONC_STEPS;
     p->rough_layer_multiplier = 1.0;
     p->sigmas_cutoff = SIGMAS_CUTOFF;
     p->gaussian_accurate = FALSE;
@@ -94,6 +93,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->int_cs_accuracy = CS_CONC_INTEGRATION_ACCURACY;
     p->int_cs_stragg_max_intervals = CS_STRAGG_MAX_INTEGRATION_INTERVALS;
     p->int_cs_stragg_accuracy = CS_STRAGG_INTEGRATION_ACCURACY;
+    p->cs_adaptive = FALSE;
     p->cs_energy_step_max = CS_ENERGY_STEP_MAX_DEFAULT;
     p->cs_depth_step_max = CS_DEPTH_STEP_MAX_DEFAULT;
     p->cs_stragg_step_fudge_factor = CS_STRAGG_STEP_FUDGE_FACTOR_DEFAULT;
@@ -109,7 +109,6 @@ sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
     p->nucl_stop_accurate = FALSE;
     p->mean_conc_and_energy = TRUE;
     p->cs_n_stragg_steps = 0; /* Not used if mean_conc_and_energy == TRUE */
-    p->cs_n_steps = 0; /* Not used if mean_conc_and_energy == TRUE */
     p->stop_step_fudge_factor *= 1.4;
     p->stop_step_add *= 2.0;
     p->geostragg = FALSE;
@@ -123,14 +122,11 @@ sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
 
 sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
     sim_calc_params_defaults(p);
-    p->cs_n_steps = 0; /* Automatic (adaptive) */
     p->cs_n_stragg_steps = 0; /* Automatic (adaptive) */
     p->stop_step_fudge_factor *= 0.5;
     p->sigmas_cutoff += 1.0;
     p->gaussian_accurate = TRUE;
-    p->cs_energy_step_max *= 0.75; /* TODO: not used? */
-    p->cs_depth_step_max *= 0.5; /* TODO: not used? */
-    p->cs_stragg_step_fudge_factor *= 0.75; /* TODO: not used? */
+    p->cs_adaptive = TRUE;
     return p;
 }
 
@@ -148,7 +144,6 @@ sim_calc_params *sim_calc_params_defaults_brisk(sim_calc_params *p) {
 
 sim_calc_params *sim_calc_params_defaults_improved(sim_calc_params *p) {
     sim_calc_params_defaults(p);
-    p->cs_n_steps += 2;
     p->cs_n_stragg_steps += 4;
     p->stop_step_fudge_factor *= 0.75;
     p->sigmas_cutoff += 0.5;
@@ -172,15 +167,16 @@ void sim_calc_params_copy(const sim_calc_params *p_src, sim_calc_params *p_dst) 
 }
 
 void sim_calc_params_update(sim_calc_params *p) {
-    p->cs_frac = 1.0/(1.0*(p->cs_n_steps+1));
     prob_dist_free(p->cs_stragg_pd);
+    if(p->mean_conc_and_energy) {
+        p->cs_n_stragg_steps = 0;
+    }
     p->cs_stragg_pd = prob_dist_gaussian(p->cs_n_stragg_steps);
 
     if(p->ds && p->ds_steps_azi == 0 && p->ds_steps_polar == 0) { /* DS defaults are applied if nothing else is specified */
         p->ds_steps_azi = DUAL_SCATTER_AZI_STEPS;
         p->ds_steps_polar = DUAL_SCATTER_POLAR_STEPS;
     }
-    p->n_ds = p->ds_steps_azi *  p->ds_steps_polar;
 }
 
 void sim_calc_params_ds(sim_calc_params *p, int ds) {
@@ -202,11 +198,6 @@ void sim_calc_params_print(const sim_calc_params *params) {
     jabs_message(MSG_INFO, stderr, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");
     jabs_message(MSG_INFO, stderr, "geometric broadening = %s\n", params->geostragg?"true":"false");
     if(!params->mean_conc_and_energy) {
-        if(params->cs_n_steps == 0) {
-            jabs_message(MSG_INFO, stderr, "concentration * cross section steps integration accuracy = %g\n", params->int_cs_accuracy);
-        } else {
-            jabs_message(MSG_INFO, stderr, "concentration * cross section steps per brick = %zu\n", params->cs_n_steps);
-        }
         if(params->cs_n_stragg_steps == 0) {
             jabs_message(MSG_INFO, stderr, "straggling weighting integration accuracy = %g\n", params->int_cs_stragg_accuracy);
         } else {
@@ -465,11 +456,13 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->isotopes = jibal->isotopes;
     ws->n_reactions = 0; /* Will be incremented later */
 
+#if 0
     if(sim->n_reactions == 0) {
         jabs_message(MSG_ERROR, stderr,  "No reactions! Will not initialize workspace if there is nothing to simulate.\n");
         free(ws);
         return NULL;
     }
+#endif
 
     if(sim->params->beta_manual && sim->params->ds) {
         jabs_message(MSG_WARNING, stderr,  "Manual exit angle is enabled in addition to dual scattering. This is an unsupported combination. Manual exit angle calculation will be disabled.\n");
@@ -501,7 +494,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     sim_workspace_calculate_number_of_bricks(ws);
     sim_workspace_init_reactions(ws);
 
-    if(ws->params->cs_n_steps == 0) { /* Actually integrate, allocate workspace for this */
+    if(ws->params->cs_adaptive) { /* Actually integrate, allocate workspace for this */
 #ifdef DEBUG
         fprintf(stderr, "cs_n_steps = 0, allocating integration workspace w_int_cs with %zu max intervals.\n", ws->params->int_cs_max_intervals);
 #endif
