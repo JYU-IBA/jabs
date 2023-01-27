@@ -24,7 +24,6 @@
 #include "stop.h"
 #include "des.h"
 
-void exit_from_sample(ion *p, depth depth_start, const sim_workspace *ws, const sample *sample);
 int simulate(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample);
 void simulate_reaction(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r);
 void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const geostragg_vars *g, double E_min, double E_max);

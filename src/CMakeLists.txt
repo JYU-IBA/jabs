@@ -30,6 +30,7 @@ add_executable(jabs
         geostragg.c  script_command.c script_session.c script_file.c
         calibration.c prob_dist.c idf2jbs.c idfelementparsers.c
         idfparse.c nuclear_stopping.c stop.c des.c
+        simulation_workspace.c sim_reaction.c
         "$<$<BOOL:${JABS_PLUGINS}>:plugin.c>"
         "$<$<BOOL:${WIN32}>:win_compat.c>"
         )

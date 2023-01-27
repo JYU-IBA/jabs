@@ -87,6 +87,8 @@ set(PROJECT_SOURCES
         ../src/fit_params.c
         ../src/stop.c
         ../src/des.c
+        ../src/simulation_workspace.c
+        ../src/sim_reaction.c
         "$<$<BOOL:${PLUGINS}>:plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui

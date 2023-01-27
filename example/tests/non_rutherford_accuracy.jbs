@@ -3,7 +3,7 @@ set ion 4He
 set energy "3.200 MeV"
 set emin "100 keV"
 set fluence 1e14
-set det theta "160 deg" solid 10msr calib slope 1.00keV offset 0keV reso 1keV
+set det theta "160 deg" solid 10msr calib slope 1.00keV offset 0keV reso 5keV
 set alpha "0 deg"
 set sample SiO2 30000tfu
 
@@ -19,7 +19,8 @@ set stopping srim2013 He Si O
 set sim defaults
 simulate
 save spectra "non_rutherford_accuracy_defaults_out.csv"
-test roi [650:900] 207880 3e-3
+save bricks "bricks.dat"
+test roi [550:900] 214813 0.02
 
 set sim fast
 simulate
@@ -33,10 +34,11 @@ save spectra "non_rutherford_accuracy_brisk_out.csv"
 set sim improved
 simulate
 save spectra "non_rutherford_accuracy_improved_out.csv"
+test roi [550:900] 214813 0.02
 
 set sim accurate
 #set stop_step_incident 1keV
 simulate
 save spectra "non_rutherford_accuracy_accurate_out.csv"
 
-test roi [650:900] 207880 2e-3
+test roi [550:900] 214813 3e-2

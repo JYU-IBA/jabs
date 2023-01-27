@@ -159,3 +159,29 @@ double stop_step_calc(const jabs_stop_step_params *params, const ion *ion) {
     step = GSL_MAX_DBL(step, params->min);
     return step;
 }
+
+void stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, const depth depth_start, const sample *sample) {
+    depth d = depth_start;
+    while(1) { /* Exit from sample (hopefully) */
+#ifdef DEBUG_REACTION
+        fprintf(stderr, "  Exiting... depth = %g tfu (i = %zu)\n", d.x, d.i);
+#endif
+        if(p->inverse_cosine_theta > 0.0 && d.x >= (sample->thickness - DEPTH_TOLERANCE)) { /* Exit through back (transmission) */
+            break;
+        }
+        if(p->inverse_cosine_theta < 0.0 && d.x <= DEPTH_TOLERANCE) { /* Exit (surface, front of sample) */
+            break;
+        }
+        double E_step = stop_step_calc(params_exiting, p);
+        depth d_after = stop_step(stop, stragg, p, sample, d, E_step);
+        if(p->E < stop->emin) {
+#ifdef DEBUG_REACTION
+            fprintf(stderr,
+                            "  Reaction %zu with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
+                            i, r->r->target->name, d_after.x / C_TFU);
+#endif
+            return;
+        }
+        d = d_after;
+    }
+}

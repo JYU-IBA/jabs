@@ -22,6 +22,7 @@ typedef struct jabs_stop {
     gsto_stopping_type type;
     int nuclear_stopping_accurate;
     int rk4;
+    double emin;
 } jabs_stop;
 
 typedef struct jabs_stop_step_params {
@@ -35,4 +36,5 @@ depth stop_next_crossing(const ion *incident, const sample *sample, const depth 
 depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, const sample *sample, depth depth_before, double step);
 double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sample, depth depth, double E);
 double stop_step_calc(const jabs_stop_step_params *params, const ion *ion);
+void stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, depth depth_start, const sample *sample);
 #endif // JABS_STOP_H

@@ -1,6 +1,7 @@
 #!/usr/bin/env jabs
 set ion 4He
 set energy "3.035 MeV"
+set energy_broad "0 keV"
 set emin "150 keV"
 set fluence 5.4e12
 set det theta "160 deg" solid 70msr calib slope 2.00keV offset 10keV reso 20keV
@@ -22,11 +23,11 @@ load reaction "sigmacalc_16O_alpha_alpha_16O_160deg.r33"
 #set sim accurate
 
 simulate
-add fit range [254:926] [1338:1424]
+add fit range [250:950] [1370:1420]
 
 #We skip the fast fit phase, since the lower accuracy simulation is counterproductive */
 set fit slow
 
-fit *calib*,fluence,energy,yield3
+fit *calib*,fluence,energy,yield3,thick1,rough1,thick2
 save spectra "non_rutherford_out.csv"
 show fit

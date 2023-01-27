@@ -256,32 +256,6 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
     return sample->ranges[d_before->i].yield * sigmaconc;
 }
 
-void exit_from_sample(ion *p, const depth depth_start, const sim_workspace *ws, const sample *sample) {
-    depth d = depth_start;
-    while(1) { /* Exit from sample (hopefully) */
-#ifdef DEBUG_REACTION
-        fprintf(stderr, "  Exiting... depth = %g tfu (i = %zu)\n", d.x, d.i);
-#endif
-        if(p->inverse_cosine_theta > 0.0 && d.x >= (sample->thickness - DEPTH_TOLERANCE)) { /* Exit through back (transmission) */
-            break;
-        }
-        if(p->inverse_cosine_theta < 0.0 && d.x <= DEPTH_TOLERANCE) { /* Exit (surface, front of sample) */
-            break;
-        }
-        double E_step = stop_step_calc(&ws->params->exiting_stop_params, p);
-        depth d_after = stop_step(&ws->stop, &ws->stragg, p, sample, d, E_step);
-        if(p->E < ws->emin) {
-#ifdef DEBUG_REACTION
-            fprintf(stderr,
-                            "  Reaction %zu with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
-                            i, r->r->target->name, d_after.x / C_TFU);
-#endif
-            return;
-        }
-        d = d_after;
-    }
-}
-
 void simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
     ion ion1 = *incident; /* Shallow copy */
     //des_table_set_ion_depth(dt, &ion1, depth_start); /* TODO: is this necessary? */
@@ -347,21 +321,21 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
         b->E_0 = ion1.E;
         b->S_0 = ion1.S;
         if(ws->params->geostragg) {
-            b->S_geo_x = geostragg(ws, sample, sim_r, &(g->x), d_after, b->E_0);
-            b->S_geo_y = geostragg(ws, sample, sim_r, &(g->y), d_after, b->E_0);
+            b->S_geo_x = geostragg(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, sample, sim_r, &(g->x), d_after, b->E_0);
+            b->S_geo_y = geostragg(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, sample, sim_r, &(g->y), d_after, b->E_0);
         }
         sim_reaction_product_energy_and_straggling(sim_r, &ion1); /* sets sim_r->p */
         assert(sim_r->p.S >= 0.0);
         b->E_r = sim_r->p.E;
         b->S_r = sim_r->p.S;
 
-        exit_from_sample(&sim_r->p, d_after, ws, sample);
+        stop_sample_exit(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, &sim_r->p, d_after, sample);
 
         if(ws->det->foil) { /* Energy loss in detector foil */
             depth d_foil = {.i = 0, .x = 0.0};
             ion ion_foil = *&sim_r->p;
             ion_set_angle(&ion_foil, 0.0, 0.0); /* Foils are not tilted. We use a temporary copy of "p" to do this step. */
-            exit_from_sample(&ion_foil, d_foil, ws, ws->det->foil);
+            stop_sample_exit(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, &ion_foil, d_foil, ws->det->foil);
             b->E = ion_foil.E;
             b->S = ion_foil.S;
         } else {
@@ -470,7 +444,9 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             incident->isotope->name, incident->E / C_KEV, C_FWHM * sqrt(incident->S) / C_KEV, incident->theta / C_DEG, incident->phi / C_DEG,
             depth_start.x / C_TFU, depth_start.i);
 #endif
-    geostragg_vars g = geostragg_vars_calculate(ws, incident);
+    geostragg_vars g = geostragg_vars_calculate(incident, ws->sim->sample_theta, ws->sim->sample_phi,
+                                                ws->det, ws->sim->beam_aperture,
+                                                ws->params->geostragg, ws->params->beta_manual);
     des_table *dt = des_table_compute(&ws->stop, &ws->stragg, ws->params, sample, incident, depth_start, ws->emin); /* Depth, energy and straggling of incident ion */
     if(!dt) {
         jabs_message(MSG_ERROR, stderr, "DES table computation failed.\n");
@@ -954,12 +930,13 @@ int simulate_with_ds(sim_workspace *ws) {
                     double ds_azi = C_2PI * (1.0 * i_azi) / (ds_steps_azi * 1.0);
                     ion_rotate(&ion2, ds_polar, ds_azi); /* Dual scattering: first scattering to some angle (scattering angle: ds_polar). Note that this does not follow SimNRA conventions. */
                     ws->fluence = fluence_azi * fluence;
+                    double scatangle = scattering_angle(&ion2, ws->sim->sample_theta, ws->sim->sample_phi, ws->det);
 #ifdef DEBUG
                     if(d_before.x == 0.0) {
-                    fprintf(stderr, "DS polar %.3lf, azi %.3lf, scatter %.3lf\n", ds_polar/C_DEG, ds_azi/C_DEG, scattering_angle(&ion2, ws)/C_DEG);
-                }
+                        fprintf(stderr, "DS polar %.3lf, azi %.3lf, scatter %.3lf\n", ds_polar/C_DEG, ds_azi/C_DEG, scatangle/C_DEG);
+                    }
 #endif
-                    if(scattering_angle(&ion2, ws) > 19.99999 * C_DEG) {
+                    if(scatangle > 19.99999 * C_DEG) {
                         if(simulate(&ion2, d_halfdepth, ws, ws->sample)) {
                             return EXIT_FAILURE;
                         }

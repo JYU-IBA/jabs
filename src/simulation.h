@@ -82,50 +82,6 @@ typedef struct simulation {
     ion ion; /* This ion is not to be used in calculations, it is simply copied to ws->ion */
 } simulation;
 
-typedef struct sim_reaction {
-    const reaction *r;
-    ion p; /* Reaction product */
-    gsl_histogram *histo;
-    brick *bricks;
-    size_t n_bricks;
-    size_t last_brick; /* inclusive, from 0 up to n_bricks-1 */
-    int stop;
-    double max_depth;
-    size_t i_isotope; /* Number of isotope (r->target) in sample->isotopes */
-    double theta; /* theta used in simulations (will be overwritten by simulate() when necessary) */
-    double K;
-    double (*cross_section)(const struct sim_reaction *, double);
-    double theta_cm; /* theta in CM system */
-    double mass_ratio; /* m1/m2, these are variables to speed up cross section calculation */
-    double E_cm_ratio;  /* m1/(m1+m2) */
-    double cs_constant; /* Non-energy dependent Rutherford cross section terms for RBS or ERD */
-    double r_VE_factor; /* Andersen correction factor r_VE = this / E_cm */
-    double r_VE_factor2;
-} sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
-
-
-typedef struct sim_workspace {
-    double fluence; /* With DS can be different from sim->fluence, otherwise the same */
-    const simulation *sim;
-    const detector *det;
-    const sample *sample; /* Note that simulate() can be passed a sample explicitly, but in most cases it should be this. Also this should be exactly the same as sim->sample. */
-    size_t n_reactions;
-    const jibal_gsto *gsto;
-    size_t n_channels; /* in histograms */
-    gsl_histogram *histo_sum;
-    ion ion;
-    sim_reaction **reactions; /* table of reaction pointers, size n_reactions */
-    const jibal_isotope *isotopes;
-    sim_calc_params *params;
-    jabs_stop stop;
-    jabs_stop stragg;
-    double emin;
-    gsl_integration_workspace *w_int_cs; /* Integration workspace for conc * cross section product */
-    gsl_integration_workspace *w_int_cs_stragg;
-    size_t n_bricks; /* same as r->n_bricks in each reaction */
-} sim_workspace;
-
-
 #include "sample.h"
 simulation *sim_init(jibal *jibal);
 void sim_free(simulation *sim);
@@ -150,29 +106,8 @@ detector *sim_det(const simulation *sim, size_t i_det);
 detector *sim_det_from_string(const simulation *sim, const char *s);
 int sim_det_add(simulation *sim, detector *det);
 int sim_det_set(simulation *sim, detector *det, size_t i_det); /* Will free existing detector (can be NULL too) */
-sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det);
-void sim_workspace_init_reactions(sim_workspace *ws); /* used by sim_workspace_init(), ws->sim and ws->n_bricks should be set before calling */
-void sim_workspace_calculate_number_of_bricks(sim_workspace *ws);
-void sim_workspace_free(sim_workspace *ws);
-void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);
-void sim_workspace_calculate_sum_spectra(sim_workspace *ws);
 void sim_print(const simulation *sim);
-void sim_workspace_histograms_reset(sim_workspace *ws);
-void sim_workspace_histograms_calculate(sim_workspace *ws);
-void sim_workspace_histograms_scale(sim_workspace *ws, double scale);
-sim_reaction *sim_reaction_init(sim_workspace *ws, const reaction *r); /* ws->sample, ws->det and ws->ion need to be set */
-void sim_reaction_free(sim_reaction *sim_r);
-void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double theta, double E_min, double E_max);
-void sim_reaction_reset_bricks(sim_reaction *sim_r);
-void sim_reaction_set_cross_section_by_type(sim_reaction *sim_r);
-double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);
-double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E);
-#ifdef JABS_PLUGINS
-double sim_reaction_cross_section_plugin(const sim_reaction *sim_r, double E);
-#endif
-double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);
 void sim_sort_reactions(const simulation *sim);
-void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident);
 double sim_alpha_angle(const simulation *sim);
 double sim_exit_angle(const simulation *sim, const detector *det);
 int sim_do_we_need_erd(const simulation *sim);
