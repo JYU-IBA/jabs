@@ -42,13 +42,14 @@
 #define ENERGY_DERIVATIVE_MIN (0.1) /* dE(detected)/dE(incident) is forced to be higher or equal to this. */
 #define ENERGY_DERIVATIVE_MAX (10.0)
 #define BRICK_WIDTH_SIGMAS_DEFAULT (2.0) /* Attempt to make bricks width energy difference equal to this many times the detector resolution and straggling sigmas combined (in quadrature (variances)) */
-#define STOP_STEP_INCIDENT (0.0*C_KEV) /* Zero is automatic */
-#define STOP_STEP_EXITING (0.0*C_KEV) /* Zero is automatic */
-#define STOP_STEP_FUDGE_FACTOR (1.0) /* Factor to automatic incident step size. */
-#define STOP_STEP_MIN (0.0 * C_KEV) /* Minimum stopping step. Zero is automatic. */
-#define STOP_STEP_MAX (0.0 * C_KEV) /* Minimum stopping step. Zero is automatic. */
-#define STOP_STEP_MIN_FALLBACK (0.5 * C_KEV) /* Fallback for minimum stopping step in case we don't know what to guess. */
-#define STOP_STEP_ADD (0.1 * C_KEV) /* Default for a value that is added to calculated stop step */
+#define INCIDENT_STOP_STEP_DEFAULT (0.0*C_KEV) /* Zero is automatic */
+#define INCIDENT_STOP_STEP_SIGMAS_DEFAULT (1.0)
+#define INCIDENT_STOP_STEP_MIN_DEFAULT (0.5 * C_KEV) /* Default minimum stopping step. */
+#define INCIDENT_STOP_STEP_MAX_DEFAULT (50.0 * C_KEV) /* Default maximum stopping step.  */
+#define EXITING_STOP_STEP_DEFAULT (0.0*C_KEV) /* Zero is automatic */
+#define EXITING_STOP_STEP_SIGMAS_DEFAULT (5.0)
+#define EXITING_STOP_STEP_MIN_DEFAULT (20.0 * C_KEV) /* Default minimum stopping step. */
+#define EXITING_STOP_STEP_MAX_DEFAULT (250.0 * C_KEV) /* Default maximum stopping step.  */
 #define STOP_STEP_DEPTH_FALLBACK (100.0 * C_TFU) /* If stop step can't be determined using stopping reliable, do a maximum of this */
 #define STOP_STEP_MINIMUM_STOPPING (0.1 * C_EV_TFU) /* Stopping below this is suspicious */
 #define BRICKS_DEFAULT (1000)
@@ -60,11 +61,11 @@
 #define CONC_TOLERANCE (1.0e-7)
 #define GAMMA_ROUGHNESS_STEPS 21
 #define ROUGHNESS_SUBSPECTRA_MAXIMUM 99
-#define CS_CONC_STEPS 3 /* Minimum 1, odd numbers preferred */
 #define CS_STRAGG_STEPS 7 /* Number of steps used when weighting cross section by straggling. Odd numbers preferred. */
 #define DUAL_SCATTER_POLAR_STEPS 21
 #define DUAL_SCATTER_POLAR_SUBSTEPS 9
 #define DUAL_SCATTER_AZI_STEPS 15
+#define DUAL_SCATTER_INCIDENT_STOP_STEP_FACTOR_DEFAULT (2.0)
 #define FIT_ITERS_MAX 100
 #define FIT_XTOL (1e-7)
 #define FIT_FAST_XTOL_MULTIPLIER (1.0e3)

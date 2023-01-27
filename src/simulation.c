@@ -69,12 +69,14 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
         p = malloc(sizeof(sim_calc_params));
         p->cs_stragg_pd = NULL; /* Will be allocated by sim_calc_params_update() */
     }
-    p->stop_step_incident = STOP_STEP_INCIDENT;
-    p->stop_step_exiting = STOP_STEP_EXITING;
-    p->stop_step_fudge_factor = STOP_STEP_FUDGE_FACTOR;
-    p->stop_step_min = STOP_STEP_MIN;
-    p->stop_step_max = STOP_STEP_MAX;
-    p->stop_step_add = STOP_STEP_ADD;
+    p->incident_stop_step = INCIDENT_STOP_STEP_DEFAULT;
+    p->incident_stop_step_sigmas = INCIDENT_STOP_STEP_SIGMAS_DEFAULT;
+    p->incident_stop_step_min = INCIDENT_STOP_STEP_MIN_DEFAULT;
+    p->incident_stop_step_max = INCIDENT_STOP_STEP_MAX_DEFAULT;
+    p->exiting_stop_step = EXITING_STOP_STEP_DEFAULT;
+    p->exiting_stop_step_sigmas = EXITING_STOP_STEP_SIGMAS_DEFAULT;
+    p->exiting_stop_step_min = EXITING_STOP_STEP_MIN_DEFAULT;
+    p->exiting_stop_step_max = EXITING_STOP_STEP_MAX_DEFAULT;
     p->brick_width_sigmas = BRICK_WIDTH_SIGMAS_DEFAULT;
     p->depthsteps_max = 0; /* automatic */
     p->geostragg = FALSE;
@@ -96,7 +98,8 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->cs_adaptive = FALSE;
     p->cs_energy_step_max = CS_ENERGY_STEP_MAX_DEFAULT;
     p->cs_depth_step_max = CS_DEPTH_STEP_MAX_DEFAULT;
-    p->cs_stragg_step_fudge_factor = CS_STRAGG_STEP_FUDGE_FACTOR_DEFAULT;
+    p->cs_stragg_step_sigmas = CS_STRAGG_STEP_FUDGE_FACTOR_DEFAULT;
+    p->ds_incident_stop_step_factor = DUAL_SCATTER_INCIDENT_STOP_STEP_FACTOR_DEFAULT;
 #ifdef DEBUG
     fprintf(stderr, "New calc params created.\n");
 #endif
@@ -109,48 +112,51 @@ sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
     p->nucl_stop_accurate = FALSE;
     p->mean_conc_and_energy = TRUE;
     p->cs_n_stragg_steps = 0; /* Not used if mean_conc_and_energy == TRUE */
-    p->stop_step_fudge_factor *= 1.4;
-    p->stop_step_add *= 2.0;
     p->geostragg = FALSE;
     p->rough_layer_multiplier = 0.5;
     p->sigmas_cutoff = SIGMAS_FAST_CUTOFF;
-    p->cs_energy_step_max *= 2.0;
-    p->cs_depth_step_max *= 2.0;
-    p->cs_stragg_step_fudge_factor = 1.5;
+    p->incident_stop_step_min *= 2.0;
+    p->incident_stop_step_sigmas *= 1.5;
+    p->exiting_stop_step_min *= 1.5;
+    p->exiting_stop_step_sigmas *= 1.5;
+    p->exiting_stop_step_max *= 1.5;
     return p;
 }
 
 sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
     sim_calc_params_defaults(p);
     p->cs_n_stragg_steps = 0; /* Automatic (adaptive) */
-    p->stop_step_fudge_factor *= 0.5;
     p->sigmas_cutoff += 1.0;
     p->gaussian_accurate = TRUE;
     p->cs_adaptive = TRUE;
+    p->incident_stop_step_min *= 0.5;
+    p->exiting_stop_step_min *= 0.5;
+    p->exiting_stop_step_sigmas *= 0.5;
     return p;
 }
 
 sim_calc_params *sim_calc_params_defaults_brisk(sim_calc_params *p) {
     sim_calc_params_defaults(p);
     p->cs_n_stragg_steps -= 2;
-    p->stop_step_fudge_factor *= 1.25;
-    p->stop_step_add *= 2.0;
     p->sigmas_cutoff -= 1.0;
+    p->incident_stop_step_min *= 2.0;
+    p->exiting_stop_step_sigmas *= 1.5;
     p->cs_energy_step_max *= 1.5;
     p->cs_depth_step_max *= 1.5;
-    p->cs_stragg_step_fudge_factor = 1.25;
+    p->cs_stragg_step_sigmas = 1.25;
     return p;
 }
 
 sim_calc_params *sim_calc_params_defaults_improved(sim_calc_params *p) {
     sim_calc_params_defaults(p);
     p->cs_n_stragg_steps += 4;
-    p->stop_step_fudge_factor *= 0.75;
     p->sigmas_cutoff += 0.5;
     p->gaussian_accurate = TRUE;
+    p->exiting_stop_step_min *= 0.75;
+    p->exiting_stop_step_sigmas *= 0.75;
     p->cs_energy_step_max *= 0.75;
     p->cs_depth_step_max *= 0.75;
-    p->cs_stragg_step_fudge_factor = 0.75;
+    p->cs_stragg_step_sigmas = 0.75;
     return p;
 }
 
@@ -188,16 +194,31 @@ void sim_calc_params_ds(sim_calc_params *p, int ds) {
 void sim_calc_params_print(const sim_calc_params *params) {
     if(!params)
         return;
-    jabs_message(MSG_INFO, stderr, "step for incident ions = %.3lf keV (0 = auto)\n", params->stop_step_incident/C_KEV);
-    jabs_message(MSG_INFO, stderr, "step for exiting ions = %.3lf keV (0 = auto)\n", params->stop_step_exiting/C_KEV);
-    jabs_message(MSG_INFO, stderr, "stopping step fudge factor = %g\n", params->stop_step_fudge_factor);
-    jabs_message(MSG_INFO, stderr, "stopping step minimum = %.3lf keV (0 = auto)\n", params->stop_step_min / C_KEV);
+    jabs_message(MSG_INFO, stderr, "step for incident ions = %.3lf keV (0 = auto)\n", params->incident_stop_step / C_KEV);
+    if(params->incident_stop_step == 0.0) {
+        jabs_message(MSG_INFO, stderr, "step for incident ions = %g times straggling sigma\n", params->incident_stop_step_sigmas/C_KEV);
+        jabs_message(MSG_INFO, stderr, "minimum step for incident ions = %.3lf keV\n", params->incident_stop_step_min/C_KEV);
+        jabs_message(MSG_INFO, stderr, "maximum step for incident ions = %.3lf keV\n", params->incident_stop_step_max/C_KEV);
+    }
+    jabs_message(MSG_INFO, stderr, "step for incident ions = %.3lf keV (0 = auto)\n", params->incident_stop_step / C_KEV);
+    if(params->incident_stop_step == 0.0) {
+        jabs_message(MSG_INFO, stderr, "step for incident ions = %g times straggling sigma\n", params->incident_stop_step_sigmas/C_KEV);
+        jabs_message(MSG_INFO, stderr, "minimum step for incident ions = %.3lf keV\n", params->incident_stop_step_min/C_KEV);
+        jabs_message(MSG_INFO, stderr, "maximum step for incident ions = %.3lf keV\n", params->incident_stop_step_max/C_KEV);
+    }
     jabs_message(MSG_INFO, stderr, "stopping RK4 = %s\n", params->rk4?"true":"false");
     jabs_message(MSG_INFO, stderr, "accurate nuclear stopping = %s\n", params->nucl_stop_accurate?"true":"false");
     jabs_message(MSG_INFO, stderr, "depth steps max = %zu\n", params->depthsteps_max);
-    jabs_message(MSG_INFO, stderr, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");
     jabs_message(MSG_INFO, stderr, "geometric broadening = %s\n", params->geostragg?"true":"false");
+    jabs_message(MSG_INFO, stderr, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");
     if(!params->mean_conc_and_energy) {
+        if(params->cs_adaptive) {
+            jabs_message(MSG_INFO, stderr, "cross section integration accuracy = %g\n", params->int_cs_accuracy);
+        } else {
+            jabs_message(MSG_INFO, stderr, "cross section evaluation step = %g times straggling sigma\n", params->cs_stragg_step_sigmas);
+            jabs_message(MSG_INFO, stderr, "maximum energy step for cross section evaluation = %g keV\n", params->cs_energy_step_max);
+            jabs_message(MSG_INFO, stderr, "maximum depth step for cross section evaluation = %g tfu\n", params->cs_depth_step_max);
+        }
         if(params->cs_n_stragg_steps == 0) {
             jabs_message(MSG_INFO, stderr, "straggling weighting integration accuracy = %g\n", params->int_cs_stragg_accuracy);
         } else {
@@ -404,10 +425,10 @@ void sim_workspace_calculate_number_of_bricks(sim_workspace *ws) {
         n_bricks = ws->params->depthsteps_max;
     } else {
         if(det->type == DETECTOR_ENERGY) {
-            if(ws->params->stop_step_incident == 0.0) { /* Automatic incident step size */
-                n_bricks = (int) ceil(sim->beam_E / (ws->params->stop_step_fudge_factor*sqrt(detector_resolution(ws->det, sim->beam_isotope, sim->beam_E))) + ws->sample->n_ranges);
+            if(ws->params->incident_stop_step == 0.0) { /* Automatic incident step size */
+                n_bricks = (int) ceil(sim->beam_E / (ws->params->brick_width_sigmas * sqrt(detector_resolution(ws->det, sim->beam_isotope, sim->beam_E))) + ws->sample->n_ranges);
             } else {
-                n_bricks = (int) ceil(sim->beam_E / ws->params->stop_step_incident + ws->sample->n_ranges); /* This is conservative */
+                n_bricks = (int) ceil(sim->beam_E / ws->params->incident_stop_step + ws->sample->n_ranges); /* This is conservative */
                 fprintf(stderr, "n_bricks = %zu\n", n_bricks);
             }
         } else { /* TODO: maybe something more clever is needed here */
@@ -442,16 +463,6 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->params = sim_calc_params_defaults(NULL);
     sim_calc_params_copy(sim->params,  ws->params);
     sim_calc_params_update(ws->params);
-    if(ws->params->stop_step_min == 0.0) { /* Automatic, calculate here. */
-        if(det->type == DETECTOR_ENERGY) {
-            ws->params->stop_step_min = sqrt(det->calibration->resolution_variance)/2.0;
-        } else {
-            ws->params->stop_step_min = STOP_STEP_MIN_FALLBACK;
-        }
-    }
-#ifdef DEBUG
-    fprintf(stderr, "Minimum stop step %g keV.\n", ws->params->stop_step_min/C_KEV);
-#endif
     ws->gsto = jibal->gsto;
     ws->isotopes = jibal->isotopes;
     ws->n_reactions = 0; /* Will be incremented later */

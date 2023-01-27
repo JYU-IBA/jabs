@@ -88,8 +88,8 @@ int main(int argc, char * const *argv) {
         sim_calc_params_defaults_fast(sim->params);
     }
     sim_calc_params_ds(sim->params, cmd_opt->ds);
-    sim->params->stop_step_incident = cmd_opt->stop_step_incident;
-    sim->params->stop_step_exiting = cmd_opt->stop_step_exiting;
+    sim->params->incident_stop_step = cmd_opt->incident_stop_step;
+    sim->params->exiting_stop_step = cmd_opt->exiting_stop_step;
     sim->params->depthsteps_max = cmd_opt->depthsteps_max;
     sim->rbs = cmd_opt->rbs;
     sim->erd = cmd_opt->erd;

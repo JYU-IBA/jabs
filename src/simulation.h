@@ -40,12 +40,15 @@ typedef struct sim_calc_params {
     int geostragg; /* Geometric straggling true/false */
     int beta_manual; /* Don't calculate exit angle based on detector geometry, use something given by user, true/false */
     int gaussian_accurate; /* If this is FALSE an approximative gaussian CDF is used in convolution of spectra, otherwise function from GSL is used. */
-    double stop_step_incident;
-    double stop_step_exiting;
-    double stop_step_fudge_factor;
-    double stop_step_min; /* TODO: automatic */
-    double stop_step_max; /* TODO: automatic */
-    double stop_step_add; /* This is added to stop step */
+    double exiting_stop_step; /* This is energy. Zero is automatic. */
+    double exiting_stop_step_min;
+    double exiting_stop_step_max;
+    double exiting_stop_step_sigmas;
+    double incident_stop_step; /* This is energy. Zero is automatic. */
+    double incident_stop_step_min;
+    double incident_stop_step_max;
+    double incident_stop_step_sigmas;
+    double ds_incident_stop_step_factor;
     double brick_width_sigmas;
     double rough_layer_multiplier; /* Multiply given (or default) number of subspectra when calculating rough layers. */
     double sigmas_cutoff; /* Number of (+-) sigmas to consider when turning bricks to spectra */
@@ -56,7 +59,7 @@ typedef struct sim_calc_params {
     int cs_adaptive;
     double cs_energy_step_max; /* Largest energy step (incident beam, mean) between cross section * concentration evaluation. Weight by straggling happens inside this step (finer stepping).*/
     double cs_depth_step_max /* Largest depth step for section * concentration evaluation. Also see cs_energy_step_max. */ ;
-    double cs_stragg_step_fudge_factor; /*  Cross section * concentration evaluation straggling step multiplier. Step is standard deviation times this. Maximum step may also be limited by cs_depth_step_max, cs_energy_step_max  */
+    double cs_stragg_step_sigmas; /*  Cross section * concentration evaluation straggling step multiplier. Step is standard deviation times this. Maximum step may also be limited by cs_depth_step_max, cs_energy_step_max  */
 } sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
 
 typedef struct simulation {

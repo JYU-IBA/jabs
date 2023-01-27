@@ -575,7 +575,7 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
 double cross_section_concentration_product_stepping(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
     const double E_step_max = ws->params->cs_energy_step_max;
     const double depth_step_max = ws->params->cs_depth_step_max;
-    const double S_avg_FWHM = ws->params->cs_stragg_step_fudge_factor * sqrt((S_front + S_back)/2.0);
+    const double S_avg_FWHM = ws->params->cs_stragg_step_sigmas * sqrt((S_front + S_back) / 2.0);
     const double E_step_nominal = -1.0 * GSL_MIN_DBL(E_step_max, S_avg_FWHM); /* Actual step is negative */
     const double d_diff = fabs(d_after->x - d_before->x); /* Since depth_step_max is (typically) always absolute number, we should use absolute value here to determine number of steps. */
     assert(d_diff > 0);
@@ -657,8 +657,8 @@ void exit_from_sample(ion *p, const depth depth_start, const sim_workspace *ws, 
         if(p->inverse_cosine_theta < 0.0 && d.x <= DEPTH_TOLERANCE) { /* Exit (surface, front of sample) */
             break;
         }
-        depth d_after = stop_step(ws, p, sample, d, ws->params->stop_step_exiting == 0.0 ? ws->params->stop_step_fudge_factor * (p->E * 0.07 + sqrt(p->S) + 10.0 * C_KEV)
-                                                                                        : ws->params->stop_step_exiting); /* TODO: 7% of energy plus straggling plus 10 keV is a weird rule. Automatic stop size should be based more on required accuracy in stopping. */
+        double E_step = stop_step_calc_exiting(ws, p);
+        depth d_after = stop_step(ws, p, sample, d, E_step);
         if(p->E < ws->emin) {
 #ifdef DEBUG_REACTION
             fprintf(stderr,
@@ -672,29 +672,23 @@ void exit_from_sample(ion *p, const depth depth_start, const sim_workspace *ws, 
 }
 
 double stop_step_calc_incident(const sim_workspace *ws, const ion *ion) {
-    if(ws->params->stop_step_incident > 0.0) {
-        return ws->params->stop_step_incident;
+    if(ws->params->incident_stop_step > 0.0) {
+        return ws->params->incident_stop_step;
     }
-    double step = sqrt(ion->S) + ws->params->stop_step_add;
-    if(step < STOP_STEP_MIN_FALLBACK) {
-        return STOP_STEP_MIN_FALLBACK;
-    }
-    if(ws->params->stop_step_max > 0.0 && step > ws->params->stop_step_max) {
-        return ws->params->stop_step_max;
-    }
+    double step = ws->params->incident_stop_step_sigmas * sqrt(ion->S);
+    step = GSL_MIN_DBL(step, ws->params->incident_stop_step_max);
+    step = GSL_MAX_DBL(step, ws->params->incident_stop_step_min);
     return step;
 }
 
-double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calculate stop step to take */
-    if(ws->params->stop_step_incident > 0) {
-        return ws->params->stop_step_incident;
+double stop_step_calc_exiting(const sim_workspace *ws, const ion *ion) {
+    if(ws->params->exiting_stop_step > 0.0) {
+        return ws->params->exiting_stop_step;
     }
-    //double E_step = ws->params.stop_step_incident == 0.0?ws->params.stop_step_fudge_factor*sqrt(detector_resolution(ws->det, ion1.isotope, ion1.E)+ion1.S):ws->params.stop_step_incident;
-    double broad = sqrt(ion->S) + ws->params->stop_step_add;
-    if(broad < ws->params->stop_step_min) {
-        return ws->params->stop_step_min;
-    }
-    return ws->params->stop_step_fudge_factor * broad; /* Fudge factor also affects the minimum stop step */
+    double step = ws->params->exiting_stop_step_sigmas * sqrt(ion->S);
+    step = GSL_MIN_DBL(step, ws->params->exiting_stop_step_max);
+    step = GSL_MAX_DBL(step, ws->params->exiting_stop_step_min);
+    return step;
 }
 
 void simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
@@ -1311,19 +1305,32 @@ int simulate_with_ds(sim_workspace *ws) {
     sim_calc_params_update(ws->params);
     jabs_message(MSG_ERROR, stderr, "\n");
     const jibal_isotope *incident = ws->sim->beam_isotope;
+    int last = FALSE;
+    jabs_message(MSG_VERBOSE, stderr, "Dual scattering simulation starts.\n\n");
     while(1) {
-        double E_front = ion1.E;
-        if(E_front < ws->emin)
+        if(last) {
             break;
-        depth d_after = stop_step(ws, &ion1, ws->sample, d_before, ws->params->stop_step_fudge_factor * sqrt(detector_resolution(ws->det, ion1.isotope, ion1.E) + ion1.S)); /* TODO: step? */
+        }
+        double E_front = ion1.E;
+        if(E_front <= ws->emin)
+            break;
+        double E_step = ws->params->ds_incident_stop_step_factor * stop_step_calc_incident(ws, &ion1);
+        if(E_front - E_step <= ws->emin) { /* Fix last step to be "just enough" */
+            last = TRUE;
+            E_step = E_front - ws->emin;
+            if(E_step < ws->emin * 0.2) { /* The step would be really small, let's not take it */
+                break;
+            }
+        }
+        depth d_after = stop_step(ws, &ion1, ws->sample, d_before, E_step);
         double thick_step = depth_diff(d_before, d_after);
         const depth d_halfdepth = {.x = (d_before.x + d_after.x) /
                                         2.0, .i = d_after.i}; /* Stop step performs all calculations in a single range (the one in output!). That is why d_after.i instead of d_before.i */
         double E_back = ion1.E;
         const double E_mean = (E_front + E_back) / 2.0;
 
-        jabs_message(MSG_VERBOSE, stderr, "DS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV. p*sr = %g\n", d_before.x / C_TFU, d_after.x / C_TFU, E_front / C_KEV,
-                     E_back / C_KEV, fluence);
+        jabs_message(MSG_VERBOSE, stderr, "\rDS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV", d_before.x / C_TFU, d_after.x / C_TFU, E_front / C_KEV,
+                     E_back / C_KEV);
         for(int i_polar = 0; i_polar < ds_steps_polar; i_polar++) {
             const double ds_polar_min = 20.0 * C_DEG;
             const double ds_polar_max = 180.0 * C_DEG;
@@ -1373,6 +1380,7 @@ int simulate_with_ds(sim_workspace *ws) {
             break;
         d_before = d_after;
     }
+    jabs_message(MSG_VERBOSE, stderr, "\nDual scattering simulation complete.\n");
     sim_workspace_calculate_sum_spectra(ws);
     return EXIT_SUCCESS;
 }

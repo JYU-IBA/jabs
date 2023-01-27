@@ -112,6 +112,7 @@ set(PROJECT_SOURCES
         ../src/idfparse.h
         ../src/nuclear_stopping.c
         ../src/nuclear_stopping.h
+        ../src/fit_params.c
         "$<$<BOOL:${PLUGINS}>:plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui

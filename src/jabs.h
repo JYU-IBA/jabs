@@ -51,6 +51,7 @@ depth next_crossing(const ion *incident, const sample *sample, const depth *d_fr
 depth stop_step(const sim_workspace *ws, ion *incident, const sample *sample, struct depth depth, double step);
 void exit_from_sample(ion *p, depth depth_start, const sim_workspace *ws, const sample *sample);
 double stop_step_calc_incident(const sim_workspace *ws, const ion *ion);
+double stop_step_calc_exiting(const sim_workspace *ws, const ion *ion);
 int simulate(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample);
 void simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r);
 void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const geostragg_vars *g, double E_min, double E_max);

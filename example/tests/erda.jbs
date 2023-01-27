@@ -1,5 +1,4 @@
 #!/usr/bin/env jabs
-set stop_step_fudge 1.0
 set ion 35Cl
 set energy 8.5MeV
 set geostragg true
