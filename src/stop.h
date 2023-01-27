@@ -24,7 +24,15 @@ typedef struct jabs_stop {
     int rk4;
 } jabs_stop;
 
+typedef struct jabs_stop_step_params {
+    double step; /* This is energy. Zero is automatic. */
+    double min;
+    double max;
+    double sigmas;
+} jabs_stop_step_params;
+
 depth stop_next_crossing(const ion *incident, const sample *sample, const depth *d_from);
 depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, const sample *sample, depth depth_before, double step);
 double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sample, depth depth, double E);
+double stop_step_calc(const jabs_stop_step_params *params, const ion *ion);
 #endif // JABS_STOP_H

@@ -12,6 +12,7 @@
 
  */
 #include <assert.h>
+#include <gsl/gsl_math.h>
 #include "stop.h"
 #include "defaults.h"
 
@@ -46,9 +47,9 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
     double h_max_perp = depth_next.x - depth_before.x;
 #ifdef DEBUG_STOP_STEP
     if(depth_next.i != depth_before.i) {
-        fprintf(stderr, "stop_step crossing depth range from %zu to %zu at depth %lf tfu. E = %.3lf keV, Inverse cosine %lf\n", depth_before.i, depth_next.i, depth_before.x/C_TFU, incident->E/C_KEV, incident->inverse_cosine_theta);
+        fprintf(stderr, "step crossing depth range from %zu to %zu at depth %lf tfu. E = %.3lf keV, Inverse cosine %lf\n", depth_before.i, depth_next.i, depth_before.x/C_TFU, incident->E/C_KEV, incident->inverse_cosine_theta);
     } else {
-        fprintf(stderr, "stop_step depth_before %g tfu (i=%zu) distance to next crossing %g tfu.\n", depth_before.x/C_TFU, depth_before.i, h_max_perp/C_TFU);
+        fprintf(stderr, "step depth_before %g tfu (i=%zu) distance to next crossing %g tfu.\n", depth_before.x/C_TFU, depth_before.i, h_max_perp/C_TFU);
     }
     assert(fabs(h_max_perp) > 0.01 * C_TFU);
 #endif
@@ -64,7 +65,7 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
     double h = (step / k1); /* (energy) step should always be positive, as well as k1, so depth step h (not perpendicular, but "real" depth) is always positive  */
     if(k1 < STOP_STEP_MINIMUM_STOPPING) { /* We are (almost) dividing by zero if there is no or very little stopping. Assume stopping is zero and make a jump. */
 #ifdef DEBUG_STOP_STEP
-        fprintf(stderr, "stop_step returns no progress, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)\n", k1/C_EV_TFU, depth_before.x/C_TFU, E/C_KEV);
+        fprintf(stderr, "step returns no progress, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)\n", k1/C_EV_TFU, depth_before.x/C_TFU, E/C_KEV);
 #endif
         h = STOP_STEP_DEPTH_FALLBACK;
         if(h > h_max_perp) {
@@ -147,4 +148,14 @@ double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sam
         default:
             return S1;
     }
+}
+
+double stop_step_calc(const jabs_stop_step_params *params, const ion *ion) {
+    if(params->step > 0.0) {
+        return params->step;
+    }
+    double step = params->sigmas * sqrt(ion->S);
+    step = GSL_MIN_DBL(step, params->max);
+    step = GSL_MAX_DBL(step, params->min);
+    return step;
 }

@@ -41,14 +41,8 @@ typedef struct sim_calc_params {
     int geostragg; /* Geometric straggling true/false */
     int beta_manual; /* Don't calculate exit angle based on detector geometry, use something given by user, true/false */
     int gaussian_accurate; /* If this is FALSE an approximative gaussian CDF is used in convolution of spectra, otherwise function from GSL is used. */
-    double exiting_stop_step; /* This is energy. Zero is automatic. */
-    double exiting_stop_step_min;
-    double exiting_stop_step_max;
-    double exiting_stop_step_sigmas;
-    double incident_stop_step; /* This is energy. Zero is automatic. */
-    double incident_stop_step_min;
-    double incident_stop_step_max;
-    double incident_stop_step_sigmas;
+    jabs_stop_step_params incident_stop_params;
+    jabs_stop_step_params exiting_stop_params;
     double ds_incident_stop_step_factor;
     double brick_width_sigmas;
     double rough_layer_multiplier; /* Multiply given (or default) number of subspectra when calculating rough layers. */

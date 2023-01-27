@@ -69,14 +69,14 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
         p = malloc(sizeof(sim_calc_params));
         p->cs_stragg_pd = NULL; /* Will be allocated by sim_calc_params_update() */
     }
-    p->incident_stop_step = INCIDENT_STOP_STEP_DEFAULT;
-    p->incident_stop_step_sigmas = INCIDENT_STOP_STEP_SIGMAS_DEFAULT;
-    p->incident_stop_step_min = INCIDENT_STOP_STEP_MIN_DEFAULT;
-    p->incident_stop_step_max = INCIDENT_STOP_STEP_MAX_DEFAULT;
-    p->exiting_stop_step = EXITING_STOP_STEP_DEFAULT;
-    p->exiting_stop_step_sigmas = EXITING_STOP_STEP_SIGMAS_DEFAULT;
-    p->exiting_stop_step_min = EXITING_STOP_STEP_MIN_DEFAULT;
-    p->exiting_stop_step_max = EXITING_STOP_STEP_MAX_DEFAULT;
+    p->incident_stop_params.step = INCIDENT_STOP_STEP_DEFAULT;
+    p->incident_stop_params.sigmas = INCIDENT_STOP_STEP_SIGMAS_DEFAULT;
+    p->incident_stop_params.min = INCIDENT_STOP_STEP_MIN_DEFAULT;
+    p->incident_stop_params.max = INCIDENT_STOP_STEP_MAX_DEFAULT;
+    p->exiting_stop_params.step = EXITING_STOP_STEP_DEFAULT;
+    p->exiting_stop_params.sigmas = EXITING_STOP_STEP_SIGMAS_DEFAULT;
+    p->exiting_stop_params.min = EXITING_STOP_STEP_MIN_DEFAULT;
+    p->exiting_stop_params.max = EXITING_STOP_STEP_MAX_DEFAULT;
     p->brick_width_sigmas = BRICK_WIDTH_SIGMAS_DEFAULT;
     p->depthsteps_max = 0; /* automatic */
     p->geostragg = FALSE;
@@ -115,11 +115,11 @@ sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
     p->geostragg = FALSE;
     p->rough_layer_multiplier = 0.5;
     p->sigmas_cutoff = SIGMAS_FAST_CUTOFF;
-    p->incident_stop_step_min *= 2.0;
-    p->incident_stop_step_sigmas *= 1.5;
-    p->exiting_stop_step_min *= 1.5;
-    p->exiting_stop_step_sigmas *= 1.5;
-    p->exiting_stop_step_max *= 1.5;
+    p->incident_stop_params.min *= 2.0;
+    p->incident_stop_params.sigmas *= 1.5;
+    p->exiting_stop_params.min *= 1.5;
+    p->exiting_stop_params.sigmas *= 1.5;
+    p->exiting_stop_params.max *= 1.5;
     return p;
 }
 
@@ -129,9 +129,9 @@ sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
     p->sigmas_cutoff += 1.0;
     p->gaussian_accurate = TRUE;
     p->cs_adaptive = TRUE;
-    p->incident_stop_step_min *= 0.5;
-    p->exiting_stop_step_min *= 0.5;
-    p->exiting_stop_step_sigmas *= 0.5;
+    p->incident_stop_params.min *= 0.5;
+    p->exiting_stop_params.min *= 0.5;
+    p->exiting_stop_params.sigmas *= 0.5;
     return p;
 }
 
@@ -139,8 +139,8 @@ sim_calc_params *sim_calc_params_defaults_brisk(sim_calc_params *p) {
     sim_calc_params_defaults(p);
     p->cs_n_stragg_steps -= 2;
     p->sigmas_cutoff -= 1.0;
-    p->incident_stop_step_min *= 2.0;
-    p->exiting_stop_step_sigmas *= 1.5;
+    p->incident_stop_params.min *= 2.0;
+    p->exiting_stop_params.sigmas *= 1.5;
     p->cs_energy_step_max *= 1.5;
     p->cs_depth_step_max *= 1.5;
     p->cs_stragg_step_sigmas = 1.25;
@@ -152,8 +152,8 @@ sim_calc_params *sim_calc_params_defaults_improved(sim_calc_params *p) {
     p->cs_n_stragg_steps += 4;
     p->sigmas_cutoff += 0.5;
     p->gaussian_accurate = TRUE;
-    p->exiting_stop_step_min *= 0.75;
-    p->exiting_stop_step_sigmas *= 0.75;
+    p->exiting_stop_params.min *= 0.75;
+    p->exiting_stop_params.sigmas *= 0.75;
     p->cs_energy_step_max *= 0.75;
     p->cs_depth_step_max *= 0.75;
     p->cs_stragg_step_sigmas = 0.75;
@@ -194,17 +194,17 @@ void sim_calc_params_ds(sim_calc_params *p, int ds) {
 void sim_calc_params_print(const sim_calc_params *params) {
     if(!params)
         return;
-    jabs_message(MSG_INFO, stderr, "step for incident ions = %.3lf keV (0 = auto)\n", params->incident_stop_step / C_KEV);
-    if(params->incident_stop_step == 0.0) {
-        jabs_message(MSG_INFO, stderr, "step for incident ions = %g times straggling sigma\n", params->incident_stop_step_sigmas/C_KEV);
-        jabs_message(MSG_INFO, stderr, "minimum step for incident ions = %.3lf keV\n", params->incident_stop_step_min/C_KEV);
-        jabs_message(MSG_INFO, stderr, "maximum step for incident ions = %.3lf keV\n", params->incident_stop_step_max/C_KEV);
+    jabs_message(MSG_INFO, stderr, "step for incident ions = %.3lf keV (0 = auto)\n", params->incident_stop_params.step / C_KEV);
+    if(params->incident_stop_params.step == 0.0) {
+        jabs_message(MSG_INFO, stderr, "step for incident ions = %g times straggling sigma\n", params->incident_stop_params.sigmas / C_KEV);
+        jabs_message(MSG_INFO, stderr, "minimum step for incident ions = %.3lf keV\n", params->incident_stop_params.min / C_KEV);
+        jabs_message(MSG_INFO, stderr, "maximum step for incident ions = %.3lf keV\n", params->incident_stop_params.max / C_KEV);
     }
-    jabs_message(MSG_INFO, stderr, "step for incident ions = %.3lf keV (0 = auto)\n", params->incident_stop_step / C_KEV);
-    if(params->incident_stop_step == 0.0) {
-        jabs_message(MSG_INFO, stderr, "step for incident ions = %g times straggling sigma\n", params->incident_stop_step_sigmas/C_KEV);
-        jabs_message(MSG_INFO, stderr, "minimum step for incident ions = %.3lf keV\n", params->incident_stop_step_min/C_KEV);
-        jabs_message(MSG_INFO, stderr, "maximum step for incident ions = %.3lf keV\n", params->incident_stop_step_max/C_KEV);
+    jabs_message(MSG_INFO, stderr, "step for exiting ions = %.3lf keV (0 = auto)\n", params->exiting_stop_params.step / C_KEV);
+    if(params->exiting_stop_params.step == 0.0) {
+        jabs_message(MSG_INFO, stderr, "step for exiting ions = %g times straggling sigma\n", params->exiting_stop_params.sigmas / C_KEV);
+        jabs_message(MSG_INFO, stderr, "minimum step for exiting ions = %.3lf keV\n", params->exiting_stop_params.min / C_KEV);
+        jabs_message(MSG_INFO, stderr, "maximum step for exiting ions = %.3lf keV\n", params->exiting_stop_params.max / C_KEV);
     }
     jabs_message(MSG_INFO, stderr, "stopping RK4 = %s\n", params->rk4?"true":"false");
     jabs_message(MSG_INFO, stderr, "accurate nuclear stopping = %s\n", params->nuclear_stopping_accurate?"true":"false");
@@ -425,10 +425,10 @@ void sim_workspace_calculate_number_of_bricks(sim_workspace *ws) {
         n_bricks = ws->params->depthsteps_max;
     } else {
         if(det->type == DETECTOR_ENERGY) {
-            if(ws->params->incident_stop_step == 0.0) { /* Automatic incident step size */
+            if(ws->params->incident_stop_params.step == 0.0) { /* Automatic incident step size */
                 n_bricks = (int) ceil(sim->beam_E / (ws->params->brick_width_sigmas * sqrt(detector_resolution(ws->det, sim->beam_isotope, sim->beam_E))) + ws->sample->n_ranges);
             } else {
-                n_bricks = (int) ceil(sim->beam_E / ws->params->incident_stop_step + ws->sample->n_ranges); /* This is conservative */
+                n_bricks = (int) ceil(sim->beam_E / ws->params->incident_stop_params.step + ws->sample->n_ranges); /* This is conservative */
                 fprintf(stderr, "n_bricks = %zu\n", n_bricks);
             }
         } else { /* TODO: maybe something more clever is needed here */
