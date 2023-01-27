@@ -99,12 +99,10 @@ void des_table_rebuild_index(des_table *dt) {
     if(!dt->n)
         return;
     assert(dt->n > 0);
-    size_t n_ranges = dt->t[dt->n - 1].d.i + 1; /* Number of ranges is one greater than the last index. Make sure the last element is nice and valid. */
-    dt->n_ranges = n_ranges;
     if(dt->depth_interval_index) {
         free(dt->depth_interval_index);
     }
-    dt->depth_interval_index = malloc(sizeof(size_t) * (n_ranges + 1));
+    dt->depth_interval_index = malloc(sizeof(size_t) * (dt->n_ranges + 1));
     size_t i_range_old = 0, i_range_new = 0;
     /* NOTE: depth_start may have not been start of bin! This shouldn't matter if everything is ok...*/
     dt->depth_interval_index[0] = 0;
@@ -112,14 +110,14 @@ void des_table_rebuild_index(des_table *dt) {
         const des *des = &(dt->t[i]);
         if(des->d.i > i_range_old) {
             i_range_new = des->d.i;
-            assert(i_range_new < n_ranges);
+            assert(i_range_new < dt->n_ranges);
             for(size_t i_range = i_range_old + 1; i_range <= i_range_new; i_range++) { /* Handles indices stop_step skips over (no thickness between them) */
                 dt->depth_interval_index[i_range] = i - 1;
             }
             i_range_old = i_range_new;
         }
     }
-    dt->depth_interval_index[n_ranges] = dt->n - 1;
+    dt->depth_interval_index[dt->n_ranges] = dt->n - 1; /* TODO: not true always! */
 }
 
 void des_table_print(FILE *f, const des_table *dt) {
@@ -131,8 +129,12 @@ void des_table_print(FILE *f, const des_table *dt) {
         const des *des = &(dt->t[i]);
         fprintf(f, "DES %4zu %3zu %10.3lf %10.3lf %8.3lf\n", i, des->d.i, des->d.x / C_TFU, des->E / C_KEV, sqrt(des->S) / C_KEV);
     }
-    for(size_t i = 0; i < dt->n_ranges; i++) {
-        fprintf(f, "DES INDEX %3zu [%3zu,%3zu]\n", i, dt->depth_interval_index[i],  dt->depth_interval_index[i+1]);
+    if(dt->depth_interval_index) {
+        for(size_t i = 0; i < dt->n_ranges; i++) {
+            fprintf(f, "DES INDEX %3zu [%3zu,%3zu]\n", i, dt->depth_interval_index[i], dt->depth_interval_index[i + 1]);
+        }
+    } else {
+        fprintf(f, "DES INDEX DOES NOT EXIST\n");
     }
 }
 
@@ -141,6 +143,10 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     assert(dt);
     assert(dt->n > 0);
     double E = incident->E;
+#ifdef JABS_DEBUG_DES
+    fprintf(stderr, "Where is E = %g keV in DES table? Start index %zu. Previous depth %g tfu (range %zu)\n",
+            E / C_KEV, *i_des, depth_prev.x / C_TFU, depth_prev.i);
+#endif
     for(i = *i_des; i < dt->n - 1; i++) {
         if(dt->t[i].d.i != dt->t[i + 1].d.i) { /* This means last point of this layer */
             E = dt->t[i].E;
@@ -151,6 +157,9 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
             break;
         }
         if(dt->t[i].E < E) {/* i is the index of the first element in dt->t that has energy below E. So i-1 should have energy above E. */
+#ifdef JABS_DEBUG_DES
+            fprintf(stderr, "Breaking, i_des = i = %zu, because first element %.12e J (%g keV) <  E = %.12e J (%g keV)\n", i, dt->t[i].E, dt->t[i].E / C_KEV,  E, E / C_KEV);
+#endif
             *i_des = i;
             break;
         }
@@ -158,10 +167,18 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     if(i == dt->n - 1) {
         if(E < dt->t[i].E) {
 #ifdef JABS_DEBUG_DES
-            fprintf(stderr, "Energy %g keV is below last point in table (%g keV).\n", E / C_KEV, dt->t[i].E / C_KEV);
+            fprintf(stderr, "Energy %g keV is below last point in table (%g keV). Changing energy.\n", E / C_KEV, dt->t[i].E / C_KEV);
 #endif
             E = dt->t[i].E;
         }
+    } else if(i == 0) {
+        if(E > dt->t[i].E) {
+#ifdef JABS_DEBUG_DES
+            fprintf(stderr, "Energy %g keV is above first point in table (%g keV). Changing energy.\n", E / C_KEV, dt->t[i].E / C_KEV);
+#endif
+            E = dt->t[i].E;
+        }
+        i = 1;
     }
     assert(i > 0);
     const des *des_low = &dt->t[i - 1]; /* Closer to surface, higher energy */
@@ -232,13 +249,18 @@ des_table *des_table_compute(const ion *incident, depth depth_start, sim_workspa
     size_t i = 0;
     depth d_before;
     depth d_after = depth_start;
+    assert(ion.inverse_cosine_theta <= -1.0 || ion.inverse_cosine_theta >= 1.0);
+#ifdef DEBUG
+    fprintf(stderr, "Computing DES table. start_depth = %g tfu, E = %g keV, angle in sample %g deg (1/cos = %.6lf).\n", depth_start.x / C_TFU, ion.E / C_KEV,
+            ion.theta / C_DEG, ion.inverse_cosine_theta);
+#endif
     do {
         if(i == dt->n) {
 #ifdef DEBUG
             fprintf(stderr, "DES table reallocation, size %zu reached.\n", dt->n);
 #endif
             if(des_table_realloc(dt, dt->n * 2)) {
-
+                break;
             }
         }
         d_before = d_after;
@@ -246,15 +268,24 @@ des_table *des_table_compute(const ion *incident, depth depth_start, sim_workspa
         des->E = ion.E;
         des->S = ion.S;
         des->d = d_before;
-        if(d_before.x >= sample->thickness) {
+        if((ion.inverse_cosine_theta > 0.0 && d_before.x >= sample->thickness - DEPTH_TOLERANCE) || (ion.inverse_cosine_theta < 0.0 && d_before.x < DEPTH_TOLERANCE)) {
+#ifdef DEBUG
+            fprintf(stderr, "DES table calculation stops at %g tfu (i = %zu).\n", d_before.x / C_TFU, i);
+#endif
             i++; /* TODO: Safe? */
             break;
         }
         d_after = stop_step(ws, &ion, sample, d_before, stop_step_calc_incident(ws, &ion));
         i++;
     } while(ion.E > ws->emin);
-    if(dt->n > 0) {
+    if(dt->n) {
         des_table_realloc(dt, i); /* Shrinks to size */
+        if(i > 0 ) {
+            dt->n_ranges = GSL_MAX(depth_start.i, dt->t[i - 1].d.i) + 1;
+        } else {
+            dt->n_ranges = 0;
+        }
+        des_table_print(stderr, dt);
         des_table_rebuild_index(dt);
         return dt;
     } else {
@@ -579,7 +610,7 @@ double cross_section_concentration_product_new(const sim_workspace *ws, const sa
     const double depth_step_max = ws->params->cs_depth_step_max;
     const double S_avg_FWHM = ws->params->cs_stragg_step_fudge_factor * sqrt((S_front + S_back)/2.0);
     const double E_step_nominal = -1.0 * GSL_MIN_DBL(E_step_max, S_avg_FWHM); /* Actual step is negative */
-    const double d_diff = d_after->x - d_before->x;
+    const double d_diff = fabs(d_after->x - d_before->x); /* Since depth_step_max is (typically) always absolute number, we should use absolute value here to determine number of steps. */
     assert(d_diff > 0);
     assert(E_step_nominal < 0.0);
     double sigma;
@@ -827,10 +858,16 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
 #endif
             break;
         }
-        if(d_after.x >= sim_r->max_depth) {
+        if(ion1.inverse_cosine_theta > 0.0 && d_after.x >= sim_r->max_depth) {
             sim_r->last_brick = i_brick;
 #ifdef DEBUG
             fprintf(stderr, "Max depth reached.\n");
+#endif
+            break;
+        } else if(ion1.inverse_cosine_theta < 0.0 && d_after.x < DEPTH_TOLERANCE) {
+            sim_r->last_brick = i_brick;
+#ifdef DEBUG
+            fprintf(stderr, "Surface reached.\n");
 #endif
             break;
         }

@@ -13,7 +13,7 @@ typedef struct {
     double theta; /* polar angle. theta = 0 is along the z axis (deeper into sample, perpendicular to surface) */
     double phi; /* azimuthal angle. phi = 0 is x-axis, phi = 90deg is y-axis. */
     double cosine_theta;
-    double inverse_cosine_theta; /* Inverse cosine of theta. Traversing matter "straight on" means 1.0 and going sideways approaches infinity. Negative for travelling "backwards". */
+    double inverse_cosine_theta; /* Inverse cosine of theta. Traversing matter "straight on" means 1.0 and going sideways approaches +inf. Negative -1.0 to -inf for travelling "backwards". Values between (-1.0,1.0) are not allowed. */
     double cosine_phi;
     double inverse_cosine_phi;
     nuclear_stopping *nucl_stop;

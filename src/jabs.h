@@ -23,13 +23,13 @@
 #include "geostragg.h"
 
 typedef struct {
-    depth d;
-    double E;
-    double S;
-} des; /* depth should be increasing monotonously (but not strictly), E decreasing and S can do whatever it does */
+    depth d; /* Depth */
+    double E; /* Energy */
+    double S; /* Straggling */
+} des; /* DES = Depth, Energy, Straggling */
 
 typedef struct {
-    des *t; /* array, n elements */
+    des *t; /* array, n elements. E decreasing, d either increases (ion going deeper) or decreases. S can do whatever S does. */
     size_t n;
     size_t n_ranges;
     size_t *depth_interval_index; /* table, size same as number of sample ranges (as given in des_table_compute()). Array stores location i of t[i].d.x == sample->range[i_range].x  */
