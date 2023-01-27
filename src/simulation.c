@@ -85,7 +85,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->ds_steps_azi = 0;
     p->ds_steps_polar = 0;
     p->rk4 = TRUE;
-    p->nucl_stop_accurate = TRUE;
+    p->nuclear_stopping_accurate = TRUE;
     p->mean_conc_and_energy = FALSE;
     p->cs_n_stragg_steps = CS_STRAGG_STEPS;
     p->rough_layer_multiplier = 1.0;
@@ -109,7 +109,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
 sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
     sim_calc_params_defaults(p);
     p->rk4 = FALSE;
-    p->nucl_stop_accurate = FALSE;
+    p->nuclear_stopping_accurate = FALSE;
     p->mean_conc_and_energy = TRUE;
     p->cs_n_stragg_steps = 0; /* Not used if mean_conc_and_energy == TRUE */
     p->geostragg = FALSE;
@@ -207,7 +207,7 @@ void sim_calc_params_print(const sim_calc_params *params) {
         jabs_message(MSG_INFO, stderr, "maximum step for incident ions = %.3lf keV\n", params->incident_stop_step_max/C_KEV);
     }
     jabs_message(MSG_INFO, stderr, "stopping RK4 = %s\n", params->rk4?"true":"false");
-    jabs_message(MSG_INFO, stderr, "accurate nuclear stopping = %s\n", params->nucl_stop_accurate?"true":"false");
+    jabs_message(MSG_INFO, stderr, "accurate nuclear stopping = %s\n", params->nuclear_stopping_accurate?"true":"false");
     jabs_message(MSG_INFO, stderr, "depth steps max = %zu\n", params->depthsteps_max);
     jabs_message(MSG_INFO, stderr, "geometric broadening = %s\n", params->geostragg?"true":"false");
     jabs_message(MSG_INFO, stderr, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");
@@ -486,8 +486,6 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     }
     ws->ion = sim->ion; /* Shallow copy, but that is ok */
 
-    ws->stopping_type = GSTO_STO_TOT;
-
     sim_workspace_recalculate_n_channels(ws, sim);
 
     if(ws->n_channels == 0) {
@@ -521,6 +519,12 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     } else {
         ws->w_int_cs_stragg = NULL;
     }
+    ws->stop.type = GSTO_STO_TOT;
+    ws->stop.gsto = jibal->gsto;
+    ws->stop.rk4 = ws->params->rk4;
+    ws->stop.nuclear_stopping_accurate = ws->params->nuclear_stopping_accurate;
+    ws->stragg = ws->stop; /* Copy */
+    ws->stragg.type = GSTO_STO_STRAGG;
     return ws;
 }
 

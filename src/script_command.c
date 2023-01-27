@@ -1249,7 +1249,7 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_min",       &sim->params->exiting_stop_step_min,           NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_max",       &sim->params->exiting_stop_step_max,           NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "ds_incident_stop_step_factor",&sim->params->ds_incident_stop_step_factor,    NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "nucl_stop_accurate",          &sim->params->nucl_stop_accurate,              NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "nuclear_stopping_accurate",   &sim->params->nuclear_stopping_accurate,       NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy",        &sim->params->mean_conc_and_energy,            NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "geostragg",                   &sim->params->geostragg,                       NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",                 &sim->params->beta_manual,                     NULL},

@@ -113,6 +113,7 @@ set(PROJECT_SOURCES
         ../src/nuclear_stopping.c
         ../src/nuclear_stopping.h
         ../src/fit_params.c
+        ../src/stop.c
         "$<$<BOOL:${PLUGINS}>:plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui

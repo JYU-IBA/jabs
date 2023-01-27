@@ -25,6 +25,7 @@
 #include "detector.h"
 #include "sample.h"
 #include "prob_dist.h"
+#include "stop.h"
 
 
 typedef struct sim_calc_params {
@@ -35,7 +36,7 @@ typedef struct sim_calc_params {
     size_t cs_n_stragg_steps; /* Number of steps to take, when calculating straggling weighted cross sections (note that these are substeps of cs_n_steps) */
     size_t depthsteps_max;
     int rk4; /* Use fourth order Runge-Kutta for energy loss calculation (differential equation with dE/dx). When false, a first-order method is used. */
-    int nucl_stop_accurate; /* Use accurate nuclear stopping equation true/false. When false a faster (poorly approximating) equation is used below the nuclear stopping maximum. */
+    int nuclear_stopping_accurate; /* Use accurate nuclear stopping equation true/false. When false a faster (poorly approximating) equation is used below the nuclear stopping maximum. */
     int mean_conc_and_energy; /* Calculation of cross-section concentration product is simplified by calculating cross section at mean energy of a depth step and concentration at mid-bin (only relevant for samples with concentration gradients) */
     int geostragg; /* Geometric straggling true/false */
     int beta_manual; /* Don't calculate exit angle based on detector geometry, use something given by user, true/false */
@@ -79,6 +80,7 @@ typedef struct simulation {
     double channeling_offset; /* a very ad-hoc channeling yield correction */
     double channeling_slope;
     sim_calc_params *params;
+    jabs_stop *stop;
     int erd; /* Add ERD reactions */
     int rbs; /* Add RBS reactions */
     jabs_reaction_cs cs_rbs;
@@ -115,13 +117,14 @@ typedef struct sim_workspace {
     const sample *sample; /* Note that simulate() can be passed a sample explicitly, but in most cases it should be this. Also this should be exactly the same as sim->sample. */
     size_t n_reactions;
     const jibal_gsto *gsto;
-    gsto_stopping_type stopping_type;
     size_t n_channels; /* in histograms */
     gsl_histogram *histo_sum;
     ion ion;
     sim_reaction **reactions; /* table of reaction pointers, size n_reactions */
     const jibal_isotope *isotopes;
     sim_calc_params *params;
+    jabs_stop stop;
+    jabs_stop stragg;
     double emin;
     gsl_integration_workspace *w_int_cs; /* Integration workspace for conc * cross section product */
     gsl_integration_workspace *w_int_cs_stragg;

@@ -29,7 +29,7 @@ add_executable(jabs
         roughness.c  script.c  generic.c message.c aperture.c
         geostragg.c  script_command.c script_session.c script_file.c
         calibration.c prob_dist.c idf2jbs.c idfelementparsers.c
-        idfparse.c nuclear_stopping.c
+        idfparse.c nuclear_stopping.c stop.c
         "$<$<BOOL:${JABS_PLUGINS}>:plugin.c>"
         "$<$<BOOL:${WIN32}>:win_compat.c>"
         )
