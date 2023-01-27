@@ -35,12 +35,15 @@
 #include "message.h"
 #include "win_compat.h"
 
+extern inline double des_table_min_energy(const des_table *dt);
+
 des_table *des_table_init(size_t n) {
     des_table *dt = malloc(sizeof(des_table));
     dt->t = NULL;
     dt->depth_interval_index = NULL;
     dt->n = 0;
     dt->n_ranges = 0;
+    dt->depth_increases = TRUE;
     if(des_table_realloc(dt, n)) {
         free(dt);
         return NULL;
@@ -98,26 +101,36 @@ des *des_table_element(const des_table *dt, size_t i) {
 void des_table_rebuild_index(des_table *dt) {
     if(!dt->n)
         return;
-    assert(dt->n > 0);
     if(dt->depth_interval_index) {
         free(dt->depth_interval_index);
     }
     dt->depth_interval_index = malloc(sizeof(size_t) * (dt->n_ranges + 1));
-    size_t i_range_old = 0, i_range_new = 0;
-    /* NOTE: depth_start may have not been start of bin! This shouldn't matter if everything is ok...*/
-    dt->depth_interval_index[0] = 0;
-    for(size_t i = 1; i < dt->n; i++) {
-        const des *des = &(dt->t[i]);
-        if(des->d.i > i_range_old) {
-            i_range_new = des->d.i;
-            assert(i_range_new < dt->n_ranges);
-            for(size_t i_range = i_range_old + 1; i_range <= i_range_new; i_range++) { /* Handles indices stop_step skips over (no thickness between them) */
-                dt->depth_interval_index[i_range] = i - 1;
+
+    size_t i_range_old = dt->t[0].d.i;
+    dt->depth_interval_index[i_range_old] = 0;
+    if(dt->depth_increases) {
+        for(size_t i = 1; i < dt->n; i++) {
+            const des *des = &(dt->t[i]);
+            if(des->d.i > i_range_old) { /* index increases (des table has increasing depth) */
+                for(size_t i_range = i_range_old + 1; i_range <= des->d.i && i_range < dt->n_ranges; i_range++) { /* Handles indices stop_step skips over (no thickness between them) */
+                    dt->depth_interval_index[i_range] = i - 1;
+                }
+                i_range_old = des->d.i;
             }
-            i_range_old = i_range_new;
         }
+        dt->depth_interval_index[dt->n_ranges] = dt->n - 1; /* Last point, last index */
+    } else {
+        for(size_t i = 1; i < dt->n; i++) {
+            const des *des = &(dt->t[i]);
+            if(des->d.i < i_range_old) {
+                for(size_t i_range = des->d.i; i_range < i_range_old; i_range++) {
+                    dt->depth_interval_index[i_range + 1] = i;
+                }
+                i_range_old = des->d.i;
+            }
+        }
+        dt->depth_interval_index[i_range_old] = dt->n - 1;
     }
-    dt->depth_interval_index[dt->n_ranges] = dt->n - 1; /* TODO: not true always! */
 }
 
 void des_table_print(FILE *f, const des_table *dt) {
@@ -129,6 +142,7 @@ void des_table_print(FILE *f, const des_table *dt) {
         const des *des = &(dt->t[i]);
         fprintf(f, "DES %4zu %3zu %10.3lf %10.3lf %8.3lf\n", i, des->d.i, des->d.x / C_TFU, des->E / C_KEV, sqrt(des->S) / C_KEV);
     }
+    fprintf(f, "DES DEPTH INCREASES: %s\n", dt->depth_increases?"TRUE":"FALSE");
     if(dt->depth_interval_index) {
         for(size_t i = 0; i < dt->n_ranges; i++) {
             fprintf(f, "DES INDEX %3zu [%3zu,%3zu]\n", i, dt->depth_interval_index[i], dt->depth_interval_index[i + 1]);
@@ -213,9 +227,15 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
 }
 
 void des_table_set_ion_depth(const des_table *dt, ion *ion, depth d) {
-    size_t lo = dt->depth_interval_index[d.i];
-    size_t hi = dt->depth_interval_index[d.i + 1];
-    size_t mi;
+    size_t lo, mi, hi;
+    if(dt->depth_increases) {
+        lo = dt->depth_interval_index[d.i];
+        hi = dt->depth_interval_index[d.i + 1];
+    } else {
+        lo = dt->depth_interval_index[d.i + 1];
+        hi = dt->depth_interval_index[d.i];
+    }
+
 #ifdef DEBUG_VERBOSE
     fprintf(stderr, "Depth %g = tfu, index = %zu. Probably in DES table between %zu and %zu.\n", d.x / C_TFU, d.i, lo, hi);
 #endif
@@ -249,6 +269,7 @@ des_table *des_table_compute(const ion *incident, depth depth_start, sim_workspa
     size_t i = 0;
     depth d_before;
     depth d_after = depth_start;
+    dt->depth_increases = (ion.inverse_cosine_theta > 0.0);
     assert(ion.inverse_cosine_theta <= -1.0 || ion.inverse_cosine_theta >= 1.0);
 #ifdef DEBUG
     fprintf(stderr, "Computing DES table. start_depth = %g tfu, E = %g keV, angle in sample %g deg (1/cos = %.6lf).\n", depth_start.x / C_TFU, ion.E / C_KEV,
@@ -285,7 +306,6 @@ des_table *des_table_compute(const ion *incident, depth depth_start, sim_workspa
         } else {
             dt->n_ranges = 0;
         }
-        des_table_print(stderr, dt);
         des_table_rebuild_index(dt);
         return dt;
     } else {
@@ -731,8 +751,12 @@ double stop_step_calculate(const sim_workspace *ws, const ion *ion) { /* Calcula
 
 void simulate_reaction_new_routine(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
     ion ion1 = *incident; /* Shallow copy */
-    des_table_set_ion_depth(dt, &ion1, depth_start); /* TODO: is this necessary? */
+    //des_table_set_ion_depth(dt, &ion1, depth_start); /* TODO: is this necessary? */
     simulate_init_reaction(sim_r, sample, g, ws->emin, ion1.E);
+    if(sim_r->stop) {
+        sim_r->last_brick = 0;
+        return;
+    }
     depth d_before, d_after = depth_start;
     size_t i_des = 0;
     brick *b = NULL, *b_prev = NULL;
@@ -745,10 +769,13 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         b_prev = b;
         b = &sim_r->bricks[i_brick];
         d_before = d_after;
-        d_after = des_table_find_depth(dt, &i_des, d_before, &ion1);
-        if(ion1.E < ws->emin) {
 #ifdef DEBUG
-            fprintf(stderr, "Incident energy below minimum.\n");
+        fprintf(stderr, "E = %g keV (incident)\n", ion1.E / C_KEV);
+#endif
+        d_after = des_table_find_depth(dt, &i_des, d_before, &ion1); /* Does this handle E below min? */
+        if(ion1.E < des_table_min_energy(dt)) { /* since DES table minimum should be above ws->emin, we don't need to check for that */
+#ifdef DEBUG
+            fprintf(stderr, "Incident energy below table minimum (%g keV).\n", des_table_min_energy(dt) / C_KEV);
 #endif
             sim_r->last_brick = i_brick - 1;
             break;
@@ -775,8 +802,10 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
 #endif // NO_SKIP_EMPTY_RANGES
             d_before.i = d_after.i;
             crossed = TRUE;
-        } else if(d_after.i < d_before.i){
+        } else if(d_after.i < d_before.i){ /* Skipping towards surface? */
+#if 0
             fprintf(stderr, "This shouldn't happen. But it did. E = %g keV\n", ion1.E / C_KEV);
+#endif
         }
         assert(ion1.S >= 0.0);
         b->d = d_after;
@@ -828,8 +857,14 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
             double stop_incident = stop_sample(ws, &ion1, sample, ws->stopping_type, d_after, b->E_0) * ion1.inverse_cosine_theta;
             double stop_exiting = stop_sample(ws, &sim_r->p, sample, ws->stopping_type, d_after, b->E_r) * sim_r->p.inverse_cosine_theta;
             double K = reaction_product_energy(sim_r->r, sim_r->theta, b->E_0) / b->E_0;
+#ifdef DEBUG_VERBOSE
+            fprintf(stderr, "Calculating E_deriv = (%g * (%g eV/tfu) - (%g eV/tfu)) / (%g eV/tfu)\n", K, stop_incident / C_EV_TFU, stop_exiting / C_EV_TFU, stop_incident / C_EV_TFU);
+#endif
             E_deriv = fabs((K * stop_incident - stop_exiting ) / (stop_incident)); /* TODO: NaN if reaction is not possible */
         }
+#ifdef DEBUG_VERBOSE
+        fprintf(stderr, "E_deriv before imposing min/max clamping was %g.\n", E_deriv);
+#endif
         E_deriv = GSL_MAX_DBL(E_deriv, ENERGY_DERIVATIVE_MIN);
         E_deriv = GSL_MIN_DBL(E_deriv, ENERGY_DERIVATIVE_MAX);
         b->deriv = E_deriv;
@@ -837,7 +872,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         b->Q = ion1.inverse_cosine_theta * sigma_conc * b->thick;
         b->sc = sigma_conc;
 #ifdef DEBUG
-        fprintf(stderr, "%12s %6s %3zu %3zu:%10.3lf %3zu:%10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %8.3lf %10.3e %8.3lf %2i\n",
+        fprintf(stderr, "%12s %6s %3zu %3zu:%10.3lf %3zu:%10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3e %8.3lf %2i\n",
                 sim_r->r->target->name, reaction_type_to_string(sim_r->r->type), i_brick,
                 d_before.i, d_before.x / C_TFU,
                 d_after.i, d_after.x / C_TFU,
@@ -1130,8 +1165,10 @@ void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const geo
         sim_r->stop = TRUE;
     }
 #ifdef DEBUG
-    fprintf(stderr, "Simulation reaction %s %s initialized. Max depth %g tfu. i_isotope=%zu, stop = %i.\n"
-            , reaction_name(sim_r->r), sim_r->r->target->name, sim_r->max_depth / C_TFU, sim_r->i_isotope, sim_r->stop);
+    fprintf(stderr, "Simulation reaction %s %s initialized, E_max = %g keV, E_min = %g keV. Max depth %g tfu. i_isotope=%zu, stop = %i.\n",
+            reaction_name(sim_r->r), sim_r->r->target->name,
+            E_max / C_KEV, E_min / C_KEV,
+            sim_r->max_depth / C_TFU, sim_r->i_isotope, sim_r->stop);
     ion_print(stderr, &sim_r->p);
 #endif
 }
@@ -1353,14 +1390,17 @@ int print_bricks(const char *filename, const sim_workspace *ws) {
         return EXIT_FAILURE;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const sim_reaction *r = ws->reactions[i];
+        if(r->last_brick == 0) {
+            continue;
+        }
         fprintf(f, "#Reaction %zu: %s %s\n", i+1, reaction_name(r->r), r->r->target->name);
         if(r->r->filename) {
             fprintf(f, "#Filename: %s\n", r->r->filename);
         }
-        fprintf(f, "#i  brick    depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo)    S(sum) sigma*conc            Q  dE(det)/dE_0\n");
+        fprintf(f, "#i  brick    depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo)    S(sum) sigma*conc              Q  dE(det)/dE_0\n");
         for(size_t j = 0; j <= r->last_brick; j++) {
             brick *b = &r->bricks[j];
-            fprintf(f, "%2zu %4zu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %10.3lf %12.6g %8.3lf\n",
+            fprintf(f, "%2zu %4zu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %10.3lf %14.6e %8.3lf\n",
                     i, j, b->d.x / C_TFU, b->thick / C_TFU,
                     b->E_0 / C_KEV, C_FWHM * sqrt(b->S_0) / C_KEV,
                     b->E_r / C_KEV, C_FWHM * sqrt(b->S_r) / C_KEV,
