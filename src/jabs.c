@@ -48,10 +48,18 @@ des_table *des_table_init(size_t n) {
     return dt;
 }
 int des_table_realloc(des_table *dt, size_t n) {
+    if(n > DES_TABLE_MAX_SIZE) {
 #ifdef DEBUG
-    fprintf(stderr, "DES table %p realloc to %zu\n", (void *)dt, n);
+        fprintf(stderr, "DES table requested size %zu larger than allowed %i\n", n, DES_TABLE_MAX_SIZE);
 #endif
-    dt->t = realloc(dt->t, n * sizeof(des));
+        free(dt->t);
+        dt->t = NULL;
+    } else {
+#ifdef DEBUG
+        fprintf(stderr, "DES table %p realloc to %zu\n", (void *) dt, n);
+#endif
+        dt->t = realloc(dt->t, n * sizeof(des));
+    }
     if(dt->t) {
         dt->n = n;
         return 0;
@@ -90,7 +98,8 @@ des *des_table_element(const des_table *dt, size_t i) {
 void des_table_rebuild_index(des_table *dt) {
     if(!dt->n)
         return;
-    size_t n_ranges = dt->t[dt->n-1].d.i + 1; /* Number of ranges is one greater than the last index. Make sure the last element is nice and valid. */
+    assert(dt->n > 0);
+    size_t n_ranges = dt->t[dt->n - 1].d.i + 1; /* Number of ranges is one greater than the last index. Make sure the last element is nice and valid. */
     dt->n_ranges = n_ranges;
     if(dt->depth_interval_index) {
         free(dt->depth_interval_index);
@@ -224,6 +233,14 @@ des_table *des_table_compute(const ion *incident, depth depth_start, sim_workspa
     depth d_before;
     depth d_after = depth_start;
     do {
+        if(i == dt->n) {
+#ifdef DEBUG
+            fprintf(stderr, "DES table reallocation, size %zu reached.\n", dt->n);
+#endif
+            if(des_table_realloc(dt, dt->n * 2)) {
+
+            }
+        }
         d_before = d_after;
         des *des = &dt->t[i];
         des->E = ion.E;
@@ -233,19 +250,17 @@ des_table *des_table_compute(const ion *incident, depth depth_start, sim_workspa
             i++; /* TODO: Safe? */
             break;
         }
-
         d_after = stop_step(ws, &ion, sample, d_before, stop_step_calc_incident(ws, &ion));
-        if(i == dt->n) {
-#ifdef DEBUG
-            fprintf(stderr, "DES table reallocation, size %zu reached.\n", dt->n);
-#endif
-            des_table_realloc(dt, dt->n * 2);
-        }
         i++;
     } while(ion.E > ws->emin);
-    des_table_realloc(dt, i); /* Shrinks to size */
-    des_table_rebuild_index(dt);
-    return dt;
+    if(dt->n > 0) {
+        des_table_realloc(dt, i); /* Shrinks to size */
+        des_table_rebuild_index(dt);
+        return dt;
+    } else {
+        des_table_free(dt);
+        return NULL;
+    }
 }
 
 
@@ -702,7 +717,7 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
         d_after = des_table_find_depth(dt, &i_des, d_before, &ion1);
         if(ion1.E < ws->emin) {
 #ifdef DEBUG
-            fprintf(stderr, "Energy minimum.\n");
+            fprintf(stderr, "Incident energy below minimum.\n");
 #endif
             sim_r->last_brick = i_brick - 1;
             break;
@@ -759,11 +774,6 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
             b->S = sim_r->p.S;
         }
 
-        if(b->E < ws->emin) {
-            sim_r->last_brick = i_brick - 1;
-            break;
-        }
-
         double E_deriv;
         double sigma_conc;
         double d_diff;
@@ -809,8 +819,19 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
                 );
 #endif
         assert(!isnan(ion1.E));
+        if(b->E - sqrt(b->S) < ws->emin) {
+            sim_r->last_brick = i_brick;
+
+#ifdef DEBUG
+            fprintf(stderr, "Brick E = %g keV sufficiently below emin.\n", b->E / C_KEV);
+#endif
+            break;
+        }
         if(d_after.x >= sim_r->max_depth) {
             sim_r->last_brick = i_brick;
+#ifdef DEBUG
+            fprintf(stderr, "Max depth reached.\n");
+#endif
             break;
         }
         if(!skipped) {
@@ -826,11 +847,21 @@ void simulate_reaction_new_routine(const ion *incident, const depth depth_start,
             }
         }
     }
+    assert(sim_r->last_brick < sim_r->n_bricks);
 }
 
 int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) {
+#ifdef DEBUG
+    fprintf(stderr, "simulate(ion = %s (E = %.3lf keV, S = %.3lf keV, angles = %.3lf deg, %.3lf deg in sample), depth_start = %g tfu (i = %zu), ...)\n",
+            incident->isotope->name, incident->E / C_KEV, C_FWHM * sqrt(incident->S) / C_KEV, incident->theta / C_DEG, incident->phi / C_DEG,
+            depth_start.x / C_TFU, depth_start.i);
+#endif
     geostragg_vars g = geostragg_vars_calculate(ws, incident);
     des_table *dt = des_table_compute(incident, depth_start, ws, sample); /* Depth, energy and straggling of incident ion */
+    if(!dt) {
+        jabs_message(MSG_ERROR, stderr, "DES table computation failed.\n");
+        return EXIT_FAILURE;
+    }
 #ifdef DEBUG
     des_table_print(stderr, dt);
 #endif
