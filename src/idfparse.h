@@ -12,7 +12,10 @@ typedef enum idf_error {
     IDF2JBS_SUCCESS = 0,
     IDF2JBS_FAILURE = -1,
     IDF2JBS_FAILURE_COULD_NOT_READ = -2,
-    IDF2JBS_FAILURE_NOT_IDF_FILE = -3
+    IDF2JBS_FAILURE_NOT_IDF_FILE = -3,
+    IDF2JBS_FAILURE_WRONG_EXTENSION = -4,
+    IDF2JBS_FAILURE_COULD_NOT_WRITE_OUTPUT = -5,
+    IDF2JBS_FAILURE_NO_SAMPLES_DEFINED = -6
 } idf_error;
 
 typedef struct idf_unit {
@@ -65,4 +68,5 @@ idf_error idf_write_buf_to_file(const idf_parser *idf, char **filename_out); /* 
 idf_error idf_write_buf(const idf_parser *idf, FILE *f);
 char *idf_file_name_with_suffix(const idf_parser *idf, const char *suffix);
 const char *idf_boolean_to_str(int boolean); /* "true", "false", "unset" trinary */
+const char *idf_error_code_to_str(idf_error idferr);
 #endif // IDFPARSER_H

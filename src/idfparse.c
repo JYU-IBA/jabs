@@ -224,31 +224,37 @@ idf_parser *idf_file_read(const char *filename) {
         return idf;
     }
     size_t l = strlen(filename);
-    if(l < 4) {
-        fprintf(stderr, "Filename %s is suspiciously short.\n", filename);
-        idf->error = IDF2JBS_FAILURE_COULD_NOT_READ;
-        return idf;
-    }
-    const char *extension = filename + l - 4;
-    if(!idf_stringeq(extension, ".xml") && !idf_stringeq(extension, ".idf")) {
+    char *fn = strdup(filename);
+    char *extension;
+    for(extension = fn + l; extension > fn && *extension != '.'; extension--) {}
+    if(!idf_stringeq(extension, ".xml") && !idf_stringeq(extension, ".idf") && !idf_stringeq(extension, ".xnra")) {
 #ifdef DEBUG
         fprintf(stderr, "Extension %s is not valid.\n", extension);
 #endif
-        idf->error = IDF2JBS_FAILURE_COULD_NOT_READ;
+        free(fn);
+        idf->error = IDF2JBS_FAILURE_WRONG_EXTENSION;
         return idf;
     }
-    idf->doc = xmlReadFile(filename, NULL, 0);
+    idf->doc = xmlReadFile(fn, NULL, 0);
     if(!idf->doc) {
         idf->error = IDF2JBS_FAILURE_COULD_NOT_READ;
+        free(fn);
         return idf;
     }
     idf->root_element = xmlDocGetRootElement(idf->doc);
     if(!idf_stringeq(idf->root_element->name, "idf")) {
         idf->error = IDF2JBS_FAILURE_NOT_IDF_FILE;
+        free(fn);
         return idf;
     }
-    idf->filename = strdup(filename);
-    idf->basename = strndup(filename, l - 4);
+    idf->filename = strdup(fn);
+    *extension = '\0'; /* extension still points to start of extension, rest of fn can be used for basename */
+    idf->basename = strdup(fn);
+    free(fn);
+    if(strlen(idf->basename) == 0) { /* Without this filename of ".xml" would be valid and this could cause problems. */
+        idf->error = IDF2JBS_FAILURE;
+        return idf;
+    }
     idf->buf = NULL;
     idf_buffer_realloc(idf);
     return idf;
@@ -269,10 +275,10 @@ idf_error idf_write_buf_to_file(const idf_parser *idf, char **filename_out) {
     FILE *f = fopen(filename, "w");
     if(!f) {
         free(filename);
-        return IDF2JBS_FAILURE;
+        return IDF2JBS_FAILURE_COULD_NOT_WRITE_OUTPUT;
     }
     if(idf_write_buf(idf, f)) {
-       return IDF2JBS_FAILURE;
+       return IDF2JBS_FAILURE_COULD_NOT_WRITE_OUTPUT;
     }
     if(filename_out) {
         *filename_out = filename;
@@ -302,5 +308,24 @@ const char *idf_boolean_to_str(int boolean) {
         return "false";
     } else {
         return "unset";
+    }
+}
+
+const char *idf_error_code_to_str(idf_error idferr) {
+    switch(idferr) {
+        case IDF2JBS_SUCCESS:
+            return "success";
+        case IDF2JBS_FAILURE:
+            return "generic failure";
+        case IDF2JBS_FAILURE_COULD_NOT_READ:
+            return "could not read file";
+        case IDF2JBS_FAILURE_NOT_IDF_FILE:
+            return "not an IDF file";
+        case IDF2JBS_FAILURE_WRONG_EXTENSION:
+            return "wrong file extension";
+        case IDF2JBS_FAILURE_NO_SAMPLES_DEFINED:
+            return "no samples defined in file";
+        default:
+            return "unknown error code";
     }
 }

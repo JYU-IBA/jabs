@@ -43,12 +43,13 @@
 int idf2jbs(int argc, char * const *argv) {
     char *filename_out = NULL;
     if(argc == 1) {
-        if(idf_parse(argv[0], &filename_out) == IDF2JBS_SUCCESS) {
+        idf_error idferr = idf_parse(argv[0], &filename_out);
+        if(idferr == IDF2JBS_SUCCESS) {
             fprintf(stderr, "Success. Wrote script to file \"%s\"\n", filename_out);
             free(filename_out);
             return EXIT_SUCCESS;
         } else {
-            fprintf(stderr, "Failure.\n");
+            fprintf(stderr, "IDF2JBS failed with error code %i (%s).\n", idferr, idf_error_code_to_str(idferr));
             return EXIT_FAILURE;
         }
     } else {

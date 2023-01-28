@@ -675,7 +675,7 @@ void MainWindow::on_actionIDF_triggered()
     if(!MainWindow::askToSave())
         return;
     QMessageBox::StandardButton reply;
-    QString filename = QFileDialog::getOpenFileName(this, "Import IDF file", "", tr("IDF files (*.xml;*.idf)"));
+    QString filename = QFileDialog::getOpenFileName(this, "Import IDF file", "", tr("IDF files (*.idf;*.xml;*.xnra)"));
     if(filename.isEmpty()) {
         return;
     }
@@ -685,10 +685,11 @@ void MainWindow::on_actionIDF_triggered()
         return;
     }
     char *filename_out = nullptr;
-    if(idf_parse(qPrintable(filename), &filename_out) == IDF2JBS_SUCCESS) {
+    idf_error idferr = idf_parse(qPrintable(filename), &filename_out);
+    if(idferr == IDF2JBS_SUCCESS) {
         openFile(filename_out);
     } else {
-        QMessageBox::critical(this, "Error", QString("Could not import file %1.\nCheck that you have write permissions in the directory.\n").arg(filename));
+        QMessageBox::critical(this, "Error", QString("Could not import file %1.\n\nidf2jbs failed with error: %2.\n").arg(filename).arg(idf_error_code_to_str(idferr)));
     }
 }
 

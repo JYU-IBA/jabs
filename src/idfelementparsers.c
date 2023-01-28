@@ -242,9 +242,13 @@ idf_error idf_detectorshape_or_spot(idf_parser *idf, xmlNode *node, const char *
     double l2 = idf_node_content_to_double(idf_findnode(node, "l2"));
     char *shape = idf_node_content_to_str(idf_findnode(node, "shape"));
     if(idf_stringneq(shape, "circ", 4)) {
-        idf_output_printf(idf, "%s circle diameter %gmm\n", prefix, l1 / C_MM);
+        if(l1 > 0.0) {
+            idf_output_printf(idf, "%s circle diameter %gmm\n", prefix, l1 / C_MM);
+        }
     } else if(idf_stringneq(shape, "rect", 4)) {
-        idf_output_printf(idf, "%s rectangle width %gmm height %gmm\n", prefix, l1 / C_MM, l2 / C_MM);
+        if(l1 > 0.0 && l2 > 0.0) {
+            idf_output_printf(idf, "%s rectangle width %gmm height %gmm\n", prefix, l1 / C_MM, l2 / C_MM);
+        }
     }
     free(shape);
     return IDF2JBS_SUCCESS;

@@ -10,17 +10,23 @@ idf_error idf_parse(const char *filename, char **filename_out) {
         return IDF2JBS_FAILURE;
     }
     if(idf->error) {
-        return IDF2JBS_FAILURE;
+        return idf->error;
     }
     idf_foreach(idf, idf_findnode(idf->root_element, "notes"), "note", idf_parse_note);
-    idf_foreach(idf, idf->root_element, "sample", idf_parse_sample);
+    size_t n_samples = idf_foreach(idf, idf->root_element, "sample", idf_parse_sample);
+
+    if(n_samples == 0) {
+        idf_file_free(idf);
+        return IDF2JBS_FAILURE_NO_SAMPLES_DEFINED;
+    }
+
     char *fn = NULL;
-    idf_write_buf_to_file(idf,  &fn);
+    idf->error = idf_write_buf_to_file(idf,  &fn);
     if(filename_out) {
         *filename_out = fn;
     } else {
         free(fn);
     }
     idf_file_free(idf);
-    return IDF2JBS_SUCCESS;
+    return idf->error;
 }
