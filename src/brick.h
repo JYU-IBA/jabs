@@ -20,6 +20,7 @@ typedef struct {
     double Q; /* Counts in brick (concentration, cross section, fluence, solid angle etc) */
     double sc; /* Concentration cross-section product. Possibly weighted by straggling and affected by concentration gradients. */
     double S_sum; /* Sum (quadrature) of all broadening. */
+    double deriv; /* TODO: Remove */
 } brick;
 
 void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, brick *bricks, size_t last_brick); /* Sums up all the contributions to sigma (including detector resolution) */

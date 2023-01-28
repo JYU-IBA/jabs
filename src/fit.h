@@ -22,6 +22,7 @@
 #include <jibal.h>
 
 #include "simulation.h"
+#include "simulation_workspace.h"
 #include "detector.h"
 #include "sample.h"
 #include "fit_params.h"

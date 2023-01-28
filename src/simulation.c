@@ -69,11 +69,15 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
         p = malloc(sizeof(sim_calc_params));
         p->cs_stragg_pd = NULL; /* Will be allocated by sim_calc_params_update() */
     }
-    p->stop_step_incident = STOP_STEP_INCIDENT;
-    p->stop_step_exiting = STOP_STEP_EXITING;
-    p->stop_step_fudge_factor = STOP_STEP_FUDGE_FACTOR;
-    p->stop_step_min = STOP_STEP_MIN;
-    p->stop_step_add = STOP_STEP_ADD;
+    p->incident_stop_params.step = INCIDENT_STOP_STEP_DEFAULT;
+    p->incident_stop_params.sigmas = INCIDENT_STOP_STEP_SIGMAS_DEFAULT;
+    p->incident_stop_params.min = INCIDENT_STOP_STEP_MIN_DEFAULT;
+    p->incident_stop_params.max = INCIDENT_STOP_STEP_MAX_DEFAULT;
+    p->exiting_stop_params.step = EXITING_STOP_STEP_DEFAULT;
+    p->exiting_stop_params.sigmas = EXITING_STOP_STEP_SIGMAS_DEFAULT;
+    p->exiting_stop_params.min = EXITING_STOP_STEP_MIN_DEFAULT;
+    p->exiting_stop_params.max = EXITING_STOP_STEP_MAX_DEFAULT;
+    p->brick_width_sigmas = BRICK_WIDTH_SIGMAS_DEFAULT;
     p->depthsteps_max = 0; /* automatic */
     p->geostragg = FALSE;
     p->beta_manual  = FALSE;
@@ -81,10 +85,9 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->ds_steps_azi = 0;
     p->ds_steps_polar = 0;
     p->rk4 = TRUE;
-    p->nucl_stop_accurate = TRUE;
+    p->nuclear_stopping_accurate = TRUE;
     p->mean_conc_and_energy = FALSE;
     p->cs_n_stragg_steps = CS_STRAGG_STEPS;
-    p->cs_n_steps = CS_CONC_STEPS;
     p->rough_layer_multiplier = 1.0;
     p->sigmas_cutoff = SIGMAS_CUTOFF;
     p->gaussian_accurate = FALSE;
@@ -92,6 +95,11 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->int_cs_accuracy = CS_CONC_INTEGRATION_ACCURACY;
     p->int_cs_stragg_max_intervals = CS_STRAGG_MAX_INTEGRATION_INTERVALS;
     p->int_cs_stragg_accuracy = CS_STRAGG_INTEGRATION_ACCURACY;
+    p->cs_adaptive = FALSE;
+    p->cs_energy_step_max = CS_ENERGY_STEP_MAX_DEFAULT;
+    p->cs_depth_step_max = CS_DEPTH_STEP_MAX_DEFAULT;
+    p->cs_stragg_step_sigmas = CS_STRAGG_STEP_FUDGE_FACTOR_DEFAULT;
+    p->ds_incident_stop_step_factor = DUAL_SCATTER_INCIDENT_STOP_STEP_FACTOR_DEFAULT;
 #ifdef DEBUG
     fprintf(stderr, "New calc params created.\n");
 #endif
@@ -101,44 +109,54 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
 sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
     sim_calc_params_defaults(p);
     p->rk4 = FALSE;
-    p->nucl_stop_accurate = FALSE;
+    p->nuclear_stopping_accurate = FALSE;
     p->mean_conc_and_energy = TRUE;
     p->cs_n_stragg_steps = 0; /* Not used if mean_conc_and_energy == TRUE */
-    p->cs_n_steps = 0; /* Not used if mean_conc_and_energy == TRUE */
-    p->stop_step_fudge_factor *= 1.4;
-    p->stop_step_add *= 2.0;
     p->geostragg = FALSE;
     p->rough_layer_multiplier = 0.5;
     p->sigmas_cutoff = SIGMAS_FAST_CUTOFF;
+    p->incident_stop_params.min *= 2.0;
+    p->incident_stop_params.sigmas *= 1.5;
+    p->exiting_stop_params.min *= 1.5;
+    p->exiting_stop_params.sigmas *= 1.5;
+    p->exiting_stop_params.max *= 1.5;
     return p;
 }
 
 sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
     sim_calc_params_defaults(p);
-    p->cs_n_steps = 0; /* Automatic (adaptive) */
     p->cs_n_stragg_steps = 0; /* Automatic (adaptive) */
-    p->stop_step_fudge_factor *= 0.5;
     p->sigmas_cutoff += 1.0;
     p->gaussian_accurate = TRUE;
+    p->cs_adaptive = TRUE;
+    p->incident_stop_params.min *= 0.5;
+    p->exiting_stop_params.min *= 0.5;
+    p->exiting_stop_params.sigmas *= 0.5;
     return p;
 }
 
 sim_calc_params *sim_calc_params_defaults_brisk(sim_calc_params *p) {
     sim_calc_params_defaults(p);
     p->cs_n_stragg_steps -= 2;
-    p->stop_step_fudge_factor *= 1.25;
-    p->stop_step_add *= 2.0;
     p->sigmas_cutoff -= 1.0;
+    p->incident_stop_params.min *= 2.0;
+    p->exiting_stop_params.sigmas *= 1.5;
+    p->cs_energy_step_max *= 1.5;
+    p->cs_depth_step_max *= 1.5;
+    p->cs_stragg_step_sigmas = 1.25;
     return p;
 }
 
 sim_calc_params *sim_calc_params_defaults_improved(sim_calc_params *p) {
     sim_calc_params_defaults(p);
-    p->cs_n_steps += 2;
     p->cs_n_stragg_steps += 4;
-    p->stop_step_fudge_factor *= 0.75;
     p->sigmas_cutoff += 0.5;
     p->gaussian_accurate = TRUE;
+    p->exiting_stop_params.min *= 0.75;
+    p->exiting_stop_params.sigmas *= 0.75;
+    p->cs_energy_step_max *= 0.75;
+    p->cs_depth_step_max *= 0.75;
+    p->cs_stragg_step_sigmas = 0.75;
     return p;
 }
 
@@ -155,15 +173,16 @@ void sim_calc_params_copy(const sim_calc_params *p_src, sim_calc_params *p_dst) 
 }
 
 void sim_calc_params_update(sim_calc_params *p) {
-    p->cs_frac = 1.0/(1.0*(p->cs_n_steps+1));
     prob_dist_free(p->cs_stragg_pd);
+    if(p->mean_conc_and_energy) {
+        p->cs_n_stragg_steps = 0;
+    }
     p->cs_stragg_pd = prob_dist_gaussian(p->cs_n_stragg_steps);
 
     if(p->ds && p->ds_steps_azi == 0 && p->ds_steps_polar == 0) { /* DS defaults are applied if nothing else is specified */
         p->ds_steps_azi = DUAL_SCATTER_AZI_STEPS;
         p->ds_steps_polar = DUAL_SCATTER_POLAR_STEPS;
     }
-    p->n_ds = p->ds_steps_azi *  p->ds_steps_polar;
 }
 
 void sim_calc_params_ds(sim_calc_params *p, int ds) {
@@ -175,20 +194,31 @@ void sim_calc_params_ds(sim_calc_params *p, int ds) {
 void sim_calc_params_print(const sim_calc_params *params) {
     if(!params)
         return;
-    jabs_message(MSG_INFO, stderr, "step for incident ions = %.3lf keV (0 = auto)\n", params->stop_step_incident/C_KEV);
-    jabs_message(MSG_INFO, stderr, "step for exiting ions = %.3lf keV (0 = auto)\n", params->stop_step_exiting/C_KEV);
-    jabs_message(MSG_INFO, stderr, "stopping step fudge factor = %g\n", params->stop_step_fudge_factor);
-    jabs_message(MSG_INFO, stderr, "stopping step minimum = %.3lf keV (0 = auto)\n", params->stop_step_min / C_KEV);
+    jabs_message(MSG_INFO, stderr, "step for incident ions = %.3lf keV (0 = auto)\n", params->incident_stop_params.step / C_KEV);
+    if(params->incident_stop_params.step == 0.0) {
+        jabs_message(MSG_INFO, stderr, "step for incident ions = %g times straggling sigma\n", params->incident_stop_params.sigmas);
+        jabs_message(MSG_INFO, stderr, "minimum step for incident ions = %.3lf keV\n", params->incident_stop_params.min / C_KEV);
+        jabs_message(MSG_INFO, stderr, "maximum step for incident ions = %.3lf keV\n", params->incident_stop_params.max / C_KEV);
+    }
+    jabs_message(MSG_INFO, stderr, "step for exiting ions = %.3lf keV (0 = auto)\n", params->exiting_stop_params.step / C_KEV);
+    if(params->exiting_stop_params.step == 0.0) {
+        jabs_message(MSG_INFO, stderr, "step for exiting ions = %g times straggling sigma\n", params->exiting_stop_params.sigmas);
+        jabs_message(MSG_INFO, stderr, "minimum step for exiting ions = %.3lf keV\n", params->exiting_stop_params.min / C_KEV);
+        jabs_message(MSG_INFO, stderr, "maximum step for exiting ions = %.3lf keV\n", params->exiting_stop_params.max / C_KEV);
+    }
     jabs_message(MSG_INFO, stderr, "stopping RK4 = %s\n", params->rk4?"true":"false");
-    jabs_message(MSG_INFO, stderr, "accurate nuclear stopping = %s\n", params->nucl_stop_accurate?"true":"false");
+    jabs_message(MSG_INFO, stderr, "accurate nuclear stopping = %s\n", params->nuclear_stopping_accurate?"true":"false");
     jabs_message(MSG_INFO, stderr, "depth steps max = %zu\n", params->depthsteps_max);
-    jabs_message(MSG_INFO, stderr, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");
     jabs_message(MSG_INFO, stderr, "geometric broadening = %s\n", params->geostragg?"true":"false");
+    jabs_message(MSG_INFO, stderr, "brick width = %g times detector and straggling sum sigma\n", params->brick_width_sigmas);
+    jabs_message(MSG_INFO, stderr, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");
     if(!params->mean_conc_and_energy) {
-        if(params->cs_n_steps == 0) {
-            jabs_message(MSG_INFO, stderr, "concentration * cross section steps integration accuracy = %g\n", params->int_cs_accuracy);
+        if(params->cs_adaptive) {
+            jabs_message(MSG_INFO, stderr, "cross section integration accuracy = %g\n", params->int_cs_accuracy);
         } else {
-            jabs_message(MSG_INFO, stderr, "concentration * cross section steps per brick = %zu\n", params->cs_n_steps);
+            jabs_message(MSG_INFO, stderr, "cross section evaluation step = %g times straggling sigma\n", params->cs_stragg_step_sigmas);
+            jabs_message(MSG_INFO, stderr, "maximum energy step for cross section evaluation = %g keV\n", params->cs_energy_step_max / C_KEV);
+            jabs_message(MSG_INFO, stderr, "maximum depth step for cross section evaluation = %g tfu\n", params->cs_depth_step_max / C_TFU);
         }
         if(params->cs_n_stragg_steps == 0) {
             jabs_message(MSG_INFO, stderr, "straggling weighting integration accuracy = %g\n", params->int_cs_stragg_accuracy);
@@ -379,181 +409,6 @@ int sim_det_set(simulation *sim, detector *det, size_t i_det) {
     return EXIT_SUCCESS;
 }
 
-void sim_workspace_init_reactions(sim_workspace *ws) {
-    const simulation *sim = ws->sim;
-    ws->reactions = calloc(sim->n_reactions, sizeof (sim_reaction *));
-    for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-        ws->reactions[i_reaction] = sim_reaction_init(ws, sim->reactions[i_reaction]);
-        ws->n_reactions++;
-    }
-}
-
-void sim_workspace_calculate_number_of_bricks(sim_workspace *ws) {
-    size_t n_bricks = 0;
-    const detector *det = ws->det;
-    const simulation *sim = ws->sim;
-    if(ws->params->depthsteps_max) {
-        n_bricks = ws->params->depthsteps_max;
-    } else {
-        if(det->type == DETECTOR_ENERGY) {
-            if(ws->params->stop_step_incident == 0.0) { /* Automatic incident step size */
-                n_bricks = (int) ceil(sim->beam_E / (ws->params->stop_step_fudge_factor*sqrt(detector_resolution(ws->det, sim->beam_isotope, sim->beam_E))) + ws->sample->n_ranges);
-            } else {
-                n_bricks = (int) ceil(sim->beam_E / ws->params->stop_step_incident + ws->sample->n_ranges); /* This is conservative */
-                fprintf(stderr, "n_bricks = %zu\n", n_bricks);
-            }
-        } else { /* TODO: maybe something more clever is needed here */
-            n_bricks = BRICKS_DEFAULT;
-        }
-        if(n_bricks > BRICKS_MAX) {
-            n_bricks = BRICKS_MAX;
-            jabs_message(MSG_WARNING, stderr,  "Number of bricks limited to %zu.\n", n_bricks);
-        }
-    }
-    ws->n_bricks = n_bricks;
-#ifdef DEBUG
-    fprintf(stderr, "Number of bricks: %zu\n", n_bricks);
-#endif
-}
-
-sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det) {
-    if(!jibal || !sim || !det) {
-        jabs_message(MSG_ERROR, stderr,  "No JIBAL, sim or det. Guru thinks: %p, %p %p.\n", jibal, sim, det);
-        return NULL;
-    }
-    if(!sim->sample) {
-        jabs_message(MSG_ERROR, stderr,  "No sample has been set. Will not initialize workspace.\n");
-        return NULL;
-    }
-    sim_workspace *ws = malloc(sizeof(sim_workspace));
-    ws->sim = sim;
-    ws->emin = sim->emin;
-    ws->fluence = sim->fluence;
-    ws->det = det;
-    ws->sample = sim->sample;
-    ws->params = sim_calc_params_defaults(NULL);
-    sim_calc_params_copy(sim->params,  ws->params);
-    sim_calc_params_update(ws->params);
-    if(ws->params->stop_step_min == 0.0) { /* Automatic, calculate here. */
-        if(det->type == DETECTOR_ENERGY) {
-            ws->params->stop_step_min = sqrt(det->calibration->resolution_variance)/2.0;
-        } else {
-            ws->params->stop_step_min = STOP_STEP_MIN_FALLBACK;
-        }
-    }
-#ifdef DEBUG
-    fprintf(stderr, "Minimum stop step %g keV.\n", ws->params->stop_step_min/C_KEV);
-#endif
-    ws->gsto = jibal->gsto;
-    ws->isotopes = jibal->isotopes;
-    ws->n_reactions = 0; /* Will be incremented later */
-
-    if(sim->n_reactions == 0) {
-        jabs_message(MSG_ERROR, stderr,  "No reactions! Will not initialize workspace if there is nothing to simulate.\n");
-        free(ws);
-        return NULL;
-    }
-
-    if(sim->params->beta_manual && sim->params->ds) {
-        jabs_message(MSG_WARNING, stderr,  "Manual exit angle is enabled in addition to dual scattering. This is an unsupported combination. Manual exit angle calculation will be disabled.\n");
-        ws->params->beta_manual  = FALSE;
-    }
-
-    if(sim->params->beta_manual && sim->params->geostragg) {
-        jabs_message(MSG_WARNING, stderr,  "Manual exit angle is enabled in addition to geometric scattering. This is an unsupported combination. Geometric straggling calculation will be disabled.\n");
-        ws->params->geostragg = FALSE;
-    }
-    ws->ion = sim->ion; /* Shallow copy, but that is ok */
-
-    ws->stopping_type = GSTO_STO_TOT;
-
-    sim_workspace_recalculate_n_channels(ws, sim);
-
-    if(ws->n_channels == 0) {
-        free(ws);
-        jabs_message(MSG_ERROR, stderr,  "Number of channels in workspace is zero. Aborting initialization.\n");
-        return NULL;
-    }
-    ws->histo_sum = gsl_histogram_alloc(ws->n_channels);
-    if(!ws->histo_sum) {
-        return NULL;
-    }
-    spectrum_set_calibration(ws->histo_sum, ws->det, JIBAL_ANY_Z); /* Calibration (assuming default calibration) can be set now. */
-    gsl_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
-
-    sim_workspace_calculate_number_of_bricks(ws);
-    sim_workspace_init_reactions(ws);
-
-    if(ws->params->cs_n_steps == 0) { /* Actually integrate, allocate workspace for this */
-#ifdef DEBUG
-        fprintf(stderr, "cs_n_steps = 0, allocating integration workspace w_int_cs with %zu max intervals.\n", ws->params->int_cs_max_intervals);
-#endif
-        ws->w_int_cs = gsl_integration_workspace_alloc(ws->params->int_cs_max_intervals);
-    } else {
-        ws->w_int_cs = NULL;
-    }
-    if(ws->params->cs_n_stragg_steps == 0) {
-#ifdef DEBUG
-        fprintf(stderr, "cs_n_stragg_steps = 0, allocating integration workspace w_int_cs_stragg with %zu max intervals.\n", ws->params->int_cs_stragg_max_intervals);
-#endif
-        ws->w_int_cs_stragg = gsl_integration_workspace_alloc(ws->params->int_cs_stragg_max_intervals);
-    } else {
-        ws->w_int_cs_stragg = NULL;
-    }
-    return ws;
-}
-
-void sim_workspace_free(sim_workspace *ws) {
-    if(!ws)
-        return;
-    sim_calc_params_free(ws->params);
-    for(size_t i = 0; i < ws->n_reactions; i++) {
-        sim_reaction_free(ws->reactions[i]);
-    }
-    free(ws->reactions);
-    gsl_integration_workspace_free(ws->w_int_cs);
-    gsl_integration_workspace_free(ws->w_int_cs_stragg);
-    gsl_histogram_free(ws->histo_sum);
-    free(ws);
-}
-
-void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim) { /* TODO: assumes calibration function is increasing */
-    size_t n_max = CHANNELS_ABSOLUTE_MIN; /* Always simulate at least CHANNELS_ABSOLUTE_MIN channels */
-    for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-        const reaction *r = sim->reactions[i_reaction];
-        if(!reaction_is_possible(r, ws->det->theta)) {
-#ifdef DEBUG
-            fprintf(stderr, "Reaction %zu (target %s, type %s) is not possible when theta = %g deg. Skipping. \n", i_reaction + 1, r->target->name,
-                    reaction_type_to_string(r->type), ws->det->theta / C_DEG);
-#endif
-            continue;
-        }
-        double E = reaction_product_energy(r, ws->det->theta, sim->beam_E);
-        double E_safer = E + 3.0*sqrt(detector_resolution(ws->det, r->product, E)); /* Add 3x resolution sigma to max energy */
-        E_safer *= 1.1; /* and 10% for good measure! */
-        while(detector_calibrated(ws->det, JIBAL_ANY_Z, n_max) < E_safer && n_max <= CHANNELS_ABSOLUTE_MAX) {n_max++;} /* Increase number of channels until we hit this energy. TODO: this requires changes for ToF spectra. */
-#ifdef DEBUG
-        fprintf(stderr, "Reaction %zu (target %s, type %s), max E = %g keV -> %g keV after resolution and safety factor have been added, current n_max %zu (channels)\n", i_reaction + 1, r->target->name,
-                reaction_type_to_string(r->type), E/C_KEV, E_safer/C_KEV, n_max);
-#endif
-    }
-    if(n_max == CHANNELS_ABSOLUTE_MAX)
-        n_max=0;
-    ws->n_channels = n_max;
-}
-
-void sim_workspace_calculate_sum_spectra(sim_workspace *ws) {
-    double sum;
-    for(size_t i = 0; i < ws->histo_sum->n; i++) {
-        sum = 0.0;
-        for(size_t j = 0; j < ws->n_reactions; j++) {
-            if(ws->reactions[j]->histo && i < ws->reactions[j]->histo->n)
-                sum += ws->reactions[j]->histo->bin[i];
-        }
-        ws->histo_sum->bin[i] = sum;
-    }
-}
-
 void sim_print(const simulation *sim) {
     if(!sim) {
         return;
@@ -606,263 +461,10 @@ void sim_print(const simulation *sim) {
         jabs_message(MSG_INFO, stderr, "substrate channeling yield correction slope = %g / keV (%e)\n", sim->channeling_slope/(1.0/C_KEV), sim->channeling_slope);
     }
 }
-void sim_workspace_histograms_reset(sim_workspace *ws) {
-    for(size_t i = 0; i < ws->n_reactions; i++) {
-        sim_reaction *r = ws->reactions[i];
-        if(!r)
-            continue;
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Reaction %i:\n", i);
-#endif
-        gsl_histogram_reset(r->histo);
-    }
-}
-
-
-void sim_workspace_histograms_calculate(sim_workspace *ws) {
-    for(size_t i = 0; i < ws->n_reactions; i++) {
-        sim_reaction *r = ws->reactions[i];
-        if(!r)
-            continue;
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Reaction %i:\n", i);
-#endif
-        bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
-        bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->params->gaussian_accurate);
-    }
-}
-
-void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
-    for(size_t i = 0; i < ws->n_reactions; i++) {
-        sim_reaction *r = ws->reactions[i];
-        if(!r)
-            continue;
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Reaction %i:\n", i);
-#endif
-        gsl_histogram_scale(r->histo, scale);
-    }
-}
-
-sim_reaction *sim_reaction_init(sim_workspace *ws, const reaction *r) {
-    if(!r) {
-        return NULL;
-    }
-    assert(r->product);
-    sim_reaction *sim_r = malloc(sizeof(sim_reaction));
-    sim_r->r = r;
-    ion *p = &sim_r->p;
-    ion_reset(p);
-    sim_r->max_depth = 0.0;
-    sim_r->i_isotope = ws->sample->n_isotopes; /* Intentionally not valid */
-
-    for(size_t i_isotope = 0; i_isotope < ws->sample->n_isotopes; i_isotope++) {
-        if(ws->sample->isotopes[i_isotope] == r->target) {
-#ifdef DEBUG
-            fprintf(stderr, "Reaction target isotope %s is isotope number %zu in sample.\n", r->target->name, i_isotope);
-#endif
-            sim_r->i_isotope = i_isotope;
-        }
-    }
-    sim_r->histo = gsl_histogram_alloc(ws->n_channels); /* free'd by sim_workspace_free */
-    spectrum_set_calibration(sim_r->histo, ws->det, r->product->Z); /* Setting histogram with Z-specific (or as fallback, default) calibration. */
-    gsl_histogram_reset(sim_r->histo);
-    sim_r->n_bricks = ws->n_bricks;
-    sim_r->bricks = calloc(sim_r->n_bricks, sizeof(brick));
-    ion_set_isotope(p, r->product);
-    if(p->isotope == ws->ion.isotope) {
-        p->nucl_stop = nuclear_stopping_shared_copy(ws->ion.nucl_stop);
-    } else {
-        p->nucl_stop = nuclear_stopping_new(p->isotope, ws->isotopes);
-    }
-    sim_reaction_set_cross_section_by_type(sim_r);
-    return sim_r;
-}
-
-void sim_reaction_free(sim_reaction *sim_r) {
-    if(!sim_r) {
-        return;
-    }
-    if(sim_r->histo) {
-        gsl_histogram_free(sim_r->histo);
-        sim_r->histo = NULL;
-    }
-    if(sim_r->bricks) {
-        free(sim_r->bricks);
-        sim_r->bricks = NULL;
-    }
-    nuclear_stopping_free(sim_r->p.nucl_stop);
-    free(sim_r);
-}
-
-void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double theta, double E_min, double E_max) {
-    /* Calculate variables for Rutherford (and Andersen) cross sections. This is done for all reactions, even if they are not RBS or ERD reactions! */
-    (void) E_min; /* Energy range could be used to set something (in the future) */
-    (void) E_max;
-    if(!sim_r || !sim_r->r)
-        return;
-    const jibal_isotope *incident = sim_r->r->incident;
-    const jibal_isotope *target = sim_r->r->target;
-    sim_r->E_cm_ratio = target->mass / (incident->mass + target->mass);
-    sim_r->mass_ratio = incident->mass / target->mass;
-    sim_r->theta = theta;
-    if(sim_r->r->Q == 0.0) {
-        sim_r->K = reaction_product_energy(sim_r->r, sim_r->theta, 1.0);
-    } else {
-        sim_r->K = 0.0;
-    }
-    sim_r->cs_constant = 0.0;
-    sim_r->theta_cm = 0.0; /* Will be recalculated, if possible */
-    reaction_type type = sim_r->r->type;
-
-    if(!reaction_is_possible(sim_r->r, theta)) {
-        sim_r->stop = TRUE;
-#ifdef DEBUG
-        fprintf(stderr, "Reaction not possible, returning.\n");
-#endif
-        return;
-    }
-    if(type == REACTION_RBS) {
-        sim_r->theta_cm = sim_r->theta + asin(sim_r->mass_ratio * sin(sim_r->theta));
-    }
-    if(type == REACTION_RBS_ALT) {
-        sim_r->theta_cm = C_PI - (asin(sim_r->mass_ratio * sin(sim_r->theta)) - sim_r->theta);
-    }
-    if(type == REACTION_RBS || type ==REACTION_RBS_ALT) {
-        sim_r->cs_constant = fabs((pow2(sin(sim_r->theta_cm))) / (pow2(sin(sim_r->theta)) * cos(sim_r->theta_cm - sim_r->theta)) *
-                                  pow2((incident->Z * C_E * target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) *
-                                  pow4(1.0 / sin(sim_r->theta_cm / 2.0)) * (1.0 / 16.0));
-    }
-     if(type == REACTION_ERD) { /* ERD */
-        sim_r->theta_cm = C_PI - 2.0 * sim_r->theta;
-        sim_r->cs_constant = pow2(incident->Z * C_E * target->Z * C_E / (8 * C_PI * C_EPSILON0)) * pow2(1.0 + incident->mass / target->mass) * pow(cos(sim_r->theta), -3.0) * pow2(sim_r->E_cm_ratio);
-    }
-    if(sim_r->r->cs == JIBAL_CS_ANDERSEN) {
-        sim_r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0)); /* Factors for Andersen correction */
-        sim_r->r_VE_factor2 = pow2(0.5 / sin(sim_r->theta_cm / 2.0));
-    }
-#ifdef DEBUG
-    fprintf(stderr, "Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g (valid for RBS and ERD). Q = %g MeV.\n", sim_r->theta/C_DEG, sim_r->theta_cm/C_DEG, sim_r->K, sim_r->r->Q / C_MEV);
-#endif
-}
-
-void sim_reaction_reset_bricks(sim_reaction *sim_r) {
-    memset(sim_r->bricks, 0, sizeof(brick) * sim_r->n_bricks);
-}
-
-void sim_reaction_set_cross_section_by_type(sim_reaction *sim_r) {
-    switch(sim_r->r->type) {
-        case REACTION_RBS:
-            /* Falls through */
-        case REACTION_RBS_ALT:
-            /* Falls through */
-        case REACTION_ERD:
-            sim_r->cross_section = sim_reaction_cross_section_rutherford;
-            break;
-        case REACTION_FILE:
-            sim_r->cross_section = sim_reaction_cross_section_tabulated;
-            break;
-#ifdef JABS_PLUGINS
-        case REACTION_PLUGIN:
-            sim_r->cross_section = sim_reaction_cross_section_plugin;
-            break;
-#endif
-        default:
-#ifdef DEBUG
-            fprintf(stderr, "Unknown reaction type %i, cross_section() function pointer is NULL!\n", sim_r->r->type);
-#endif
-            sim_r->cross_section = NULL;
-    }
-}
-
-double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm) {
-    const double r_VE = sim_r->r_VE_factor / E_cm;
-    return pow2(1 + 0.5 * r_VE) / pow2(1 + r_VE + sim_r->r_VE_factor2 * pow2(r_VE));
-}
-
-double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E) {
-#ifdef CROSS_SECTIONS_FROM_JIBAL
-    return jibal_cross_section_erd(sim_r->r->incident, sim_r->r->target, sim_r->theta, E, sim_r->r->cs);
-#else
-    const reaction *r = sim_r->r;
-    if(E > r->E_max || E < r->E_min)
-        return 0.0;
-    const double E_cm = sim_r->E_cm_ratio * E;
-    double sigma_r = sim_r->cs_constant / pow2(E_cm) ;
-    switch(r->cs) {
-        case JIBAL_CS_RUTHERFORD:
-            return sigma_r;
-        case JIBAL_CS_ANDERSEN:
-            return sigma_r * sim_reaction_andersen(sim_r, E_cm);
-        default:
-            return 0.0;
-    }
-#endif
-}
-
-double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E) {
-    size_t lo, mi, hi;
-    const reaction *r = sim_r->r;
-    const struct reaction_point *t = r->cs_table;
-    hi = r->n_cs_table - 1;
-    lo = 0;
-    if(E < t[lo].E || E > t[hi].E) {
-#ifdef REACTIONS_FALL_BACK
-        return sim_reaction_cross_section_rutherford(sim_r, E); /* Fall back quietly to analytical formulae outside tabulated values */
-#else
-        return 0.0;
-#endif
-    }
-    if(fabs(sim_r->theta - sim_r->r->theta) > 0.01 * C_DEG) {
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Reaction theta %g deg different from one in the file: %g deg\n", sim_r->theta/C_DEG, sim_r->r->theta/C_DEG);
-#endif
-#ifdef REACTIONS_FALL_BACK
-        return sim_reaction_cross_section_rutherford(sim_r, E);
-#else
-        return 0.0;
-#endif
-    }
-    while (hi - lo > 1) {
-        mi = (hi + lo) / 2;
-        if (E >= t[mi].E) {
-            lo = mi;
-        } else {
-            hi = mi;
-        }
-    }
-    return t[lo].sigma+((t[lo+1].sigma-t[lo].sigma)/(t[lo+1].E-t[lo].E))*(E-t[lo].E);
-}
-
-#ifdef JABS_PLUGINS
-double sim_reaction_cross_section_plugin(const sim_reaction *sim_r, double E) {
-    jabs_plugin_reaction *r = sim_r->r->plugin_r;
-    return r->cs(r, sim_r->theta, E);
-}
-#endif
 
 void sim_sort_reactions(const simulation *sim) {
     qsort(sim->reactions, sim->n_reactions, sizeof(reaction *), &reaction_compare);
 }
-
-void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident) {
-    if(r->r->Q == 0.0) {
-        r->p.E = incident->E * r->K;
-        r->p.S = incident->S * pow2(r->K);
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Product energy %g keV, eloss straggling %g keV FWHM. Calculated using K = %g\n", r->p.E/C_KEV, C_FWHM * sqrt(r->p.S) / C_KEV, r->K);
-#endif
-        return;
-    }
-    r->p.E = reaction_product_energy(r->r, r->theta, incident->E);
-    double epsilon = 0.001*C_KEV;
-    double deriv = (reaction_product_energy(r->r, r->theta, incident->E+epsilon) - r->p.E)/(epsilon); /* TODO: this derivative could be solved analytically */
-    r->p.S = incident->S * pow2(deriv) * incident->E;
-#ifdef DEBUG_VERBOSE
-    fprintf(stderr, "deriv %g, E_out/E %g, E_out = %g keV, E = %g keV\n", deriv, r->p.E / incident->E, r->p.E/C_KEV, incident->E/C_KEV);
-#endif
-}
-
 double sim_alpha_angle(const simulation *sim) { /* Returns alpha angle (no sign!) */
     double theta, phi; /* Temporary variables */
     rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */

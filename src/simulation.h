@@ -25,35 +25,36 @@
 #include "detector.h"
 #include "sample.h"
 #include "prob_dist.h"
+#include "stop.h"
 
 
 typedef struct sim_calc_params {
     int ds; /* Dual scattering true/false */
     int ds_steps_azi;
     int ds_steps_polar;
-    int n_ds;
-    size_t cs_n_steps; /* Number of steps to take, when calculating cross section * concentration product */
-    double cs_frac; /* Fractional step size 1.0/(cs_n_steps+1), calculated from cs_n_steps. */
     prob_dist *cs_stragg_pd;
     size_t cs_n_stragg_steps; /* Number of steps to take, when calculating straggling weighted cross sections (note that these are substeps of cs_n_steps) */
     size_t depthsteps_max;
     int rk4; /* Use fourth order Runge-Kutta for energy loss calculation (differential equation with dE/dx). When false, a first-order method is used. */
-    int nucl_stop_accurate; /* Use accurate nuclear stopping equation true/false. When false a faster (poorly approximating) equation is used below the nuclear stopping maximum. */
+    int nuclear_stopping_accurate; /* Use accurate nuclear stopping equation true/false. When false a faster (poorly approximating) equation is used below the nuclear stopping maximum. */
     int mean_conc_and_energy; /* Calculation of cross-section concentration product is simplified by calculating cross section at mean energy of a depth step and concentration at mid-bin (only relevant for samples with concentration gradients) */
     int geostragg; /* Geometric straggling true/false */
     int beta_manual; /* Don't calculate exit angle based on detector geometry, use something given by user, true/false */
     int gaussian_accurate; /* If this is FALSE an approximative gaussian CDF is used in convolution of spectra, otherwise function from GSL is used. */
-    double stop_step_incident;
-    double stop_step_exiting;
-    double stop_step_fudge_factor;
-    double stop_step_min; /* TODO: automatic */
-    double stop_step_add; /* This is added to stop step */
+    jabs_stop_step_params incident_stop_params;
+    jabs_stop_step_params exiting_stop_params;
+    double ds_incident_stop_step_factor;
+    double brick_width_sigmas;
     double rough_layer_multiplier; /* Multiply given (or default) number of subspectra when calculating rough layers. */
     double sigmas_cutoff; /* Number of (+-) sigmas to consider when turning bricks to spectra */
     size_t int_cs_max_intervals;
     double int_cs_accuracy; /* Accuracy of conc*cross section integration (not always relevant) */
     size_t int_cs_stragg_max_intervals;
     double int_cs_stragg_accuracy; /* Accuracy of conc * straggling (gaussian) integration (not always relevant) */
+    int cs_adaptive;
+    double cs_energy_step_max; /* Largest energy step (incident beam, mean) between cross section * concentration evaluation. Weight by straggling happens inside this step (finer stepping).*/
+    double cs_depth_step_max /* Largest depth step for section * concentration evaluation. Also see cs_energy_step_max. */ ;
+    double cs_stragg_step_sigmas; /*  Cross section * concentration evaluation straggling step multiplier. Step is standard deviation times this. Maximum step may also be limited by cs_depth_step_max, cs_energy_step_max  */
 } sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
 
 typedef struct simulation {
@@ -73,55 +74,13 @@ typedef struct simulation {
     double channeling_offset; /* a very ad-hoc channeling yield correction */
     double channeling_slope;
     sim_calc_params *params;
+    jabs_stop *stop;
     int erd; /* Add ERD reactions */
     int rbs; /* Add RBS reactions */
     jabs_reaction_cs cs_rbs;
     jabs_reaction_cs cs_erd;
     ion ion; /* This ion is not to be used in calculations, it is simply copied to ws->ion */
 } simulation;
-
-typedef struct sim_reaction {
-    const reaction *r;
-    ion p; /* Reaction product */
-    gsl_histogram *histo;
-    brick *bricks;
-    size_t n_bricks;
-    size_t last_brick; /* inclusive, from 0 up to n_bricks-1 */
-    int stop;
-    double max_depth;
-    size_t i_isotope; /* Number of isotope (r->target) in sample->isotopes */
-    double theta; /* theta used in simulations (will be overwritten by simulate() when necessary) */
-    double K;
-    double (*cross_section)(const struct sim_reaction *, double);
-    double theta_cm; /* theta in CM system */
-    double mass_ratio; /* m1/m2, these are variables to speed up cross section calculation */
-    double E_cm_ratio;  /* m1/(m1+m2) */
-    double cs_constant; /* Non-energy dependent Rutherford cross section terms for RBS or ERD */
-    double r_VE_factor; /* Andersen correction factor r_VE = this / E_cm */
-    double r_VE_factor2;
-} sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
-
-
-typedef struct sim_workspace {
-    double fluence; /* With DS can be different from sim->fluence, otherwise the same */
-    const simulation *sim;
-    const detector *det;
-    const sample *sample; /* Note that simulate() can be passed a sample explicitly, but in most cases it should be this. Also this should be exactly the same as sim->sample. */
-    size_t n_reactions;
-    const jibal_gsto *gsto;
-    gsto_stopping_type stopping_type;
-    size_t n_channels; /* in histograms */
-    gsl_histogram *histo_sum;
-    ion ion;
-    sim_reaction **reactions; /* table of reaction pointers, size n_reactions */
-    const jibal_isotope *isotopes;
-    sim_calc_params *params;
-    double emin;
-    gsl_integration_workspace *w_int_cs; /* Integration workspace for conc * cross section product */
-    gsl_integration_workspace *w_int_cs_stragg;
-    size_t n_bricks; /* same as r->n_bricks in each reaction */
-} sim_workspace;
-
 
 #include "sample.h"
 simulation *sim_init(jibal *jibal);
@@ -147,29 +106,8 @@ detector *sim_det(const simulation *sim, size_t i_det);
 detector *sim_det_from_string(const simulation *sim, const char *s);
 int sim_det_add(simulation *sim, detector *det);
 int sim_det_set(simulation *sim, detector *det, size_t i_det); /* Will free existing detector (can be NULL too) */
-sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det);
-void sim_workspace_init_reactions(sim_workspace *ws); /* used by sim_workspace_init(), ws->sim and ws->n_bricks should be set before calling */
-void sim_workspace_calculate_number_of_bricks(sim_workspace *ws);
-void sim_workspace_free(sim_workspace *ws);
-void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);
-void sim_workspace_calculate_sum_spectra(sim_workspace *ws);
 void sim_print(const simulation *sim);
-void sim_workspace_histograms_reset(sim_workspace *ws);
-void sim_workspace_histograms_calculate(sim_workspace *ws);
-void sim_workspace_histograms_scale(sim_workspace *ws, double scale);
-sim_reaction *sim_reaction_init(sim_workspace *ws, const reaction *r); /* ws->sample, ws->det and ws->ion need to be set */
-void sim_reaction_free(sim_reaction *sim_r);
-void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double theta, double E_min, double E_max);
-void sim_reaction_reset_bricks(sim_reaction *sim_r);
-void sim_reaction_set_cross_section_by_type(sim_reaction *sim_r);
-double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);
-double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E);
-#ifdef JABS_PLUGINS
-double sim_reaction_cross_section_plugin(const sim_reaction *sim_r, double E);
-#endif
-double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);
 void sim_sort_reactions(const simulation *sim);
-void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident);
 double sim_alpha_angle(const simulation *sim);
 double sim_exit_angle(const simulation *sim, const detector *det);
 int sim_do_we_need_erd(const simulation *sim);

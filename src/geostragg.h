@@ -13,7 +13,10 @@
  */
 #ifndef JABS_GEOSTRAGG_H
 #define JABS_GEOSTRAGG_H
-#include "simulation.h"
+#include "detector.h"
+#include "ion.h"
+#include "stop.h"
+#include "sim_reaction.h"
 
 typedef struct {
     char direction;
@@ -39,12 +42,12 @@ typedef struct {
 } geostragg_vars;
 
 
-double scattering_angle(const ion *incident, const sim_workspace *ws); /* Calculate scattering angle necessary for ion (in sample coordinate system) to hit detector */
-double scattering_angle_exit_deriv(const ion *incident, const sim_workspace *ws);
-double exit_angle_delta(const sim_workspace *ws, char direction);
-geostragg_vars geostragg_vars_calculate(const sim_workspace *ws, const ion *incident);
-double geostragg(const sim_workspace *ws, const sample *sample, const sim_reaction *r, const geostragg_vars_dir *gd, depth d, double E_0);
+double scattering_angle(const ion *incident, double sample_theta, double sample_phi, const detector *det); /* Calculate scattering angle necessary for ion (in sample coordinate system) to hit detector *//* Calculate scattering angle necessary for ion (in sample coordinate system) to hit detector */
+double scattering_angle_exit_deriv(const ion *incident, double sample_theta, double sample_phi, const detector *det); /* Calculates the dtheta/dbeta derivative for geometrical straggling */
+double exit_angle_delta(double sample_theta, double sample_phi, const detector *det, const aperture *beam_aperture, char direction);
+geostragg_vars geostragg_vars_calculate(const ion *incident, double sample_theta, double sample_phi, const detector *det, const aperture *beam_aperture, int geostragg_enabled, int beta_manual_enabled);
+double geostragg(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, const sample *sample, const sim_reaction *r, const geostragg_vars_dir *gd, depth d, double E_0);
 double theta_deriv_beta(const detector *det, char direction);
-double beta_deriv(const detector *det, const simulation *sim, char direction);
+double beta_deriv(double sample_theta, double sample_phi, const detector *det, char direction);
 int geostragg_vars_print(FILE *f, const geostragg_vars *g);
 #endif // JABS_GEOSTRAGG_H

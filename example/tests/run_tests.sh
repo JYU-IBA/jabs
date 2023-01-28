@@ -6,15 +6,19 @@ error_exit() {
 }
 for jabsfile in *.jbs; do
     echo "Running JaBS script $jabsfile";
-    if [ "$jabsfile" == "ds.jbs" ]; then
+    if [ "$jabsfile" == "ds.jbs" ]; then    
         echo "Skipping DS test."; # Takes too long...
-    elif [ "$jabsfile" == "cornell_complicated.jbs" ]; then
-        echo "Skipping cornell_complicated test."; # Has DS too
-    elif [ "$jabsfile" == "plugin_cs.jbs" ]; then
-        echo "Skipping plugin test."; # JaBS can be compiled without plugin support 
-    else
-        jabs "$jabsfile"||  error_exit "$jabsfile"
+        continue
     fi
+#    if [ "$jabsfile" == "cornell_complicated.jbs" ]; then
+#        echo "Skipping cornell_complicated test."; # Has DS too
+#        continue
+#    fi
+    if [ "$jabsfile" == "plugin_cs.jbs" ]; then
+        echo "Skipping plugin test."; # JaBS can be compiled without plugin support 
+        continue
+    fi      
+    jabs "$jabsfile"||  error_exit "$jabsfile"
 done
 
 #TODO: inspect generated CSV files

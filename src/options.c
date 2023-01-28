@@ -142,7 +142,7 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
                     cmd_opt->fast++;
                 break;
             case 1:
-                cmd_opt->stop_step_exiting = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
+                cmd_opt->exiting_stop_step = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case '1':
                 calibration_set_param(sim->det[0]->calibration, CALIBRATION_PARAM_SLOPE, jibal_get_val(jibal->units, UNIT_TYPE_ANY, optarg));
@@ -184,7 +184,7 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
                 cmd_opt->fit = 1;
                 break;
             case 2:
-                cmd_opt->stop_step_incident = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
+                cmd_opt->incident_stop_step = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, optarg);
                 break;
             case 's':
                 cmd_opt->sample_filename = strdup(optarg);

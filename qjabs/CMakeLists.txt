@@ -55,63 +55,40 @@ endif()
 
 set(PROJECT_SOURCES
         ../src/sample.c
-        ../src/sample.h
         ../src/brick.c
         ../src/ion.c
-        ../src/ion.h
         ../src/simulation.c
-        ../src/simulation.h
         ../src/reaction.c
-        ../src/reaction.h
-       ../src/sample.c
-       ../src/sample.h
-       ../src/spectrum.c
-       ../src/spectrum.h
-       ../src/fit.c
-       ../src/fit.h
-       ../src/rotate.c
-       ../src/rotate.h
-       ../src/jabs.c
-       ../src/jabs.h
-       ../src/generic.c
-       ../src/generic.h
-       ../src/detector.c
-       ../src/detector.h
-       ../src/roughness.c
-       ../src/roughness.h
-       ../src/script.c
-       ../src/script.h
-       ../src/jabs.c
-       ../src/jabs.h
-       ../src/options.c
-       ../src/options.h
-       ../src/message.h
+        ../src/sample.c
+        ../src/spectrum.c
+        ../src/fit.c
+        ../src/rotate.c
+         ../src/jabs.c
+        ../src/generic.c
+        ../src/detector.c
+        ../src/roughness.c
+        ../src/script.c
+        ../src/jabs.c
+        ../src/options.c
         ../src/win_compat.c
-        ../src/win_compat.h
         ../src/defaults.h
         ../src/aperture.c
-        ../src/aperture.h
         ../src/geostragg.c
-        ../src/geostragg.h
         ../src/script_command.c
-        ../src/script_command.h
         ../src/script_session.c
-        ../src/script_session.h
         ../src/script_file.c
-        ../src/script_file.h
         ../src/script_generic.h
         ../src/calibration.c
-        ../src/calibration.h
-        ../src/prob_dist.h
         ../src/prob_dist.c
         ../src/idf2jbs.c
-         ../src/idf2jbs.h
         ../src/idfelementparsers.c
-        ../src/idfelementparsers.h
         ../src/idfparse.c
-        ../src/idfparse.h
         ../src/nuclear_stopping.c
-        ../src/nuclear_stopping.h
+        ../src/fit_params.c
+        ../src/stop.c
+        ../src/des.c
+        ../src/simulation_workspace.c
+        ../src/sim_reaction.c
         "$<$<BOOL:${PLUGINS}>:plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui

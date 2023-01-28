@@ -27,8 +27,8 @@ typedef struct {
     int ds;
     int fast;
     size_t depthsteps_max;
-    double stop_step_incident;
-    double stop_step_exiting;
+    double incident_stop_step;
+    double exiting_stop_step;
     char *output_filename;
     char *exp_filename;
     char *fit_vars;
