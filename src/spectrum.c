@@ -50,14 +50,10 @@ fprintf(stderr, "Reading experimental spectrum from file %s. Detector column is 
             skip--;
             continue;
         }
-        line[strcspn(line, "\r\n")] = 0; /* Strips all kinds of newlines! */
-        size_t line_len = strlen(line);
-        if(line_len == 0)
+        if(jabs_line_is_comment(line)) {
             continue;
-        if(line_len >= 1 && *line == '#') /* Comment */
-            continue;
-        if(line_len >= 4 && strncmp(line, "REM", 3) == 0)
-            continue;
+        }
+        jabs_strip_newline(line);
         char *line_split = line;
         char *col_str;
         size_t n = 0; /* Number of columns on this row */

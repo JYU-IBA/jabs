@@ -135,6 +135,9 @@ void MainWindow::readPlotSettings()
 
 
 int MainWindow::runLine(const QString &line) {
+    if(line.isEmpty()) {
+        return SCRIPT_COMMAND_SUCCESS;
+    }
     jabs_message(MSG_INFO, stderr, "%s%s\n", PROMPT, qPrintable(line));
     int status = script_execute_command(session, qPrintable(line));
     return status;
@@ -353,10 +356,6 @@ void MainWindow::on_action_Run_triggered()
 #ifdef DEBUG
         qDebug() << "Processing line " << lineno << line;
 #endif
-        if(line.isEmpty())
-                continue;
-        if(line.at(0) == '#')
-            continue;
         if(runLine(line) < 0) {
             error = true;
             break;

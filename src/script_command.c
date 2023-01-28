@@ -729,6 +729,9 @@ script_command_status script_execute_command(script_session *s, const char *cmd)
         jabs_message(MSG_ERROR, stderr, "Session has not been initialized.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
+    if(jabs_line_is_comment(cmd)) {
+        return SCRIPT_COMMAND_SUCCESS;
+    }
     char **argv = string_to_argv(cmd, &argc);
     if(!argv) {
         jabs_message(MSG_ERROR, stderr, "Something went wrong in parsing arguments.\n");

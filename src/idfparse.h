@@ -46,15 +46,16 @@ typedef struct idf_parser {
     idf_error error;
 } idf_parser;
 
-xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next); /* Called by findnode(), goes one step deeper in path */
-xmlNode *findnode(xmlNode *root, const char *path); /* Finds the first node with given path. Path should look "like/this/thing" */
+xmlNode *idf_findnode_deeper(xmlNode *root, const char *path, const char **path_next); /* Called by idf_findnode(), goes one step deeper in path */
+xmlNode *idf_findnode(xmlNode *root, const char *path); /* Finds the first node with given path. Path should look "like/this/thing" */
 idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_error (*f)(idf_parser *idf, xmlNode *node)); /* Runs f(parser,child_node) for each child element of node element name "name" */
-int idf_nodename_equals(const xmlNode *node, const char *s);
-char *idf_node_content_to_str(const xmlNode *node);
+char *idf_node_content_to_str(const xmlNode *node); /* will always return a char * which should be freed by free() */
 const xmlChar *idf_xmlstr(const char *s);
-double idf_node_content_to_double(const xmlNode *node);
+double idf_node_content_to_double(const xmlNode *node); /* performs unit conversion */
+int idf_node_content_to_boolean(const xmlNode *node);
 double idf_unit_string_to_SI(xmlChar *unit);
 int idf_stringeq(const void *a, const void *b);
+int idf_stringneq(const void *a, const void *b, size_t n);
 idf_error idf_write_simple_data_to_file(const char *filename, const char *x, const char *y);
 idf_error idf_output_printf(idf_parser *idf, const char *format, ...);
 idf_error idf_buffer_realloc(idf_parser *idf);
@@ -63,4 +64,5 @@ void idf_file_free(idf_parser *idf);
 idf_error idf_write_buf_to_file(const idf_parser *idf, char **filename_out); /* Name is generated automatically and set to filename_out (if it is not NULL). */
 idf_error idf_write_buf(const idf_parser *idf, FILE *f);
 char *idf_file_name_with_suffix(const idf_parser *idf, const char *suffix);
+const char *idf_boolean_to_str(int boolean); /* "true", "false", "unset" trinary */
 #endif // IDFPARSER_H

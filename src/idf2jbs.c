@@ -12,8 +12,8 @@ idf_error idf_parse(const char *filename, char **filename_out) {
     if(idf->error) {
         return IDF2JBS_FAILURE;
     }
+    idf_foreach(idf, idf_findnode(idf->root_element, "notes"), "note", idf_parse_note);
     idf_foreach(idf, idf->root_element, "sample", idf_parse_sample);
-    idf_output_printf(idf, "simulate\n");
     char *fn = NULL;
     idf_write_buf_to_file(idf,  &fn);
     if(filename_out) {

@@ -4,7 +4,7 @@
 #endif
 #include "idfparse.h"
 
-xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next) {
+xmlNode *idf_findnode_deeper(xmlNode *root, const char *path, const char **path_next) {
 #ifdef DEBUG
     fprintf(stderr, "findnode_deeper called with path = \"%s\".\n", path);
 #endif
@@ -37,7 +37,7 @@ xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next
     return NULL;
 }
 
-xmlNode *findnode(xmlNode *root, const char *path) {
+xmlNode *idf_findnode(xmlNode *root, const char *path) {
     const char *path_remains = NULL;
     xmlNode *node = root;
     if(!root || !path) {
@@ -47,13 +47,16 @@ xmlNode *findnode(xmlNode *root, const char *path) {
     fprintf(stderr, "findnode(node name = %s, path = %s) called.\n", root->name, path);
 #endif
     do {
-        node = findnode_deeper(node, path, &path_remains);
+        node = idf_findnode_deeper(node, path, &path_remains);
         path = path_remains;
     } while(node && path_remains && *path_remains != '\0');
     return node;
 }
 
 idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_error (*f)(idf_parser *idf, xmlNode *node)) {
+    if(!node) {
+        return IDF2JBS_FAILURE;
+    }
     xmlNode *cur = NULL;
     int n = 0;
     for (cur = node->children; cur; cur = cur->next) {
@@ -71,13 +74,6 @@ idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_erro
     }
     return n;
 }
-
-int idf_nodename_equals(const xmlNode *node, const char *s) {
-    if(!node || !s)
-        return -1;
-    return (strcmp((char *)node->name, s) == 0);
-}
-
 
 char *idf_node_content_to_str(const xmlNode *node) {
     if(!node) {
@@ -106,6 +102,18 @@ double idf_node_content_to_double(const xmlNode *node) {
     return out;
 }
 
+int idf_node_content_to_boolean(const xmlNode *node) {
+    xmlChar *content = xmlNodeGetContent(node);
+    int out = -1; /* Invalid */
+    if(idf_stringeq(content, "true")) {
+        out = TRUE;
+    } else if(idf_stringeq(content, "false")) {
+        out = FALSE;
+    }
+    free(content);
+    return out;
+}
+
 double idf_unit_string_to_SI(xmlChar *unit) {
     for(const idf_unit *u = idf_units; u->unit; u++) {
         if(xmlStrEqual(unit, idf_xmlstr(u->unit))) {
@@ -118,7 +126,13 @@ double idf_unit_string_to_SI(xmlChar *unit) {
 int idf_stringeq(const void *a, const void *b) {
     if(!a || !b)
         return -1;
-    return (strcmp(a,b) == 0);
+    return (strcmp(a, b) == 0);
+}
+
+int idf_stringneq(const void *a, const void *b, size_t n) {
+    if(!a || !b)
+        return -1;
+    return (strncmp(a, b, n) == 0);
 }
 
 idf_error idf_write_simple_data_to_file(const char *filename, const char *x, const char *y) {
@@ -164,6 +178,21 @@ idf_error idf_output_printf(idf_parser *idf, const char *format, ...) {
     idf->pos_write += n;
     va_end(argp);
     return IDF2JBS_SUCCESS;
+}
+
+int idf_output_puts(idf_parser *idf, const char *s) {
+    if(!idf) {
+        return EOF;
+    }
+    size_t len = strlen(s);
+    while(idf->buf && idf->pos_write + len >= idf->buf_size) {
+        idf_buffer_realloc(idf);
+    }
+    if(!idf->buf) {
+        return EOF;
+    }
+    strncat(idf->buf, s, len);
+    return 0;
 }
 
 idf_error idf_buffer_realloc(idf_parser *idf) {
@@ -264,4 +293,14 @@ char *idf_file_name_with_suffix(const idf_parser *idf, const char *suffix) {
     strcpy(fn, idf->basename);
     strcat(fn, suffix);
     return fn;
+}
+
+const char *idf_boolean_to_str(int boolean) {
+    if(boolean == TRUE) {
+        return "true";
+    } else if(boolean == FALSE) {
+        return "false";
+    } else {
+        return "unset";
+    }
 }
