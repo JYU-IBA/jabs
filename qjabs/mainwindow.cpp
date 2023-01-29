@@ -679,7 +679,7 @@ void MainWindow::on_actionIDF_triggered()
     if(filename.isEmpty()) {
         return;
     }
-    QString question = QString("The program will now convert the IDF file %1 to a JaBS script (file extension .jbs) and a spectrum (if applicable; extension .dat).\n\nThese files, if they already exist, may be overwritten.\n\nContinue?").arg(filename);
+    QString question = QString("The program will now convert the IDF file %1 to a JaBS script (file extension .jbs) and a spectra (if applicable; extension(s) .dat).\n\nThese files, if they already exist, may be overwritten.\n\nContinue?").arg(filename);
     reply = QMessageBox::question(this, "Possible overwrite", question, QMessageBox::Ok|QMessageBox::Cancel);
     if(reply != QMessageBox::Ok) {
         return;

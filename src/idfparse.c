@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdio.h>
 #ifdef WIN32
 #include "win_compat.h"
 #endif
@@ -65,7 +66,7 @@ idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_erro
 #ifdef DEBUG
                 fprintf(stderr, "foreach found %s.\n", name);
 #endif
-                if(f(idf, cur)) {
+                if(f && f(idf, cur)) {
                     return IDF2JBS_FAILURE;
                 }
                 n++;
@@ -284,12 +285,13 @@ void idf_file_free(idf_parser *idf) {
     xmlFreeDoc(idf->doc);
     free(idf->filename);
     free(idf->basename);
+    free(idf->sample_basename);
     free(idf->buf);
     free(idf);
 }
 
 idf_error idf_write_buf_to_file(const idf_parser *idf, char **filename_out) {
-    char *filename = idf_file_name_with_suffix(idf, JABS_FILE_SUFFIX);
+    char *filename = idf_jbs_name(idf);
     FILE *f = fopen(filename, "w");
     if(!f) {
         free(filename);
@@ -311,12 +313,30 @@ idf_error idf_write_buf(const idf_parser *idf, FILE *f) {
     return (fputs(idf->buf, f) == EOF) ? IDF2JBS_FAILURE : IDF2JBS_SUCCESS;
 }
 
-char *idf_file_name_with_suffix(const idf_parser *idf, const char *suffix) {
-    size_t len = strlen(idf->basename) + strlen(suffix) + 1;
-    char *fn = malloc(sizeof(char) * len);
-    strcpy(fn, idf->basename);
-    strcat(fn, suffix);
-    return fn;
+char *idf_jbs_name(const idf_parser *idf) {
+    char *out;
+    asprintf(&out, "%s%s", idf->basename, JABS_FILE_SUFFIX);
+    return out;
+}
+
+char *idf_exp_name(const idf_parser *idf, size_t i_spectrum) {
+    char *out;
+    if(idf->n_spectra == 1) {
+        asprintf(&out, "%s_exp%s", idf->sample_basename, EXP_SPECTRUM_FILE_SUFFIX);
+    } else {
+        asprintf(&out, "%s_exp%zu%s", idf->sample_basename, i_spectrum, EXP_SPECTRUM_FILE_SUFFIX);
+    }
+    return out;
+}
+
+char *idf_spectrum_out_name(const idf_parser *idf, size_t i_spectrum) {
+    char *out;
+    if(idf->n_spectra == 1) {
+        asprintf(&out, "%s_out%s", idf->sample_basename, SAVE_SPECTRUM_FILE_SUFFIX);
+    } else {
+        asprintf(&out, "%s_out%zu%s", idf->sample_basename, i_spectrum, SAVE_SPECTRUM_FILE_SUFFIX);
+    }
+    return out;
 }
 
 const char *idf_boolean_to_str(int boolean) {

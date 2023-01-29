@@ -5,8 +5,9 @@
 
 #define IDF_BUF_MSG_MAX (1024) /* Maximum length of input string to idf_output_printf. Longer strings will be truncated. */
 #define IDF_BUF_SIZE_INITIAL (8*IDF_BUF_MSG_MAX)
-#define JABS_FILE_SUFFIX (".jbs")
-#define SPECTRUM_FILE_SUFFIX (".dat")
+#define JABS_FILE_SUFFIX ".jbs"
+#define EXP_SPECTRUM_FILE_SUFFIX ".dat"
+#define SAVE_SPECTRUM_FILE_SUFFIX ".csv"
 
 typedef enum idf_error {
     IDF2JBS_SUCCESS = 0,
@@ -53,6 +54,11 @@ typedef struct idf_parser {
     size_t buf_size;
     size_t pos_write;
     idf_error error;
+    size_t n_samples;
+    size_t i_sample; /* Keep track on how many samples are defined in the file */
+    char *sample_basename;
+    size_t n_spectra; /* Number of spectra in a sample (the one that is currently being parsed) */
+    size_t i_spectrum;
 } idf_parser;
 
 xmlNode *idf_findnode_deeper(xmlNode *root, const char *path, const char **path_next); /* Called by idf_findnode(), goes one step deeper in path */
@@ -73,7 +79,9 @@ idf_parser *idf_file_read(const char *filename);
 void idf_file_free(idf_parser *idf);
 idf_error idf_write_buf_to_file(const idf_parser *idf, char **filename_out); /* Name is generated automatically and set to filename_out (if it is not NULL). */
 idf_error idf_write_buf(const idf_parser *idf, FILE *f);
-char *idf_file_name_with_suffix(const idf_parser *idf, const char *suffix);
+char *idf_jbs_name(const idf_parser *idf);
+char *idf_exp_name(const idf_parser *idf, size_t i_spectrum);
+char *idf_spectrum_out_name(const idf_parser *idf, size_t i_spectrum);
 const char *idf_boolean_to_str(int boolean); /* "true", "false", "unset" trinary */
 const char *idf_error_code_to_str(idf_error idferr);
 #endif // IDFPARSER_H

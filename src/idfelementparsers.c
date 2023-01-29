@@ -1,6 +1,9 @@
 #include <string.h>
 #include "idfelementparsers.h"
 #include "generic.h"
+#ifdef WIN32
+#include "win_compat.h"
+#endif
 
 idf_error idf_parse_note(idf_parser *idf, xmlNode *note) {
     char *s = idf_node_content_to_str(note);
@@ -12,23 +15,26 @@ idf_error idf_parse_note(idf_parser *idf, xmlNode *note) {
     return IDF2JBS_SUCCESS;
 }
 int idf_parse_sample(idf_parser *idf, xmlNode *sample) {
-    idf_output_printf(idf, "#Sample\n");
+    idf->i_sample++; /* Numbering from 1 .. idf->n_samples inclusive */
+    free(idf->sample_basename);
+    if(idf->n_samples == 1) {
+        idf->sample_basename = strdup(idf->basename);
+    } else {
+        asprintf(&idf->sample_basename, "%s-sample%zu", idf->basename, idf->i_sample);
+    }
+    idf_output_printf(idf, "#Sample number %zu in file %s\n", idf->i_sample, idf->filename);
     char *description = idf_node_content_to_str(idf_findnode(sample, "description"));
     if(strlen(description) > 0) {
         idf_output_printf(idf, "#Description: %s\n", jabs_strip_newline(description));
     }
     free(description);
     idf_foreach(idf, idf_findnode(sample, "notes"), "note", idf_parse_note);
-    xmlNode *spectra_node = idf_findnode(sample, "spectra");
-    if(spectra_node) {
-        idf_parse_spectra(idf, spectra_node);
+    idf_parse_layers(idf, idf_findnode(sample, "structure/layeredstructure/layers"));
+    idf_parse_spectra(idf, idf_findnode(sample, "spectra"));
+    idf_output_printf(idf, "#End of sample %zu\n", idf->i_sample);
+    if(idf->i_sample != idf->n_samples) {
+        idf_output_printf(idf, "reset\n\n", idf->i_sample);
     }
-    xmlNode *layers_node = idf_findnode(sample, "structure/layeredstructure/layers");
-    if(layers_node) {
-        idf_parse_layers(idf, layers_node);
-    }
-    idf_output_printf(idf, "simulate\n");
-    idf_output_printf(idf, "save spectra \"%s.csv\"\n", idf->basename);
     return IDF2JBS_SUCCESS;
 }
 
@@ -120,7 +126,7 @@ int idf_parse_simple_data(idf_parser *idf, xmlNode *simple_data) {
     }
     char *x_raw = idf_node_content_to_str(idf_findnode(simple_data, "x"));
     char *y_raw = idf_node_content_to_str(idf_findnode(simple_data, "y"));
-    char *filename = idf_file_name_with_suffix(idf, SPECTRUM_FILE_SUFFIX);
+    char *filename = idf_exp_name(idf, idf->i_spectrum);
     if(idf_write_simple_data_to_file(filename, x_raw, y_raw) == IDF2JBS_SUCCESS) {
         idf_output_printf(idf, "load exp \"%s\"\n", filename);
     }
@@ -130,8 +136,9 @@ int idf_parse_simple_data(idf_parser *idf, xmlNode *simple_data) {
 
 
 int idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum) {
+    idf->i_spectrum++;
 #ifdef DEBUG
-    fprintf(stderr, "parse spectrum called.\n");
+    fprintf(stderr, "parse spectrum called, i_spectrum = %zu.\n", idf->i_spectrum);
 #endif
     xmlNode *beam = idf_findnode(spectrum, "beam");
     if(beam) {
@@ -158,17 +165,22 @@ int idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum) {
         fprintf(stderr, "There is geometry.\n");
 #endif
         char *geotype = idf_node_content_to_str(idf_findnode(geometry, "geometrytype"));
-        const char *phi_str;
+        const char *phi_str = "";
         if(idf_stringeq(geotype, "IBM")) {
-            phi_str = "\0";
+            idf_output_printf(idf, "#IBM geometry set in file.\n");
         } else if(idf_stringeq(geotype, "Cornell")) {
             phi_str = " phi 90.0deg";
+            idf_output_printf(idf, "#Cornell geometry set in file.\n");
+        } else {
+            idf_output_printf(idf, "#Not IBM or Cornell geometry? Use set det phi XXXdeg to tell JaBS where the detector is.\n");
         }
         free(geotype);
         double incidenceangle = idf_node_content_to_double(idf_findnode(geometry, "incidenceangle"));
         idf_output_printf(idf, "set alpha %gdeg\n", incidenceangle/C_DEG);
         double scatteringangle = idf_node_content_to_double(idf_findnode(geometry, "scatteringangle"));
         idf_output_printf(idf, "set det theta %gdeg%s\n", scatteringangle/C_DEG, phi_str);
+        double exitangle = idf_node_content_to_double(idf_findnode(geometry, "exitangle"));
+        idf_output_printf(idf, "#Check output to confirm JaBS uses correct exit angle (%g deg?)\n", exitangle / C_DEG);
         idf_parse_spot(idf, idf_findnode(geometry, "spot"));
     }
     xmlNode *calibrations = idf_findnode(spectrum, "calibrations");
@@ -193,10 +205,21 @@ int idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum) {
         xmlNode *simple_data_node = idf_findnode(data_node, "simpledata");
         idf_parse_simple_data(idf, simple_data_node);
     }
+    idf_output_printf(idf, "simulate\n");
+    char *savespectrafilename = idf_spectrum_out_name(idf, idf->i_spectrum);
+    if(savespectrafilename) {
+        idf_output_printf(idf, "save spectra \"%s\"\n", savespectrafilename);
+        free(savespectrafilename);
+    }
+    if(idf->i_spectrum != idf->n_spectra) {
+        idf_output_printf(idf, "reset detectors\nadd detector default\n", idf->i_sample);
+    }
     return IDF2JBS_SUCCESS;
 }
 
 int idf_parse_spectra(idf_parser *idf, xmlNode *spectra) {
+    idf->i_spectrum = 0;
+    idf->n_spectra = idf_foreach(idf, spectra, "spectrum", NULL);
     return idf_foreach(idf, spectra, "spectrum", idf_parse_spectrum);
 }
 
