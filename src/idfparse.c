@@ -1,10 +1,11 @@
 #include <string.h>
+#include <stdio.h>
 #ifdef WIN32
 #include "win_compat.h"
 #endif
 #include "idfparse.h"
 
-xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next) {
+xmlNode *idf_findnode_deeper(xmlNode *root, const char *path, const char **path_next) {
 #ifdef DEBUG
     fprintf(stderr, "findnode_deeper called with path = \"%s\".\n", path);
 #endif
@@ -37,7 +38,7 @@ xmlNode *findnode_deeper(xmlNode *root, const char *path, const char **path_next
     return NULL;
 }
 
-xmlNode *findnode(xmlNode *root, const char *path) {
+xmlNode *idf_findnode(xmlNode *root, const char *path) {
     const char *path_remains = NULL;
     xmlNode *node = root;
     if(!root || !path) {
@@ -47,13 +48,16 @@ xmlNode *findnode(xmlNode *root, const char *path) {
     fprintf(stderr, "findnode(node name = %s, path = %s) called.\n", root->name, path);
 #endif
     do {
-        node = findnode_deeper(node, path, &path_remains);
+        node = idf_findnode_deeper(node, path, &path_remains);
         path = path_remains;
     } while(node && path_remains && *path_remains != '\0');
     return node;
 }
 
 idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_error (*f)(idf_parser *idf, xmlNode *node)) {
+    if(!node) {
+        return IDF2JBS_FAILURE;
+    }
     xmlNode *cur = NULL;
     int n = 0;
     for (cur = node->children; cur; cur = cur->next) {
@@ -62,7 +66,7 @@ idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_erro
 #ifdef DEBUG
                 fprintf(stderr, "foreach found %s.\n", name);
 #endif
-                if(f(idf, cur)) {
+                if(f && f(idf, cur)) {
                     return IDF2JBS_FAILURE;
                 }
                 n++;
@@ -71,13 +75,6 @@ idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_erro
     }
     return n;
 }
-
-int idf_nodename_equals(const xmlNode *node, const char *s) {
-    if(!node || !s)
-        return -1;
-    return (strcmp((char *)node->name, s) == 0);
-}
-
 
 char *idf_node_content_to_str(const xmlNode *node) {
     if(!node) {
@@ -96,11 +93,31 @@ const xmlChar *idf_xmlstr(const char *s) {
 
 double idf_node_content_to_double(const xmlNode *node) {
     xmlChar *content = xmlNodeGetContent(node);
+    if(!content) {
+        return 0.0;
+    }
     double out = strtod((char *)content, NULL); /* TODO: error checking */
     xmlChar *unit = xmlGetProp(node, idf_xmlstr("units"));
     if(unit) {
         out *= idf_unit_string_to_SI(unit);
         free(unit);
+    }
+    xmlChar *mode = xmlGetProp(node, idf_xmlstr("mode"));
+    if(mode) {
+        out *= idf_unit_mode(mode);
+        free(mode);
+    }
+    free(content);
+    return out;
+}
+
+int idf_node_content_to_boolean(const xmlNode *node) {
+    xmlChar *content = xmlNodeGetContent(node);
+    int out = -1; /* Invalid */
+    if(idf_stringeq(content, "true")) {
+        out = TRUE;
+    } else if(idf_stringeq(content, "false")) {
+        out = FALSE;
     }
     free(content);
     return out;
@@ -112,13 +129,29 @@ double idf_unit_string_to_SI(xmlChar *unit) {
             return u->factor;
         }
     }
+#ifdef DEBUG
+    fprintf(stderr, "No such unit: \"%s\"!\n", unit);
+#endif
     return 0.0;
+}
+
+double idf_unit_mode(xmlChar *mode) {
+    if(idf_stringeq(mode, "FWHM")) {
+        return 1.0/C_FWHM;
+    }
+    return 1.0;
 }
 
 int idf_stringeq(const void *a, const void *b) {
     if(!a || !b)
         return -1;
-    return (strcmp(a,b) == 0);
+    return (strcmp(a, b) == 0);
+}
+
+int idf_stringneq(const void *a, const void *b, size_t n) {
+    if(!a || !b)
+        return -1;
+    return (strncmp(a, b, n) == 0);
 }
 
 idf_error idf_write_simple_data_to_file(const char *filename, const char *x, const char *y) {
@@ -140,7 +173,7 @@ idf_error idf_write_simple_data_to_file(const char *filename, const char *x, con
         n++;
     }
     fclose(f);
-    if(n > 1) { /* At least two successfull conversions should be performed before we can call it a spectrum */
+    if(n >= 2) { /* At least two successful conversions should be performed before we can call it a spectrum */
         return IDF2JBS_SUCCESS;
     } else {
         return IDF2JBS_FAILURE;
@@ -164,6 +197,21 @@ idf_error idf_output_printf(idf_parser *idf, const char *format, ...) {
     idf->pos_write += n;
     va_end(argp);
     return IDF2JBS_SUCCESS;
+}
+
+int idf_output_puts(idf_parser *idf, const char *s) {
+    if(!idf) {
+        return EOF;
+    }
+    size_t len = strlen(s);
+    while(idf->buf && idf->pos_write + len >= idf->buf_size) {
+        idf_buffer_realloc(idf);
+    }
+    if(!idf->buf) {
+        return EOF;
+    }
+    strncat(idf->buf, s, len);
+    return 0;
 }
 
 idf_error idf_buffer_realloc(idf_parser *idf) {
@@ -195,31 +243,37 @@ idf_parser *idf_file_read(const char *filename) {
         return idf;
     }
     size_t l = strlen(filename);
-    if(l < 4) {
-        fprintf(stderr, "Filename %s is suspiciously short.\n", filename);
-        idf->error = IDF2JBS_FAILURE_COULD_NOT_READ;
-        return idf;
-    }
-    const char *extension = filename + l - 4;
-    if(!idf_stringeq(extension, ".xml") && !idf_stringeq(extension, ".idf")) {
+    char *fn = strdup(filename);
+    char *extension;
+    for(extension = fn + l; extension > fn && *extension != '.'; extension--) {}
+    if(!idf_stringeq(extension, ".xml") && !idf_stringeq(extension, ".idf") && !idf_stringeq(extension, ".xnra")) {
 #ifdef DEBUG
         fprintf(stderr, "Extension %s is not valid.\n", extension);
 #endif
-        idf->error = IDF2JBS_FAILURE_COULD_NOT_READ;
+        free(fn);
+        idf->error = IDF2JBS_FAILURE_WRONG_EXTENSION;
         return idf;
     }
-    idf->doc = xmlReadFile(filename, NULL, 0);
+    idf->doc = xmlReadFile(fn, NULL, 0);
     if(!idf->doc) {
         idf->error = IDF2JBS_FAILURE_COULD_NOT_READ;
+        free(fn);
         return idf;
     }
     idf->root_element = xmlDocGetRootElement(idf->doc);
     if(!idf_stringeq(idf->root_element->name, "idf")) {
         idf->error = IDF2JBS_FAILURE_NOT_IDF_FILE;
+        free(fn);
         return idf;
     }
-    idf->filename = strdup(filename);
-    idf->basename = strndup(filename, l - 4);
+    idf->filename = strdup(fn);
+    *extension = '\0'; /* extension still points to start of extension, rest of fn can be used for basename */
+    idf->basename = strdup(fn);
+    free(fn);
+    if(strlen(idf->basename) == 0) { /* Without this filename of ".xml" would be valid and this could cause problems. */
+        idf->error = IDF2JBS_FAILURE;
+        return idf;
+    }
     idf->buf = NULL;
     idf_buffer_realloc(idf);
     return idf;
@@ -231,19 +285,20 @@ void idf_file_free(idf_parser *idf) {
     xmlFreeDoc(idf->doc);
     free(idf->filename);
     free(idf->basename);
+    free(idf->sample_basename);
     free(idf->buf);
     free(idf);
 }
 
 idf_error idf_write_buf_to_file(const idf_parser *idf, char **filename_out) {
-    char *filename = idf_file_name_with_suffix(idf, JABS_FILE_SUFFIX);
+    char *filename = idf_jbs_name(idf);
     FILE *f = fopen(filename, "w");
     if(!f) {
         free(filename);
-        return IDF2JBS_FAILURE;
+        return IDF2JBS_FAILURE_COULD_NOT_WRITE_OUTPUT;
     }
     if(idf_write_buf(idf, f)) {
-       return IDF2JBS_FAILURE;
+       return IDF2JBS_FAILURE_COULD_NOT_WRITE_OUTPUT;
     }
     if(filename_out) {
         *filename_out = filename;
@@ -258,10 +313,57 @@ idf_error idf_write_buf(const idf_parser *idf, FILE *f) {
     return (fputs(idf->buf, f) == EOF) ? IDF2JBS_FAILURE : IDF2JBS_SUCCESS;
 }
 
-char *idf_file_name_with_suffix(const idf_parser *idf, const char *suffix) {
-    size_t len = strlen(idf->basename) + strlen(suffix) + 1;
-    char *fn = malloc(sizeof(char) * len);
-    strcpy(fn, idf->basename);
-    strcat(fn, suffix);
-    return fn;
+char *idf_jbs_name(const idf_parser *idf) {
+    char *out;
+    asprintf(&out, "%s%s", idf->basename, JABS_FILE_SUFFIX);
+    return out;
+}
+
+char *idf_exp_name(const idf_parser *idf, size_t i_spectrum) {
+    char *out;
+    if(idf->n_spectra == 1) {
+        asprintf(&out, "%s_exp%s", idf->sample_basename, EXP_SPECTRUM_FILE_SUFFIX);
+    } else {
+        asprintf(&out, "%s_exp%zu%s", idf->sample_basename, i_spectrum, EXP_SPECTRUM_FILE_SUFFIX);
+    }
+    return out;
+}
+
+char *idf_spectrum_out_name(const idf_parser *idf, size_t i_spectrum) {
+    char *out;
+    if(idf->n_spectra == 1) {
+        asprintf(&out, "%s_out%s", idf->sample_basename, SAVE_SPECTRUM_FILE_SUFFIX);
+    } else {
+        asprintf(&out, "%s_out%zu%s", idf->sample_basename, i_spectrum, SAVE_SPECTRUM_FILE_SUFFIX);
+    }
+    return out;
+}
+
+const char *idf_boolean_to_str(int boolean) {
+    if(boolean == TRUE) {
+        return "true";
+    } else if(boolean == FALSE) {
+        return "false";
+    } else {
+        return "unset";
+    }
+}
+
+const char *idf_error_code_to_str(idf_error idferr) {
+    switch(idferr) {
+        case IDF2JBS_SUCCESS:
+            return "success";
+        case IDF2JBS_FAILURE:
+            return "generic failure";
+        case IDF2JBS_FAILURE_COULD_NOT_READ:
+            return "could not read file";
+        case IDF2JBS_FAILURE_NOT_IDF_FILE:
+            return "not an IDF file";
+        case IDF2JBS_FAILURE_WRONG_EXTENSION:
+            return "wrong file extension";
+        case IDF2JBS_FAILURE_NO_SAMPLES_DEFINED:
+            return "no samples defined in file";
+        default:
+            return "unknown error code";
+    }
 }

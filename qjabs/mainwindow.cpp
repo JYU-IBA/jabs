@@ -135,6 +135,9 @@ void MainWindow::readPlotSettings()
 
 
 int MainWindow::runLine(const QString &line) {
+    if(line.isEmpty()) {
+        return SCRIPT_COMMAND_SUCCESS;
+    }
     jabs_message(MSG_INFO, stderr, "%s%s\n", PROMPT, qPrintable(line));
     int status = script_execute_command(session, qPrintable(line));
     return status;
@@ -353,10 +356,6 @@ void MainWindow::on_action_Run_triggered()
 #ifdef DEBUG
         qDebug() << "Processing line " << lineno << line;
 #endif
-        if(line.isEmpty())
-                continue;
-        if(line.at(0) == '#')
-            continue;
         if(runLine(line) < 0) {
             error = true;
             break;
@@ -676,20 +675,21 @@ void MainWindow::on_actionIDF_triggered()
     if(!MainWindow::askToSave())
         return;
     QMessageBox::StandardButton reply;
-    QString filename = QFileDialog::getOpenFileName(this, "Import IDF file", "", tr("IDF files (*.xml;*.idf)"));
+    QString filename = QFileDialog::getOpenFileName(this, "Import IDF file", "", tr("IDF files (*.idf;*.xml;*.xnra)"));
     if(filename.isEmpty()) {
         return;
     }
-    QString question = QString("The program will now convert the IDF file %1 to a JaBS script (file extension .jbs) and a spectrum (if applicable; extension .dat).\n\nThese files, if they already exist, may be overwritten.\n\nContinue?").arg(filename);
+    QString question = QString("The program will now convert the IDF file %1 to a JaBS script (file extension .jbs) and a spectra (if applicable; extension(s) .dat).\n\nThese files, if they already exist, may be overwritten.\n\nContinue?").arg(filename);
     reply = QMessageBox::question(this, "Possible overwrite", question, QMessageBox::Ok|QMessageBox::Cancel);
     if(reply != QMessageBox::Ok) {
         return;
     }
     char *filename_out = nullptr;
-    if(idf_parse(qPrintable(filename), &filename_out) == IDF2JBS_SUCCESS) {
+    idf_error idferr = idf_parse(qPrintable(filename), &filename_out);
+    if(idferr == IDF2JBS_SUCCESS) {
         openFile(filename_out);
     } else {
-        QMessageBox::critical(this, "Error", QString("Could not import file %1.\nCheck that you have write permissions in the directory.\n").arg(filename));
+        QMessageBox::critical(this, "Error", QString("Could not import file %1.\n\nidf2jbs failed with error: %2.\n").arg(filename).arg(idf_error_code_to_str(idferr)));
     }
 }
 

@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include "win_compat.h"
 #include "generic.h"
+#include "defaults.h"
 
 /* strsep from NetBSD, modified by Jaakko Julin. Original copyright note below */
 
@@ -86,7 +87,7 @@ char *strsep_with_quotes(char **stringp, const char *delim) {
 char **string_to_argv(const char *str, int *argc) { /* Returns allocated array of allocated strings, needs to be free'd (see argv_free()) */
     char *s = strdup(str);
     char *s_split = s;
-    s[strcspn(s, "\r\n")] = 0;
+    jabs_strip_newline(s);
     size_t len = strlen(s);
     size_t n = 0;
     char *col;
@@ -296,4 +297,22 @@ int is_match(const char* candidate, const char* pattern) {
     else {
         return 0;
     }
+}
+
+char *jabs_strip_newline(char *str) { /* Replaces newline with null, so everything after newline is discarded in practice */
+    str[strcspn(str, "\r\n")] = 0;
+    return str;
+}
+
+int jabs_line_is_comment(const char *line) {
+    if(!line) {
+        return FALSE;
+    }
+    if(*line == '#') {
+        return TRUE;
+    }
+    if(strncmp(line, "REM ", 4) == 0) {
+        return TRUE;
+    }
+    return FALSE;
 }

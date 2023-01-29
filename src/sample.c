@@ -473,9 +473,10 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
 
     while(getline(&line, &line_size, in) > 0) {
         lineno++;
-        line[strcspn(line, "\r\n")] = 0; /* Strips all kinds of newlines! */
-        if(strlen(line) >= 1 && *line == '#') /* Comment */
+        if(jabs_line_is_comment(line)) {
             continue;
+        }
+        jabs_strip_newline(line);
         char *line_split = line;
         char *col;
         size_t n = 0; /* Number of columns on this row */

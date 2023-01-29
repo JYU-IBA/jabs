@@ -62,13 +62,13 @@ ssize_t script_file_getline(script_file *sfile) {
             return n;
         }
         sfile->lineno++;
-        sfile->line[strcspn(sfile->line, "\r\n")] = 0; /* Strip newlines */
+        if(jabs_line_is_comment(sfile->line)) {
+            continue;
+        }
+        jabs_strip_newline(sfile->line);
 #ifdef DEBUG
         fprintf(stderr, "File %s: line %zu: %s\n", sfile->filename, sfile->lineno, sfile->line);
 #endif
-        if(*sfile->line == '#') {/* Comment */
-            continue;
-        }
         return n;
     }
 }

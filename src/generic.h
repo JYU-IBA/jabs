@@ -30,5 +30,6 @@ void fclose_file_or_stream(FILE *f); /* fclose() if f is not stdout or stderr */
 char *strdup_non_null(const char *s); /* if s is NULL, returns NULL, else strdup(s) */
 int asprintf_append(char **ret, const char *format, ...);
 int is_match(const char *candidate, const char *pattern); /* stolen from https://stackoverflow.com/questions/23457305/compare-strings-with-wildcard because of laziness. License unknown. */
-
+char *jabs_strip_newline(char *str);
+int jabs_line_is_comment(const char *line);
 #endif //JABS_GENERIC_H

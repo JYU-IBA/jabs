@@ -97,8 +97,8 @@ thick_prob_dist *thickness_probability_table_from_file(const char *filename) { /
     thick_prob_dist *tpd = thickness_probability_table_new(n);
     while(getline(&line, &line_size, in) > 0) {
         lineno++;
-        line[strcspn(line, "\r\n")] = 0; /* Strips all kinds of newlines! */
-        if(strlen(line) >= 1 && *line == '#') {/* Comment */
+        jabs_strip_newline(line);
+        if(jabs_line_is_comment(line)) {
             continue;
         }
         if(n_true == n) {
