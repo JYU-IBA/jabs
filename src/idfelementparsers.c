@@ -145,7 +145,7 @@ int idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum) {
         idf_output_printf(idf, "set energy %gkeV\n", energy/C_KEV);
         double energyspread = idf_node_content_to_double(idf_findnode(beam, "beamenergyspread"));
         if(energyspread > 0.0) {
-            idf_output_printf(idf, "set energy_broad %gkeV\n", energyspread / C_KEV);
+            idf_output_printf(idf, "set energy_broad %gkeV\n", energyspread / C_KEV * C_FWHM);
         }
         double fluence = idf_node_content_to_double(idf_findnode(beam, "beamfluence"));
         idf_output_printf(idf, "set fluence %e\n", fluence);
@@ -179,7 +179,7 @@ int idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum) {
         idf_parse_energycalibrations(idf, idf_findnode(calibrations, "energycalibrations"));
         double resolution = idf_node_content_to_double(idf_findnode(calibrations, "detectorresolutions/detectorresolution/resolutionparameters/resolutionparameter"));
         if(resolution > 0.0) {
-            idf_output_printf(idf, "set det resolution %gkeV\n", resolution / C_KEV);
+            idf_output_printf(idf, "set det resolution %gkeV\n", resolution / C_KEV * C_FWHM);
         }
     }
 
@@ -213,16 +213,25 @@ int idf_parse_detector(idf_parser *idf, xmlNode *detector) {
     }
     char *type = idf_node_content_to_str(idf_findnode(detector, "detectortype"));
     if(idf_stringeq(type, "SSB")) {
-#if 0
         idf_output_printf(idf, "set detector type energy\n");
-#endif
-    } /* TODO: other types */
+    } else if(idf_stringeq(type, "ToF")) {
+        double length = idf_node_content_to_double(idf_findnode(detector, "tof/toflength"));
+        double timing_resolution = idf_node_content_to_double(idf_findnode(detector, "tof/toftimeresolution"));;
+        idf_output_printf(idf, "set det type tof length %gmm resolution %gps\n", length / C_MM, timing_resolution / C_PS * C_FWHM);
+    }
     free(type);
     double solid = idf_node_content_to_double(idf_findnode(detector, "solidangle"));
     if(solid > 0.0) {
         idf_output_printf(idf, "set det solid %gmsr\n", solid / C_MSR);
     }
+    double distance = idf_node_content_to_double(idf_findnode(detector, "distancedetectortosample"));
+    if(distance > 0.0) {
+        idf_output_printf(idf, "set det distance %gmm\n", distance / C_MM);
+    }
     idf_parse_detectorshape(idf, idf_findnode(detector, "detectorshape"));
+
+
+
     return IDF2JBS_SUCCESS;
 }
 

@@ -26,6 +26,7 @@ typedef struct idf_unit {
 static const idf_unit idf_units[] = {
         {"fraction", 1.0},
         {"degree", C_DEG},
+        {"radian", 1.0},
         {"1e15at/cm2", C_TFU},
         {"#particles", 1.0},
         {"amu", C_U},
@@ -33,9 +34,14 @@ static const idf_unit idf_units[] = {
         {"keV/channel", C_KEV},
         {"keV/channel^2", C_KEV},
         {"MeV", C_MEV},
+        {"m",  1.0},
+        {"cm", C_CM},
         {"mm", C_MM},
         {"us", C_US},
+        {"ns", C_NS},
+        {"ps", C_PS},
         {"msr", C_MSR},
+        {"sr", 1.0},
         {0, 0}};
 
 typedef struct idf_parser {
@@ -57,6 +63,7 @@ const xmlChar *idf_xmlstr(const char *s);
 double idf_node_content_to_double(const xmlNode *node); /* performs unit conversion */
 int idf_node_content_to_boolean(const xmlNode *node);
 double idf_unit_string_to_SI(xmlChar *unit);
+double idf_unit_mode(xmlChar *mode); /* FWHM etc */
 int idf_stringeq(const void *a, const void *b);
 int idf_stringneq(const void *a, const void *b, size_t n);
 idf_error idf_write_simple_data_to_file(const char *filename, const char *x, const char *y);

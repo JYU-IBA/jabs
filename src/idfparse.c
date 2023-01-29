@@ -92,11 +92,19 @@ const xmlChar *idf_xmlstr(const char *s) {
 
 double idf_node_content_to_double(const xmlNode *node) {
     xmlChar *content = xmlNodeGetContent(node);
+    if(!content) {
+        return 0.0;
+    }
     double out = strtod((char *)content, NULL); /* TODO: error checking */
     xmlChar *unit = xmlGetProp(node, idf_xmlstr("units"));
     if(unit) {
         out *= idf_unit_string_to_SI(unit);
         free(unit);
+    }
+    xmlChar *mode = xmlGetProp(node, idf_xmlstr("mode"));
+    if(mode) {
+        out *= idf_unit_mode(mode);
+        free(mode);
     }
     free(content);
     return out;
@@ -120,7 +128,17 @@ double idf_unit_string_to_SI(xmlChar *unit) {
             return u->factor;
         }
     }
+#ifdef DEBUG
+    fprintf(stderr, "No such unit: \"%s\"!\n", unit);
+#endif
     return 0.0;
+}
+
+double idf_unit_mode(xmlChar *mode) {
+    if(idf_stringeq(mode, "FWHM")) {
+        return 1.0/C_FWHM;
+    }
+    return 1.0;
 }
 
 int idf_stringeq(const void *a, const void *b) {
@@ -154,7 +172,7 @@ idf_error idf_write_simple_data_to_file(const char *filename, const char *x, con
         n++;
     }
     fclose(f);
-    if(n > 1) { /* At least two successfull conversions should be performed before we can call it a spectrum */
+    if(n >= 2) { /* At least two successful conversions should be performed before we can call it a spectrum */
         return IDF2JBS_SUCCESS;
     } else {
         return IDF2JBS_FAILURE;
