@@ -1,12 +1,17 @@
 /*
- *  Jaakko's Backscattering Simulator (JaBS)
- *  Copyright (C) 2021 - 2023 Jaakko Julin
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *   See LICENSE.txt for the full license.
+
+    Jaakko's Backscattering Simulator (JaBS)
+    Copyright (C) 2021 - 2023 Jaakko Julin
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    See LICENSE.txt for the full license.
+
+    Some parts of this source file under different license, see below!
+
  */
 
 /*
@@ -14,7 +19,11 @@
  * https://www.gnu.org/software/gsl/doc/html/nls.html . Please note that GSL (https://www.gnu.org/software/gsl/) is
  * is distributed under the terms of the GNU General Public License (GPL).
  */
-
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <stdio.h>
+#include "win_compat.h"
 #include <string.h>
 #include <time.h>
 #include <assert.h>
