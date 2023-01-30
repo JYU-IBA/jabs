@@ -110,7 +110,7 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_
         sim_r->theta_cm = C_PI - 2.0 * sim_r->theta;
         sim_r->cs_constant = pow2(incident->Z * C_E * target->Z * C_E / (8 * C_PI * C_EPSILON0)) * pow2(1.0 + incident->mass / target->mass) * pow(cos(sim_r->theta), -3.0) * pow2(sim_r->E_cm_ratio);
     }
-    if(sim_r->r->cs == JIBAL_CS_ANDERSEN) {
+    if(sim_r->r->cs == JABS_CS_ANDERSEN) {
         sim_r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0)); /* Factors for Andersen correction */
         sim_r->r_VE_factor2 = pow2(0.5 / sin(sim_r->theta_cm / 2.0));
     }
@@ -163,9 +163,9 @@ double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E
     const double E_cm = sim_r->E_cm_ratio * E;
     double sigma_r = sim_r->cs_constant / pow2(E_cm) ;
     switch(r->cs) {
-        case JIBAL_CS_RUTHERFORD:
+        case JABS_CS_RUTHERFORD:
             return sigma_r;
-        case JIBAL_CS_ANDERSEN:
+        case JABS_CS_ANDERSEN:
             return sigma_r * sim_reaction_andersen(sim_r, E_cm);
         default:
             return 0.0;

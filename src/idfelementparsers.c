@@ -39,7 +39,10 @@ int idf_parse_sample(idf_parser *idf, xmlNode *sample) {
     if(idf->n_samples == 1) {
         idf->sample_basename = strdup(idf->basename);
     } else {
-        asprintf(&idf->sample_basename, "%s-sample%zu", idf->basename, idf->i_sample);
+        int len = asprintf(&idf->sample_basename, "%s-sample%zu", idf->basename, idf->i_sample);
+        if(len < 0) {
+            return IDF2JBS_FAILURE;
+        }
     }
     idf_output_printf(idf, "#Sample number %zu in file %s\n", idf->i_sample, idf->filename);
     char *description = idf_node_content_to_str(idf_findnode(sample, "description"));

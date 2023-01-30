@@ -13,11 +13,11 @@
     Some parts of this source file under different license, see below!
 
  */
-#include <string.h>
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 #include <stdio.h>
+#include <string.h>
 #include "generic.h"
 #ifdef WIN32
 #include "win_compat.h"

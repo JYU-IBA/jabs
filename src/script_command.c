@@ -2157,7 +2157,7 @@ script_command_status script_add_reaction(script_session *s, int argc, char *con
         jabs_message(MSG_ERROR, stderr, "Could not make a reaction based on given description.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(r->cs == JIBAL_CS_NONE) {
+    if(r->cs == JABS_CS_NONE) {
         jabs_reaction_cs cs = sim_cs(fit->sim, r->type);
         r->cs = cs;
         jabs_message(MSG_VERBOSE, stderr,

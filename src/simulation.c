@@ -40,7 +40,7 @@ simulation *sim_init(jibal *jibal) {
     sim->rbs = TRUE;
     sim->erd = TRUE;
     sim->cs_rbs = jabs_reaction_cs_from_jibal_cs(jibal->config->cs_rbs);
-    sim->cs_erd =  jabs_reaction_cs_from_jibal_cs(jibal->config->cs_erd);
+    sim->cs_erd = jabs_reaction_cs_from_jibal_cs(jibal->config->cs_erd);
     sim_det_add(sim, detector_default(NULL));
     return sim;
 }
@@ -65,7 +65,7 @@ void sim_free(simulation *sim) {
 }
 
 jabs_reaction_cs sim_cs(const simulation *sim, const reaction_type type) {
-    if(type == REACTION_RBS ||type == REACTION_RBS_ALT)
+    if(type == REACTION_RBS || type == REACTION_RBS_ALT)
         return sim->cs_rbs;
     if(type == REACTION_ERD)
         return sim->cs_erd;
@@ -76,7 +76,7 @@ int sim_reactions_add_reaction(simulation *sim, reaction *r) {
     if(!sim || !r)
         return EXIT_FAILURE;
     sim->n_reactions++;
-    sim->reactions = realloc(sim->reactions, sim->n_reactions*sizeof(reaction *));
+    sim->reactions = realloc(sim->reactions, sim->n_reactions * sizeof(reaction *));
     sim->reactions[sim->n_reactions - 1] = r;
     jabs_message(MSG_INFO, stderr, "Added reaction %zu (%s), %s(%s,%s)%s, E = [%g keV, %g keV], Q = %g keV\n",
                  sim->n_reactions, reaction_name(r), r->target->name, r->incident->name, r->product->name, r->product_nucleus->name, r->E_min / C_KEV, r->E_max / C_KEV, r->Q / C_KEV);
@@ -120,14 +120,14 @@ int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_typ
     if(type != REACTION_RBS && type != REACTION_RBS_ALT && type != REACTION_ERD) {
         return 0;
     }
-    if(cs == JIBAL_CS_NONE) {
+    if(cs == JABS_CS_NONE) {
         return 0;
     }
     struct sample *sample = sample_from_sample_model(sm);
     if(!sample) {
         return -1;
     }
-    for (size_t i = 0; i < sample->n_isotopes; i++) {
+    for(size_t i = 0; i < sample->n_isotopes; i++) {
         const jibal_isotope *isotope = sample->isotopes[i];
         if(type == REACTION_RBS_ALT) {
             if(sim->beam_isotope->mass <= isotope->mass) { /* alternative solution for RBS exists only if m1 > m2 */
@@ -135,8 +135,9 @@ int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_typ
             }
         }
         reaction *r_new = reaction_make(sim->beam_isotope, isotope, type, cs);
-        if (!r_new) {
-            jabs_message(MSG_ERROR, stderr, "Failed to make an %s reaction with %s cross sections for isotope %zu (%s)\n", reaction_type_to_string(type), jabs_reaction_cs_to_string(cs), i, isotope->name);
+        if(!r_new) {
+            jabs_message(MSG_ERROR, stderr, "Failed to make an %s reaction with %s cross sections for isotope %zu (%s)\n", reaction_type_to_string(type), jabs_reaction_cs_to_string(cs), i,
+                         isotope->name);
             continue;
         }
         sim_reactions_add_reaction(sim, r_new);
@@ -156,26 +157,27 @@ void sim_reactions_free(simulation *sim) {
     sim->n_reactions = 0;
 }
 
-int sim_sanity_check(const simulation *sim) { /* This does not guarantee sanity, but it guarantees insanity... Checks should be limited to obvious things. Note that sample and reactions might not be set before this is called. */
+int sim_sanity_check(
+        const simulation *sim) { /* This does not guarantee sanity, but it guarantees insanity... Checks should be limited to obvious things. Note that sample and reactions might not be set before this is called. */
     if(!sim) {
-        jabs_message(MSG_ERROR, stderr,  "No simulation.\n");
+        jabs_message(MSG_ERROR, stderr, "No simulation.\n");
         return -1;
     }
 
     if(!sim->beam_isotope) {
-        jabs_message(MSG_ERROR, stderr,  "No valid isotope given for the beam.\n");
+        jabs_message(MSG_ERROR, stderr, "No valid isotope given for the beam.\n");
         return -1;
     }
     if(sim->beam_isotope->Z == 0) {
-        jabs_message(MSG_ERROR, stderr,  "Neutron beams are not supported.\n");
+        jabs_message(MSG_ERROR, stderr, "Neutron beams are not supported.\n");
         return -1;
     }
-    if (sim->beam_E > 1000.0*C_MEV || sim->beam_E < 10*C_KEV) {
-        jabs_message(MSG_ERROR, stderr,  "Hmm...? Check your numbers. Your energy is %g J (%g MeV)!\n", sim->beam_E, sim->beam_E/C_MEV);
+    if(sim->beam_E > 1000.0 * C_MEV || sim->beam_E < 10 * C_KEV) {
+        jabs_message(MSG_ERROR, stderr, "Hmm...? Check your numbers. Your energy is %g J (%g MeV)!\n", sim->beam_E, sim->beam_E / C_MEV);
         return -1;
     }
     if(sim->fluence < 0.0) {
-        jabs_message(MSG_ERROR, stderr,  "Fluence is negative (%g).\n", sim->fluence);
+        jabs_message(MSG_ERROR, stderr, "Fluence is negative (%g).\n", sim->fluence);
         return -1;
     }
 #ifdef NO_BLOCKING
@@ -250,16 +252,16 @@ void sim_print(const simulation *sim) {
         return;
     }
     if(sim->beam_isotope) {
-        jabs_message(MSG_INFO, stderr,  "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass / C_U);
+        jabs_message(MSG_INFO, stderr, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass / C_U);
     } else {
         jabs_message(MSG_INFO, stderr, "ion = None\n");
     }
-    jabs_message(MSG_INFO, stderr, "E = %.3lf keV\n", sim->beam_E/C_KEV);
+    jabs_message(MSG_INFO, stderr, "E = %.3lf keV\n", sim->beam_E / C_KEV);
     jabs_message(MSG_INFO, stderr, "E_broad = %.3lf keV FWHM\n", sim->beam_E_broad / C_KEV);
-    jabs_message(MSG_INFO, stderr, "E_min = %.3lf keV\n", sim->emin/C_KEV);
-    jabs_message(MSG_INFO, stderr, "alpha = %.3lf deg\n", sim_alpha_angle(sim)/C_DEG);
-    jabs_message(MSG_INFO, stderr, "sample tilt (horizontal) = %.3lf deg\n", angle_tilt(sim->sample_theta, sim->sample_phi, 'x')/C_DEG);
-    jabs_message(MSG_INFO, stderr, "sample tilt (vertical) = %.3lf deg\n", angle_tilt(sim->sample_theta, sim->sample_phi, 'y')/C_DEG);
+    jabs_message(MSG_INFO, stderr, "E_min = %.3lf keV\n", sim->emin / C_KEV);
+    jabs_message(MSG_INFO, stderr, "alpha = %.3lf deg\n", sim_alpha_angle(sim) / C_DEG);
+    jabs_message(MSG_INFO, stderr, "sample tilt (horizontal) = %.3lf deg\n", angle_tilt(sim->sample_theta, sim->sample_phi, 'x') / C_DEG);
+    jabs_message(MSG_INFO, stderr, "sample tilt (vertical) = %.3lf deg\n", angle_tilt(sim->sample_theta, sim->sample_phi, 'y') / C_DEG);
     rot_vect v = rot_vect_from_angles(C_PI - sim->sample_theta, sim->sample_phi); /* By default our sample faces the beam and tilt angles are based on that choice. Pi is there for a reason. */
     jabs_message(MSG_INFO, stderr, "surf normal unit vector (beam in z direction) = (%.3lf, %.3lf, %.3lf)\n", v.x, v.y, v.z);
     char *aperture_str = aperture_to_string(sim->beam_aperture);
@@ -278,11 +280,11 @@ void sim_print(const simulation *sim) {
         } else {
             jabs_message(MSG_INFO, stderr, "  beta = %.3lf deg\n", sim_exit_angle(sim, det) / C_DEG);
         }
-        jabs_message(MSG_INFO, stderr, "  angle from horizontal = %.3lf deg\n", detector_angle(det, 'x')/C_DEG);
-        jabs_message(MSG_INFO, stderr, "  angle from vertical = %.3lf deg\n", detector_angle(det, 'y')/C_DEG);
-        jabs_message(MSG_INFO, stderr, "  solid angle (given, used) = %.4lf msr\n", i, det->solid/C_MSR);
+        jabs_message(MSG_INFO, stderr, "  angle from horizontal = %.3lf deg\n", detector_angle(det, 'x') / C_DEG);
+        jabs_message(MSG_INFO, stderr, "  angle from vertical = %.3lf deg\n", detector_angle(det, 'y') / C_DEG);
+        jabs_message(MSG_INFO, stderr, "  solid angle (given, used) = %.4lf msr\n", i, det->solid / C_MSR);
         if(det->distance > 1.0 * C_MM) {
-            jabs_message(MSG_INFO, stderr, "  solid angle (calculated, not used) = %.4lf msr\n", i, detector_solid_angle_calc(det)/C_MSR);
+            jabs_message(MSG_INFO, stderr, "  solid angle (calculated, not used) = %.4lf msr\n", i, detector_solid_angle_calc(det) / C_MSR);
             jabs_message(MSG_INFO, stderr, "  distance = %.3lf mm\n", i, det->distance / C_MM);
             rot_vect v = rot_vect_from_angles(det->theta, det->phi);
             double r = det->distance;
@@ -291,16 +293,17 @@ void sim_print(const simulation *sim) {
         jabs_message(MSG_INFO, stderr, "  particle solid angle product = %e sr\n", i, sim->fluence * det->solid);
     }
     jabs_message(MSG_INFO, stderr, "n_reactions = %zu\n", sim->n_reactions);
-    jabs_message(MSG_INFO, stderr, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence*C_E*1.0e6);
+    jabs_message(MSG_INFO, stderr, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence * C_E * 1.0e6);
     if(sim->channeling_offset != 1.0 || sim->channeling_slope != 0.0) {
         jabs_message(MSG_INFO, stderr, "substrate channeling yield correction offset = %.5lf\n", sim->channeling_offset);
-        jabs_message(MSG_INFO, stderr, "substrate channeling yield correction slope = %g / keV (%e)\n", sim->channeling_slope/(1.0/C_KEV), sim->channeling_slope);
+        jabs_message(MSG_INFO, stderr, "substrate channeling yield correction slope = %g / keV (%e)\n", sim->channeling_slope / (1.0 / C_KEV), sim->channeling_slope);
     }
 }
 
 void sim_sort_reactions(const simulation *sim) {
     qsort(sim->reactions, sim->n_reactions, sizeof(reaction *), &reaction_compare);
 }
+
 double sim_alpha_angle(const simulation *sim) { /* Returns alpha angle (no sign!) */
     double theta, phi; /* Temporary variables */
     rotate(0.0, 0.0, sim->sample_theta, sim->sample_phi, &theta, &phi); /* Sample in beam system. */
