@@ -28,22 +28,11 @@ See instructions below on how to compile JaBS from sources. Supported platforms 
 
 ## Getting started
 
-One [example](example/) showing basic use is provided, along with more complex [test-cases](example/tests/). Try running `help` and `help commands` in the interactive mode.
+One [example](example/) showing basic use is provided, along with more complex [test-cases](example/tests/). Try running `help` and `help commands` in the interactive mode. XML files in IDF format created by other programs can be imported.
 
 ## Installation from sources
 
-1. Install [JIBAL](https://github.com/JYU-IBA/jibal), preferably from sources. You'll need [GSL](https://www.gnu.org/software/gsl/) for both JIBAL and JaBS.
-2. Clone this repository, e.g.
-
-        $ git clone git@github.com:JYU-IBA/jabs.git
-
-
-3. Build, see [CMake instructions](https://cmake.org/runningcmake/), or try...
-
-        $ mkdir build
-        $ cd build
-        $ cmake ../
-        $ make
+See [instructions](INSTALL.md).
 
 ## Graphical user interface
 
@@ -97,11 +86,10 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Two-phase fitting, where faster physics model is used in the beginning and more accurate (user configurable) model is turned on after the first phase is starting to converge. User can skip the faster fitting phase.
  - Testing of areal sum (counts) and residuals. Some test cases are run by the developer to check sanity and accuracy of simulations for every new release.
  - Higher accuracy mode using adaptive integration for more accurate handling of sharp peaks in cross sections (resonances) and accurate weighting of cross sections by (Gaussian) straggling.
- - Conversion tool from IDF to JaBS script (caveats; partial support)
+ - Conversion tool from IDF to JaBS script (caveats; partial support in 0.6.7)
  - Simulation of large angle plural scattering (dual scattering model), with the assumption that first scattering is RBS (not ERD). DS in JaBS 0.6.7 and older is broken.
 
 ### Not implemented, but planned or being worked on
- - Rewrite of core simulation routine to reduce amount of ad-hoc parameters and guaranteeing numerical accuracy even outside typical usage scenarios
  - Support for more input and output data formats (CSV, ...)
  - Multiple scattering (small angle)
  - Simulation of pile-up and dead time
