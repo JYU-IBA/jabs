@@ -32,8 +32,8 @@ void sim_workspace_calculate_number_of_bricks(sim_workspace *ws) {
     size_t n_bricks = 0;
     const detector *det = ws->det;
     const simulation *sim = ws->sim;
-    if(ws->params->depthsteps_max) {
-        n_bricks = ws->params->depthsteps_max;
+    if(ws->params->n_bricks_max) {
+        n_bricks = ws->params->n_bricks_max;
     } else {
         if(det->type == DETECTOR_ENERGY) {
             if(ws->params->incident_stop_params.step == 0.0) { /* Automatic incident step size */

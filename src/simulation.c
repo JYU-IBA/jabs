@@ -78,7 +78,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->exiting_stop_params.min = EXITING_STOP_STEP_MIN_DEFAULT;
     p->exiting_stop_params.max = EXITING_STOP_STEP_MAX_DEFAULT;
     p->brick_width_sigmas = BRICK_WIDTH_SIGMAS_DEFAULT;
-    p->depthsteps_max = 0; /* automatic */
+    p->n_bricks_max = 0; /* automatic */
     p->geostragg = FALSE;
     p->beta_manual  = FALSE;
     p->ds = FALSE;
@@ -208,7 +208,7 @@ void sim_calc_params_print(const sim_calc_params *params) {
     }
     jabs_message(MSG_INFO, stderr, "stopping RK4 = %s\n", params->rk4?"true":"false");
     jabs_message(MSG_INFO, stderr, "accurate nuclear stopping = %s\n", params->nuclear_stopping_accurate?"true":"false");
-    jabs_message(MSG_INFO, stderr, "depth steps max = %zu\n", params->depthsteps_max);
+    jabs_message(MSG_INFO, stderr, "maximum number of bricks = %zu\n", params->n_bricks_max);
     jabs_message(MSG_INFO, stderr, "geometric broadening = %s\n", params->geostragg?"true":"false");
     jabs_message(MSG_INFO, stderr, "brick width = %g times detector and straggling sum sigma\n", params->brick_width_sigmas);
     jabs_message(MSG_INFO, stderr, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");

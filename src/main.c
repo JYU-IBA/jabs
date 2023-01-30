@@ -91,7 +91,7 @@ int main(int argc, char * const *argv) {
     sim_calc_params_ds(sim->params, cmd_opt->ds);
     sim->params->incident_stop_params.step = cmd_opt->incident_stop_step;
     sim->params->exiting_stop_params.step = cmd_opt->exiting_stop_step;
-    sim->params->depthsteps_max = cmd_opt->depthsteps_max;
+    sim->params->n_bricks_max = cmd_opt->depthsteps_max;
     sim->rbs = cmd_opt->rbs;
     sim->erd = cmd_opt->erd;
     sim_calc_params_update(sim->params);
