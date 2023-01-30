@@ -285,32 +285,24 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
             last = TRUE;
         }
         d_after = des_table_find_depth(dt, &i_des, d_before, &ion1); /* Does this handle E below min? */
-        if(i_brick == 0 || d_after.i > d_before.i) { /* There was a layer (depth range) crossing. If step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
-#ifndef NO_SKIP_EMPTY_RANGES
-            double conc_start = *sample_conc_bin(sample, d_after.i, sim_r->i_isotope);
-            double conc_stop = *sample_conc_bin(sample, d_after.i + 1, sim_r->i_isotope);
+        if(i_brick == 0 || d_after.i != d_before.i) { /* There was a layer (depth range) crossing. If step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
+            if(ws->params->bricks_skip_zero_conc_ranges) {
+                double conc_start = *sample_conc_bin(sample, d_after.i, sim_r->i_isotope);
+                double conc_stop = *sample_conc_bin(sample, d_after.i + 1, sim_r->i_isotope);
 #ifdef DEBUG_VERBOSE
-            fprintf(stderr, "Brick %zu crosses into range %zu, d_before = %g tfu.\n", i_brick, d_after.i, d_before.x / C_TFU);
-            fprintf(stderr, "Concentration varies between %g%% and %g%%\n", conc_start * 100.0, conc_stop * 100.0);
+                fprintf(stderr, "Brick %zu crosses into range %zu, d_before = %g tfu.\n", i_brick, d_after.i, d_before.x / C_TFU);
+                fprintf(stderr, "Concentration varies between %g%% and %g%%\n", conc_start * 100.0, conc_stop * 100.0);
 #endif
-            if(conc_start < CONC_TOLERANCE && conc_stop < CONC_TOLERANCE) { /* This isotope concentration is zero in this layer, skip to next one */
-                size_t i_des_skip = dt->depth_interval_index[d_after.i + 1];
-                des *des_skip = &(dt->t[i_des_skip]);
-                ion1.E = des_skip->E; /* TODO: long skips may make E_deriv calculation below inaccurate */
-                ion1.S = des_skip->S;
-                d_after = des_skip->d;
-                skipped = TRUE;
-#ifdef DEBUG_VERBOSE
-                fprintf(stderr, "Skipped to %g.\n", d_after.x / C_TFU);
+                if(conc_start < CONC_TOLERANCE && conc_stop < CONC_TOLERANCE) { /* This isotope concentration is zero in this layer, skip to next one */
+                    d_after = des_next_range(dt, &ion1, d_after);
+                    skipped = TRUE;
+#ifdef DEBUG
+                    fprintf(stderr, "Skipped to %g.\n", d_after.x / C_TFU);
 #endif
+                }
             }
-#endif // NO_SKIP_EMPTY_RANGES
             d_before.i = d_after.i;
             crossed = TRUE;
-        } else if(d_after.i < d_before.i){ /* Skipping towards surface? */
-#if 0
-            fprintf(stderr, "This shouldn't happen. But it did. E = %g keV\n", ion1.E / C_KEV);
-#endif
         }
         assert(ion1.S >= 0.0);
         b->d = d_after;

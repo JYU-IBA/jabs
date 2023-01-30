@@ -53,6 +53,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->cs_stragg_step_sigmas = CS_STRAGG_STEP_FUDGE_FACTOR_DEFAULT;
     p->ds_incident_stop_step_factor = DUAL_SCATTER_INCIDENT_STOP_STEP_FACTOR_DEFAULT;
     p->reaction_file_angle_tolerance = REACTION_FILE_ANGLE_TOLERANCE_DEFAULT;
+    p->bricks_skip_zero_conc_ranges = FALSE;
 #ifdef DEBUG
     fprintf(stderr, "New calc params created.\n");
 #endif
@@ -73,6 +74,7 @@ sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
     p->exiting_stop_params.min *= 1.5;
     p->exiting_stop_params.sigmas *= 1.5;
     p->exiting_stop_params.max *= 1.5;
+    p->bricks_skip_zero_conc_ranges = TRUE;
     return p;
 }
 
@@ -97,6 +99,7 @@ sim_calc_params *sim_calc_params_defaults_brisk(sim_calc_params *p) {
     p->cs_energy_step_max *= 1.5;
     p->cs_depth_step_max *= 1.5;
     p->cs_stragg_step_sigmas = 1.25;
+    p->bricks_skip_zero_conc_ranges = TRUE;
     return p;
 }
 

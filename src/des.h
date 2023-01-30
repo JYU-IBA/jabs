@@ -42,4 +42,5 @@ void des_table_print(FILE *f, const des_table *dt);
 depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev, ion *incident); /* Returns depth at given incident->E, or the next layer boundary, starting search from i_des in DES table. Updates i_des, incident->E and ->S. */
 inline const des *des_table_min_energy_bin(const des_table *dt) {return &(dt->t[dt->n - 1]);}
 void des_set_ion(const des *des, ion *ion);
+depth des_next_range(const des_table *dt, ion *incident, depth d); /* Returns the next depth of next range (w.r.t. ion direction of travel, deeper or closer to surface) and sets ion energy and straggling */
 #endif // JABS_DES_H

@@ -110,7 +110,11 @@ int script_prepare_sim_or_fit(script_session *s) {
 int script_finish_sim_or_fit(script_session *s) {
     s->end = clock();
     double cputime_total = (((double) (s->end - s->start)) / CLOCKS_PER_SEC);
-    jabs_message(MSG_INFO, stderr, "\n...finished! Total CPU time: %.3lf s.\n", cputime_total);
+    if(cputime_total > 1.0) {
+        jabs_message(MSG_INFO, stderr, "\n...finished! Total CPU time: %.3lf s.\n", cputime_total);
+    } else {
+        jabs_message(MSG_INFO, stderr, "\n...finished! Total CPU time: %.3lf ms.\n", cputime_total * 1000.0);
+    }
 #ifdef CLEAR_GSTO_ASSIGNMENTS_WHEN_FINISHED
     jibal_gsto_assign_clear_all(s->fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
 #endif
@@ -1268,6 +1272,8 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT,   "cs_energy_step_max",          &sim->params->cs_energy_step_max,          NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "cs_depth_step_max",           &sim->params->cs_depth_step_max,           NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "cs_stragg_step_sigmas",       &sim->params->cs_stragg_step_sigmas,       NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "reaction_file_angle_tolerance", &sim->params->reaction_file_angle_tolerance, NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "bricks_skip_zero_conc_ranges",  &sim->params->bricks_skip_zero_conc_ranges,  NULL},
             {JIBAL_CONFIG_VAR_NONE,   NULL,                          NULL,                                      NULL}
     };
     c = script_command_list_from_vars_array(vars, 0);

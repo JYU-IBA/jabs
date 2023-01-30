@@ -270,3 +270,22 @@ void des_set_ion(const des *des, ion *ion) {
     ion->E = des->E;
     ion->S = des->S;
 }
+
+depth des_next_range(const des_table *dt, ion *incident, depth d) {
+    assert(d.i < dt->n);
+    size_t i_range_next;
+    if(incident->inverse_cosine_theta > 0.0) { /* Going deeper */
+        i_range_next = d.i + 1;
+    } else {
+        if(d.i == 0) {
+            i_range_next = 0;
+        } else {
+            i_range_next = d.i - 1;
+        }
+    }
+    size_t i_des_skip = dt->depth_interval_index[i_range_next];
+    des *des_skip = &(dt->t[i_des_skip]);
+    incident->E = des_skip->E; /* TODO: long skips may make E_deriv calculation inaccurate */
+    incident->S = des_skip->S;
+    return des_skip->d;
+}
