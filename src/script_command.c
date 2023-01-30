@@ -1286,6 +1286,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command *c_show = script_command_new("show", "Show information on things.", 0, NULL);
     script_command_list_add_command(&head, c_show);
     script_command_list_add_command(&c_show->subcommands, script_command_new("aperture", "Show aperture.", 0, &script_show_aperture));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("calc_params", "Show calculation parameters.", 0, &script_show_calc_params));
     script_command_list_add_command(&c_show->subcommands, script_command_new("detector", "Show detector.", 0, &script_show_detector));
 
     script_command *c_fit = script_command_new("fit", "Show fit results.", 0, &script_show_fit);
@@ -1762,6 +1763,13 @@ script_command_status script_show_aperture(struct script_session *s, int argc, c
     char *aperture_str = aperture_to_string(fit->sim->beam_aperture);
     jabs_message(MSG_INFO, stderr, "aperture %s\n", aperture_str);
     free(aperture_str);
+    return argc_orig - argc;
+}
+
+script_command_status script_show_calc_params(script_session *s, int argc, char * const *argv) {
+    (void) argv;
+    const int argc_orig = argc;
+    sim_calc_params_print(s->fit->sim->params);
     return argc_orig - argc;
 }
 

@@ -259,7 +259,7 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
 void simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
     ion ion1 = *incident; /* Shallow copy */
     //des_table_set_ion_depth(dt, &ion1, depth_start); /* TODO: is this necessary? */
-    simulate_init_reaction(sim_r, sample, g, ws->emin, ion1.E);
+    simulate_init_reaction(sim_r, sample, ws->params, g, ws->emin, ion1.E);
     if(sim_r->stop) {
         sim_r->last_brick = 0;
         return;
@@ -473,7 +473,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     return EXIT_SUCCESS;
 }
 
-void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const geostragg_vars *g, double E_min, double E_max) {
+void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim_calc_params *params, const geostragg_vars *g, double E_min, double E_max) {
     if(!sim_r) {
         fprintf(stderr, "Simulation reaction is NULL\n");
         return;
@@ -481,7 +481,7 @@ void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const geo
     sim_r->last_brick = 0;
     sim_r->stop = FALSE;
     ion_set_angle(&sim_r->p, g->theta_product, g->phi_product);
-    sim_reaction_recalculate_internal_variables(sim_r, g->scatter_theta, E_min, E_max);
+    sim_reaction_recalculate_internal_variables(sim_r, params, g->scatter_theta, E_min, E_max);
     if(sim_r->stop) {
         sim_r->max_depth = 0.0;
         return;

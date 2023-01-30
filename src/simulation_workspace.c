@@ -157,7 +157,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
     size_t n_max = CHANNELS_ABSOLUTE_MIN; /* Always simulate at least CHANNELS_ABSOLUTE_MIN channels */
     for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
         const reaction *r = sim->reactions[i_reaction];
-        if(!reaction_is_possible(r, ws->det->theta)) {
+        if(!reaction_is_possible(r, ws->params, ws->det->theta)) {
 #ifdef DEBUG
             fprintf(stderr, "Reaction %zu (target %s, type %s) is not possible when theta = %g deg. Skipping. \n", i_reaction + 1, r->target->name,
                     reaction_type_to_string(r->type), ws->det->theta / C_DEG);

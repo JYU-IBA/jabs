@@ -195,14 +195,14 @@ void reaction_free(reaction *r) {
 }
 
 
-int reaction_is_possible(const reaction *r, double theta) {
+int reaction_is_possible(const reaction *r, const sim_calc_params *p, double theta) {
     reaction_type type = r->type;
     const jibal_isotope *incident = r->incident;
     const jibal_isotope *target = r->target;
     if(type == REACTION_RBS || type == REACTION_RBS_ALT) {
         if(incident->mass >= target->mass && theta > asin(target->mass / incident->mass)) {
 #ifdef DEBUG
-            fprintf(stderr, "RBS with %s is not possible (theta %g deg > %g deg)\n", target->name, r->theta/C_DEG, asin(target->mass / incident->mass)/C_DEG);
+            fprintf(stderr, "RBS with %s is not possible (theta %g deg > %g deg)\n", target->name, theta/C_DEG, asin(target->mass / incident->mass)/C_DEG);
 #endif
             return FALSE;
         }
@@ -218,8 +218,14 @@ int reaction_is_possible(const reaction *r, double theta) {
         if(theta >= C_PI / 2.0) {
             return FALSE;
         }
+    } else if(type == REACTION_FILE) {
+            return reaction_theta_within_tolerance(r, p, theta);
     }
     return TRUE;
+}
+
+int reaction_theta_within_tolerance(const reaction *r, const sim_calc_params *p, double theta) {
+    return (fabs(theta - r->theta) <= p->reaction_file_angle_tolerance);
 }
 
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile) {

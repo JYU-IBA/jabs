@@ -41,7 +41,7 @@ typedef struct sim_reaction {
 
 sim_reaction *sim_reaction_init(const ion *incident_ion, const jibal_isotope *isotopes, const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks);
 void sim_reaction_free(sim_reaction *sim_r);
-void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double theta, double E_min, double E_max);
+void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_calc_params *params, double theta, double E_min, double E_max);
 void sim_reaction_reset_bricks(sim_reaction *sim_r);
 void sim_reaction_set_cross_section_by_type(sim_reaction *sim_r);
 double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);

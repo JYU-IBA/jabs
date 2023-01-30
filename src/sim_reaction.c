@@ -1,8 +1,21 @@
+/*
+
+    Jaakko's Backscattering Simulator (JaBS)
+    Copyright (C) 2021 - 2023 Jaakko Julin
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    See LICENSE.txt for the full license.
+
+ */
+
 #include <string.h>
 #include <assert.h>
 #include "spectrum.h"
 #include "sim_reaction.h"
-
 
 sim_reaction *sim_reaction_init(const ion *incident_ion, const jibal_isotope *isotopes, const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks) {
     if(!r) {
@@ -55,7 +68,7 @@ void sim_reaction_free(sim_reaction *sim_r) {
     free(sim_r);
 }
 
-void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double theta, double E_min, double E_max) {
+void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_calc_params *params, double theta, double E_min, double E_max) {
     /* Calculate variables for Rutherford (and Andersen) cross sections. This is done for all reactions, even if they are not RBS or ERD reactions! */
     (void) E_min; /* Energy range could be used to set something (in the future) */
     (void) E_max;
@@ -75,7 +88,7 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, double the
     sim_r->theta_cm = 0.0; /* Will be recalculated, if possible */
     reaction_type type = sim_r->r->type;
 
-    if(!reaction_is_possible(sim_r->r, theta)) {
+    if(!reaction_is_possible(sim_r->r, params, theta)) {
         sim_r->stop = TRUE;
 #ifdef DEBUG
         fprintf(stderr, "Reaction not possible, returning.\n");
@@ -169,16 +182,6 @@ double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E)
     if(E < t[lo].E || E > t[hi].E) {
 #ifdef REACTIONS_FALL_BACK
         return sim_reaction_cross_section_rutherford(sim_r, E); /* Fall back quietly to analytical formulae outside tabulated values */
-#else
-        return 0.0;
-#endif
-    }
-    if(fabs(sim_r->theta - sim_r->r->theta) > 0.01 * C_DEG) {
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Reaction theta %g deg different from one in the file: %g deg\n", sim_r->theta/C_DEG, sim_r->r->theta/C_DEG);
-#endif
-#ifdef REACTIONS_FALL_BACK
-        return sim_reaction_cross_section_rutherford(sim_r, E);
 #else
         return 0.0;
 #endif

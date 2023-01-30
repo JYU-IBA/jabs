@@ -63,7 +63,7 @@ set(PROJECT_SOURCES
         ../src/spectrum.c
         ../src/fit.c
         ../src/rotate.c
-         ../src/jabs.c
+        ../src/jabs.c
         ../src/generic.c
         ../src/detector.c
         ../src/roughness.c
@@ -89,6 +89,7 @@ set(PROJECT_SOURCES
         ../src/des.c
         ../src/simulation_workspace.c
         ../src/sim_reaction.c
+        ../src/sim_calc_params.c
         "$<$<BOOL:${PLUGINS}>:plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui
