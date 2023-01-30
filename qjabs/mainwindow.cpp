@@ -67,6 +67,8 @@ MainWindow::MainWindow(QWidget *parent)
         enableRun(false);
         ui->action_Plot->setEnabled(false);
     }
+    connect(ui->widget, &SpectrumPlot::rangeSelected, this, &MainWindow::runRoi);
+
     ui->msgTextBrowser->append("\n");
     ui->msgTextBrowser->ensureCursorVisible();
     ui->editor->blockSignals(true); /* extremely dirty hack:
@@ -117,6 +119,11 @@ void MainWindow::openFile(const QString &filename)
         resetAll();
         plotSession();  /* Will hide plot etc. */
     }
+}
+
+void MainWindow::runRoi(const QString &roi) {
+    qDebug() << "Got ROI" << roi;
+    runLine(QString("roi %1 %2").arg(ui->plotSpinBox->value()).arg(roi));
 }
 
 void MainWindow::plotDialogClosed()
@@ -390,7 +397,7 @@ void MainWindow::plotSpectrum(size_t i_det)
     }
     if(i_det >= session->fit->sim->n_det)
         return;
-    gsl_histogram *sim_histo = fit_data_sim(session->fit, i_det);
+    gsl_histogram *sim_histo = fit_data_histo_sum(session->fit, i_det);
     gsl_histogram *exp_histo = fit_data_exp(session->fit, i_det);
     sim_workspace *ws = fit_data_ws(session->fit, i_det);
     if(exp_histo) {

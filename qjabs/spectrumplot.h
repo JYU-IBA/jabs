@@ -36,6 +36,9 @@ public:
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
 
+signals:
+    void rangeSelected(QString);
+
 public slots:
     void setLogScale(bool value);
     void setAutoRange(bool value);

@@ -136,6 +136,10 @@ bool SpectrumPlot::eventFilter(QObject *obj, QEvent *event)
             setZoom(!zoom);
             return true;
         }
+        if(ke->key() == Qt::Key_R) {
+            startSelection();
+            return true;
+        }
         return false;
     } else {
         return QCustomPlot::eventFilter(obj, event);
@@ -464,6 +468,7 @@ void SpectrumPlot::selectionAccepted(const QRect &rect, QMouseEvent *event)
         if(selectRect) {
             setSelectRect(false);
         }
+        emit rangeSelected(rangeText);
     }
 }
 

@@ -38,11 +38,11 @@ public:
 
 public slots:
     void openFile(const QString &filename);
+    void runRoi(const QString &roi);
 
 private slots:
     void on_actionPreferences_triggered();
 
-private slots:
     void plotDialogClosed();
 
     void readSettings(); /* does not include plot settings, see readPlotSettings() */

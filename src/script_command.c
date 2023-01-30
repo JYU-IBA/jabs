@@ -182,7 +182,7 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
             return SCRIPT_COMMAND_FAILURE;
         }
     }
-    //fit_data_histo_sum_store(fit);
+    fit_data_histo_sum_store(fit);
     script_finish_sim_or_fit(s);
     return argc_orig - argc;
 }
@@ -2112,7 +2112,7 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
     }
     double sum_ref = strtod(argv[1], NULL);
     double tolerance = strtod(argv[2], NULL);
-    gsl_histogram *h = exp ? fit_data_exp(fit, i_det) : fit_data_sim(fit, i_det);
+    gsl_histogram *h = exp ? fit_data_exp(fit, i_det) : fit_data_histo_sum(fit, i_det);
     if(!h) {
         jabs_message(MSG_ERROR, stderr, "No histogram.\n");
         return SCRIPT_COMMAND_FAILURE;
