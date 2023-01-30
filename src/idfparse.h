@@ -78,7 +78,7 @@ typedef struct idf_parser {
 
 xmlNode *idf_findnode_deeper(xmlNode *root, const char *path, const char **path_next); /* Called by idf_findnode(), goes one step deeper in path */
 xmlNode *idf_findnode(xmlNode *root, const char *path); /* Finds the first node with given path. Path should look "like/this/thing" */
-idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_error (*f)(idf_parser *idf, xmlNode *node)); /* Runs f(parser,child_node) for each child element of node element name "name" */
+size_t idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_error (*f)(idf_parser *idf, xmlNode *node)); /* Runs f(parser,child_node) for each child element of node element name "name" */
 char *idf_node_content_to_str(const xmlNode *node); /* will always return a char * which should be freed by free() */
 const xmlChar *idf_xmlstr(const char *s);
 double idf_node_content_to_double(const xmlNode *node); /* performs unit conversion */

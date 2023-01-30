@@ -73,12 +73,12 @@ xmlNode *idf_findnode(xmlNode *root, const char *path) {
     return node;
 }
 
-idf_error idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_error (*f)(idf_parser *idf, xmlNode *node)) {
+size_t idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_error (*f)(idf_parser *idf, xmlNode *node)) {
     if(!node) {
         return IDF2JBS_FAILURE;
     }
     xmlNode *cur = NULL;
-    int n = 0;
+    size_t n = 0;
     for (cur = node->children; cur; cur = cur->next) {
         if(cur->type == XML_ELEMENT_NODE) {
             if(idf_stringeq(cur->name, name)) {

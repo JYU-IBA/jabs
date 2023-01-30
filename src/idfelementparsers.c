@@ -33,7 +33,8 @@ idf_error idf_parse_note(idf_parser *idf, xmlNode *note) {
     free(s);
     return IDF2JBS_SUCCESS;
 }
-int idf_parse_sample(idf_parser *idf, xmlNode *sample) {
+
+idf_error idf_parse_sample(idf_parser *idf, xmlNode *sample) {
     idf->i_sample++; /* Numbering from 1 .. idf->n_samples inclusive */
     free(idf->sample_basename);
     if(idf->n_samples == 1) {
@@ -60,7 +61,7 @@ int idf_parse_sample(idf_parser *idf, xmlNode *sample) {
     return IDF2JBS_SUCCESS;
 }
 
-int idf_parse_layerelement(idf_parser *idf, xmlNode *element) {
+idf_error idf_parse_layerelement(idf_parser *idf, xmlNode *element) {
     if(!element) {
         return IDF2JBS_FAILURE;
     }
@@ -83,7 +84,7 @@ int idf_parse_layerelements(idf_parser *idf, xmlNode *elements) {
     return idf_foreach(idf, elements, "layerelement", idf_parse_layerelement);
 }
 
-int idf_parse_layer(idf_parser *idf, xmlNode *layer) {
+idf_error idf_parse_layer(idf_parser *idf, xmlNode *layer) {
     if(idf_parse_layerelements(idf, idf_findnode(layer, "layerelements")) == IDF2JBS_FAILURE) {
         return IDF2JBS_FAILURE;
     }
@@ -92,7 +93,7 @@ int idf_parse_layer(idf_parser *idf, xmlNode *layer) {
 }
 
 
-int idf_parse_energycalibrations(idf_parser *idf, xmlNode *energycalibrations) {
+idf_error idf_parse_energycalibrations(idf_parser *idf, xmlNode *energycalibrations) {
     xmlNode *energycalibration = idf_findnode(energycalibrations, "energycalibration");
     if(!energycalibration) {
         fprintf(stderr, "No energy calibration in energycalibrations.\n");
@@ -142,7 +143,7 @@ int idf_parse_energycalibrations(idf_parser *idf, xmlNode *energycalibrations) {
     return IDF2JBS_SUCCESS;
 }
 
-int idf_parse_simple_data(idf_parser *idf, xmlNode *simple_data) {
+idf_error idf_parse_simple_data(idf_parser *idf, xmlNode *simple_data) {
     if(!simple_data) {
         return IDF2JBS_FAILURE;
     }
@@ -157,7 +158,7 @@ int idf_parse_simple_data(idf_parser *idf, xmlNode *simple_data) {
 }
 
 
-int idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum) {
+idf_error idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum) {
     idf->i_spectrum++;
 #ifdef DEBUG
     fprintf(stderr, "parse spectrum called, i_spectrum = %zu.\n", idf->i_spectrum);
@@ -239,20 +240,20 @@ int idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum) {
     return IDF2JBS_SUCCESS;
 }
 
-int idf_parse_spectra(idf_parser *idf, xmlNode *spectra) {
+idf_error idf_parse_spectra(idf_parser *idf, xmlNode *spectra) {
     idf->i_spectrum = 0;
     idf->n_spectra = idf_foreach(idf, spectra, "spectrum", NULL);
     return idf_foreach(idf, spectra, "spectrum", idf_parse_spectrum);
 }
 
-int idf_parse_layers(idf_parser *idf, xmlNode *layers) {
+idf_error idf_parse_layers(idf_parser *idf, xmlNode *layers) {
     idf_output_printf(idf, "set sample");
     idf_foreach(idf, layers, "layer", idf_parse_layer);
     idf_output_printf(idf, "\n");
     return IDF2JBS_SUCCESS;
 }
 
-int idf_parse_detector(idf_parser *idf, xmlNode *detector) {
+idf_error idf_parse_detector(idf_parser *idf, xmlNode *detector) {
     if(!detector) {
         return IDF2JBS_FAILURE;
     }
