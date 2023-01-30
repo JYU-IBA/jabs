@@ -14,6 +14,7 @@
 #include <string.h>
 #include <assert.h>
 #include "defaults.h"
+#include "generic.h"
 #include "message.h"
 #include "simulation_workspace.h"
 #include "spectrum.h"
@@ -229,4 +230,89 @@ void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
 #endif
         gsl_histogram_scale(r->histo, scale);
     }
+}
+
+
+int sim_workspace_print_spectra(const sim_workspace *ws, const char *filename, const gsl_histogram *histo_iter, const gsl_histogram *exp) {
+    char sep = ' ';
+    if(!ws) {
+        return EXIT_FAILURE;
+    }
+    const gsl_histogram *h;
+    if(histo_iter) {
+        h = histo_iter;
+    } else {
+#ifdef DEBUG
+        fprintf(stderr, "No stored sum spectrum in fit_data, falling back to sum spectrum in workspace.\n");
+#endif
+        h = ws->histo_sum;
+    }
+    if(!h) {
+        return EXIT_FAILURE;
+    }
+    FILE *f = fopen_file_or_stream(filename, "w");
+    if(!f) {
+        return EXIT_FAILURE;
+    }
+    if(filename) {
+        size_t l = strlen(filename);
+        if(l > 4 && strncmp(filename + l - 4, ".csv", 4) == 0) { /* For CSV: print header line */
+            sep = ','; /* and set the separator! */
+            fprintf(f, "\"Channel\",\"Energy (keV)\",\"Simulated\"");
+            if(exp) {
+                fprintf(f, ",\"Experimental\"");
+            }
+            for(size_t j = 0; j < ws->n_reactions; j++) {
+                const reaction *r = ws->reactions[j]->r;
+                fprintf(f, ",\"%s (%s)\"", r->target->name, reaction_name(r));
+            }
+            fprintf(f, "\n");
+        }
+    }
+    for(size_t i = 0; i < ws->n_channels; i++) {
+        fprintf(f, "%zu%c%.3lf%c", i, sep, detector_calibrated(ws->det, JIBAL_ANY_Z, i) / C_KEV,
+                sep); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
+        if(i >= h->n || h->bin[i] == 0.0) {
+            fprintf(f, "0"); /* Tidier output with a clean zero sum */
+        } else {
+            fprintf(f, "%e", h->bin[i]);
+        }
+        if(exp) {
+            if(i < exp->n) {
+                fprintf(f, "%c%g", sep, exp->bin[i]);
+            } else {
+                fprintf(f, "%c0", sep);
+            }
+        }
+        for(size_t j = 0; j < ws->n_reactions; j++) {
+            gsl_histogram *rh = ws->reactions[j]->histo; /* TODO: these don't correspond to stored sum spectrum in fit (but they should be very close!). */
+            if(i >= rh->n || rh->bin[i] == 0.0) {
+                fprintf(f, "%c0", sep);
+            } else {
+                fprintf(f, "%c%e", sep, rh->bin[i]);
+            }
+        }
+        fprintf(f, "\n");
+    }
+    fclose_file_or_stream(f);
+    return EXIT_SUCCESS;
+}
+
+int sim_workspace_print_bricks(const sim_workspace *ws, const char *filename) {
+    double psr = ws->fluence * ws->det->solid;
+    FILE *f = fopen_file_or_stream(filename, "w");
+    if(!f) {
+        return EXIT_FAILURE;
+    }
+    for(size_t i = 0; i < ws->n_reactions; i++) {
+        fprintf(f, "#Reaction %zu\n", i + 1);
+        const sim_reaction *r = ws->reactions[i];
+        if(r->last_brick == 0) {
+            continue;
+        }
+        sim_reaction_print_bricks(f, r, psr);
+        fprintf(f, "\n\n");
+    }
+    fclose_file_or_stream(f);
+    return EXIT_SUCCESS;
 }

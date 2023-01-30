@@ -21,11 +21,12 @@
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_blas.h>
 
-#include "fit.h"
-#include "jabs.h"
 #include "defaults.h"
+#include "generic.h"
+#include "jabs.h"
 #include "spectrum.h"
 #include "message.h"
+#include "fit.h"
 
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     clock_t start, end;
@@ -318,6 +319,84 @@ gsl_histogram *fit_data_sim(const struct fit_data *fit_data, size_t i_det) {
         return NULL;
 }
 
+
+fit_params *fit_params_all(fit_data *fit) {
+    simulation *sim = fit->sim;
+    sample_model *sm = fit->sm;
+    if(!sim)
+        return NULL;
+    size_t param_name_max_len = 256; /* Laziness. We use a fixed size temporary string. snprintf is used, so no overflows should occur, but very long names may be truncated. */
+    char *param_name = malloc(sizeof(char) * param_name_max_len);
+    fit_params *params = fit_params_new();
+    fit_params_add_parameter(params, &sim->fluence, "fluence", "", 1.0); /* This must be the first parameter always, as there is a speedup in the fit routine */
+    fit_params_add_parameter(params, &sim->channeling_offset, "channeling", "", 1.0);
+    fit_params_add_parameter(params, &sim->channeling_slope, "channeling_slope", "1/keV", 1.0 / C_KEV);
+    fit_params_add_parameter(params, &sim->sample_theta, "alpha", "deg", C_DEG);
+    fit_params_add_parameter(params, &sim->beam_E, "energy", "keV", C_KEV);
+    for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
+        detector *det = sim_det(sim, i_det);
+        char *det_name = NULL;
+        if(asprintf(&det_name, "det%zu_", i_det + 1) < 0) {
+            return NULL;
+        }
+        snprintf(param_name, param_name_max_len, "%ssolid", det_name);
+        fit_params_add_parameter(params, &det->solid, param_name, "msr", C_MSR);
+
+        for(int Z = JIBAL_ANY_Z; Z <= det->cal_Z_max; Z++) {
+            calibration *c = detector_get_calibration(det, Z);
+            if(Z != JIBAL_ANY_Z && c == det->calibration) /* No Z-specific calibration */
+                continue;
+            assert(c);
+            size_t n = calibration_get_number_of_params(c);
+            for(int i = CALIBRATION_PARAM_RESOLUTION; i < (int) n; i++) {
+                char *calib_param_name = calibration_param_name(c->type, i);
+                snprintf(param_name, param_name_max_len, "%scalib%s%s_%s",
+                         det_name,
+                         (Z == JIBAL_ANY_Z) ? "" : "_",
+                         (Z == JIBAL_ANY_Z) ? "" : jibal_element_name(fit->jibal->elements, Z),
+                         calib_param_name);
+                free(calib_param_name);
+                fit_params_add_parameter(params, calibration_get_param_ref(c, i), param_name, "keV", C_KEV);
+            }
+        }
+        free(det_name);
+    }
+    if(sm) {
+        for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
+            sample_range *r = &(sm->ranges[i_range]);
+            size_t range_index = i_range + 1; /* Human readable indexing */
+            if(r->x > 0.0) {
+                snprintf(param_name, param_name_max_len, "thick%zu", range_index);
+                fit_params_add_parameter(params, &(r->x), param_name, "tfu", C_TFU);
+            }
+            if(r->yield != 1.0) {
+                snprintf(param_name, param_name_max_len, "yield%zu", range_index);
+                fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0);
+            }
+            if(r->bragg != 1.0) {
+                snprintf(param_name, param_name_max_len, "bragg%zu", range_index);
+                fit_params_add_parameter(params, &(r->bragg), param_name, "", 1.0);
+            }
+            if(r->stragg != 1.0) {
+                snprintf(param_name, param_name_max_len, "stragg%zu", range_index);
+                fit_params_add_parameter(params, &(r->stragg), param_name, "", 1.0);
+            }
+            if(r->rough.model != ROUGHNESS_NONE && r->rough.x > 0.0) {
+                snprintf(param_name, param_name_max_len, "rough%zu", range_index);
+                fit_params_add_parameter(params, &(r->rough.x), param_name, "tfu", C_TFU);
+            }
+            for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+                if(*sample_model_conc_bin(sm, i_range, i_mat) < CONC_TOLERANCE) /* Don't add fit variables for negative, zero or very low concentrations. */
+                    continue;
+                snprintf(param_name, param_name_max_len, "conc%zu_%s", range_index, sm->materials[i_mat]->name);
+                fit_params_add_parameter(params, sample_model_conc_bin(sm, i_range, i_mat), param_name, "%", C_PERCENT);
+            }
+        }
+    }
+    free(param_name);
+    return params;
+}
+
 void fit_data_exp_free(struct fit_data *fit_data) {
     if(!fit_data->exp)
         return;
@@ -365,6 +444,14 @@ void fit_data_histo_sum_store(struct fit_data *fit_data) {
         fit_data->histo_sum_iter[i_det] = gsl_histogram_clone(ws->histo_sum);
     }
     fit_data->n_histo_sum = fit_data->n_ws;
+}
+
+gsl_histogram *fit_data_histo_sum(const struct fit_data *fit_data, size_t i_det) {
+    if(!fit_data || !fit_data->histo_sum_iter)
+        return NULL;
+    if(i_det >= fit_data->n_histo_sum)
+        return NULL;
+    return fit_data->histo_sum_iter[i_det];
 }
 
 int fit_data_add_det(struct fit_data *fit_data, detector *det) {

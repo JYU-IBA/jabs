@@ -223,3 +223,23 @@ void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *inci
     fprintf(stderr, "deriv %g, E_out/E %g, E_out = %g keV, E = %g keV\n", deriv, r->p.E / incident->E, r->p.E/C_KEV, incident->E/C_KEV);
 #endif
 }
+
+void sim_reaction_print_bricks(FILE *f, const sim_reaction *r, double psr) {
+    fprintf(f, "#Reaction %s %s\n", reaction_name(r->r), r->r->target->name);
+    if(r->r->filename) {
+        fprintf(f, "#Filename: %s\n", r->r->filename);
+    }
+    fprintf(f, "#brick    depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo)    S(sum) sigma*conc              Q  dE(det)/dE_0\n");
+    for(size_t j = 0; j <= r->last_brick; j++) {
+        brick *b = &r->bricks[j];
+        fprintf(f, "%4zu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %10.3lf %14.6e %8.3lf\n",
+                j, b->d.x / C_TFU, b->thick / C_TFU,
+                b->E_0 / C_KEV, C_FWHM * sqrt(b->S_0) / C_KEV,
+                b->E_r / C_KEV, C_FWHM * sqrt(b->S_r) / C_KEV,
+                b->E / C_KEV, C_FWHM * sqrt(b->S) / C_KEV,
+                C_FWHM * sqrt(b->S_geo_x + b->S_geo_y) / C_KEV, C_FWHM * b->S_sum / C_KEV,
+                b->sc / C_MB_SR, b->Q * psr,
+                b->deriv
+        );
+    }
+}

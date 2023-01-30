@@ -50,6 +50,7 @@ int script_prepare_sim_or_fit(script_session *s) {
         jabs_message(MSG_ERROR, stderr, "Simulation failed sanity check.\n");
         return -1;
     }
+    fit_data_histo_sum_free(fit);
     fit_data_workspaces_free(s->fit);
     sample_free(fit->sim->sample);
 #ifdef DEBUG
@@ -121,7 +122,7 @@ int script_finish_sim_or_fit(script_session *s) {
         sim_workspace *ws = fit_data_ws(fit, i_det);
         if(ws) {
             if(s->output_filename) {
-                if(print_spectra(s->output_filename, ws, fit_data_exp(fit, i_det))) {
+                if(sim_workspace_print_spectra(ws, s->output_filename, fit_data_histo_sum(fit, i_det), fit_data_exp(fit, i_det))) {
                     jabs_message(MSG_ERROR, stderr, "Could not save spectra of detector %zu to file \"%s\"\n", i_det,
                                  s->output_filename);
                     return EXIT_FAILURE;
@@ -177,6 +178,7 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
             return SCRIPT_COMMAND_FAILURE;
         }
     }
+    //fit_data_histo_sum_store(fit);
     script_finish_sim_or_fit(s);
     return argc_orig - argc;
 }
@@ -264,7 +266,7 @@ script_command_status script_save_bricks(script_session *s, int argc, char *cons
         jabs_message(MSG_ERROR, stderr, "Usage: save bricks [detector] file\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(print_bricks(argv[0], fit_data_ws(fit, i_det))) {
+    if(sim_workspace_print_bricks(fit_data_ws(fit, i_det), argv[0])) {
         jabs_message(MSG_ERROR, stderr,
                      "Could not save bricks of detector %zu to file \"%s\"! There should be %zu detector(s).\n",
                      i_det + 1, argv[0], fit->sim->n_det);
@@ -287,7 +289,7 @@ script_command_status script_save_spectra(script_session *s, int argc, char *con
         jabs_message(MSG_ERROR, stderr, "Not enough arguments for save spectra.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(print_spectra(argv[0], fit_data_ws(fit, i_det), fit_data_exp(fit, i_det))) {
+    if(sim_workspace_print_spectra(fit_data_ws(fit, i_det), argv[0], fit_data_histo_sum(fit, i_det), fit_data_exp(fit, i_det))) {
         jabs_message(MSG_ERROR, stderr,
                      "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n",
                      i_det + 1, argv[0], fit->sim->n_det);

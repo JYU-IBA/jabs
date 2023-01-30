@@ -15,4 +15,5 @@ save spectra "simple_test_out.csv"
 test roi [1825:1865] 8219.47 2e-5
 
 set sim accurate
+simulate
 test roi [1825:1865] 8219.47 2e-5

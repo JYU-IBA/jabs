@@ -51,4 +51,5 @@ double sim_reaction_cross_section_plugin(const sim_reaction *sim_r, double E);
 #endif
 double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);
 void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident);
+void sim_reaction_print_bricks(FILE *f, const sim_reaction *r, double psr);
 #endif // JABS_SIM_REACTION_H
