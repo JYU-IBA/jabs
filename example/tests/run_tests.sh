@@ -1,5 +1,7 @@
 #!/bin/bash
 
+./clean.sh
+
 error_exit() {
     echo "Error when running test ${1}! Aborted.";
     exit 1;

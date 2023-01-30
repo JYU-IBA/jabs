@@ -19,7 +19,6 @@ set stopping srim2013 He Si O
 set sim defaults
 simulate
 save spectra "non_rutherford_accuracy_defaults_out.csv"
-save bricks "bricks.dat"
 test roi [550:900] 214813 0.02
 
 set sim fast
