@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include "generic.h"
 #ifdef WIN32
 #include "win_compat.h"
 #endif
@@ -242,10 +243,8 @@ idf_parser *idf_file_read(const char *filename) {
         idf->error = IDF2JBS_FAILURE_COULD_NOT_READ;
         return idf;
     }
-    size_t l = strlen(filename);
     char *fn = strdup(filename);
-    char *extension;
-    for(extension = fn + l; extension > fn && *extension != '.'; extension--) {}
+    char *extension = jabs_file_extension(fn);
     if(!idf_stringeq(extension, ".xml") && !idf_stringeq(extension, ".idf") && !idf_stringeq(extension, ".xnra")) {
 #ifdef DEBUG
         fprintf(stderr, "Extension %s is not valid.\n", extension);

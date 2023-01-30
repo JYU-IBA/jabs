@@ -90,13 +90,14 @@ void Highlighter::highlightBlock(const QString &text)
         return;
     }
     int argc = 0;
-    char **argv = string_to_argv(qPrintable(text), &argc);
+    char *s_out;
+    char **argv = string_to_argv(qPrintable(text), &argc, &s_out);
     if(!argv) {
         return;
 
     }
     highlightArgv(argc, argv);
-    argv_free(argv, argc);
+    argv_free(argv, s_out);
     setCurrentBlockState(0);
 
     return;

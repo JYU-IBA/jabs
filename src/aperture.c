@@ -99,11 +99,12 @@ aperture *aperture_set_from_argv(const jibal *jibal, aperture *a, int * const ar
 
 aperture *aperture_from_string(const jibal *jibal, const char *str) {
     int argc_orig = 0;
-    char **argv_orig = string_to_argv(str, &argc_orig);
+    char *s_out;
+    char **argv_orig = string_to_argv(str, &argc_orig, &s_out);
     char **argv = argv_orig;
     int argc = argc_orig;
     aperture *a = aperture_set_from_argv(jibal, NULL, &argc, (char *const **) &argv);
-    argv_free(argv_orig, argc_orig);
+    argv_free(argv_orig, s_out);
     return a;
 }
 

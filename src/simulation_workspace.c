@@ -255,8 +255,7 @@ int sim_workspace_print_spectra(const sim_workspace *ws, const char *filename, c
         return EXIT_FAILURE;
     }
     if(filename) {
-        size_t l = strlen(filename);
-        if(l > 4 && strncmp(filename + l - 4, ".csv", 4) == 0) { /* For CSV: print header line */
+        if(strncmp(jabs_file_extension_const(filename), ".csv", 4) == 0) { /* For CSV: print header line */
             sep = ','; /* and set the separator! */
             fprintf(f, "\"Channel\",\"Energy (keV)\",\"Simulated\"");
             if(exp) {

@@ -19,7 +19,9 @@
 #include "sample.h"
 #include "message.h"
 #include "win_compat.h"
+#include <jibal_generic.h>
 #include "generic.h"
+
 
 depth depth_seek(const sample *sample, double x) {
     depth depth;
@@ -481,7 +483,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
         char *col;
         size_t n = 0; /* Number of columns on this row */
         size_t i_material = 0;
-        while((col = strsep_with_quotes(&line_split, " \t")) != NULL) {
+        while((col = jibal_strsep_with_quotes(&line_split, " \t")) != NULL) {
             if(*col == '\0') {/* Multiple separators are treated as one */
                 continue;
             }
@@ -709,14 +711,15 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
 
 sample_model *sample_model_from_string(const jibal *jibal, const char *str) {
     int argc_orig = 0;
-    char **argv_orig = string_to_argv(str, &argc_orig);
+    char *s_out;
+    char **argv_orig = string_to_argv(str, &argc_orig, &s_out);
     char **argv = argv_orig;
     int argc = argc_orig;
     sample_model *sm = sample_model_from_argv(jibal, &argc, (char *const **) &argv);
 #ifdef DEBUG
     fprintf(stderr, "%i arguments remain after sample conversion\n", argc);
 #endif
-    argv_free(argv_orig, argc_orig);
+    argv_free(argv_orig, s_out);
     return sm;
 }
 

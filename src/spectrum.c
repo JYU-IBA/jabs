@@ -26,9 +26,8 @@ gsl_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_
     int error = FALSE;
     if(!in)
         return NULL;
-    size_t l = strlen(filename);
     char *delim;
-    if(l > 4 && strncmp(filename+l-4, ".csv", 4) == 0) { /* File ending is .csv. TODO: CSV support is not complete (e.g. quotes are not supported) */
+    if(strncmp(jabs_file_extension_const(filename), ".csv", 4) == 0) { /* File ending is .csv, assume CSV */
         if(skip == 0)
             skip = 1; /* TODO: this assumes CSV files always have headers. In worst case we skip the first line unintentionally (is it a big deal?) */
         delim = ",";

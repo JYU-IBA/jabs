@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 Jaakko Julin
+    Copyright (C) 2021 - 2023 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -19,9 +19,8 @@
 #endif
 #include <stdio.h>
 
-char *strsep_with_quotes(char **stringp, const char *delim);
-char **string_to_argv(const char *str, int *argc);
-void argv_free(char **argv, int argc);
+char **string_to_argv(const char *str, int *argc, char **s_out); /* Turns string str into an argument vector (output array allocated or NULL), number of arguments stored in argc. All argument strings point to one string, allocated and location stored to s_out */
+void argv_free(char **argv, char *s_out);
 char *argv_to_string(int argc, char * const *argv);
 
 FILE *fopen_file_or_stream(const char *filename, const char *mode); /* opens file and returns file pointer, returns NULL if fails, stderr if filename is NULL, stdout if filename is "-" */
@@ -32,4 +31,6 @@ int asprintf_append(char **ret, const char *format, ...);
 int is_match(const char *candidate, const char *pattern); /* stolen from https://stackoverflow.com/questions/23457305/compare-strings-with-wildcard because of laziness. License unknown. */
 char *jabs_strip_newline(char *str);
 int jabs_line_is_comment(const char *line);
+char *jabs_file_extension(char *filename); /* Returns pointer in filename to the LAST dot, '.' in string filename or beginning of filename if not found. */
+const char *jabs_file_extension_const(const char *filename);
 #endif //JABS_GENERIC_H

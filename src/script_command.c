@@ -18,6 +18,8 @@
 #else
 #include <unistd.h>
 #endif
+#include "win_compat.h"
+#include <jibal_generic.h>
 #include "message.h"
 #include "sample.h"
 #include "spectrum.h"
@@ -196,7 +198,7 @@ int foo(fit_params *params, const char *fit_vars) {
         return EXIT_FAILURE;
     char *token, *s, *s_orig;
     s_orig = s = strdup(fit_vars);
-    while((token = strsep_with_quotes(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
+    while((token = jibal_strsep_with_quotes(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
         if(fit_params_enable(params, token, TRUE) == 0) {
             jabs_message(MSG_ERROR, stderr, "No matches for %s. See 'show fit variables' for a list of possible fit variables.\n", token);
             status = EXIT_FAILURE;
@@ -738,7 +740,8 @@ script_command_status script_execute_command(script_session *s, const char *cmd)
     if(jabs_line_is_comment(cmd)) {
         return SCRIPT_COMMAND_SUCCESS;
     }
-    char **argv = string_to_argv(cmd, &argc);
+    char *s_out;
+    char **argv = string_to_argv(cmd, &argc, &s_out);
     if(!argv) {
         jabs_message(MSG_ERROR, stderr, "Something went wrong in parsing arguments.\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -748,7 +751,7 @@ script_command_status script_execute_command(script_session *s, const char *cmd)
     } else {
         status = SCRIPT_COMMAND_SUCCESS; /* Doing nothing successfully */
     }
-    argv_free(argv, argc);
+    argv_free(argv, s_out);
     return status;
 }
 

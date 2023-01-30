@@ -1,3 +1,19 @@
+/*
+
+    Jaakko's Backscattering Simulator (JaBS)
+    Copyright (C) 2021 - 2023 Jaakko Julin
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    See LICENSE.txt for the full license.
+
+    Some parts of this source file under different license, see below!
+
+ */
+
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE /* Needed by vasprintf() on Linux, since it is a GNU extension */
 #endif
@@ -5,93 +21,18 @@
 #include <string.h>
 #include <stdarg.h>
 #include "win_compat.h"
+#include <jibal_generic.h>
 #include "generic.h"
 #include "defaults.h"
 
-/* strsep from NetBSD, modified by Jaakko Julin. Original copyright note below */
-
-/*      $NetBSD: strsep.c,v 1.14 2003/08/07 16:43:52 agc Exp $  */
-
-/*-
- * Copyright (c) 1990, 1993
- *      The Regents of the University of California.  All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- */
-
-char *strsep_with_quotes(char **stringp, const char *delim) {
-    char *s;
-    const char *spanp;
-    int c, sc;
-    char *tok;
-
-    if ((s = *stringp) == NULL)
-        return (NULL);
-
-    tok = s;
-    if(*s == '"') {
-        *s = '\0';
-        s++;
-        size_t end = strcspn(s, "\""); /* Find ending quote (or end of string) */
-        if(s[end] == '"') {
-            s[end] = 0;
-            *stringp = s+end+1;
-            return tok+1;
-        }
-        else {
-            return tok; /* We return the position of the starting quote (now a '\0') because no terminating quote was found.*/
-        }
-    }
-    for (tok = s;;) {
-        c = *s++;
-        spanp = delim;
-        do {
-            if ((sc = *spanp++) == c) {
-                if (c == 0)
-                    s = NULL;
-                else
-                    s[-1] = 0;
-                *stringp = s;
-                return (tok);
-            } else {
-            }
-        } while (sc != 0);
-    }
-}
-
-
-/* End of code from NetBSD */
-
-char **string_to_argv(const char *str, int *argc) { /* Returns allocated array of allocated strings, needs to be free'd (see argv_free()) */
+char **string_to_argv(const char *str, int *argc, char **s_out) { /* Returns allocated array of allocated strings, needs to be free'd (see argv_free()) */
     char *s = strdup(str);
     char *s_split = s;
     jabs_strip_newline(s);
     size_t len = strlen(s);
     size_t n = 0;
     char *col;
-    while((col = strsep_with_quotes(&s_split, " \t")) != NULL) { /* TODO: parse quotation marks so that 'foo "bar baz"' becomes out[0] == "foo", out[1] == "bar baz"; */
+    while((col = jibal_strsep_with_quotes(&s_split, " \t")) != NULL) {
         if(*col == '\0') {
             continue;
         }
@@ -99,46 +40,29 @@ char **string_to_argv(const char *str, int *argc) { /* Returns allocated array o
     }
     char **out = malloc(sizeof(char *) * (n + 1));
     out[0] = s;
-    size_t pos;
-    size_t i = 1;
-    for(pos = 0; pos < len && i < n; pos++) {
-        if(s[pos] == '\0' /*&& s[pos-1] != '\0'*/) {
-            out[i] = s+pos+1;
-            if(*out[i] != '\0') { /* Consecutive delimeters (turned to '\0' by strsep above) are ignored */
-                i++;
-            }
+    size_t i = 0;
+    for(size_t pos = 0; pos < len && i < n; pos++) {
+        if(s[pos] == '\0') {
+            continue;
         }
-    }
-    for(i = 0; i < n; i++) { /* We should have our final strings now, let's make deep copies */
-#ifdef ARGV_DEEP_COPY
-        out[i] = strdup(out[i]);
-#endif
-#ifdef DEBUG
-        fprintf(stderr, "argv[%zu] = %s\n", i, out[i]);
-#endif
+        out[i] = s + pos;
+        pos += strlen(out[i]);
+        i++;
     }
     if(n == 0) {
         free(s); /* Passing the string that needs to be freed later as the first element and NULL terminating are not compatible if n == 0, unless we free the string already here. */
+        s = NULL;
     }
     out[n] = NULL;
     if(argc) {
         *argc = n;
     }
-#ifdef ARGV_DEEP_COPY
-    free(s);
-#endif
+    *s_out = s;
     return out;
 }
 
-void argv_free(char **argv, int argc) {
-#ifdef ARGV_DEEP_COPY
-    for(int i = 0; i < argc; i++) {
-        free(argv[i]);
-    }
-#else
-    (void) argc;
-    free(argv[0]);
-#endif
+void argv_free(char **argv, char *s_out) {
+    free(s_out);
     free(argv);
 }
 
@@ -315,4 +239,14 @@ int jabs_line_is_comment(const char *line) {
         return TRUE;
     }
     return FALSE;
+}
+
+char *jabs_file_extension(char *filename) {
+    return (char *)jabs_file_extension_const(filename);
+}
+
+const char *jabs_file_extension_const(const char *filename) {
+    const char *ext;
+    for(ext = filename + strlen(filename); ext > filename && *ext != '.'; ext--) {}
+    return ext;
 }
