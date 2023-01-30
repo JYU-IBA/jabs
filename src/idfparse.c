@@ -332,26 +332,37 @@ idf_error idf_write_buf(const idf_parser *idf, FILE *f) {
 
 char *idf_jbs_name(const idf_parser *idf) {
     char *out;
-    asprintf(&out, "%s%s", idf->basename, JABS_FILE_SUFFIX);
+    int len = asprintf(&out, "%s%s", idf->basename, JABS_FILE_SUFFIX);
+    if(len < 0) {
+        return NULL;
+    }
     return out;
 }
 
 char *idf_exp_name(const idf_parser *idf, size_t i_spectrum) {
     char *out;
+    int len;
     if(idf->n_spectra == 1) {
-        asprintf(&out, "%s_exp%s", idf->sample_basename, EXP_SPECTRUM_FILE_SUFFIX);
+        len = asprintf(&out, "%s_exp%s", idf->sample_basename, EXP_SPECTRUM_FILE_SUFFIX);
     } else {
-        asprintf(&out, "%s_exp%zu%s", idf->sample_basename, i_spectrum, EXP_SPECTRUM_FILE_SUFFIX);
+        len = asprintf(&out, "%s_exp%zu%s", idf->sample_basename, i_spectrum, EXP_SPECTRUM_FILE_SUFFIX);
+    }
+    if(len < 0) {
+        return NULL;
     }
     return out;
 }
 
 char *idf_spectrum_out_name(const idf_parser *idf, size_t i_spectrum) {
     char *out;
+    int len;
     if(idf->n_spectra == 1) {
-        asprintf(&out, "%s_out%s", idf->sample_basename, SAVE_SPECTRUM_FILE_SUFFIX);
+        len = asprintf(&out, "%s_out%s", idf->sample_basename, SAVE_SPECTRUM_FILE_SUFFIX);
     } else {
-        asprintf(&out, "%s_out%zu%s", idf->sample_basename, i_spectrum, SAVE_SPECTRUM_FILE_SUFFIX);
+        len = asprintf(&out, "%s_out%zu%s", idf->sample_basename, i_spectrum, SAVE_SPECTRUM_FILE_SUFFIX);
+    }
+    if(len < 0) {
+        return NULL;
     }
     return out;
 }
