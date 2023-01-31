@@ -50,4 +50,5 @@ double geostragg(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop
 double theta_deriv_beta(const detector *det, char direction);
 double beta_deriv(double sample_theta, double sample_phi, const detector *det, char direction);
 int geostragg_vars_print(FILE *f, const geostragg_vars *g);
+double exit_angle(double sample_theta, double sample_phi, double det_theta, double det_phi);
 #endif // JABS_GEOSTRAGG_H

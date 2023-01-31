@@ -23,6 +23,7 @@
 #ifdef WIN32
 #include "win_compat.h"
 #endif
+#include "geostragg.h"
 
 idf_error idf_parse_note(idf_parser *idf, xmlNode *note) {
     char *s = idf_node_content_to_str(note);
@@ -245,21 +246,40 @@ idf_error idf_parse_geometry(idf_parser *idf, xmlNode *geometry) {
 #endif
     char *geotype = idf_node_content_to_str(idf_findnode(geometry, "geometrytype"));
     const char *phi_str = "";
+    double incidenceangle = idf_node_content_to_double(idf_findnode(geometry, "incidenceangle"));
+    double scatteringangle = idf_node_content_to_double(idf_findnode(geometry, "scatteringangle"));
+    double exitangle = idf_node_content_to_double(idf_findnode(geometry, "exitangle"));
+    double ibm1 = exit_angle(incidenceangle, 0.0, scatteringangle, 0.0);
+    double ibm2 = exit_angle(-1.0 * incidenceangle, 0.0, scatteringangle, 0.0);
+    double cornell = exit_angle(incidenceangle, 0.0, scatteringangle, 90.0 * C_DEG);
+#ifdef DEBUG
+    fprintf(stderr, "Possible angles: IBM1: %g deg, IBM2: %g deg,  Cornell: %g deg\n", ibm1 / C_DEG, ibm2 / C_DEG, cornell / C_DEG);
+#endif
     if(idf_stringeq(geotype, "IBM")) {
         idf_output_printf(idf, "#IBM geometry set in file.\n");
+        if(fabs(exitangle - ibm1) < 0.1 * C_DEG) {
+            idf_output_printf(idf, "#Geometry in file matches with IBM exit angle %g deg.\n", ibm1 / C_DEG);
+        } else if(fabs(exitangle - ibm2) < 0.1 * C_DEG) {
+            idf_output_printf(idf, "#Geometry in file matches with IBM exit angle %g deg.\n", ibm2 / C_DEG);
+            incidenceangle *= -1.0;
+        } else {
+            idf_output_printf(idf, "#Geometry in file (exit angle %g deg) does not match with IBM geometry. Check it!\n", exitangle / C_DEG);
+        }
     } else if(idf_stringeq(geotype, "Cornell")) {
-        phi_str = " phi 90.0deg";
         idf_output_printf(idf, "#Cornell geometry set in file.\n");
+        if(fabs(exitangle - cornell) < 0.1 * C_DEG) {
+            idf_output_printf(idf, "#Geometry in file matches with Cornell exit angle %g deg.\n", cornell / C_DEG);
+            phi_str = " phi 90.0deg";
+        } else {
+            idf_output_printf(idf, "#Geometry in file (exit angle %g deg) does not match with Cornell geometry! Check it.\n", exitangle / C_DEG);
+        }
     } else {
-        idf_output_printf(idf, "#Not IBM or Cornell geometry? Use set det phi XXXdeg to tell JaBS where the detector is.\n");
+        idf_output_printf(idf, "#Not IBM or Cornell geometry (exit angle %g deg)? Use set det phi XXXdeg to tell JaBS where the detector is.\n", exitangle / C_DEG);
+        phi_str = " phi 0.0deg";
     }
     free(geotype);
-    double incidenceangle = idf_node_content_to_double(idf_findnode(geometry, "incidenceangle"));
     idf_output_printf(idf, "set alpha %gdeg\n", incidenceangle / C_DEG);
-    double scatteringangle = idf_node_content_to_double(idf_findnode(geometry, "scatteringangle"));
     idf_output_printf(idf, "set det theta %gdeg%s\n", scatteringangle / C_DEG, phi_str);
-    double exitangle = idf_node_content_to_double(idf_findnode(geometry, "exitangle"));
-    idf_output_printf(idf, "#Check simulation output to confirm JaBS uses correct exit angle (%g deg?)\n", exitangle / C_DEG);
     idf_parse_spot(idf, idf_findnode(geometry, "spot"));
     return IDF2JBS_SUCCESS;
 }

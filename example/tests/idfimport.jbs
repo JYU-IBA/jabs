@@ -1,0 +1,19 @@
+#This file tests import of IDF files created with SIMNRA 7.03 and benchmarks accuracy of JaBS vs SIMNRA with (almost) default settings. SRIM stopping, Yang straggling, simulation of isotopes, no multiple scattering, gaussian straggling, gamma roughness, geometrical straggling (rectangular beam spot, circular detector), different geometries.
+
+reset
+#Geometry "IBM1"
+idf2jbs "rbs_rough.xnra"
+load script "rbs_rough.jbs"
+test ref [200:1000] 5e-3
+
+reset
+#Geometry "IBM2"
+idf2jbs "rbs_rough2.xnra"
+load script "rbs_rough2.jbs"
+test ref [350:1000] 1e-2
+
+reset
+#Geometry "Cornell"
+idf2jbs "rbs_rough3.xnra"
+load script "rbs_rough3.jbs"
+test ref [200:950] 1e-2

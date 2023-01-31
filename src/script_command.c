@@ -32,6 +32,7 @@
 #include "script_session.h"
 #include "script_command.h"
 #include "plugin.h"
+#include "idf2jbs.h"
 
 
 int script_prepare_sim_or_fit(script_session *s) {
@@ -1386,6 +1387,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&head, script_command_new("cwd", "Display current working directory.", 0, script_cwd));
     script_command_list_add_command(&head, script_command_new("pwd", "Display current working directory.", 0, script_cwd));
     script_command_list_add_command(&head, script_command_new("cd", "Change current working directory.", 0, script_cd));
+    script_command_list_add_command(&head, script_command_new("idf2jbs", "Convert IDF file to a JaBS script.", 0, script_idf2jbs));
     return script_commands_sort_all(head);
 }
 
@@ -2105,7 +2107,7 @@ script_command_status script_test_reference(struct script_session *s, int argc, 
     argv += 2;
     int return_value = argc_orig - argc;
     if(spectrum_compare(sim, fit->ref, r.low, r.high, &error)) { /* Failed, test fails */
-        jabs_message(MSG_ERROR, stderr, "Test failed. Is range valid?\n");
+        jabs_message(MSG_ERROR, stderr, "Test of detector %zu from %zu to %zu failed. Is range valid?\n", r.i_det + 1, r.low, r.high);
         return_value = SCRIPT_COMMAND_FAILURE;
     } else {
         jabs_message(MSG_INFO, stderr, "Test of simulated spectrum to reference from %zu to %zu. Error %e.\n", r.low, r.high, error);
@@ -2435,6 +2437,25 @@ script_command_status script_cd(struct script_session *s, int argc, char *const 
         jabs_message(MSG_ERROR, stderr, "Could not change directory to \"%s\"\n", argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
+    argc--;
+    argv++;
+    return argc_orig - argc;
+}
+
+script_command_status script_idf2jbs(struct script_session *s, int argc, char * const *argv) {
+    const int argc_orig = argc;
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: idf2jbs <idf file>\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    char *filename_out = NULL;
+    idf_error idferr = idf_parse(argv[0], &filename_out);
+    if(idferr == IDF2JBS_SUCCESS) {
+        jabs_message(MSG_INFO, stderr, "Success. Wrote script to file \"%s\"\n", filename_out);
+    } else {
+        jabs_message(MSG_ERROR, stderr, "IDF2JBS failed with error code %i (%s).\n", idferr, idf_error_code_to_str(idferr));
+    }
+    free(filename_out);
     argc--;
     argv++;
     return argc_orig - argc;

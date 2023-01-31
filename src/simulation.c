@@ -16,8 +16,8 @@
 #include "simulation.h"
 #include "defaults.h"
 #include "rotate.h"
-#include "spectrum.h"
 #include "message.h"
+#include "geostragg.h"
 
 simulation *sim_init(jibal *jibal) {
     simulation *sim = malloc(sizeof(simulation));
@@ -311,9 +311,7 @@ double sim_alpha_angle(const simulation *sim) { /* Returns alpha angle (no sign!
 }
 
 double sim_exit_angle(const simulation *sim, const detector *det) { /* Not actually used by simulation, just a convenience function! */
-    double theta, phi;
-    rotate(sim->sample_theta, sim->sample_phi, det->theta, det->phi, &theta, &phi);
-    return C_PI - theta;
+    return exit_angle(sim->sample_theta, sim->sample_phi, det->theta, det->phi);
 }
 
 int sim_do_we_need_erd(const simulation *sim) {

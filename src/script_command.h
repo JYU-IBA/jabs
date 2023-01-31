@@ -111,4 +111,5 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
 script_command_status script_split_sample_elements(struct script_session *s, int argc, char * const *argv);
 script_command_status script_cwd(struct script_session *s, int argc, char * const *argv);
 script_command_status script_cd(struct script_session *s, int argc, char * const *argv);
+script_command_status script_idf2jbs(struct script_session *s, int argc, char * const *argv);
 #endif //JABS_SCRIPT_COMMAND_H
