@@ -116,7 +116,7 @@ detector *detector_default(detector *det) {
     det->distance = DETECTOR_DISTANCE;
     det->length = DETECTOR_LENGTH;
     det->column = 1; /* This implies default file format has channel numbers. Values are in the second column (number 1). */
-    det->channels = 16384;
+    det->channels = CHANNELS_MAX_DEFAULT;
     det->compress = 1;
     det->foil = NULL;
     det->foil_sm = NULL;

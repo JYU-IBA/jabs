@@ -66,6 +66,7 @@ script_command_status script_identify_plugin(struct script_session *s, int argc,
 script_command_status script_load_reaction_plugin(script_session *s, int argc, char *const *argv);
 #endif
 script_command_status script_load_experimental(struct script_session *s, int argc, char *const *argv);
+script_command_status script_load_reference(struct script_session *s, int argc, char *const *argv);
 script_command_status script_load_reaction(struct script_session *s, int argc, char *const *argv);
 script_command_status script_load_roughness(script_session *s, int argc, char *const *argv);
 script_command_status script_load_sample(struct script_session *s, int argc, char *const *argv);
@@ -74,6 +75,7 @@ script_command_status script_remove_reaction(struct script_session *s, int argc,
 script_command_status script_reset(struct script_session *s, int argc, char * const *argv);
 script_command_status script_reset_detectors(struct script_session *s, int argc, char * const *argv);
 script_command_status script_reset_experimental(struct script_session *s, int argc, char * const *argv);
+script_command_status script_reset_reference(script_session *s, int argc, char *const *argv);
 script_command_status script_reset_fit(struct script_session *s, int argc, char * const *argv);
 script_command_status script_reset_reactions(struct script_session *s, int argc, char * const *argv);
 script_command_status script_reset_sample(struct script_session *s, int argc, char * const *argv);
@@ -104,7 +106,7 @@ script_command_status script_set_detector_foil(struct script_session *s, int arg
 script_command_status script_set_detector_calibration_poly(struct script_session *s, int argc, char *const *argv);
 script_command_status script_set_sample(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_stopping(struct script_session *s, int argc, char * const *argv);
-script_command_status script_test_file(struct script_session *s, int argc, char * const *argv);
+script_command_status script_test_reference(struct script_session *s, int argc, char * const *argv);
 script_command_status script_test_roi(struct script_session *s, int argc, char * const *argv);
 script_command_status script_split_sample_elements(struct script_session *s, int argc, char * const *argv);
 script_command_status script_cwd(struct script_session *s, int argc, char * const *argv);

@@ -1285,6 +1285,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command *c_load = script_command_new("load", "Load something.", 0, NULL);
     script_command_list_add_command(&head, c_load);
     script_command_list_add_command(&c_load->subcommands, script_command_new("experimental", "Load an experimental spectrum.", 0, &script_load_experimental));
+    script_command_list_add_command(&c_load->subcommands, script_command_new("reference", "Load a reference spectrum.", 0, &script_load_reference));
     script_command_list_add_command(&c_load->subcommands, script_command_new("script", "Load (run) a script.", 0, &script_load_script));
     script_command_list_add_command(&c_load->subcommands, script_command_new("sample", "Load a sample.", 0, &script_load_sample));
     script_command *c_reaction = script_command_new("reaction", "Load a reaction from R33 file.", 0, &script_load_reaction);
@@ -1327,7 +1328,7 @@ script_command *script_commands_create(struct script_session *s) {
 
     c = script_command_new("test", "Test something.", 0, NULL);
     script_command_list_add_command(&head, c);
-    script_command_list_add_command(&c->subcommands, script_command_new("file", "Test simulated spectrum against a reference.", 0, &script_test_file));
+    script_command_list_add_command(&c->subcommands, script_command_new("reference", "Test simulated spectrum against reference spectrum.", 0, &script_test_reference));
     script_command_list_add_command(&c->subcommands, script_command_new("roi", "Test ROI.", 0, &script_test_roi));
 
     c = script_command_new("add", "Add something.", 0, NULL);
@@ -1349,6 +1350,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("detectors", "Reset detectors.", 0, &script_reset_detectors));
     script_command_list_add_command(&c->subcommands, script_command_new("experimental", "Reset experimental spectra.", 0, &script_reset_experimental));
+    script_command_list_add_command(&c->subcommands, script_command_new("reference", "Reset reference spectrum.", 0, &script_reset_reference));
     script_command_list_add_command(&c->subcommands, script_command_new("fit", "Reset fit (ranges).", 0, &script_reset_fit));
     script_command_list_add_command(&c->subcommands, script_command_new("reactions", "Reset reactions.", 0, &script_reset_reactions));
     script_command_list_add_command(&c->subcommands, script_command_new("sample", "Reset sample.", 0, &script_reset_sample));
@@ -1538,6 +1540,25 @@ script_command_status script_load_experimental(script_session *s, int argc, char
     return argc_orig - argc; /* Number of arguments */
 }
 
+script_command_status script_load_reference(script_session *s, int argc, char *const *argv) {
+    struct fit_data *fit = s->fit;
+    const int argc_orig = argc;
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: load reference <filename>\n");
+    }
+    const char *filename = argv[0];
+    gsl_histogram *h =spectrum_read(filename, 0, CHANNELS_MAX_DEFAULT, 1, 1);
+    if(!h) {
+        jabs_message(MSG_ERROR, stderr, "Reading reference spectrum from file \"%s\" was not successful.\n", filename);
+        return EXIT_FAILURE;
+    }
+    gsl_histogram_free(fit->ref);
+    fit->ref = h;
+    argc--;
+    argv++;
+    return argc_orig - argc; /* Number of arguments */
+}
+
 script_command_status script_load_reaction(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
     if(argc < 1) {
@@ -1631,7 +1652,16 @@ script_command_status script_reset_experimental(script_session *s, int argc, cha
     (void) argv;
     struct fit_data *fit = s->fit;
     fit_data_exp_free(s->fit);
-    fit->exp = calloc(fit->sim->n_det, sizeof(gsl_histogram *));
+    fit_data_exp_alloc(s->fit);
+    return 0;
+}
+
+script_command_status script_reset_reference(script_session *s, int argc, char *const *argv) {
+    (void) argc;
+    (void) argv;
+    struct fit_data *fit = s->fit;
+    gsl_histogram_free(s->fit->ref);
+    s->fit->ref = NULL;
     return 0;
 }
 
@@ -1655,6 +1685,8 @@ script_command_status script_reset(script_session *s, int argc, char *const *arg
     fit_params_free(fit->fit_params);
     fit->fit_params = NULL;
     fit_data_exp_free(fit);
+    gsl_histogram_free(fit->ref);
+    fit->ref = NULL;
     fit_data_workspaces_free(fit);
     sample_model_free(fit->sm);
     fit->sm = NULL;
@@ -2041,18 +2073,22 @@ script_command_status script_set_stopping(struct script_session *s, int argc, ch
     return argc_orig - argc;
 }
 
-script_command_status script_test_file(struct script_session *s, int argc, char *const *argv) {
+script_command_status script_test_reference(struct script_session *s, int argc, char *const *argv) {
     const struct fit_data *fit = s->fit;
     const int argc_orig = argc;
     size_t i_det = 0;
+    if(!fit->ref) {
+        jabs_message(MSG_ERROR, stderr, "No reference spectrum loaded. Use 'load reference' to do so.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(argc < 3) {
-        jabs_message(MSG_ERROR, stderr, "Usage: test file <range> <filename> <tolerance>\nTests if simulation is within tolerance to a reference file.\n");
+    if(argc < 2) {
+        jabs_message(MSG_ERROR, stderr, "Usage: test reference {detector number} <range> <tolerance>\nTests if simulated spectrum is within tolerance to a reference spectrum.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    const gsl_histogram *sim = fit_data_sim(fit, i_det);
+    const gsl_histogram *sim = fit_data_histo_sum(fit, i_det);
     if(!sim) {
         jabs_message(MSG_ERROR, stderr, "No simulation.\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -2063,17 +2099,12 @@ script_command_status script_test_file(struct script_session *s, int argc, char 
         jabs_message(MSG_ERROR, stderr, "Could not parse range.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    gsl_histogram *h_ref = spectrum_read_detector(argv[1], det);
-    if(!h_ref) {
-        jabs_message(MSG_ERROR, stderr, "Could not read spectrum.\n");
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    double tolerance = strtod(argv[2], NULL);
+    double tolerance = strtod(argv[1], NULL);
     double error;
-    argc -= 3;
-    argv += 3;
+    argc -= 2;
+    argv += 2;
     int return_value = argc_orig - argc;
-    if(spectrum_compare(sim, h_ref, r.low, r.high, &error)) { /* Failed, test fails */
+    if(spectrum_compare(sim, fit->ref, r.low, r.high, &error)) { /* Failed, test fails */
         jabs_message(MSG_ERROR, stderr, "Test failed. Is range valid?\n");
         return_value = SCRIPT_COMMAND_FAILURE;
     } else {
@@ -2085,7 +2116,6 @@ script_command_status script_test_file(struct script_session *s, int argc, char 
             jabs_message(MSG_ERROR, stderr, "Test passed.\n");
         }
     }
-    gsl_histogram_free(h_ref);
     return return_value;
 }
 

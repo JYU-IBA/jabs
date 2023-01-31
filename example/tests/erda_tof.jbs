@@ -12,4 +12,5 @@ set sample Au 590tfu SiO2 1000tfu Si 10000tfu
 #add reactions RBS
 simulate
 save spectra "erda_tof_out.csv"
-test file [200:2005] "erda_tof_ref.csv" 5e-3
+load ref "erda_tof_ref.csv"
+test ref [200:2005] 5e-3

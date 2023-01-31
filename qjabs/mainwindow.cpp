@@ -399,12 +399,16 @@ void MainWindow::plotSpectrum(size_t i_det)
         return;
     gsl_histogram *sim_histo = fit_data_histo_sum(session->fit, i_det);
     gsl_histogram *exp_histo = fit_data_exp(session->fit, i_det);
+    gsl_histogram *ref_histo = session->fit->ref;
     sim_workspace *ws = fit_data_ws(session->fit, i_det);
     if(exp_histo) {
         ui->widget->drawDataToChart("Experimental", exp_histo->bin, exp_histo->n, QColor("Black"));
     }
     if(sim_histo) {
         ui->widget->drawDataToChart("Simulated", sim_histo->bin, sim_histo->n, QColor("Blue"));
+    }
+    if(ref_histo) {
+        ui->widget->drawDataToChart("Reference", ref_histo->bin, ref_histo->n, QColor("Gray"));
     }
     if(ws) {
         gsl_histogram *histo = NULL;

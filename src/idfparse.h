@@ -96,6 +96,7 @@ idf_error idf_write_buf_to_file(const idf_parser *idf, char **filename_out); /* 
 idf_error idf_write_buf(const idf_parser *idf, FILE *f);
 char *idf_jbs_name(const idf_parser *idf);
 char *idf_exp_name(const idf_parser *idf, size_t i_spectrum);
+char *idf_sim_name(const idf_parser *idf, size_t i_spectrum);
 char *idf_spectrum_out_name(const idf_parser *idf, size_t i_spectrum);
 const char *idf_boolean_to_str(int boolean); /* "true", "false", "unset" trinary */
 const char *idf_error_code_to_str(idf_error idferr);

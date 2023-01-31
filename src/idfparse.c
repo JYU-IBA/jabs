@@ -353,6 +353,20 @@ char *idf_exp_name(const idf_parser *idf, size_t i_spectrum) {
     return out;
 }
 
+char *idf_sim_name(const idf_parser *idf, size_t i_spectrum) {
+    char *out;
+    int len;
+    if(idf->n_spectra == 1) {
+        len = asprintf(&out, "%s_sim%s", idf->sample_basename, EXP_SPECTRUM_FILE_SUFFIX);
+    } else {
+        len = asprintf(&out, "%s_sim%zu%s", idf->sample_basename, i_spectrum, EXP_SPECTRUM_FILE_SUFFIX);
+    }
+    if(len < 0) {
+        return NULL;
+    }
+    return out;
+}
+
 char *idf_spectrum_out_name(const idf_parser *idf, size_t i_spectrum) {
     char *out;
     int len;

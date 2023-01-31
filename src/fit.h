@@ -67,7 +67,9 @@ typedef struct roi {
 } roi;
 
 typedef struct fit_data {
-    gsl_histogram **exp; /* experimental data to be fitted, array of sim->n_det */
+    gsl_histogram **exp; /* experimental data to be fitted, array of n_exp elements */
+    size_t n_exp; /* same as sim->n_det, but this keeps track on how many spectra we have allocated in exp and ref */
+    gsl_histogram *ref; /* reference spectra, exactly one */
     simulation *sim;
     const jibal *jibal; /* This shouldn't be here, but it is the only place I can think of */
     sample_model *sm;
@@ -98,14 +100,16 @@ void fit_data_free(struct fit_data *fit); /* Doesn't free everything in fit_data
 void fit_data_print(FILE *f, const struct fit_data *fit_data);
 void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct roi *roi);
 gsl_histogram *fit_data_exp(const struct fit_data *fit_data, size_t i_det);
-gsl_histogram *fit_data_sim(const struct fit_data *fit_data, size_t i_det);
+gsl_histogram *fit_data_sim(const struct fit_data *fit_data, size_t i_det); /* You should probably use fit_data_histo_sum() to get the simulated sum spectra */
+gsl_histogram *fit_data_ref(const struct fit_data *fit_data);
 fit_params *fit_params_all(fit_data *fit);
-void fit_data_exp_free(struct fit_data *fit_data);
+void fit_data_exp_alloc(fit_data *fit);
+void fit_data_exp_free(fit_data *fit);
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename);
 void fit_data_histo_sum_free(struct fit_data *fit_data);
 void fit_data_histo_sum_store(struct fit_data *fit_data);
 gsl_histogram *fit_data_histo_sum(const struct fit_data *fit_data, size_t i_det);
-int fit_data_add_det(struct fit_data *fit_data, detector *det);
+int fit_data_add_det(struct fit_data *fit, detector *det);
 sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det);
 size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);
 int fit_data_workspaces_init(struct fit_data *fit_data); /* If any workspace initialization fails, this frees allocated memory (function below) and returns non-zero */

@@ -22,6 +22,7 @@
 #define PROMPT "jabs> "
 
 #define CHANNELS_ABSOLUTE_MIN 128
+#define CHANNELS_MAX_DEFAULT 16384
 #define CHANNELS_ABSOLUTE_MAX 100000
 
 /* Defaults for new simulations */

@@ -248,7 +248,9 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     struct fit_data *f = malloc(sizeof(struct fit_data));
     f->jibal = jibal;
     f->sim = sim;
-    f->exp = calloc(sim->n_det, sizeof(gsl_histogram *)); /* Allocating based on initial number of detectors. */
+    f->n_exp = 0;
+    fit_data_exp_alloc(f);
+    f->ref = NULL;
     f->sm = NULL; /* Can be set later. */
     f->ws = NULL; /* Initialized later */
     f->n_ws = 0; /* Number of allocated workspaces, initially same as number of detectors. */
@@ -411,17 +413,33 @@ fit_params *fit_params_all(fit_data *fit) {
     return params;
 }
 
-void fit_data_exp_free(struct fit_data *fit_data) {
-    if(!fit_data->exp)
+void fit_data_exp_alloc(fit_data *fit) {
+    if(!fit) {
         return;
-    for(size_t i_det = 0; i_det < fit_data->sim->n_det; i_det++) {
-        if(fit_data->exp[i_det]) {
-            gsl_histogram_free(fit_data->exp[i_det]);
-            fit_data->exp[i_det] = NULL;
+    }
+    size_t n_alloc = fit->sim->n_det;
+    if(fit->n_exp == 0) { /* This could be handled by realloc too, but this is an easy way to get null pointers as contents. */
+        fit->exp = calloc(n_alloc, sizeof(gsl_histogram *));
+    } else {
+        fit->exp = realloc(fit->exp, sizeof(gsl_histogram *) * n_alloc);
+        for(size_t i = fit->n_exp; i < n_alloc; i++) { /* Reset newly allocated space */
+            fit->exp[i] = NULL;
         }
     }
-    free(fit_data->exp);
-    fit_data->exp = NULL;
+}
+
+void fit_data_exp_free(fit_data *fit) {
+    if(!fit->exp)
+        return;
+    for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
+        if(fit->exp[i_det]) {
+            gsl_histogram_free(fit->exp[i_det]);
+            fit->exp[i_det] = NULL;
+        }
+    }
+    free(fit->exp);
+    fit->exp = NULL;
+    fit->n_exp = 0;
 }
 
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename) {
@@ -468,14 +486,14 @@ gsl_histogram *fit_data_histo_sum(const struct fit_data *fit_data, size_t i_det)
     return fit_data->histo_sum_iter[i_det];
 }
 
-int fit_data_add_det(struct fit_data *fit_data, detector *det) {
-    if(!fit_data || !det)
+int fit_data_add_det(struct fit_data *fit, detector *det) {
+    if(!fit || !det)
         return EXIT_FAILURE;
-    if(sim_det_add(fit_data->sim, det)) {
+    size_t n_det_old = fit->sim->n_det;
+    if(sim_det_add(fit->sim, det)) {
         return EXIT_FAILURE;
     }
-    fit_data->exp = realloc(fit_data->exp, sizeof(gsl_histogram *) * fit_data->sim->n_det);
-    fit_data->exp[fit_data->sim->n_det - 1] = NULL;
+    fit_data_exp_alloc(fit); /* Number of detectors in sim changed, let these guys know it too */
     return EXIT_SUCCESS;
 }
 
@@ -575,7 +593,7 @@ void fit_data_print(FILE *f, const struct fit_data *fit_data) {
     for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
         roi *range = &fit_data->fit_ranges[i];
         double exp_cts = spectrum_roi(fit_data_exp(fit_data, range->i_det), range->low, range->high);
-        double sim_cts = spectrum_roi(fit_data_sim(fit_data, range->i_det), range->low, range->high);
+        double sim_cts = spectrum_roi(fit_data_histo_sum(fit_data, range->i_det), range->low, range->high);
         if(exp_cts == 0.0) {
             jabs_message(MSG_INFO, f, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf |         |         |\n", i + 1, range->low, range->high, exp_cts, sim_cts);
         } else {
