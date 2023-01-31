@@ -357,7 +357,7 @@ void MainWindow::on_action_Run_triggered()
     QTextStream stream = QTextStream(&text, QIODevice::ReadOnly);
     size_t lineno = 0;
     bool error = false;
-    while(!stream.atEnd() && !error) { /* TODO: this needs a loop to process script files. Loading script files has currently no effect (other than files getting opened) since the execution of session->files is not implemented! */
+    while(!stream.atEnd() && !error) {
         QString line = stream.readLine();
         lineno++;
 #ifdef DEBUG

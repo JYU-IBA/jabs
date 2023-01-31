@@ -245,7 +245,7 @@ des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, con
 #ifdef DEBUG
             fprintf(stderr, "DES table calculation stops at %g tfu (i = %zu).\n", d_before.x / C_TFU, i);
 #endif
-            i++; /* TODO: Safe? */
+            i++;
             break;
         }
         d_after = stop_step(stop, stragg, &ion, sample, d_before, stop_step_calc(&scp->incident_stop_params, &ion));

@@ -182,5 +182,5 @@ int main(int argc, char * const *argv) {
     script_session_free(session);
     cmdline_options_free(cmd_opt);
     jibal_free(jibal);
-    return status;
+    return status == SCRIPT_COMMAND_FAILURE ? EXIT_FAILURE : EXIT_SUCCESS;
 }

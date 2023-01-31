@@ -37,7 +37,7 @@ calibration *detector_get_calibration(const detector *det, int Z) {
     }
 }
 
-int detector_set_calibration_Z(const jibal_config *jibal_config, detector *det, calibration *cal, int Z) { /* TODO: test! */
+int detector_set_calibration_Z(const jibal_config *jibal_config, detector *det, calibration *cal, int Z) {
     if(!det || !cal)
         return EXIT_FAILURE;
     if(Z == JIBAL_ANY_Z) {

@@ -749,7 +749,7 @@ int fit(struct fit_data *fit_data) {
     }
 
     fdf.f = &fit_function;
-    fdf.df = NULL; /* Jacobian, with NULL using finite difference. TODO: this could be implemented */
+    fdf.df = NULL; /* Jacobian, with NULL using finite difference. */
     fdf.fvv = NULL; /* No geodesic acceleration */
     fdf.n = fit_data_ranges_calculate_number_of_channels(fit_data);
     fdf.p = fit_params->n_active;

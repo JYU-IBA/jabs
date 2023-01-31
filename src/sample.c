@@ -126,8 +126,9 @@ void sample_model_renormalize(sample_model *sm) {
             if(sm->ranges[i].x < 0.0)
                 sm->ranges[i].x = 0.0;
         } else if (sm->type == SAMPLE_MODEL_POINT_BY_POINT) {
-            if(i && sm->ranges[i].x < sm->ranges[i-1].x)
-                sm->ranges[i].x = sm->ranges[i-1].x; /* TODO: is this enough? */
+            if(i && sm->ranges[i].x < sm->ranges[i-1].x) {
+                sm->ranges[i].x = sm->ranges[i - 1].x;
+            }
         }
         double sum = 0.0;
         for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {

@@ -177,8 +177,9 @@ int spectrum_compare(const gsl_histogram *h1, const gsl_histogram *h2, size_t lo
     double sum = 0.0;
     size_t n = 0;
     for(size_t i = low; i <= high; i++) {
-        if(h2->bin[i] < 1e-4) /* TODO: arbitrary cutoff to prevent div by zero */
+        if(h2->bin[i] < 1e-4) { /* TODO: arbitrary cutoff to prevent div by zero */
             continue;
+        }
         sum += pow2((h1->bin[i] - h2->bin[i]))/h2->bin[i];
         n++;
     }

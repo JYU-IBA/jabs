@@ -254,7 +254,6 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
 
 void simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
     ion ion1 = *incident; /* Shallow copy */
-    //des_table_set_ion_depth(dt, &ion1, depth_start); /* TODO: is this necessary? */
     simulate_init_reaction(sim_r, sample, ws->params, g, ws->emin, ion1.E);
     if(sim_r->stop) {
         sim_r->last_brick = 0;
