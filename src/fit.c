@@ -400,18 +400,16 @@ fit_params *fit_params_all(fit_data *fit) {
                 snprintf(param_name, param_name_max_len, "thick%zu", range_index);
                 fit_params_add_parameter(params, &(r->x), param_name, "tfu", C_TFU);
             }
-            if(r->yield != 1.0) {
-                snprintf(param_name, param_name_max_len, "yield%zu", range_index);
-                fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0);
-            }
-            if(r->bragg != 1.0) {
-                snprintf(param_name, param_name_max_len, "bragg%zu", range_index);
-                fit_params_add_parameter(params, &(r->bragg), param_name, "", 1.0);
-            }
-            if(r->stragg != 1.0) {
-                snprintf(param_name, param_name_max_len, "stragg%zu", range_index);
-                fit_params_add_parameter(params, &(r->stragg), param_name, "", 1.0);
-            }
+
+            snprintf(param_name, param_name_max_len, "yield%zu", range_index);
+            fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0);
+
+            snprintf(param_name, param_name_max_len, "bragg%zu", range_index);
+            fit_params_add_parameter(params, &(r->bragg), param_name, "", 1.0);
+
+            snprintf(param_name, param_name_max_len, "stragg%zu", range_index);
+            fit_params_add_parameter(params, &(r->stragg), param_name, "", 1.0);
+
             if(r->rough.model != ROUGHNESS_NONE && r->rough.x > 0.0) {
                 snprintf(param_name, param_name_max_len, "rough%zu", range_index);
                 fit_params_add_parameter(params, &(r->rough.x), param_name, "tfu", C_TFU);
@@ -553,6 +551,7 @@ int fit_data_workspaces_init(struct fit_data *fit_data) {
             break;
         }
         detector_update(det);
+        spectrum_set_calibration(fit_data_exp(fit_data, i), det, JIBAL_ANY_Z); /* Update the experimental spectra calibration (using default calibration) */
         sim_workspace *ws = sim_workspace_init(fit_data->jibal, fit_data->sim, det);
         if(!ws) {
             jabs_message(MSG_ERROR, stderr, "Workspace %zu failed to initialize!\n", i);
@@ -876,10 +875,6 @@ int fit(struct fit_data *fit_data) {
         fit_parameters_update_changed(fit_params); /* sample_model_renormalize() can and will change concentration values, this will recompute error (assuming relative error stays the same) */
         fit_params_print_final(fit_params);
         fit_covar_print(covar);
-
-        for(size_t i = 0; i < fit_data->n_ws; i++) {
-            spectrum_set_calibration(fit_data_exp(fit_data, i), sim_det(fit_data->sim, i), JIBAL_ANY_Z); /* Update the experimental spectra to final calibration (using default calibration) */
-        }
     }
     gsl_multifit_nlinear_free(w);
     gsl_matrix_free(covar);

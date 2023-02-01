@@ -68,6 +68,8 @@ MainWindow::MainWindow(QWidget *parent)
         ui->action_Plot->setEnabled(false);
     }
     connect(ui->widget, &SpectrumPlot::rangeSelected, this, &MainWindow::runRoi);
+    connect(ui->widget, &SpectrumPlot::energyAxisSet, this, &MainWindow::onEnergyAxisSet);
+    connect(ui->widget, &SpectrumPlot::legendMoved, this, &MainWindow::onSpectrumLegendMoved);
 
     ui->msgTextBrowser->append("\n");
     ui->msgTextBrowser->ensureCursorVisible();
@@ -137,6 +139,7 @@ void MainWindow::readPlotSettings()
     plotIsotopesZ = settings.value("plotIsotopesZ", QVariant(JIBAL_ANY_Z)).toInt();
     ui->widget->setLegendVisible(settings.value("showLegend", QVariant(true)).toBool());
     ui->widget->setLegendOutside(settings.value("legendOutside", QVariant(false)).toBool());
+    ui->widget->setEnergyAxis(settings.value("energyAxis", QVariant(false)).toBool());
     plotSession();
 }
 
@@ -157,6 +160,7 @@ void MainWindow::plotSession(bool error)
         ui->plotSettingsGroupBox->setVisible(session->fit->n_ws > 1);
         plotSpectrum(ui->plotSpinBox->value() - 1);
         if(firstRun) {
+            qDebug() << "First run, resetting zoom.";
             ui->widget->resetZoom();
             firstRun = false;
         }
@@ -164,6 +168,7 @@ void MainWindow::plotSession(bool error)
     } else {
         ui->plotSettingsGroupBox->setVisible(false);
         ui->widget->setVisible(false);
+        firstRun = true;
     }
 }
 
@@ -402,13 +407,13 @@ void MainWindow::plotSpectrum(size_t i_det)
     gsl_histogram *ref_histo = session->fit->ref;
     sim_workspace *ws = fit_data_ws(session->fit, i_det);
     if(exp_histo) {
-        ui->widget->drawDataToChart("Experimental", exp_histo->bin, exp_histo->n, QColor("Black"));
+        ui->widget->drawDataToChart("Experimental", exp_histo->range, exp_histo->bin, exp_histo->n, QColor("Black"));
     }
     if(sim_histo) {
-        ui->widget->drawDataToChart("Simulated", sim_histo->bin, sim_histo->n, QColor("Blue"));
+        ui->widget->drawDataToChart("Simulated", sim_histo->range, sim_histo->bin, sim_histo->n, QColor("Blue"));
     }
     if(ref_histo) {
-        ui->widget->drawDataToChart("Reference", ref_histo->bin, ref_histo->n, QColor("Gray"));
+        ui->widget->drawDataToChart("Reference", ref_histo->range, ref_histo->bin, ref_histo->n, QColor("Gray"));
     }
     if(ws) {
         gsl_histogram *histo = NULL;
@@ -446,7 +451,7 @@ void MainWindow::plotSpectrum(size_t i_det)
                         } else {
                             name.append(jibal_element_name(jibal->elements, r->r->target->Z));
                         }
-                        ui->widget->drawDataToChart(name, histo->bin, histo->n, SpectrumPlot::getColor(colorindex));
+                        ui->widget->drawDataToChart(name, histo->range, histo->bin, histo->n, SpectrumPlot::getColor(colorindex));
                         colorindex++;
                         ui->widget->setGraphVisibility(ui->widget->graph(), false);
                         gsl_histogram_free(histo);
@@ -536,6 +541,7 @@ void MainWindow::on_action_New_File_triggered()
     filebasename.clear();
     QDir::setCurrent(originalPath);
     setNeedsSaving(false);
+
 }
 
 
@@ -702,5 +708,18 @@ void MainWindow::on_actionIDF_triggered()
     } else {
         QMessageBox::critical(this, "Error", QString("Could not import file %1.\n\nidf2jbs failed with error: %2.\n").arg(filename).arg(idf_error_code_to_str(idferr)));
     }
+}
+
+void MainWindow::onEnergyAxisSet(bool value)
+{
+    size_t i_det = ui->plotSpinBox->value() - 1;
+    plotSpectrum(i_det);
+    ui->widget->resetZoom();
+    settings.setValue("energyAxis", value);
+}
+
+void MainWindow::onSpectrumLegendMoved(bool outside)
+{
+    settings.setValue("legendOutside", outside);
 }
 

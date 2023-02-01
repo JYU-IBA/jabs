@@ -12,7 +12,7 @@ class SpectrumPlot : public QCustomPlot
     Q_OBJECT
 public:
     explicit SpectrumPlot(QWidget *parent=nullptr);
-    void drawDataToChart(const QString &name, double *data, int n, const QColor &color);
+    void drawDataToChart(const QString &name, double *range, double *bin, int n, const QColor &color);
     void setGraphVisibility(QCPGraph *graph, bool visible);
     void clearAll();
     void updateVerticalRange(bool force = false);
@@ -38,6 +38,8 @@ protected:
 
 signals:
     void rangeSelected(QString);
+    void energyAxisSet(bool);
+    void legendMoved(bool outside);
 
 public slots:
     void setLogScale(bool value);
@@ -48,6 +50,7 @@ public slots:
     void setSelectRect(bool value);
     void startSelection();
     void startZoom();
+    void setEnergyAxis(bool value);
 
     void updateMaxima();
     void resetZoom();
@@ -75,13 +78,14 @@ private:
     QAction *autoRangeAction;
     QAction *legendOutsideAction;
     QAction *zoomAction;
+    QAction *energyScaleAction;
     QCPLayoutGrid *subLayout;
     QCPItemText *coordinatesText;
-    void moveLegendOutside();
-    void moveLegendInside();
+    void moveLegend(bool outside);
     bool legendOutside;
     bool selectRect;
     int zoom;
+    bool energyAxis;
 };
 
 #endif // SPECTRUMPLOT_H

@@ -1,12 +1,14 @@
 #include "spectrumplot.h"
+extern "C" {
+#include <jibal_units.h>
+}
 
 SpectrumPlot::SpectrumPlot(QWidget *parent) : QCustomPlot(parent) {
     subLayout = NULL;
     setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
     setSelectRect(false);
-    xAxis->setLabel("Channel");
     yAxis->setLabel("Counts");
-    moveLegendInside();
+    moveLegend(false);
     legend->setBorderPen(QPen(Qt::NoPen));
     legend->setBrush(QBrush(QColor(255,255,255,127)));
     legend->setSelectableParts(QCPLegend::spItems);
@@ -33,6 +35,10 @@ SpectrumPlot::SpectrumPlot(QWidget *parent) : QCustomPlot(parent) {
     zoomAction->setCheckable(true);
     connect(zoomAction, &QAction::triggered, this, &SpectrumPlot::setZoom);
     setZoom(false);
+    energyScaleAction = new QAction("Energy axis", this);
+    energyScaleAction->setCheckable(true);
+    connect(energyScaleAction, &QAction::triggered, this, &SpectrumPlot::setEnergyAxis);
+    setEnergyAxis(false);
     coordinatesText = new QCPItemText(this);
     coordinatesText->setText("");
     coordinatesText->setPositionAlignment(Qt::AlignLeft | Qt::AlignBottom);
@@ -44,7 +50,7 @@ SpectrumPlot::SpectrumPlot(QWidget *parent) : QCustomPlot(parent) {
     connect(this->selectionRect(), &QCPSelectionRect::accepted, this, &SpectrumPlot::selectionAccepted);
 }
 
-void SpectrumPlot::drawDataToChart(const QString &name, double *data, int n, const QColor &color)
+void SpectrumPlot::drawDataToChart(const QString &name, double *range, double *bin, int n, const QColor &color)
 {
     addGraph();
     //graph()->setSelectable(QCP::SelectionType::stDataRange);
@@ -56,21 +62,35 @@ void SpectrumPlot::drawDataToChart(const QString &name, double *data, int n, con
     graph()->selectionDecorator()->setPen(graphPen);
     graph()->setName(name);
     double maxy = 0.0;
-    double maxx = 0.0;
+    int max_i = 0;
     for(int i = 0; i < n; ++i) {
-        if(data[i] > maxy) {
-            maxy = data[i];
+        if(bin[i] > maxy) {
+            maxy = bin[i];
         }
-        if(data[i] > 0.0) {
-            maxx = i;
+        if(bin[i] > 0.0) {
+            max_i = i;
         }
-        graph()->addData(i, data[i]);
+        if(energyAxis) {
+            graph()->addData(range[i] / C_KEV, bin[i]);
+        } else {
+            graph()->addData(i, bin[i]);
+        }
     }
-    maxx += 1.0; /* We want to see the right-hand edge of the highest bin, too.*/
-    if(maxy > data_ymax)
+    double xmax_new;
+    if(energyAxis) {
+        xmax_new = range[max_i + 1] / C_KEV; /* There are n+1 ranges, so this is always safe. */
+        graph()->addData(xmax_new, 0.0);
+    } else {
+        max_i++; /* We want to see the right-hand edge of the highest bin, too.*/
+        xmax_new = max_i;
+    }
+    if(xmax_new > xmax) {
+        xmax = xmax_new;
+    }
+    if(maxy > data_ymax) {
         data_ymax = maxy;
-    if(maxx > xmax)
-        xmax = maxx;
+    }
+    qDebug() << "Might have set xmax" << xmax << "based on xmax_new" << xmax_new;
     setVisible(true);
 }
 
@@ -189,6 +209,20 @@ void SpectrumPlot::setZoom(bool value)
     zoomAction->setChecked(zoom);
 }
 
+void SpectrumPlot::setEnergyAxis(bool value)
+{
+    energyScaleAction->setChecked(value);
+    if(value) {
+        xAxis->setLabel("Energy (keV)");
+    } else {
+        xAxis->setLabel("Channel");
+    }
+    if(energyAxis != value) {
+        energyAxis = value;
+        emit energyAxisSet(value);
+    }
+}
+
 void SpectrumPlot::updateMaxima()
 {
     free(subLayout);
@@ -196,6 +230,7 @@ void SpectrumPlot::updateMaxima()
 
 void SpectrumPlot::resetZoom()
 {
+    qDebug() << "Reset zoom, xmin" << xmin << "xmax" << xmax;
     xAxis->setRange(xmin, xmax);
     updateVerticalRange(true);
     replot();
@@ -222,6 +257,8 @@ SpectrumPlot::~SpectrumPlot() {
     delete logAction;
     delete autoRangeAction;
     delete legendOutsideAction;
+    delete zoomAction;
+    delete energyScaleAction;
 }
 
 const QColor SpectrumPlot::getColor(int index)
@@ -353,29 +390,31 @@ QStringList SpectrumPlot::visibleGraphs()
     return result;
 }
 
-void SpectrumPlot::moveLegendOutside()
+void SpectrumPlot::moveLegend(bool outside)
 {
-    if(subLayout) {
-        return;
+    if(outside) {
+        if(subLayout) {
+            return;
+        }
+        subLayout = new QCPLayoutGrid;
+        plotLayout()->addElement(0, 1, subLayout);
+        subLayout->setMargins(QMargins(5, 0, 5, 5));
+        subLayout->addElement(0, 0, legend);
+        plotLayout()->setColumnStretchFactor(1, 0.001);
+        legend->setWrap(20);
+        legend->setFillOrder(QCPLegend::foRowsFirst);
+    } else { /* Inside */
+        axisRect()->insetLayout()->addElement(legend, Qt::AlignRight|Qt::AlignTop);
+        legend->setWrap(5);
+        legend->setFillOrder(QCPLegend::foColumnsFirst);
+        delete subLayout; /* This is no longer needed */
+        subLayout = NULL;
     }
-    subLayout = new QCPLayoutGrid;
-    plotLayout()->addElement(0, 1, subLayout);
-    subLayout->setMargins(QMargins(5, 0, 5, 5));
-    subLayout->addElement(0, 0, legend);
-    plotLayout()->setColumnStretchFactor(1, 0.001);
-    legend->setWrap(20);
-    legend->setFillOrder(QCPLegend::foRowsFirst);
-    legendOutside = true;
-}
-
-void SpectrumPlot::moveLegendInside()
-{
-    axisRect()->insetLayout()->addElement(legend, Qt::AlignRight|Qt::AlignTop);
-    legend->setWrap(5);
-    legend->setFillOrder(QCPLegend::foColumnsFirst);
-    legendOutside = false;
-    delete subLayout; /* This is no longer needed */
-    subLayout = NULL;
+    if(legendOutside != outside) { /* Actual change */
+        qDebug() << "Old outside" << legendOutside << "new outside" << outside;
+        legendOutside = outside;
+        emit legendMoved(outside);
+    }
 }
 
 void SpectrumPlot::setGraphVisibility(QCPGraph *g, bool visible) {
@@ -401,9 +440,11 @@ void SpectrumPlot::contextMenuRequest(const QPoint &pos)
 
             }
         }
-    } if(yAxis->selectTest(pos, false) >=0) {
+    } if(yAxis->selectTest(pos, false) >= 0) {
         menu->addAction(logAction);
         menu->addAction(autoRangeAction);
+    } else if(xAxis->selectTest(pos, false) >= 0) {
+        menu->addAction(energyScaleAction);
     } else {
       if(selectedGraphs().size() > 0) {
         QString name = selectedGraphs().at(0)->name();
@@ -484,6 +525,7 @@ QCPGraph *SpectrumPlot::graphWithLegendItem(const QCPAbstractLegendItem *item)
 
 void SpectrumPlot::setLegendOutside(bool value)
 {
+    qDebug() << "setLegendOutside(" << value << ") called";
     if(!legend->visible())
         value = false; /* When legend is not visible, override. This prevents an empty box outside the plot. */
     legendOutsideAction->blockSignals(true);
@@ -491,10 +533,7 @@ void SpectrumPlot::setLegendOutside(bool value)
     legendOutsideAction->blockSignals(false);
     if(value == legendOutside) /* Legend is already where it is supposed to be */
         return;
-    if(value)
-        moveLegendOutside();
-    else
-        moveLegendInside();
+    moveLegend(value);
     if(autorange) { /* We have different y-range scaling depending on the location of the legend */
         updateVerticalRange();
     }
@@ -504,6 +543,8 @@ void SpectrumPlot::setLegendOutside(bool value)
 void SpectrumPlot::setLegendVisible(bool value)
 {
     legend->setVisible(value);
-    if(legendOutside)
-        moveLegendInside();
+    if(!value && legendOutside) { /* When legend is not visible, move it "inside" */
+        moveLegend(false);
+    }
+    legendOutsideAction->setEnabled(value);
 }

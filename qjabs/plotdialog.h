@@ -29,11 +29,13 @@ signals:
     void closed();
     void settingsSaved();
 
+public slots:
+    void readSettings();
+
 private slots:
     void on_isotopesCheckBox_stateChanged(int arg1);
     void buttonClicked(const QAbstractButton *button);
     void finish(int result);
-    void readSettings();
     void saveSettings();
 
 private:

@@ -89,6 +89,10 @@ private slots:
 
     void on_actionIDF_triggered();
 
+    void onEnergyAxisSet(bool value); /* SpectrumPlot x axis change from channels to energy or vice versa. value true for energy. */
+
+    void onSpectrumLegendMoved(bool outside);
+
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);
