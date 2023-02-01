@@ -84,13 +84,12 @@ void SpectrumPlot::drawDataToChart(const QString &name, double *range, double *b
         max_i++; /* We want to see the right-hand edge of the highest bin, too.*/
         xmax_new = max_i;
     }
-    if(xmax_new > xmax) {
+    if(xmax_new > xmax) { /* Only increase, since multiple spectra are plotted. clearAll() has reset xmax. */
         xmax = xmax_new;
     }
     if(maxy > data_ymax) {
         data_ymax = maxy;
     }
-    qDebug() << "Might have set xmax" << xmax << "based on xmax_new" << xmax_new;
     setVisible(true);
 }
 
@@ -106,7 +105,6 @@ bool SpectrumPlot::eventFilter(QObject *obj, QEvent *event)
 {
     if(event->type() == QEvent::KeyPress) {
         QKeyEvent *ke = static_cast<QKeyEvent *>(event);
-        //qDebug() << "You pushed key " << ke->key();
         if(ke->key() == Qt::Key_Escape) {
             selectionRect()->cancel();
         }
@@ -230,7 +228,6 @@ void SpectrumPlot::updateMaxima()
 
 void SpectrumPlot::resetZoom()
 {
-    qDebug() << "Reset zoom, xmin" << xmin << "xmax" << xmax;
     xAxis->setRange(xmin, xmax);
     updateVerticalRange(true);
     replot();
@@ -411,7 +408,6 @@ void SpectrumPlot::moveLegend(bool outside)
         subLayout = NULL;
     }
     if(legendOutside != outside) { /* Actual change */
-        qDebug() << "Old outside" << legendOutside << "new outside" << outside;
         legendOutside = outside;
         emit legendMoved(outside);
     }
@@ -525,7 +521,6 @@ QCPGraph *SpectrumPlot::graphWithLegendItem(const QCPAbstractLegendItem *item)
 
 void SpectrumPlot::setLegendOutside(bool value)
 {
-    qDebug() << "setLegendOutside(" << value << ") called";
     if(!legend->visible())
         value = false; /* When legend is not visible, override. This prevents an empty box outside the plot. */
     legendOutsideAction->blockSignals(true);

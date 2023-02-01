@@ -46,7 +46,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
 void sim_workspace_calculate_sum_spectra(sim_workspace *ws);
 
 void sim_workspace_histograms_reset(sim_workspace *ws);
-void sim_workspace_histograms_calculate(sim_workspace *ws);
+size_t sim_workspace_histograms_calculate(sim_workspace *ws);
 void sim_workspace_histograms_scale(sim_workspace *ws, double scale);
 int sim_workspace_print_spectra(const sim_workspace *ws, const char *filename, const gsl_histogram *histo_iter, const gsl_histogram *exp);
 int sim_workspace_print_bricks(const sim_workspace *ws, const char *filename);

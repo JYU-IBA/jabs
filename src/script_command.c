@@ -1534,6 +1534,7 @@ script_command_status script_load_experimental(script_session *s, int argc, char
             } else {
                 const gsl_histogram *h = fit->exp[i_det];
                 jabs_message(MSG_VERBOSE, stderr, "Detector %zu: experimental spectrum with %zu channels loaded.\n", i_det + 1, h?h->n:0);
+                spectrum_set_calibration(fit_data_exp(fit, i_det), sim_det(fit->sim, i_det), JIBAL_ANY_Z);
             }
         }
     }

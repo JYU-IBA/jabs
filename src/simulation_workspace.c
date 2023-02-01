@@ -203,7 +203,8 @@ void sim_workspace_histograms_reset(sim_workspace *ws) {
     }
 }
 
-void sim_workspace_histograms_calculate(sim_workspace *ws) {
+size_t sim_workspace_histograms_calculate(sim_workspace *ws) {
+    size_t n_meaningful = 0;
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = ws->reactions[i];
         if(!r)
@@ -217,7 +218,10 @@ void sim_workspace_histograms_calculate(sim_workspace *ws) {
         }
         bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
         bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->params->gaussian_accurate);
+        r->empty = FALSE;
+        n_meaningful++;
     }
+    return n_meaningful;
 }
 
 void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {

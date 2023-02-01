@@ -124,7 +124,6 @@ void MainWindow::openFile(const QString &filename)
 }
 
 void MainWindow::runRoi(const QString &roi) {
-    qDebug() << "Got ROI" << roi;
     runLine(QString("roi %1 %2").arg(ui->plotSpinBox->value()).arg(roi));
 }
 
@@ -155,20 +154,16 @@ int MainWindow::runLine(const QString &line) {
 
 void MainWindow::plotSession(bool error)
 {
-    if(session && session->fit && session->fit->sim && session->fit->n_ws && !error) {
-        ui->plotSpinBox->setMaximum(session->fit->n_ws);
-        ui->plotSettingsGroupBox->setVisible(session->fit->n_ws > 1);
+    if(session && session->fit && session->fit->sim && !error) {
+        ui->plotSpinBox->setMaximum(session->fit->sim->n_det);
+        ui->plotSettingsGroupBox->setVisible(session->fit->sim->n_det > 1);
         plotSpectrum(ui->plotSpinBox->value() - 1);
         if(firstRun) {
-            qDebug() << "First run, resetting zoom.";
             ui->widget->resetZoom();
-            firstRun = false;
         }
-        ui->widget->setVisible(true);
     } else {
         ui->plotSettingsGroupBox->setVisible(false);
         ui->widget->setVisible(false);
-        firstRun = true;
     }
 }
 
@@ -339,7 +334,7 @@ int MainWindow::fitCallback(fit_stats stats)
     }
     fitDialog->updateStats(stats);
     if(fitDialog->isPlotWhileFitting()) {
-        plotSession(stats.error < 0);
+        plotSession(/*stats.error < 0*/);
     }
     return fitDialog->isAborted();
 }
@@ -384,7 +379,12 @@ void MainWindow::on_action_Run_triggered()
     closeFitDialog();
     enableRun(true);
     ui->msgTextBrowser->ensureCursorVisible();
-    plotSession(error);
+    plotSession(/*error */);
+    if(error) {
+        firstRun = true;
+    } else {
+        firstRun = false;
+    }
 }
 
 
@@ -396,12 +396,10 @@ void MainWindow::on_plotSpinBox_valueChanged(int arg1)
 void MainWindow::plotSpectrum(size_t i_det)
 {
     ui->widget->clearAll();
-    if(!session || !session->fit || !session->fit->sim) {
+    if(!session || !session->fit || !session->fit->sim || i_det >= session->fit->sim->n_det) {
         ui->widget->replot();
         return;
     }
-    if(i_det >= session->fit->sim->n_det)
-        return;
     gsl_histogram *sim_histo = fit_data_histo_sum(session->fit, i_det);
     gsl_histogram *exp_histo = fit_data_exp(session->fit, i_det);
     gsl_histogram *ref_histo = session->fit->ref;
@@ -418,49 +416,58 @@ void MainWindow::plotSpectrum(size_t i_det)
     if(ws) {
         gsl_histogram *histo = NULL;
         int colorindex = 0;
-        for(int i = 0; i < session->fit->sim->n_reactions; ++i) {
+        for(int i = 0; i < ws->n_reactions; ++i) {
             const sim_reaction *r = ws->reactions[i];
+            if(!r) {
+                continue;
+            }
             const sim_reaction *r_next = NULL;
             if(i+1 < ws->n_reactions) {
                 r_next = ws->reactions[i+1];
             }
-            if(!r)
+            if(!r->histo || r->histo->n == 0) { /* No or empty histogram, shouldn't happen. */
                 continue;
-            if(r->last_brick == 0)
+            }
+            if(r->empty) { /* Nobody has even attempted to add anything here. */
                 continue;
-            if(r->n_bricks > 0 && r->histo->n > 0) {
-                if(histo) {
-                    for(size_t i = 0; i < histo->n && i < r->histo->n; i++) {
-                        /* ignores different ranges in GSL histograms */
-                        histo->bin[i] += r->histo->bin[i];
-                    }
-                } else {
-                    histo = gsl_histogram_clone(r->histo);
+            }
+            if(histo) {
+                for(size_t i = 0; i < histo->n && i < r->histo->n; i++) {
+                    /* ignores different ranges in GSL histograms */
+                    histo->bin[i] += r->histo->bin[i];
                 }
-                bool showThisIsotope = showIsotopes &&  (plotIsotopesZ == JIBAL_ANY_Z || plotIsotopesZ == r->r->target->Z);
-                if(showThisIsotope || !r_next || (r->r->type != r_next->r->type || r->r->target->Z != r_next->r->target->Z)) {
-                    /* Plot histo if:
+            } else {
+                histo = gsl_histogram_clone(r->histo);
+            }
+            bool showThisIsotope = showIsotopes &&  (plotIsotopesZ == JIBAL_ANY_Z || plotIsotopesZ == r->r->target->Z);
+            if(showThisIsotope || !r_next || (r->r->type != r_next->r->type || r->r->target->Z != r_next->r->target->Z)) {
+                /* Plot histo if:
                      * 1. If show isotopes is set and Z is JIBAL_ANY_Z or matches with target->Z
                      * 2. If this is the last reaction (there is no r_next), therefore the last histogram
                      * 3. Next reaction has different type (e.g. RBS vs ERD) or different Z
                      * */
-                    if(histo) {
-                        QString name = QString("") + reaction_name(r->r) + " ";
-                        if(showThisIsotope) {
-                            name.append(r->r->target->name);
-                        } else {
-                            name.append(jibal_element_name(jibal->elements, r->r->target->Z));
-                        }
-                        ui->widget->drawDataToChart(name, histo->range, histo->bin, histo->n, SpectrumPlot::getColor(colorindex));
-                        colorindex++;
-                        ui->widget->setGraphVisibility(ui->widget->graph(), false);
-                        gsl_histogram_free(histo);
-                        histo = NULL;
+                if(histo) {
+                    QString name = QString("") + reaction_name(r->r) + " ";
+                    if(showThisIsotope) {
+                        name.append(r->r->target->name);
+                    } else {
+                        name.append(jibal_element_name(jibal->elements, r->r->target->Z));
                     }
+                    ui->widget->drawDataToChart(name, histo->range, histo->bin, histo->n, SpectrumPlot::getColor(colorindex));
+                    colorindex++;
+                    ui->widget->setGraphVisibility(ui->widget->graph(), false);
+                    gsl_histogram_free(histo);
+                    histo = NULL;
                 }
             }
         }
     }
+    if(ui->widget->graphCount() == 0) {
+        ui->widget->setVisible(false);
+        return;
+    }
+    ui->widget->setVisible(true);
+
     for(int i = 0; i < ui->widget->graphCount(); ++i) {
         QString name = ui->widget->graph(i)->name();
         ui->widget->setGraphVisibility(ui->widget->graph(i), visibleGraphs.contains(name));
@@ -613,7 +620,7 @@ void MainWindow::on_commandLineEdit_returnPressed()
     if(status == SCRIPT_COMMAND_SUCCESS) {
             ui->commandLineEdit->clear();
     }
-    plotSession(status < 0);
+    plotSession(/*status < 0*/);
 }
 
 void MainWindow::on_msgTextBrowser_textChanged()
@@ -664,7 +671,6 @@ void MainWindow::postInit()
 void MainWindow::on_action_Plot_triggered()
 {
     if(plotDialog) {
-        qDebug() << "Plot dialog already exists.";
         plotDialog->show();
         plotDialog->raise();
         return;

@@ -26,6 +26,7 @@ sim_reaction *sim_reaction_init(const ion *incident_ion, const jibal_isotope *is
     sim_r->r = r;
     ion *p = &sim_r->p;
     ion_reset(p);
+    sim_r->empty = TRUE;
     sim_r->max_depth = 0.0;
     sim_r->i_isotope = sample->n_isotopes; /* Intentionally not valid */
 

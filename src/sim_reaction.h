@@ -26,6 +26,7 @@ typedef struct sim_reaction {
     size_t n_bricks;
     size_t last_brick; /* inclusive, from 0 up to n_bricks-1 */
     int stop;
+    int empty; /* Set to TRUE on sim_reaction_init(), then to false when bricks are convoluted. Note that simulate_init_reaction() does not reset this, allowing persistence over multiple simulations (like in DS). */
     double max_depth;
     size_t i_isotope; /* Number of isotope (r->target) in sample->isotopes */
     double theta; /* theta used in simulations (will be overwritten by simulate() when necessary) */

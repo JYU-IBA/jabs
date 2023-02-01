@@ -437,7 +437,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     des_table *dt = des_table_compute(&ws->stop, &ws->stragg, ws->params, sample, incident, depth_start, ws->emin); /* Depth, energy and straggling of incident ion */
     if(!dt) {
         jabs_message(MSG_ERROR, stderr, "DES table computation failed.\n");
-        return EXIT_FAILURE;
+        return -1;
     }
 #ifdef DEBUG
     des_table_print(stderr, dt);
@@ -456,8 +456,8 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
 #endif
     }
     des_table_free(dt);
-    sim_workspace_histograms_calculate(ws);
-    return EXIT_SUCCESS;
+    size_t n_meaningful = sim_workspace_histograms_calculate(ws);
+    return (int)n_meaningful;
 }
 
 void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim_calc_params *params, const geostragg_vars *g, double E_min, double E_max) {
@@ -571,7 +571,7 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
 }
 
 int simulate_with_roughness(sim_workspace *ws) {
-    int status = EXIT_SUCCESS;
+    int status = 0;
     double p_sr = ws->sim->fluence;
     size_t n_rl = 0; /* Number of rough layers */
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
@@ -663,8 +663,9 @@ int simulate_with_roughness(sim_workspace *ws) {
         ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
         sample_thickness_recalculate(sample_rough);
         status = simulate(&ws->ion, depth_seek(ws->sample, 0.0), ws, sample_rough);
-        if(status != EXIT_SUCCESS)
+        if(status < 0) {
             break;
+        }
     }
     for(size_t i = 0; i < n_rl; i++) {
         thickness_probability_table_free(tpds[i]);
@@ -680,7 +681,7 @@ int simulate_with_ds(sim_workspace *ws) {
         return EXIT_FAILURE;
     }
     double fluence = ws->fluence;
-    if(simulate_with_roughness(ws)) {
+    if(simulate_with_roughness(ws) < 0) {
         return EXIT_FAILURE;
     }
     if(!ws->params->ds) {
@@ -700,18 +701,20 @@ int simulate_with_ds(sim_workspace *ws) {
     const jibal_isotope *incident = ws->sim->beam_isotope;
     int last = FALSE;
     jabs_message(MSG_VERBOSE, stderr, "Dual scattering simulation starts.\n\n");
+    double emin = ws->emin;
+
     while(1) {
         if(last) {
             break;
         }
         double E_front = ion1.E;
-        if(E_front <= ws->emin)
+        if(E_front <= emin)
             break;
         double E_step = ws->params->ds_incident_stop_step_factor * stop_step_calc(&ws->params->incident_stop_params, &ion1);
-        if(E_front - E_step <= ws->emin) { /* Fix last step to be "just enough" */
+        if(E_front - E_step <= emin) { /* Fix last step to be "just enough" */
             last = TRUE;
-            E_step = E_front - ws->emin;
-            if(E_step < ws->emin * 0.2) { /* The step would be really small, let's not take it */
+            E_step = E_front - emin;
+            if(E_step < emin * 0.2) { /* The step would be really small, let's not take it */
                 break;
             }
         }
@@ -722,8 +725,9 @@ int simulate_with_ds(sim_workspace *ws) {
         double E_back = ion1.E;
         const double E_mean = (E_front + E_back) / 2.0;
 
-        jabs_message(MSG_VERBOSE, stderr, "\rDS depth from %9.3lf tfu to %9.3lf tfu, E from %6.1lf keV to %6.1lf keV", d_before.x / C_TFU, d_after.x / C_TFU, E_front / C_KEV,
+        jabs_message(MSG_VERBOSE, stderr, "\rDS depth from %9.3lf to %9.3lf tfu, E from %6.1lf to %6.1lf keV.", d_before.x / C_TFU, d_after.x / C_TFU, E_front / C_KEV,
                      E_back / C_KEV);
+        int n_running = 0; /* How many reactions are still producing data, largest number of all simulations for this depth step. */
         for(int i_polar = 0; i_polar < ds_steps_polar; i_polar++) {
             const double ds_polar_min = 20.0 * C_DEG;
             const double ds_polar_max = 180.0 * C_DEG;
@@ -763,8 +767,12 @@ int simulate_with_ds(sim_workspace *ws) {
                     }
 #endif
                     if(scatangle > 19.99999 * C_DEG) {
-                        if(simulate(&ion2, d_halfdepth, ws, ws->sample)) {
+                        int n_ok = simulate(&ion2, d_halfdepth, ws, ws->sample);
+                        if(n_ok < 0) {
                             return EXIT_FAILURE;
+                        }
+                        if(n_ok > n_running) {
+                            n_running = n_ok;
                         }
                     }
                 }
@@ -773,6 +781,10 @@ int simulate_with_ds(sim_workspace *ws) {
         if(ws->sample->ranges[ws->sample->n_ranges - 1].x - d_after.x < 0.01 * C_TFU)
             break;
         d_before = d_after;
+        jabs_message(MSG_VERBOSE, stderr, " %3i reactions ok.", n_running);
+        if(n_running == 0) {
+            break;
+        }
     }
     jabs_message(MSG_VERBOSE, stderr, "\nDual scattering simulation complete.\n");
     sim_workspace_calculate_sum_spectra(ws);
