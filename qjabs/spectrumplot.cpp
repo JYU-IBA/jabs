@@ -77,16 +77,18 @@ void SpectrumPlot::drawDataToChart(const QString &name, double *range, double *b
         }
     }
     double xmax_new;
+    max_i++; /* We want to see the right-hand edge of the highest bin, too.*/
     if(energyAxis) {
-        xmax_new = range[max_i + 1] / C_KEV; /* There are n+1 ranges, so this is always safe. */
-        graph()->addData(xmax_new, 0.0);
+        xmax_new = range[max_i] / C_KEV; /* There are n+1 ranges, so this is always safe, even with max_i++. */
     } else {
-        max_i++; /* We want to see the right-hand edge of the highest bin, too.*/
         xmax_new = max_i;
     }
+    graph()->addData(xmax_new, 0.0); /* Add an extra point (zero) */
+
     if(xmax_new > xmax) { /* Only increase, since multiple spectra are plotted. clearAll() has reset xmax. */
         xmax = xmax_new;
     }
+    xmax += 1.0;  /* Add one channel or one keV, just so that the maximum is a little bit better visible */
     if(maxy > data_ymax) {
         data_ymax = maxy;
     }
@@ -215,6 +217,8 @@ void SpectrumPlot::setEnergyAxis(bool value)
     } else {
         xAxis->setLabel("Channel");
     }
+    setZoom(false); /* Abort zooming when axis changes */
+    setSelectRect(false); /* Abort selection when axis changes */
     if(energyAxis != value) {
         energyAxis = value;
         emit energyAxisSet(value);
@@ -449,7 +453,9 @@ void SpectrumPlot::contextMenuRequest(const QPoint &pos)
     }
     menu->addAction("Reset zoom", this, &SpectrumPlot::resetZoom);
     menu->addAction(zoomAction);
-    menu->addAction("Select range and copy to clipboard", this, &SpectrumPlot::startSelection);
+    if(!energyAxis) { /* Selection of ranges is only implemented when X axis is channels */
+        menu->addAction("Select range and copy to clipboard", this, &SpectrumPlot::startSelection);
+    }
 #ifdef SAVING_QCUSTOMPLOT_PDF_DOES_NOT_CRASH
     menu->addAction("Save as file...", this, &SpectrumPlot::saveAsFile);
 #endif
