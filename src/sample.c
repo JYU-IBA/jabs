@@ -694,7 +694,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
         sample_model_free(sm);
         sm = sm2;
 #ifdef DEBUG_VERBOSE
-        DEBUGVERBOSESTR(Sample model after splitting elements:");
+        DEBUGVERBOSESTR("Sample model after splitting elements:");
         sample_model_print(NULL, sm);
 #endif
     }
@@ -930,7 +930,7 @@ int isotope_compar(const void *a, const void *b) {
 
 void sample_range_copy(sample_range *dst, const sample_range *src) {
     *dst = *src;
-    assert(src->rough.model == ROUGHNESS_FILE && src->rough.file != NULL || src->rough.model != ROUGHNESS_FILE); /* checks that file is NOT null */
+    assert((src->rough.model == ROUGHNESS_FILE && src->rough.file != NULL) || src->rough.model != ROUGHNESS_FILE); /* checks that file is NOT null */
     dst->rough.file = roughness_file_copy(src->rough.file);
 #ifdef DEBUG
     if(src->rough.file || dst->rough.file) {

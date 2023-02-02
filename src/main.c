@@ -63,7 +63,7 @@ int idf2jbs(int argc, char * const *argv) {
 int main(int argc, char * const *argv) {
     DEBUGMSG("This is a debug build, version %s", jabs_version());
     if(git_populated()) {
-        DEBUGMSG("%sGit build. branch %s, commit %s, date %s%s",
+        DEBUGMSG("%sGit build. branch %s, commit %s, date %s",
                  git_dirty() ? "Dirty " : "", git_branch(), git_commit_sha1(), git_commit_date());
     }
     if(argc >= 2 && strcmp(argv[1], "idf2jbs") == 0) {
