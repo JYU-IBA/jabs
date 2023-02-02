@@ -249,6 +249,8 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
     int skipped, crossed, last = FALSE;
     sim_r->last_brick = 0;
     const des *des_min = des_table_min_energy_bin(dt);
+    int product_and_incident_go_in_different_directions = (incident->inverse_cosine_theta * sim_r->p.inverse_cosine_theta < 0.0); /* false when transmission, true usually. */
+    /* When the above is true, we can safely assume that once reaction product energy goes below some energy, we can stop calculating. */
     for(size_t i_brick = 0; i_brick < sim_r->n_bricks; i_brick++) {
         assert(ion1.S >= 0.0);
         skipped = FALSE;
@@ -351,7 +353,7 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
                 crossed + skipped
                 );
         assert(!isnan(ion1.E));
-        if(b->E - sqrt(b->S) < ws->emin) {
+        if(product_and_incident_go_in_different_directions && b->E - sqrt(b->S) < ws->emin) { /* Reaction product energy decreases as incident ion energy decreases */
             sim_r->last_brick = i_brick;
             DEBUGMSG("Brick E = %g keV sufficiently below emin.", b->E / C_KEV);
             break;
@@ -634,6 +636,7 @@ int simulate_with_ds(sim_workspace *ws) {
     int ds_steps_polar = ws->params->ds_steps_polar;
     int ds_steps_azi = ws->params->ds_steps_azi;
     sim_calc_params_defaults_fast(ws->params); /* This makes DS faster. Changes to ws->params are not reverted, but they don't affect original sim settings */
+    ws->params->incident_stop_params.min *= 3.0;
     sim_calc_params_update(ws->params);
     jabs_message(MSG_ERROR, stderr, "\n");
     const jibal_isotope *incident = ws->sim->beam_isotope;

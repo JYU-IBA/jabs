@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <jibal_units.h>
 #include <gsl/gsl_sf_erf.h>
+#include <gsl/gsl_math.h>
 #include "brick.h"
 
 extern inline double erf_Q_fast(double x) { /* Approximative gaussian CDF */
@@ -15,7 +16,7 @@ void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, b
     }
 }
 
-void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, const double scale, const double sigmas_cutoff, int accurate) {
+void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, const double scale, const double sigmas_cutoff, double emin, int accurate) {
     double (*erf_Q)(double);
     if(accurate) {
         erf_Q = gsl_sf_erf_Q;
@@ -37,6 +38,9 @@ void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, 
             E_cutoff_low = b_high->E - b_high->S_sum * sigmas_cutoff;
             E_cutoff_high = b_low->E + b_low->S_sum * sigmas_cutoff;
         }
+        if(b_low->E < emin)
+            continue;
+        E_cutoff_low = GSL_MAX_DBL(E_cutoff_low, emin);
         double b_w_inv = 1.0/(b_high->E - b_low->E); /* inverse of brick width (in energy) */
         size_t lo = 0, mi, hi = h->n;
         while(hi - lo > 1) { /* Find histogram range with E_cutoff. This should be safe. */

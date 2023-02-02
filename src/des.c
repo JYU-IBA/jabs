@@ -209,7 +209,7 @@ des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, con
             ion.theta / C_DEG, ion.inverse_cosine_theta);
     do {
         if(i == dt->n) {
-            DEBUGMSG("DES table reallocation, size %zu reached.", dt->n);
+            DEBUGMSG("DES table reallocation, size %zu reached when E = %g keV.", dt->n, ion.E / C_KEV);
             if(des_table_realloc(dt, dt->n * 2)) {
                 break;
             }

@@ -75,6 +75,7 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
     }
     assert(h_max >= 0.0);
     assert(h > 0.0);
+    h = GSL_MAX_DBL(h, STOP_STEP_ABSOLUTE_MINIMUM_STEP);
     depth halfdepth, fulldepth;
     halfdepth.i = depth_before.i;
     if(h >= h_max) { /* Depth step would take us beyond a depth range. We stop exactly on the boundary */
