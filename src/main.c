@@ -28,8 +28,10 @@
 #include <jibal.h>
 #include <jibal_cs.h>
 
+#include "jabs_debug.h"
 #include "defaults.h"
 #include "generic.h"
+#include "git.h"
 #include "options.h"
 #include "sample.h"
 #include "simulation.h"
@@ -59,9 +61,11 @@ int idf2jbs(int argc, char * const *argv) {
 }
 
 int main(int argc, char * const *argv) {
-#ifdef DEBUG
-    fprintf(stderr, "Note: this is a debug build!\n");
-#endif
+    DEBUGMSG("This is a debug build, version %s", jabs_version());
+    if(git_populated()) {
+        DEBUGMSG("%sGit build. branch %s, commit %s, date %s%s",
+                 git_dirty() ? "Dirty " : "", git_branch(), git_commit_sha1(), git_commit_date());
+    }
     if(argc >= 2 && strcmp(argv[1], "idf2jbs") == 0) {
         argc -= 2;
         argv += 2;
@@ -138,18 +142,14 @@ int main(int argc, char * const *argv) {
                     return EXIT_FAILURE;
                 }
                 status = script_process(session);
-#ifdef DEBUG
-                fprintf(stderr, "Script %i/%i given from command line has been processed. Status: %s\n", i+1, argc, script_command_status_to_string(status));
-#endif
+                DEBUGMSG("Script %i/%i given from command line has been processed. Status: %s", i+1, argc, script_command_status_to_string(status));
                 if(status != SCRIPT_COMMAND_SUCCESS) {
 
                     return status;
                 }
             }
         }
-#ifdef DEBUG
-        fprintf(stderr, "All scripts given from command line have been processed.\n");
-#endif
+        DEBUGSTR("All scripts given from command line have been processed.");
         if(cmd_opt->interactive) {
             greeting(TRUE);
             if(script_session_load_script(session, NULL)) {
@@ -162,11 +162,11 @@ int main(int argc, char * const *argv) {
             session->output_filename = strdup("-"); /* If no output filename given, set it to "-" (interpreted as stdout) */
         }
         if(fit_data->sim->rbs) {
-            sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_RBS, sim_cs(fit_data->sim, REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
-            sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_RBS_ALT, sim_cs(fit_data->sim, REACTION_RBS_ALT));
+            sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_RBS, sim_cs(fit_data->sim, REACTION_RBS), TRUE); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
+            sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_RBS_ALT, sim_cs(fit_data->sim, REACTION_RBS_ALT), TRUE);
         }
         if(sim_do_we_need_erd(fit_data->sim)) {
-            sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_ERD, sim_cs(fit_data->sim, REACTION_ERD));
+            sim_reactions_add_auto(fit_data->sim, fit_data->sm, REACTION_ERD, sim_cs(fit_data->sim, REACTION_ERD), TRUE);
         }
         for(size_t i = 0; i < cmd_opt->n_reaction_filenames; i++) {
             sim_reactions_add_r33(fit_data->sim, jibal->isotopes, cmd_opt->reaction_filenames[i]);

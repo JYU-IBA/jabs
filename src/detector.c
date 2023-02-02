@@ -6,6 +6,7 @@
 
 #include <jibal_config.h>
 
+#include "jabs_debug.h"
 #include "generic.h"
 #include "defaults.h"
 #include "detector.h"
@@ -15,24 +16,15 @@
 extern inline double detector_calibrated(const detector *det, int Z, size_t ch);
 
 calibration *detector_get_calibration(const detector *det, int Z) {
-    if(det == NULL || Z < JIBAL_ANY_Z)
-        return NULL;
+    assert(det != NULL && Z >= JIBAL_ANY_Z);
     if(Z == JIBAL_ANY_Z || Z > det->cal_Z_max) {
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Z = %i is either any Z (-1) or larger than %i. Returning default calibration (%p)\n", Z, det->cal_Z_max, (void *)det->calibration);
-#endif
+        DEBUGVERBOSEMSG("Z = %i is either any Z (-1) or larger than %i. Returning default calibration (%p)", Z, det->cal_Z_max, (void *)det->calibration);
         return det->calibration;
-    }
-    assert(det->cal_Z_max > 0 && det->calibration);
-    if(det->calibration_Z[Z]) {
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "There is a Z-specific calibration (%p)\n", (void *)det->calibration_Z[Z]);
-#endif
+    } else if(det->calibration_Z[Z]) {
+        DEBUGVERBOSEMSG("There is a Z-specific calibration (%p)", (void *)det->calibration_Z[Z]);
         return det->calibration_Z[Z];
     } else {
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "There is a table of Z-specific calibrations, but nothing in there for Z = %i. Returning default calibration (%p)\n", Z, (void *)det->calibration);
-#endif
+        DEBUGVERBOSEMSG("There is a table of Z-specific calibrations, but nothing in there for Z = %i. Returning default calibration (%p)", Z, (void *)det->calibration);
         return det->calibration; /* Fallback */
     }
 }
@@ -61,16 +53,11 @@ int detector_set_calibration_Z(const jibal_config *jibal_config, detector *det, 
             det->calibration_Z[i] = NULL;
         }
         det->cal_Z_max = Z;
-#ifdef DEBUG
-        fprintf(stderr, "More space allocated for detector = %p calibrations. Z_max = %i.\n", (void *) det, det->cal_Z_max);
-#endif
+        DEBUGMSG("More space allocated for detector = %p calibrations. Z_max = %i.", (void *) det, det->cal_Z_max);
     }
     calibration_free(det->calibration_Z[Z]);
     det->calibration_Z[Z] = cal;
-#ifdef DEBUG
-    fprintf(stderr, "Calibration initialized (Z = %i) with this: %p.", Z, (void *)cal);
-#endif
-
+    DEBUGMSG("Calibration initialized (Z = %i) with this: %p.", Z, (void *)cal);
     return EXIT_SUCCESS;
 }
 
@@ -109,12 +96,12 @@ detector *detector_default(detector *det) {
         calibration_free(det->calibration);
     }
     det->type = DETECTOR_ENERGY;
-    det->theta = DETECTOR_THETA;
-    det->phi = DETECTOR_PHI;
-    det->solid = DETECTOR_SOLID;
+    det->theta = DETECTOR_THETA_DEFAULT;
+    det->phi = DETECTOR_PHI_DEFAULT;
+    det->solid = DETECTOR_SOLID_DEFAULT;
     det->aperture = NULL;
-    det->distance = DETECTOR_DISTANCE;
-    det->length = DETECTOR_LENGTH;
+    det->distance = DETECTOR_DISTANCE_DEFAULT;
+    det->length = DETECTOR_LENGTH_DEFAULT;
     det->column = 1; /* This implies default file format has channel numbers. Values are in the second column (number 1). */
     det->channels = CHANNELS_MAX_DEFAULT;
     det->compress = 1;
@@ -123,8 +110,8 @@ detector *detector_default(detector *det) {
     det->calibration = calibration_init_linear();
     det->cal_Z_max = -1;
     det->calibration_Z = NULL;
-    calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, ENERGY_SLOPE);
-    calibration_set_param(det->calibration, CALIBRATION_PARAM_RESOLUTION, DETECTOR_RESOLUTION);
+    calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, ENERGY_SLOPE_DEFAULT);
+    calibration_set_param(det->calibration, CALIBRATION_PARAM_RESOLUTION, DETECTOR_RESOLUTION_DEFAULT);
     return det;
 }
 
@@ -149,18 +136,17 @@ void detector_calibrations_free(detector *det) {
     det->cal_Z_max = -1;
 }
 
-int detector_print(const jibal *jibal, const char *filename, const detector *det) {
-    if(!det)
+int detector_print(const jibal *jibal, const detector *det) {
+    if(!det) {
+        DEBUGSTR("Tried to print detector that does not exist.\n");
         return EXIT_FAILURE;
-    FILE *f = fopen_file_or_stream(filename, "w");
-    if(!f)
-        return EXIT_FAILURE;
-    jabs_message(MSG_INFO, f, "type = %s\n", detector_type_name(det));
+    }
+    jabs_message(MSG_INFO, stderr, "type = %s\n", detector_type_name(det));
     char *calib_str = calibration_to_string(det->calibration);
-    jabs_message(MSG_INFO, f, "calibration = %s\n", calib_str);
+    jabs_message(MSG_INFO, stderr, "calibration = %s\n", calib_str);
     free(calib_str);
     char *reso_str = detector_resolution_to_string(det, JIBAL_ANY_Z);
-    jabs_message(MSG_INFO, f, "resolution = %s\n", reso_str);
+    jabs_message(MSG_INFO, stderr, "resolution = %s\n", reso_str);
     free(reso_str);
 
     for(int Z = 0; Z <= (int)det->cal_Z_max; Z++) {
@@ -169,43 +155,41 @@ int detector_print(const jibal *jibal, const char *filename, const detector *det
             continue;
         const char *elem_name = jibal_element_name(jibal->elements, Z);
         char *Z_calib_str = calibration_to_string(c);
-        jabs_message(MSG_INFO, f, "calibration(%s) = %s\n", elem_name, Z_calib_str);
+        jabs_message(MSG_INFO, stderr, "calibration(%s) = %s\n", elem_name, Z_calib_str);
         free(Z_calib_str);
         char *Z_reso_str = detector_resolution_to_string(det, Z);
-        jabs_message(MSG_INFO, f, "resolution(%s) = %s\n", elem_name, Z_reso_str);
+        jabs_message(MSG_INFO, stderr, "resolution(%s) = %s\n", elem_name, Z_reso_str);
         free(Z_reso_str);
     }
     if(det->type == DETECTOR_TOF) {
-        jabs_message(MSG_INFO, f, "length = %g mm\n", det->length/C_MM);
+        jabs_message(MSG_INFO, stderr, "length = %g mm\n", det->length/C_MM);
     }
-    jabs_message(MSG_INFO, f, "theta = %g deg\n", det->theta/C_DEG);
-    jabs_message(MSG_INFO, f, "phi = %g deg\n", det->phi/C_DEG);
+    jabs_message(MSG_INFO, stderr, "theta = %g deg\n", det->theta/C_DEG);
+    jabs_message(MSG_INFO, stderr, "phi = %g deg\n", det->phi/C_DEG);
 #if 0
-    jabs_message(MSG_INFO, f, "angle from horizontal = %.3lf deg\n", detector_angle(det, 'x')/C_DEG);
-    jabs_message(MSG_INFO, f, "angle from vertical = %.3lf deg\n", detector_angle(det, 'y')/C_DEG);
+    jabs_message(MSG_INFO, stderr, "angle from horizontal = %.3lf deg\n", detector_angle(det, 'x')/C_DEG);
+    jabs_message(MSG_INFO, stderr, "angle from vertical = %.3lf deg\n", detector_angle(det, 'y')/C_DEG);
 #endif
-    jabs_message(MSG_INFO, f, "solid = %g msr\n", det->solid/C_MSR);
+
+    jabs_message(MSG_INFO, stderr, "distance = %g mm\n", det->distance/C_MM);
+    jabs_message(MSG_INFO, stderr, "solid = %g msr\n", det->solid/C_MSR);
     if(det->aperture) {
         char *s = aperture_to_string(det->aperture);
-        jabs_message(MSG_INFO, f, "aperture = %s\n", s);
+        jabs_message(MSG_INFO, stderr, "aperture = %s\n", s);
         free(s);
     }
-    jabs_message(MSG_INFO, f, "distance = %g mm\n", det->distance/C_MM);
-#if 0
-    if(det->distance > 1.0*C_MM) {
-        jabs_message(MSG_INFO, f, "solid angle (calculated) = %.4lf msr\n", detector_solid_angle_calc(det)/C_MSR);
+    if(det->distance > 1.0*C_MM && det->aperture) {
+        jabs_message(MSG_INFO, stderr, "solid angle (calculated) = %.4lf msr\n", detector_solid_angle_calc(det)/C_MSR);
     }
-#endif
-    jabs_message(MSG_INFO, f, "column = %zu\n", det->column);
-    jabs_message(MSG_INFO, f, "channels = %zu\n", det->channels);
+    jabs_message(MSG_INFO, stderr, "column = %zu\n", det->column);
+    jabs_message(MSG_INFO, stderr, "channels = %zu\n", det->channels);
     if(det->foil) {
         char *foil_str = sample_model_to_string(det->foil_sm);
         if(foil_str) {
-            jabs_message(MSG_INFO, f, "foil = %s\n", foil_str);
+            jabs_message(MSG_INFO, stderr, "foil = %s\n", foil_str);
             free(foil_str);
         }
     }
-    fclose_file_or_stream(f);
     return EXIT_SUCCESS;
 }
 
@@ -288,18 +272,14 @@ char *detector_resolution_to_string(const detector *det, int Z) {
 
 void detector_update(detector *det) {
     det->calibration->resolution_variance = pow2(det->calibration->resolution/C_FWHM);
-#ifdef DEBUG
-    fprintf(stderr, "Updated detector, resolution = %g keV FWHM, variance = %g\n", det->calibration->resolution/C_KEV, det->calibration->resolution_variance);
-#endif
+    DEBUGMSG("Updating detector, resolution = %g keV FWHM, variance = %g", det->calibration->resolution/C_KEV, det->calibration->resolution_variance);
     for(int Z = 1; Z  <= (int)det->cal_Z_max; Z++) {
         calibration *c = det->calibration_Z[Z];
         if(!c || c == det->calibration) {
             continue;
         }
         c->resolution_variance = pow2(c->resolution/C_FWHM);
-#ifdef DEBUG
-        fprintf(stderr, "Updated detector, Z = %i, resolution = %g keV FWHM, variance = %g\n", Z, det->calibration->resolution/C_KEV, det->calibration->resolution_variance);
-#endif
+        DEBUGMSG("Updating detector, Z = %i, resolution = %g keV FWHM, variance = %g", Z, det->calibration->resolution/C_KEV, det->calibration->resolution_variance);
     }
 
 }

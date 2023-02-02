@@ -30,6 +30,7 @@
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_blas.h>
 
+#include "jabs_debug.h"
 #include "defaults.h"
 #include "generic.h"
 #include "jabs.h"
@@ -53,9 +54,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
         }
     }
     fit_data->stats.iter_call++;
-#ifdef DEBUG
-    fprintf(stderr, "Iter %zu (call %zu). var_active = %p (%s)\n", fit_data->stats.iter, fit_data->stats.iter_call, (void *)var_active, var_active?var_active->name:"none");
-#endif
+    DEBUGMSG("Iter %zu (call %zu). var_active = %p (%s)", fit_data->stats.iter, fit_data->stats.iter_call, (void *)var_active, var_active?var_active->name:"none");
 
     if(fit_parameters_set_from_vector(fit_data, x)) {
         return GSL_FAILURE;
@@ -125,9 +124,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
 
 int fit_scale_by_variable(struct fit_data *fit, const fit_variable *var) {
     double scale = *(var->value) / var->value_iter;
-#ifdef DEBUG
-    fprintf(stderr, "Varying fluence (iter %zu, call %zu) by %12.10lf (variable %s).\n", fit->stats.iter, fit->stats.iter_call, scale, var->name);
-#endif
+    DEBUGMSG("Varying fluence (iter %zu, call %zu) by %12.10lf (variable %s).", fit->stats.iter, fit->stats.iter_call, scale, var->name);
     for(size_t i = 0; i < fit->n_ws; i++) {
         sim_workspace *ws = fit_data_ws(fit, i);
         sim_workspace_histograms_scale(ws, scale);
@@ -175,7 +172,7 @@ int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x) {
         fit_variable *var = &fit->fit_params->vars[i];
         if(var->active) {
             if(!isfinite(*(var->value))) {
-                fprintf(stderr, "Fit iteration %zu, call %zu, fit variable %zu (%s) is not finite.\n", fit->stats.iter, fit->stats.iter_call, var->i_v, var->name);
+                DEBUGMSG("Fit iteration %zu, call %zu, fit variable %zu (%s) is not finite.", fit->stats.iter, fit->stats.iter_call, var->i_v, var->name);
                 fit->stats.error = FIT_ERROR_SANITY;
                 return GSL_FAILURE;
             }
@@ -183,14 +180,9 @@ int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x) {
             if(fit->stats.iter_call == 1) { /* Store the value of fit parameters at the first function evaluation */
                 var->value_iter = *(var->value);
             }
-#ifdef DEBUG
-            fprintf(stderr, "  %zu %12.10lf %12.10lf\n", var->i_v, *(var->value)/var->value_orig, *(var->value)/var->value_iter);
-#endif
+            DEBUGMSG("  i_v=%zu orig=%12.10lf iter=%12.10lf", var->i_v, *(var->value)/var->value_orig, *(var->value)/var->value_iter);
         }
     }
-#ifdef DEBUG
-    fprintf(stderr, "\n");
-#endif
     return GSL_SUCCESS;
 }
 
@@ -502,7 +494,6 @@ gsl_histogram *fit_data_histo_sum(const struct fit_data *fit_data, size_t i_det)
 int fit_data_add_det(struct fit_data *fit, detector *det) {
     if(!fit || !det)
         return EXIT_FAILURE;
-    size_t n_det_old = fit->sim->n_det;
     if(sim_det_add(fit->sim, det)) {
         return EXIT_FAILURE;
     }
@@ -626,9 +617,7 @@ int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, do
         double dxi = gsl_vector_get(dx, i);
         double tolerance = epsabs + epsrel * fabs(xi);
         double rel = fabs(dxi) / tolerance; /* "How many times over the acceptable tolerance are we */
-#ifdef DEBUG
-        fprintf(stderr, "Test delta: i %zu, xi %g, dxi %g, tolerance %g, rel %g\n", i, xi, dxi, tolerance, rel);
-#endif
+        DEBUGVERBOSEMSG("Test delta: i %zu, xi %g, dxi %g, tolerance %g, rel %g", i, xi, dxi, tolerance, rel);
         if(rel >= 1.0) {
             ok = FALSE;
             break;
@@ -652,9 +641,7 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
             fit_data->stats.cputime_iter = 0.0;
             fit_data->stats.n_evals_iter = 0;
             status = gsl_multifit_nlinear_iterate(w);
-#ifdef DEBUG
-            fprintf(stderr, "Iteration status %i (%s)\n", status, gsl_strerror(status));
-#endif
+            DEBUGMSG("Iteration status %i (%s)", status, gsl_strerror(status));
         }
         if(fit_data->stats.error) {
             return fit_data->stats.error;

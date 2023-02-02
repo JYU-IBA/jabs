@@ -14,6 +14,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include "jabs_debug.h"
 #include "message.h"
 #include "script.h"
 #include "script_session.h"
@@ -31,9 +32,7 @@ int script_process(script_session *s) {
         if(status == SCRIPT_COMMAND_EXIT || (status != SCRIPT_COMMAND_SUCCESS && !interactive)) { /* on exit, close all nested script files. When non-interactive, close scripts on error until interactive (or exit). */
             script_file_close(sfile);
             s->file_depth--;
-#ifdef DEBUG
-            fprintf(stderr, "Depth now %zu, status = %s\n", s->file_depth, script_command_status_to_string(status));
-#endif
+            DEBUGMSG("Depth now %zu, status = %s", s->file_depth, script_command_status_to_string(status));
             if(status == SCRIPT_COMMAND_EOF) {
                 status = SCRIPT_COMMAND_SUCCESS;
             }

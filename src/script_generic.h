@@ -48,6 +48,7 @@ typedef struct script_session {
 #define SCRIPT_COMMAND_NOT_FOUND (-2)
 #define SCRIPT_COMMAND_EXIT (-3)
 #define SCRIPT_COMMAND_EOF (-4)
+#define SCRIPT_COMMAND_RESET (-5)
 
 typedef int script_command_status; /* Script commands should return negative on error (see defines above) and number of arguments (zero or positive) consumed successfully */
 

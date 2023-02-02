@@ -60,10 +60,8 @@ void ion_set_angle(ion *ion, double theta, double phi) {
 }
 
 double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, int accurate) {
-#ifdef DEBUG
     assert(isotope->i < ion->nucl_stop->n_isotopes);
     assert(ion->nucl_stop->t[isotope->i].target == isotope);
-#endif
     nucl_stop_pair x = ion->nucl_stop->t[isotope->i];
     const double epsilon = x.eps0 * ion->E;
     if(accurate) {

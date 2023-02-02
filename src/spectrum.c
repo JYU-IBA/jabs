@@ -13,7 +13,7 @@
  */
 
 #include <string.h>
-
+#include "jabs_debug.h"
 #include "generic.h"
 #include "spectrum.h"
 #include "message.h"
@@ -40,9 +40,7 @@ gsl_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_
     size_t lineno = 0;
     size_t n_columns = 0; /* Number of columns (largest in file) */
     char **columns = NULL; /* Will be (re)allocated later */
-#ifdef DEBUG
-fprintf(stderr, "Reading experimental spectrum from file %s. Detector column is %zu and it can have up to %zu channels.\n", filename, column, channels_max);
-#endif
+    DEBUGMSG("Reading experimental spectrum from file %s. Detector column is %zu and it can have up to %zu channels.", filename, column, channels_max);
     while(getline(&line, &line_size, in) > 0) {
         lineno++;
         if(skip) {
@@ -62,9 +60,7 @@ fprintf(stderr, "Reading experimental spectrum from file %s. Detector column is 
             }
             if(n == n_columns) {
                 n_columns++;
-#ifdef DEBUG
-                fprintf(stderr, "(Re)allocating columns. New number %zu.\n", n_columns);
-#endif
+                DEBUGMSG("(Re)allocating columns. New number %zu.", n_columns);
                 columns = realloc(columns, n_columns*sizeof(char *));
                 if(!columns) {
                     error = TRUE;
@@ -76,6 +72,11 @@ fprintf(stderr, "Reading experimental spectrum from file %s. Detector column is 
         }
         size_t ch;
         char *end;
+        if(column >= n) {
+            jabs_message(MSG_ERROR, stderr, "Not enough columns in experimental spectra on line %zu. Expected %zu, got %zu.\n", lineno, column, n);
+            error = TRUE;
+            break;
+        }
         if(column == 0) {
             ch = lineno-1;
         } else {
@@ -86,12 +87,6 @@ fprintf(stderr, "Reading experimental spectrum from file %s. Detector column is 
                 break;
             }
         }
-        if(column >= n) {
-            jabs_message(MSG_ERROR, stderr, "Not enough columns in experimental spectra on line %zu. Expected %zu, got %zu.\n", lineno, column, n);
-            error = TRUE;
-            break;
-        }
-
         if(ch >= channels_max) {
             jabs_message(MSG_ERROR, stderr, "Channel %zu is too large (max %zu channels). Issue on line %zu of file %s.\n", ch, channels_max, lineno, filename);
             error = TRUE;
@@ -114,9 +109,7 @@ fprintf(stderr, "Reading experimental spectrum from file %s. Detector column is 
         h = NULL;
     } else {
         h->n++;
-#ifdef DEBUG
-        fprintf(stderr, "Read %zu lines from \"%s\", probably %zu channels. Allocation of %zu channels.\n", lineno, filename, h->n, channels_max);
-#endif
+        DEBUGMSG("Read %zu lines from \"%s\", probably %zu channels. Allocation of %zu channels.", lineno, filename, h->n, channels_max);
     }
     free(line);
     free(columns);
@@ -133,9 +126,7 @@ gsl_histogram *spectrum_read_detector(const char *filename, const detector *det)
 void spectrum_set_calibration(gsl_histogram *h, const detector *det, int Z) {
     if(!h || !det)
         return;
-#ifdef DEBUG
-    fprintf(stderr, "Updating spectrum %p, detector %p calibration. Z = %i\n", (void *) h, (void *) det, Z);
-#endif
+    DEBUGMSG("Updating spectrum %p, detector %p calibration. Z = %i", (void *) h, (void *) det, Z);
     for(size_t i = 0; i < h->n + 1; i++) {
         h->range[i] = detector_calibrated(det, Z, i);
     }

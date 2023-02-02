@@ -64,7 +64,7 @@ int detector_sanity_check(const detector *det);
 detector *detector_default(detector *det); /* if det is NULL, this returns pointer to a newly allocated det */
 void detector_free(detector *det);
 void detector_calibrations_free(detector *det);
-int detector_print(const jibal *jibal, const char *filename, const detector *det);
+int detector_print(const jibal *jibal, const detector *det);
 int detector_aperture_set_from_argv(const jibal *jibal, detector *det, int *argc, char * const **argv);
 int detector_foil_set_from_argv(const jibal *jibal, detector *det, int *argc, char * const **argv);
 int detector_update_foil(detector *det);

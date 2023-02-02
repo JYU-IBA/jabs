@@ -60,6 +60,12 @@ typedef struct sample_model {
     double *cbins; /* 2D-table: size is n_materials * n_ranges  */
 } sample_model;
 
+inline double *sample_model_conc_bin(const sample_model *sm, size_t i_range, size_t i_material) {
+    return sm->cbins + i_range * sm->n_materials + i_material;
+}
+inline double *sample_conc_bin(const sample *s, size_t i_range, size_t i_isotope) {
+    return s->cbins + i_range * s->n_isotopes + i_isotope;
+}
 sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges);
 int sample_model_sanity_check(const sample_model *sm);
 void sample_model_renormalize(sample_model *sm);
@@ -83,8 +89,10 @@ depth depth_seek(const sample *sample, double x);
 inline double depth_diff(const depth a, const depth b) {
     return b.x - a.x;
 }
-double get_conc(const sample *s, depth depth, size_t i_isotope);
-
+double get_conc_interpolate(const sample *s, depth depth, size_t i_isotope);
+inline double get_conc(const sample *s, const depth depth, size_t i_isotope) {
+    return s->no_conc_gradients ? *sample_conc_bin(s, depth.i, i_isotope) : get_conc_interpolate(s, depth, i_isotope);
+}
 sample *sample_alloc(size_t n_isotopes, size_t n_ranges);
 sample *sample_copy(const sample *sample); /* Deep copy */
 double sample_mass_density_range(const sample *sample, size_t i_range);
@@ -95,13 +103,6 @@ int sample_print_thicknesses(const char *filename, const sample *sample);
 int sample_print(const char *filename, const sample *sample, int print_isotopes);  /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
 void sample_free(sample *sample);
 double sample_isotope_max_depth(const sample *sample, size_t i_isotope);
-inline double *sample_model_conc_bin(const sample_model *sm, size_t i_range, size_t i_material) {
-    return sm->cbins + i_range * sm->n_materials + i_material;
-}
-inline double *sample_conc_bin(const sample *s, size_t i_range, size_t i_isotope) {
-    return s->cbins + i_range * s->n_isotopes + i_isotope;
-}
-
 void sample_sort_isotopes(sample *sample); /* Sort isotopes. Note that you can screw up concentrations tables if you call this at the wrong time! */
 void sample_sort_and_remove_duplicate_isotopes(sample *s);
 int isotope_compar(const void *, const void *); /* compares jibal_isotopes */

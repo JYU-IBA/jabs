@@ -13,6 +13,7 @@
  */
 
 #include <assert.h>
+#include "jabs_debug.h"
 #include "nuclear_stopping.h"
 
 nuclear_stopping *nuclear_stopping_new(const jibal_isotope *incident, const jibal_isotope *isotopes) {
@@ -52,9 +53,7 @@ nuclear_stopping *nuclear_stopping_shared_copy(nuclear_stopping *ns) {
     if(!ns) {
         return NULL;
     }
-#ifdef DEBUG
-    fprintf(stderr, "Shallow copy of ns = %p made (incident: %s), refcount is %i\n", (void *)ns, ns->incident->name, ns->refcount);
-#endif
+    DEBUGMSG("Shallow copy of ns = %p made (incident: %s), refcount is %i", (void *)ns, ns->incident->name, ns->refcount);
     ns->refcount += 1;
     return ns;
 }
@@ -64,9 +63,7 @@ void nuclear_stopping_free(nuclear_stopping *ns) {
         return;
     }
     ns->refcount--;
-#ifdef DEBUG_VERBOSE
-    fprintf(stderr, "nuclear_stopping_free(ns = %p), incident %s, called, refcount is now %i\n", (void *)ns, ns->incident->name, ns->refcount);
-#endif
+    DEBUGVERBOSEMSG("nuclear_stopping_free(ns = %p), incident %s, called, refcount is now %i", (void *)ns, ns->incident->name, ns->refcount);
     assert(ns->refcount >= 0);
     if(ns->refcount == 0) {
         free(ns->t);

@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include "jabs_debug.h"
 #include "defaults.h"
 #include "generic.h"
 #include "sample.h"
@@ -40,13 +41,11 @@ depth depth_seek(const sample *sample, double x) {
 extern inline double depth_diff(depth a, depth b);
 extern inline double *sample_conc_bin(const sample *s, size_t i_range, size_t i_isotope);
 extern inline double *sample_model_conc_bin(const sample_model *sm, size_t i_range, size_t i_material);
+extern inline double get_conc(const sample *s, depth depth, size_t i_isotope);
 
-double get_conc(const sample *s, const depth depth, size_t i_isotope) {
+double get_conc_interpolate(const sample *s, const depth depth, size_t i_isotope) {
     assert(i_isotope < s->n_isotopes);
     size_t i_range = depth.i;
-    if(s->no_conc_gradients) {
-        return *sample_conc_bin(s, i_range, i_isotope);
-    }
     assert(i_range < s->n_ranges-1);
 #ifdef RANGE_PEDANTIC
     assert(x >= s->ranges[i_range].x);
@@ -620,9 +619,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             } else {
                 n *= 2;
             }
-#ifdef DEBUG
-            fprintf(stderr, "(Re)allocating space for up to %zu ranges.\n", n);
-#endif
+            DEBUGMSG("(Re)allocating space for up to %zu ranges.", n);
             sm->ranges = realloc(sm->ranges, n * sizeof(sample_range));
             sm->materials = realloc(sm->materials, n * sizeof(jibal_material *));
             if(!sm->ranges)
@@ -659,14 +656,10 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
         } else {
             sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, (*argv)[0]);
             if(!sm->materials[sm->n_ranges]) {
-#ifdef DEBUG
-                fprintf(stderr, "Material from formula \"%s\" was NOT created. Finishing after %zu ranges and %zu materials.\n", (*argv)[0], sm->n_ranges, sm->n_materials);
-#endif
+                DEBUGMSG("Material from formula \"%s\" was NOT created. Finishing after %zu ranges and %zu materials.", (*argv)[0], sm->n_ranges, sm->n_materials);
                 break;
             }
-#ifdef DEBUG
-            fprintf(stderr, "Material from formula \"%s\" was created\n", (*argv)[0]);
-#endif
+            DEBUGMSG("Material from formula \"%s\" was created", (*argv)[0]);
             range = &sm->ranges[sm->n_ranges];
             range->x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1]);
             range->bragg = 1.0;
@@ -683,9 +676,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
     }
 
     if(sm->n_ranges == 0) {
-#ifdef DEBUG
-        fprintf(stderr, "No ranges were parsed.\n");
-#endif
+        DEBUGSTR("No ranges were parsed.\n");
         sample_model_free(sm);
         return NULL;
     }
@@ -695,15 +686,15 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
         *sample_model_conc_bin(sm, i, i) = 1.0;
     }
     if(simplify) {
-#ifdef DEBUG
-        fprintf(stderr, "Sample model from argv before splitting elements:\n");
+#ifdef DEBUG_VERBOSE
+        DEBUGVERBOSESTR("Sample model from argv before splitting elements:\n");
         sample_model_print(NULL, sm);
 #endif
         sample_model *sm2 = sample_model_split_elements(sm);
         sample_model_free(sm);
         sm = sm2;
-#ifdef DEBUG
-        fprintf(stderr, "Sample model after splitting elements:\n");
+#ifdef DEBUG_VERBOSE
+        DEBUGVERBOSESTR(Sample model after splitting elements:");
         sample_model_print(NULL, sm);
 #endif
     }

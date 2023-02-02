@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <jibal_units.h>
 #include <string.h>
+#include "jabs_debug.h"
 #include "generic.h"
 #include "aperture.h"
 
@@ -89,9 +90,7 @@ aperture *aperture_set_from_argv(const jibal *jibal, aperture *a, int * const ar
                 continue;
             }
         }
-#ifdef DEBUG
-        fprintf(stderr, "Aperture parsing ends, starting from str = %s. %i remain.\n", str, *argc);
-#endif
+        DEBUGMSG("Aperture parsing ends, starting from str = %s. %i remain.", str, *argc);
         break;
     }
     return a; /* Does not guarantee the aperture makes sense, unparsed arguments may remain! */

@@ -13,6 +13,7 @@
  */
 #include <assert.h>
 #include <gsl/gsl_math.h>
+#include "jabs_debug.h"
 #include "stop.h"
 #include "defaults.h"
 
@@ -64,9 +65,7 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
     double h_max = h_max_perp * incident->inverse_cosine_theta; /*  we can take bigger steps since we are going sideways. Note that inverse_cosine_theta can be negative and in this case h_max should also be negative so h_max is always positive! */
     double h = (step / k1); /* (energy) step should always be positive, as well as k1, so depth step h (not perpendicular, but "real" depth) is always positive  */
     if(k1 < STOP_STEP_MINIMUM_STOPPING) { /* We are (almost) dividing by zero if there is no or very little stopping. Assume stopping is zero and make a jump. */
-#ifdef DEBUG_STOP_STEP
-        fprintf(stderr, "step returns no progress, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)\n", k1/C_EV_TFU, depth_before.x/C_TFU, E/C_KEV);
-#endif
+        DEBUGVERBOSEMSG("step returns no progress, because k1 = %g eV/tfu (x = %.3lf tfu, E = %.3lg keV)", k1/C_EV_TFU, depth_before.x/C_TFU, E/C_KEV);
         h = STOP_STEP_DEPTH_FALLBACK;
         if(h > h_max_perp) {
             return depth_next;
@@ -163,9 +162,6 @@ double stop_step_calc(const jabs_stop_step_params *params, const ion *ion) {
 void stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, const depth depth_start, const sample *sample) {
     depth d = depth_start;
     while(1) { /* Exit from sample (hopefully) */
-#ifdef DEBUG_REACTION
-        fprintf(stderr, "  Exiting... depth = %g tfu (i = %zu)\n", d.x, d.i);
-#endif
         if(p->inverse_cosine_theta > 0.0 && d.x >= (sample->thickness - DEPTH_TOLERANCE)) { /* Exit through back (transmission) */
             break;
         }
@@ -175,11 +171,7 @@ void stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs
         double E_step = stop_step_calc(params_exiting, p);
         depth d_after = stop_step(stop, stragg, p, sample, d, E_step);
         if(p->E < stop->emin) {
-#ifdef DEBUG_REACTION
-            fprintf(stderr,
-                            "  Reaction %zu with %s: Energy below EMIN when surfacing from %.3lf tfu, break break.\n",
-                            i, r->r->target->name, d_after.x / C_TFU);
-#endif
+            DEBUGVERBOSEMSG("Energy %g keV below EMIN when surfacing from %.3lf tfu, break break.", p->E / C_KEV, d_after.x / C_TFU);
             return;
         }
         d = d_after;

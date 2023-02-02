@@ -46,6 +46,7 @@ typedef enum jabs_reaction_cs {
 
 typedef struct reaction {
     reaction_type type;
+    char *name;
     /* Reactions are like this: target(incident,product)product_nucleus */
     const jibal_isotope *incident;
     const jibal_isotope *target;
@@ -66,7 +67,7 @@ typedef struct reaction {
 } reaction;
 
 
-void reactions_print(FILE *f, reaction * const *reactions, size_t n_reactions);
+void reactions_print(reaction * const *reactions, size_t n_reactions);
 reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jabs_reaction_cs cs);
 reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incident, int *argc, char * const **argv);
 const char *reaction_name(const reaction *r);
@@ -79,5 +80,6 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
 int reaction_compare(const void *a, const void *b);
 double reaction_product_energy(const reaction *r, double theta, double E); /* Hint: call with E == 1.0 to get kinematic factor */
 const char *jabs_reaction_cs_to_string(jabs_reaction_cs cs);
+int reaction_generate_name(reaction *r); /* Used internally, don't call. */
 jabs_reaction_cs jabs_reaction_cs_from_jibal_cs(jibal_cross_section_type jcs);
 #endif //JABS_REACTION_H

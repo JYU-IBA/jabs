@@ -14,15 +14,16 @@
 
 #include <assert.h>
 #include <string.h>
+#include "jabs_debug.h"
 #include "defaults.h"
 #include "reaction.h"
 #include "message.h"
 
 
-void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) {
+void reactions_print(reaction * const * reactions, size_t n_reactions) {
     if(!reactions)
         return;
-    jabs_message(MSG_INFO, f, "Reactions (%zu):\n", n_reactions);
+    jabs_message(MSG_INFO, stderr, "Reactions (%zu):\n", n_reactions);
     for(size_t i = 0; i < n_reactions; i++) {
         const reaction *r = reactions[i];
         if(!r) {
@@ -31,21 +32,25 @@ void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) 
 #endif
             continue;
         }
-        jabs_message(MSG_INFO, f, "%3zu: %4s with %5s (reaction product %s).", i + 1, reaction_name(r), r->target->name, r->product->name);
+        jabs_message(MSG_INFO, stderr, "%3zu: %16s", i + 1, reaction_name(r));
+        if(r->E_min > E_MIN || r->E_max < E_MAX) {
+            jabs_message(MSG_INFO, stderr, ", E = [%.6g MeV, %.6g MeV]", r->E_min / C_MEV, r->E_max / C_MEV);
+        }
+        if(r->Q != 0.0) {
+            jabs_message(MSG_INFO, stderr, ", Q = %g MeV ", r->Q / C_KEV);
+        }
         if(r->type == REACTION_FILE) {
-            jabs_message(MSG_INFO, f, " Incident = %s, Theta = %g deg, E = [%g keV, %g keV]. Q = %g MeV. Data from file \"%s\".\n", r->incident->name, r->theta/C_DEG, r->E_min/C_KEV, r->E_max/C_KEV, r->Q/C_MEV, r->filename);
+            jabs_message(MSG_INFO, stderr, ", Theta = %g deg,  Data from file \"%s\".\n", r->theta/C_DEG, r->filename);
         }
 #ifdef JABS_PLUGINS
         else if(r->type == REACTION_PLUGIN) {
-            jabs_message(MSG_INFO, f, " Plugin \"%s\" filename \"%s\". Q = %g MeV.\n", r->plugin->name, r->filename, r->Q / C_MEV);
+            jabs_message(MSG_INFO, stderr, " Plugin \"%s\" filename \"%s\".\n", r->plugin->name, r->filename);
         }
 #endif
-        else {
-            jabs_message(MSG_INFO, f, " %s cross sections (built-in).", jabs_reaction_cs_to_string(r->cs));
-            if(r->E_max < E_MAX || r->E_min > 0.0) {
-                jabs_message(MSG_INFO, f, " E = [%g keV, %g keV]", r->E_min/C_KEV, r->E_max/C_KEV);
-            }
-            jabs_message(MSG_INFO, f, "\n");
+        else if(r->type == REACTION_RBS || r->type == REACTION_RBS_ALT || r->type == REACTION_ERD){
+            assert(r->Q == 0.0);
+            jabs_message(MSG_INFO, stderr, " %s cross sections (built-in).", jabs_reaction_cs_to_string(r->cs));
+            jabs_message(MSG_INFO, stderr, "\n");
         }
     }
 }
@@ -53,7 +58,7 @@ void reactions_print(FILE *f, reaction * const * reactions, size_t n_reactions) 
 const char *reaction_name(const reaction *r) {
     if(!r)
         return "NULL";
-    return reaction_type_to_string(r->type);
+    return r->name;
 }
 
 const char *reaction_type_to_string(reaction_type type) {
@@ -98,23 +103,6 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     if(!target || !incident) {
         return NULL;
     }
-#if 0
-    if(!force) {
-        if(type == REACTION_RBS) {
-            double theta_max = asin(target->mass / incident->mass);
-            if(incident->mass >= target->mass && theta > theta_max) {
-                fprintf(stderr, "RBS with %s is not possible (theta max %g deg, sim theta %g deg)\n", target->name,
-                        theta_max / C_DEG, theta / C_DEG);
-                return NULL;
-            }
-        } else if(type == REACTION_ERD) {
-            if(theta > C_PI / 2.0) {
-                fprintf(stderr, "ERD with %s is not possible (theta %g deg > 90.0 deg)", target->name, theta);
-                return NULL;
-            }
-        }
-    }
-#endif
     reaction *r = malloc(sizeof(reaction));
     r->type = type;
     r->cs = cs;
@@ -127,7 +115,7 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     r->plugin = NULL;
     r->plugin_r = NULL;
 #endif
-    r->E_min = 0.0;
+    r->E_min = E_MIN;
     r->E_max = E_MAX;
     r->Q = 0.0;
     switch(type) {
@@ -147,6 +135,7 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
             r->product_nucleus = NULL;
             break;
     }
+    reaction_generate_name(r);
     return r;
 }
 
@@ -174,7 +163,7 @@ reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incid
         } else if(strcmp((*argv)[0], "min") == 0) {
             r->E_min = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, (*argv)[1]);
         } else if(strcmp((*argv)[0], "cs") == 0) {
-            r->cs =  jibal_option_get_value(jibal_cs_types, (*argv)[1]);
+            r->cs = jibal_option_get_value(jibal_cs_types, (*argv)[1]);
         }
         (*argc) -= 2;
         (*argv) += 2;
@@ -201,16 +190,12 @@ int reaction_is_possible(const reaction *r, const sim_calc_params *p, double the
     const jibal_isotope *target = r->target;
     if(type == REACTION_RBS || type == REACTION_RBS_ALT) {
         if(incident->mass >= target->mass && theta > asin(target->mass / incident->mass)) {
-#ifdef DEBUG
-            fprintf(stderr, "RBS with %s is not possible (theta %g deg > %g deg)\n", target->name, theta/C_DEG, asin(target->mass / incident->mass)/C_DEG);
-#endif
+            DEBUGMSG("RBS with %s is not possible (theta %g deg > %g deg)", target->name, theta/C_DEG, asin(target->mass / incident->mass)/C_DEG);
             return FALSE;
         }
         if(type == REACTION_RBS_ALT) {
             if(incident->mass <= target->mass) {
-#ifdef DEBUG
-                fprintf(stderr, "RBS(-) with %s is not possible (target must be lighter than incident)\n", target->name);
-#endif
+                DEBUGMSG("RBS(-) with %s is not possible (target must be lighter than incident)", target->name);
                 return FALSE;
             }
         }
@@ -294,6 +279,7 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     }
     r->E_min = r->cs_table[0].E;
     r->E_max = r->cs_table[r->n_cs_table - 1].E;
+    reaction_generate_name(r);
     return r;
 }
 int reaction_compare(const void *a, const void *b) {
@@ -357,6 +343,15 @@ const char *jabs_reaction_cs_to_string(jabs_reaction_cs cs) {
         default:
             return "???";
     }
+}
+
+int reaction_generate_name(reaction *r) {
+    int len = asprintf(&(r->name), "%s %s(%s,%s)%s", reaction_type_to_string(r->type), r->target->name, r->incident->name, r->product->name, r->product_nucleus->name);
+    if(len < 0) {
+        DEBUGSTR("Could not generate reaction name.");
+        r->name = NULL;
+    }
+    return len;
 }
 
 jabs_reaction_cs jabs_reaction_cs_from_jibal_cs(jibal_cross_section_type jcs) {

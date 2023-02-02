@@ -14,6 +14,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "jabs_debug.h"
 #include "fit.h"
 #include "message.h"
 #include "script_command.h"
@@ -57,9 +58,7 @@ int script_session_load_script(script_session *s, const char *filename) {
     s->files[s->file_depth] = sfile;
 
     s->file_depth++;
-#ifdef DEBUG
-    fprintf(stderr, "Successfully opened file %s, depth now %zu.\n", sfile->filename, s->file_depth);
-#endif
+    DEBUGMSG("Successfully opened file %s, depth now %zu.", sfile->filename, s->file_depth);
     return EXIT_SUCCESS;
 }
 
@@ -79,9 +78,7 @@ void script_session_free(script_session *s) {
 int script_get_detector_number(const simulation *sim, int allow_empty, int * const argc, char * const ** const argv, size_t *i_det) {
     char *end;
     if(!argc || !argv || !i_det) {
-#ifdef DEBUG
-        fprintf(stderr, "Null pointer passed to script_get_detector_number()\n");
-#endif
+        DEBUGSTR("Null pointer passed to script_get_detector_number()");
         return EXIT_FAILURE;
     }
     if(*argc < 1) {
@@ -91,12 +88,11 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
     if(*s == '\0') {
         return EXIT_FAILURE;
     }
-#ifdef DEBUG
-    fprintf(stderr, "Trying to determine if %s is a detector number.\n", s);
-#endif
+    DEBUGMSG("Trying to determine if %s is a detector number.", s);
     if(strcmp(s, "first") == 0) {
         if(sim->n_det) {
             *i_det = 0;
+            DEBUGMSG("First detector, i_det = %zu", *i_det);
         } else {
             jabs_message(MSG_ERROR, stderr, "No detectors.\n");
             return EXIT_FAILURE;
@@ -104,6 +100,7 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
     } else if(strcmp(s, "last") == 0) {
         if(sim->n_det) {
             *i_det = sim->n_det - 1;
+            DEBUGMSG("Last detector, i_det = %zu", *i_det);
         } else {
             jabs_message(MSG_ERROR, stderr, "No detectors.\n");
             return EXIT_FAILURE;
@@ -112,21 +109,22 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
         size_t number = strtoul(s, &end, 10);
         if(end == s) { /* No digits at all! */
             if(allow_empty) {
+                DEBUGMSG("No, but success, i_det = %zu unchanged", *i_det);
                 return EXIT_SUCCESS; /* First argument was not a number, don't change i_det! */
             } else {
+                DEBUGMSG("No, failure, i_det = %zu unchanged", *i_det);
                 return EXIT_FAILURE;
             }
         }
         if(*end == '\0') { /* Entire string was valid */
             *i_det = number - 1;
+            DEBUGMSG("Detector, i_det = %zu", *i_det);
             if(*i_det >= sim->n_det) {
-                jabs_message(MSG_ERROR, stderr, "Detector number %zu is not valid (n_det = %zu).\n", number, sim->n_det);
+                jabs_message(MSG_ERROR, stderr, "Detector number %zu is not valid (n_det = %zu).", number, sim->n_det);
                 return EXIT_FAILURE;
             }
         } else {
-#ifdef DEBUG
-            fprintf(stderr, "Unknown failure! End points to %p, (== '%c')\n", (void *)end, *end);
-#endif
+            DEBUGMSG("Unknown failure! End points to %p, (== '%c')", (void *)end, *end);
             return EXIT_FAILURE;
         }
     }

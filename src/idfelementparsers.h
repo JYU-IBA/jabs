@@ -10,7 +10,7 @@ idf_error idf_parse_layerelement(idf_parser *idf, xmlNode *element);
 idf_error idf_parse_layerelements(idf_parser *idf, xmlNode *elements);
 idf_error idf_parse_layer(idf_parser *idf, xmlNode *layer);
 idf_error idf_parse_layers(idf_parser *idf, xmlNode *layers);
-idf_error idf_parse_simple_data(idf_parser *idf, xmlNode *simple_data, const char *filename);
+idf_error idf_parse_simple_data(xmlNode *simple_data, const char *filename);
 idf_error idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum);
 idf_error idf_parse_calibrations(idf_parser *idf, xmlNode *calibrations); /* inside spectrum */
 idf_error idf_parse_beam(idf_parser *idf, xmlNode *beam); /* inside spectrum */

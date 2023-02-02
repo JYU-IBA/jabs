@@ -31,5 +31,5 @@ void fit_params_print_final(const fit_params *params);
 size_t fit_params_enable(fit_params *params, const char *s, int enable); /* Enable/disable one or more variables matching pattern s. Returns number of matches. */
 void fit_parameters_update(const fit_params *fit_params, const gsl_multifit_nlinear_workspace *w, const gsl_matrix *covar, double chisq_dof); /* Updates values in fit_params, computes errors */
 void fit_parameters_update_changed(const fit_params *fit_params); /* Checks if values have changed since fit_parameters_update(), computes new error */
-
+int fit_params_enable_using_string(fit_params *params, const char *fit_vars);
 #endif // JABS_PARAMS_H

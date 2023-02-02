@@ -17,6 +17,7 @@
 #include <jibal_units.h>
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_cdf.h>
+#include "jabs_debug.h"
 #include "generic.h"
 #include "defaults.h"
 #include "roughness.h"
@@ -24,7 +25,6 @@
 double thickness_gamma_pdf(double x, double thickness, double sigma) {
     const double a = (thickness*thickness)/(sigma*sigma);
     const double b = (sigma*sigma)/thickness;
-
     return gsl_cdf_gamma_P(x, a, b);
 }
 
@@ -62,9 +62,7 @@ thick_prob_dist *thickness_probability_table_gamma(double thickness, double sigm
         areal_sum += p->prob * p->x;
     }
     double corr = thickness/areal_sum; /* Correction factor, since the used distribution is not perfect due to cutoffs. */
-#ifdef DEBUG
-    fprintf(stderr, "Gamma roughness, thickness low %g, high %g, step %g. Sum of probabilities %g, areal density weighted with probability is %g tfu. Correction factor %g will be applied.\n", low/C_TFU, high/C_TFU, step/C_TFU, sum, areal_sum/C_TFU, corr);
-#endif
+    DEBUGMSG("Gamma roughness, thickness low %g, high %g, step %g. Sum of probabilities %g, areal density weighted with probability is %g tfu. Correction factor %g will be applied.", low/C_TFU, high/C_TFU, step/C_TFU, sum, areal_sum/C_TFU, corr);
     for(size_t i = 0; i < n; i++) {
         thick_prob *p = &tpd->p[i];
         p->prob *= corr;
@@ -103,9 +101,7 @@ thick_prob_dist *thickness_probability_table_from_file(const char *filename) { /
         }
         if(n_true == n) {
             fail = TRUE;
-#ifdef DEBUG
-            fprintf(stderr, "TPD file too long, max = %zu.\n", n);
-#endif
+            DEBUGMSG("TPD file too long, max = %zu.", n);
             break;
         }
         char *s = line, *end;
@@ -123,9 +119,7 @@ thick_prob_dist *thickness_probability_table_from_file(const char *filename) { /
         thick_prob *p = &(tpd->p[n_true]);
         p->prob = prob;
         p->x = thick * C_TFU;
-#ifdef DEBUG
-        fprintf(stderr, "Line %zu: parsed \"%s\" into %g tfu and %g\n", lineno, line, p->x/C_TFU, p->prob);
-#endif
+        DEBUGVERBOSEMSG("Line %zu: parsed \"%s\" into %g tfu and %g", lineno, line, p->x/C_TFU, p->prob);
         n_true++;
     }
     fclose(in);
@@ -133,9 +127,7 @@ thick_prob_dist *thickness_probability_table_from_file(const char *filename) { /
         fail = TRUE;
     }
     if(fail) {
-#ifdef DEBUG
-        fprintf(stderr, "Failure in reading line %zu of file \"%s\".\n", lineno, filename);
-#endif
+        DEBUGMSG("Failure in reading line %zu of file \"%s\".", lineno, filename);
         thickness_probability_table_free(tpd);
         return NULL;
     }
@@ -151,9 +143,7 @@ void thickness_probability_table_normalize(thick_prob_dist *tpd) {
         thick_prob *p = &tpd->p[i];
         psum += p->prob;
     }
-#ifdef DEBUG
-    fprintf(stderr, "TPD sum of probabilities is %g.\n", psum);
-#endif
+    DEBUGMSG("TPD sum of probabilities is %g.", psum);
     for(size_t i = 0; i < tpd->n; i++) {
         thick_prob *p = &tpd->p[i];
         p->prob /= psum;
@@ -263,18 +253,14 @@ roughness_file *roughness_file_copy(const roughness_file *rf) {
     roughness_file *rf_out = malloc(sizeof(roughness_file));
     rf_out->tpd = thickness_probability_table_copy(rf->tpd);
     rf_out->filename = strdup_non_null(rf->filename);
-#ifdef DEBUG
-    fprintf(stderr, "Made a deep copy of roughness file = %p (filename: %s)\n", (void *)rf, rf_out->filename);
-#endif
+    DEBUGVERBOSEMSG("Made a deep copy of roughness file = %p (filename: %s)", (void *)rf, rf_out->filename);
     return rf_out;
 }
 
 void roughness_file_free(roughness_file *rf) {
     if(!rf)
         return;
-#ifdef DEBUG
-    fprintf(stderr, "Freeing roughness file %p\n", (void *)rf);
-#endif
+    DEBUGVERBOSEMSG("Freeing roughness file %p, filename %s", (void *)rf, rf->filename);
     free(rf->filename);
     thickness_probability_table_free(rf->tpd);
     free(rf);

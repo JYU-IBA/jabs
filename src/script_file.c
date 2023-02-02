@@ -20,6 +20,7 @@
 #else
 #include <unistd.h>
 #endif
+#include "jabs_debug.h"
 #include "script_file.h"
 #include "generic.h"
 
@@ -47,9 +48,7 @@ void script_file_close(script_file *sfile) {
     if(sfile->f) {
         fclose_file_or_stream(sfile->f);
     }
-#ifdef DEBUG
-    fprintf(stderr, "Closed file %s\n", sfile->filename);
-#endif
+    DEBUGMSG("Closed file %s", sfile->filename);
     free(sfile->filename);
     free(sfile->line);
     free(sfile);
@@ -66,9 +65,6 @@ ssize_t script_file_getline(script_file *sfile) {
             continue;
         }
         jabs_strip_newline(sfile->line);
-#ifdef DEBUG
-        fprintf(stderr, "File %s: line %zu: %s\n", sfile->filename, sfile->lineno, sfile->line);
-#endif
         return n;
     }
 }

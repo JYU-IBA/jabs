@@ -26,18 +26,17 @@
 #define CHANNELS_ABSOLUTE_MAX 100000
 
 /* Defaults for new simulations */
-#define ENERGY (2.0*C_MEV)
-#define ALPHA (0.0*C_DEG)
-#define DETECTOR_THETA (165.0*C_DEG)
-#define DETECTOR_PHI (0.0 * C_DEG) /* IBM geometry */
-#define DETECTOR_RESOLUTION (15.0*C_KEV) /* FWHM */
-#define DETECTOR_SOLID (10.0 * C_MSR)
-#define DETECTOR_DISTANCE (100.0 * C_MM)
-#define DETECTOR_LENGTH (1000.0 * C_MM)
-#define FLUENCE (1.0e14)
-#define E_MIN (50.0*C_KEV)
-#define E_MAX (1000.0*C_MEV)
-#define ENERGY_SLOPE (1.0*C_KEV)
+#define ENERGY_DEFAULT (2.0*C_MEV)
+#define ALPHA_DEFAULT (0.0*C_DEG)
+#define DETECTOR_THETA_DEFAULT (165.0*C_DEG)
+#define DETECTOR_PHI_DEFAULT (0.0 * C_DEG) /* IBM geometry */
+#define DETECTOR_RESOLUTION_DEFAULT (15.0*C_KEV) /* FWHM */
+#define DETECTOR_SOLID_DEFAULT (10.0 * C_MSR)
+#define DETECTOR_DISTANCE_DEFAULT (100.0 * C_MM)
+#define DETECTOR_LENGTH_DEFAULT (1000.0 * C_MM)
+#define FLUENCE_DEFAULT (1.0e14)
+#define E_MIN_DEFAULT (50.0*C_KEV)
+#define ENERGY_SLOPE_DEFAULT (1.0*C_KEV)
 #define DES_TABLE_INITIAL_ALLOC (1024)
 #define DES_TABLE_MAX_SIZE (256 * DES_TABLE_INITIAL_ALLOC)
 #define ENERGY_DERIVATIVE_MIN (0.1) /* dE(detected)/dE(incident) is forced to be higher or equal to this. */
@@ -57,6 +56,8 @@
 #define BRICKS_MAX (10000)
 #define SIMULATE_WARNING_LIMIT 10 /* Allowed number of non-critical warnings for each run of simulate() */
 /* Other constants */
+#define E_MIN (1.0 * C_KEV) /* Absolute minimum for everything */
+#define E_MAX (1000.0*C_MEV) /* Absolute maximum for everything */
 #define DEPTH_TOLERANCE (1.0e-6 * C_TFU)
 #define ROUGH_TOLERANCE (0.1 * C_TFU) /* Roughness below this is equivalent to none */
 #define CONC_TOLERANCE (1.0e-7)

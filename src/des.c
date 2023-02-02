@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <gsl/gsl_math.h>
 #include <assert.h>
+#include "jabs_debug.h"
 #include "defaults.h"
 #include "des.h"
 #include "stop.h"
@@ -35,15 +36,11 @@ des_table *des_table_init(size_t n) {
 }
 int des_table_realloc(des_table *dt, size_t n) {
     if(n > DES_TABLE_MAX_SIZE) {
-#ifdef DEBUG
-        fprintf(stderr, "DES table requested size %zu larger than allowed %i\n", n, DES_TABLE_MAX_SIZE);
-#endif
+        DEBUGMSG("DES table requested size %zu larger than allowed %i", n, DES_TABLE_MAX_SIZE);
         free(dt->t);
         dt->t = NULL;
     } else {
-#ifdef DEBUG
-        fprintf(stderr, "DES table %p realloc to %zu\n", (void *) dt, n);
-#endif
+        DEBUGMSG("DES table %p realloc to %zu elements", (void *) dt, n);
         dt->t = realloc(dt->t, n * sizeof(des));
     }
     if(dt->t) {
@@ -140,39 +137,29 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     assert(dt);
     assert(dt->n > 0);
     double E = incident->E;
-#ifdef JABS_DEBUG_DES
-    fprintf(stderr, "Where is E = %g keV in DES table? Start index %zu. Previous depth %g tfu (range %zu)\n",
+    DEBUGVERBOSEMSG("Where is E = %g keV in DES table? Start index %zu. Previous depth %g tfu (range %zu)",
             E / C_KEV, *i_des, depth_prev.x / C_TFU, depth_prev.i);
-#endif
     for(i = *i_des; i < dt->n - 1; i++) {
         if(dt->t[i].d.i != dt->t[i + 1].d.i) { /* This means last point of this layer */
             E = dt->t[i].E;
             *i_des = i + 1; /* The +1 prevents stopping at this same layer boundary on the next call */
-#ifdef JABS_DEBUG_DES
-            fprintf(stderr, "Layer boundary at %g tfu. Setting E = %g keV and i_des = %zu. index = %zu\n", dt->t[i].d.x / C_TFU, E / C_KEV, *i_des, dt->depth_interval_index[dt->t[i + 1].d.i]);
-#endif
+            DEBUGVERBOSEMSG("Layer boundary at %g tfu. Setting E = %g keV and i_des = %zu. index = %zu", dt->t[i].d.x / C_TFU, E / C_KEV, *i_des, dt->depth_interval_index[dt->t[i + 1].d.i]);
             break;
         }
         if(dt->t[i].E < E) {/* i is the index of the first element in dt->t that has energy below E. So i-1 should have energy above E. */
-#ifdef JABS_DEBUG_DES
-            fprintf(stderr, "Breaking, i_des = i = %zu, because first element %.12e J (%g keV) <  E = %.12e J (%g keV)\n", i, dt->t[i].E, dt->t[i].E / C_KEV,  E, E / C_KEV);
-#endif
+            DEBUGVERBOSEMSG("Breaking, i_des = i = %zu, because first element %.12e J (%g keV) <  E = %.12e J (%g keV)", i, dt->t[i].E, dt->t[i].E / C_KEV,  E, E / C_KEV);
             *i_des = i;
             break;
         }
     }
     if(i == dt->n - 1) {
         if(E < dt->t[i].E) {
-#ifdef JABS_DEBUG_DES
-            fprintf(stderr, "Energy %g keV is below last point in table (%g keV). Changing energy.\n", E / C_KEV, dt->t[i].E / C_KEV);
-#endif
+            DEBUGVERBOSEMSG("Energy %g keV is below last point in table (%g keV). Changing energy.", E / C_KEV, dt->t[i].E / C_KEV);
             E = dt->t[i].E;
         }
     } else if(i == 0) {
         if(E > dt->t[i].E) {
-#ifdef JABS_DEBUG_DES
-            fprintf(stderr, "Energy %g keV is above first point in table (%g keV). Changing energy.\n", E / C_KEV, dt->t[i].E / C_KEV);
-#endif
+            DEBUGVERBOSEMSG("Energy %g keV is above first point in table (%g keV). Changing energy.", E / C_KEV, dt->t[i].E / C_KEV);
             E = dt->t[i].E;
         }
         i = 1;
@@ -180,11 +167,8 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     assert(i > 0);
     const des *des_low = &dt->t[i - 1]; /* Closer to surface, higher energy */
     const des *des_high = &dt->t[i]; /* Deeper, lower energy */
-#ifdef JABS_DEBUG_DES
-    fprintf(stderr, "dt->t[%zu] = %g tfu (i = %zu), dt->t[%zu] = %g tfu (i = %zu), depth_prev = %g tfu (i = %zu)\n",
+    DEBUGVERBOSEMSG("dt->t[%zu] = %g tfu (i = %zu), dt->t[%zu] = %g tfu (i = %zu), depth_prev = %g tfu (i = %zu)",
             i - 1,  des_low->d.x / C_TFU, des_low->d.i, i, des_high->d.x / C_TFU, des_high->d.i, depth_prev.x / C_TFU, depth_prev.i);
-#endif
-
     double E_diff = E - des_low->E;
     double E_interval = des_high->E - des_low->E;
     double S_interval = des_high->S - des_low->S;
@@ -209,9 +193,7 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     incident->E = E;
 #endif
     incident->S = des_low->S + frac * S_interval;
-#ifdef JABS_DEBUG_DES
-    fprintf(stderr, "d_out = %g tfu (i = %zu), E = %g keV, S = %g keV\n", d_out.x / C_TFU, d_out.i, incident->E / C_KEV, sqrt(incident->S) * C_FWHM / C_KEV);
-#endif
+    DEBUGVERBOSEMSG("d_out = %g tfu (i = %zu), E = %g keV, S = %g keV", d_out.x / C_TFU, d_out.i, incident->E / C_KEV, sqrt(incident->S) * C_FWHM / C_KEV);
     return d_out;
 }
 
@@ -223,15 +205,11 @@ des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, con
     depth d_after = depth_start;
     dt->depth_increases = (ion.inverse_cosine_theta > 0.0);
     assert(ion.inverse_cosine_theta <= -1.0 || ion.inverse_cosine_theta >= 1.0);
-#ifdef DEBUG
-    fprintf(stderr, "Computing DES table. start_depth = %g tfu, E = %g keV, angle in sample %g deg (1/cos = %.6lf).\n", depth_start.x / C_TFU, ion.E / C_KEV,
+    DEBUGMSG("Computing DES table. start_depth = %g tfu, E = %g keV, angle in sample %g deg (1/cos = %.6lf).", depth_start.x / C_TFU, ion.E / C_KEV,
             ion.theta / C_DEG, ion.inverse_cosine_theta);
-#endif
     do {
         if(i == dt->n) {
-#ifdef DEBUG
-            fprintf(stderr, "DES table reallocation, size %zu reached.\n", dt->n);
-#endif
+            DEBUGMSG("DES table reallocation, size %zu reached.", dt->n);
             if(des_table_realloc(dt, dt->n * 2)) {
                 break;
             }
@@ -242,9 +220,7 @@ des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, con
         des->S = ion.S;
         des->d = d_before;
         if((ion.inverse_cosine_theta > 0.0 && d_before.x >= sample->thickness - DEPTH_TOLERANCE) || (ion.inverse_cosine_theta < 0.0 && d_before.x < DEPTH_TOLERANCE)) {
-#ifdef DEBUG
-            fprintf(stderr, "DES table calculation stops at %g tfu (i = %zu).\n", d_before.x / C_TFU, i);
-#endif
+            DEBUGMSG("DES table calculation stops at %g tfu (i = %zu).", d_before.x / C_TFU, i);
             i++;
             break;
         }

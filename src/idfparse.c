@@ -22,12 +22,11 @@
 #ifdef WIN32
 #include "win_compat.h"
 #endif
+#include "jabs_debug.h"
 #include "idfparse.h"
 
 xmlNode *idf_findnode_deeper(xmlNode *root, const char *path, const char **path_next) {
-#ifdef DEBUG
-    fprintf(stderr, "findnode_deeper called with path = \"%s\".\n", path);
-#endif
+    DEBUGMSG("findnode_deeper called with path = \"%s\".", path);
     size_t offset = strcspn(path, "/"); /* We use strcspn to tokenize because we don't have to mutilate path by inserting '\0' in it */
     if(offset == 0) {
         fprintf(stderr, "Weirdness. Offset is zero.\n");
@@ -38,9 +37,7 @@ xmlNode *idf_findnode_deeper(xmlNode *root, const char *path, const char **path_
         *path_next = path + offset + (last ? 0 : 1);
     }
     xmlNode *cur_node = NULL;
-#ifdef DEBUG
-    fprintf(stderr, "Should find %.*s in %s\n", (int)offset, path, root->name);
-#endif
+    DEBUGMSG("Should find %.*s in %s", (int)offset, path, root->name);
     for (cur_node = root->children; cur_node; cur_node = cur_node->next) {
         if(cur_node->type == XML_ELEMENT_NODE) {
             size_t len = xmlStrlen(cur_node->name);
@@ -51,9 +48,7 @@ xmlNode *idf_findnode_deeper(xmlNode *root, const char *path, const char **path_
             }
         }
     }
-#ifdef DEBUG
-    fprintf(stderr, "Returning NULL\n");
-#endif
+    DEBUGSTR("Returning NULL");
     return NULL;
 }
 
@@ -63,9 +58,7 @@ xmlNode *idf_findnode(xmlNode *root, const char *path) {
     if(!root || !path) {
         return NULL;
     }
-#ifdef DEBUG
-    fprintf(stderr, "findnode(node name = %s, path = %s) called.\n", root->name, path);
-#endif
+    DEBUGMSG("findnode(node name = %s, path = %s) called.", root->name, path);
     do {
         node = idf_findnode_deeper(node, path, &path_remains);
         path = path_remains;
@@ -82,9 +75,7 @@ size_t idf_foreach(idf_parser *idf, xmlNode *node, const char *name, idf_error (
     for (cur = node->children; cur; cur = cur->next) {
         if(cur->type == XML_ELEMENT_NODE) {
             if(idf_stringeq(cur->name, name)) {
-#ifdef DEBUG
-                fprintf(stderr, "foreach found %s.\n", name);
-#endif
+                DEBUGMSG("foreach found %s.", name);
                 if(f && f(idf, cur)) {
                     return IDF2JBS_FAILURE;
                 }
@@ -148,9 +139,7 @@ double idf_unit_string_to_SI(xmlChar *unit) {
             return u->factor;
         }
     }
-#ifdef DEBUG
-    fprintf(stderr, "No such unit: \"%s\"!\n", unit);
-#endif
+    DEBUGMSG("No such unit: \"%s\"!", unit);
     return 0.0;
 }
 
@@ -210,7 +199,7 @@ idf_error idf_output_printf(idf_parser *idf, const char *format, ...) {
     }
     size_t n = vsnprintf(idf->buf + idf->pos_write, IDF_BUF_MSG_MAX, format, argp);
     if(n >= IDF_BUF_MSG_MAX) {
-        fprintf(stderr, "Output truncated.\n");
+        DEBUGMSG("Output truncated, because %zu > %i", n, IDF_BUF_MSG_MAX);
         n = IDF_BUF_MSG_MAX - 1;
     }
     idf->pos_write += n;
@@ -242,9 +231,7 @@ idf_error idf_buffer_realloc(idf_parser *idf) {
     } else {
         size_new = idf->buf_size * 2; /* TODO: good strategy? */
     }
-#ifdef DEBUG
-    fprintf(stderr, "Buffer will be reallocated. New size: %zu, old size: %zu\n", size_new, idf->buf_size);
-#endif
+    DEBUGMSG("Buffer will be reallocated. New size: %zu, old size: %zu", size_new, idf->buf_size);
     idf->buf = realloc(idf->buf, size_new);
     if(!idf->buf) {
         idf->buf_size = 0;
@@ -264,9 +251,7 @@ idf_parser *idf_file_read(const char *filename) {
     char *fn = strdup(filename);
     char *extension = jabs_file_extension(fn);
     if(!idf_stringeq(extension, ".xml") && !idf_stringeq(extension, ".idf") && !idf_stringeq(extension, ".xnra")) {
-#ifdef DEBUG
-        fprintf(stderr, "Extension %s is not valid.\n", extension);
-#endif
+        DEBUGMSG("Extension %s is not valid.", extension);
         free(fn);
         idf->error = IDF2JBS_FAILURE_WRONG_EXTENSION;
         return idf;

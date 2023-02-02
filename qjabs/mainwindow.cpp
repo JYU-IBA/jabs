@@ -428,7 +428,7 @@ void MainWindow::plotSpectrum(size_t i_det)
             if(!r->histo || r->histo->n == 0) { /* No or empty histogram, shouldn't happen. */
                 continue;
             }
-            if(r->empty) { /* Nobody has even attempted to add anything here. */
+            if(r->n_convolution_calls == 0) { /* Nobody has even attempted to add anything here. */
                 continue;
             }
             if(histo) {

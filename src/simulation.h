@@ -57,9 +57,9 @@ typedef struct simulation {
 simulation *sim_init(jibal *jibal);
 void sim_free(simulation *sim);
 jabs_reaction_cs sim_cs(const simulation *sim, reaction_type type);
-int sim_reactions_add_reaction(simulation *sim, reaction *r);
+int sim_reactions_add_reaction(simulation *sim, reaction *r, int silent);
 int sim_reactions_remove_reaction(simulation *sim, size_t i);
-int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jabs_reaction_cs cs); /* Add RBS or ERD reactions automagically */
+int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jabs_reaction_cs cs, int silent); /* Add RBS or ERD reactions automagically */
 int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, const char *filename);
 void sim_reactions_free(simulation *sim); /* Free reactions and reset the number of reactions to zero */
 int sim_sanity_check(const simulation *sim);

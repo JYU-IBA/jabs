@@ -20,8 +20,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include "win_compat.h"
 #include <jibal_generic.h>
+#include "jabs_debug.h"
+#include "win_compat.h"
 #include "generic.h"
 #include "defaults.h"
 
@@ -72,9 +73,7 @@ int argc_from_argv(const char * const *argv) {
     const char * const *a = argv;
     int argc = 0;
     while(*a != NULL) {
-#ifdef DEBUG
-        fprintf(stderr, "got \"%s\" from string_to_argv\n", *a);
-#endif
+        DEBUGMSG("got \"%s\" from string_to_argv", *a);
         a++;
         argc++;
     }

@@ -23,11 +23,11 @@ simulation *sim_init(jibal *jibal) {
     simulation *sim = malloc(sizeof(simulation));
     sim->beam_isotope = jibal_isotope_find(jibal->isotopes, NULL, 2, 4);
     sim->beam_aperture = NULL;
-    sim->sample_theta = ALPHA; /* These defaults are for IBM geometry */
+    sim->sample_theta = ALPHA_DEFAULT; /* These defaults are for IBM geometry */
     sim->sample_phi = 0.0;
-    sim->fluence = FLUENCE;
-    sim->beam_E = ENERGY;
-    sim->emin = E_MIN;
+    sim->fluence = FLUENCE_DEFAULT;
+    sim->beam_E = ENERGY_DEFAULT;
+    sim->emin = E_MIN_DEFAULT;
     sim->beam_E_broad = 0.0;
     sim->channeling_offset = 1.0;
     sim->channeling_slope = 0.0;
@@ -72,14 +72,16 @@ jabs_reaction_cs sim_cs(const simulation *sim, const reaction_type type) {
     return JABS_CS_NONE;
 }
 
-int sim_reactions_add_reaction(simulation *sim, reaction *r) {
+int sim_reactions_add_reaction(simulation *sim, reaction *r, int silent) {
     if(!sim || !r)
         return EXIT_FAILURE;
     sim->n_reactions++;
     sim->reactions = realloc(sim->reactions, sim->n_reactions * sizeof(reaction *));
     sim->reactions[sim->n_reactions - 1] = r;
-    jabs_message(MSG_INFO, stderr, "Added reaction %zu (%s), %s(%s,%s)%s, E = [%g keV, %g keV], Q = %g keV\n",
-                 sim->n_reactions, reaction_name(r), r->target->name, r->incident->name, r->product->name, r->product_nucleus->name, r->E_min / C_KEV, r->E_max / C_KEV, r->Q / C_KEV);
+    if(!silent) {
+        jabs_message(MSG_INFO, stderr, "Added reaction %zu (%s), E = [%g keV, %g keV], Q = %g keV\n",
+                     sim->n_reactions, reaction_name(r), r->E_min / C_KEV, r->E_max / C_KEV, r->Q / C_KEV);
+    }
     return EXIT_SUCCESS;
 }
 
@@ -109,11 +111,11 @@ int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, 
     }
     jabs_message(MSG_INFO, stderr, "File: %s has a reaction with %s -> %s, product %s, theta %g deg\n",
                  filename, r->incident->name, r->target->name, r->product->name, r->theta / C_DEG);
-    sim_reactions_add_reaction(sim, r);
+    sim_reactions_add_reaction(sim, r, FALSE);
     return EXIT_SUCCESS;
 }
 
-int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jabs_reaction_cs cs) { /* Note that sim->ion needs to be set! */
+int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jabs_reaction_cs cs, int silent) { /* Note that sim->ion needs to be set! */
     if(!sim || !sim->beam_isotope || !sm) {
         return -1;
     }
@@ -140,7 +142,7 @@ int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_typ
                          isotope->name);
             continue;
         }
-        sim_reactions_add_reaction(sim, r_new);
+        sim_reactions_add_reaction(sim, r_new, silent);
     };
     sample_free(sample);
     return 0;

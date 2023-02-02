@@ -13,6 +13,7 @@
  */
 
 #include <assert.h>
+#include "jabs_debug.h"
 #include "jabs.h"
 #include "message.h"
 #include "geostragg.h"
@@ -23,14 +24,14 @@ double scattering_angle(const ion *incident, double sample_theta, double sample_
     double scatter_theta, scatter_phi;
     rotate(-1.0 * sample_theta, sample_phi, incident->theta, incident->phi, &theta, &phi); /* Move from sample coordinates to lab */
     rotate(det->theta, det->phi, theta, phi, &scatter_theta, &scatter_phi); /* Move from lab to detector */
-#ifdef DEBUG
-    fprintf(stderr, "theta = %g deg, phi = %g deg.\n", theta/C_DEG, phi/C_DEG);
-    fprintf(stderr, "scatter_theta = %g deg, scatter_phi = %g deg.\n", scatter_theta/C_DEG, scatter_phi/C_DEG);
+    DEBUGMSG("Scattering angle for incident_theta = %g deg, incident_phi = %g deg and sample_theta = %g deg, sample_phi = %g deg.",
+             incident->theta / C_DEG, incident->phi / C_DEG, sample_theta / C_DEG, sample_phi / C_DEG);
+    DEBUGMSG("Sample to lab, theta = %g deg, phi = %g deg.", theta/C_DEG, phi/C_DEG);
+    DEBUGMSG("Lab to detector (final): scatter_theta = %g deg, scatter_phi = %g deg.", scatter_theta/C_DEG, scatter_phi/C_DEG);
 #ifdef JABS_DEBUG_SCATTERING_ASSERT
     if(!ws->params->ds && !ws->params->geostragg) {
         assert(fabs(ws->det->theta - scatter_theta) < 0.01 * C_DEG); /* with DS this assert will fail */
     }
-#endif
 #endif
 return scatter_theta;
 }
@@ -48,9 +49,7 @@ double scattering_angle_exit_deriv(const ion *incident, double sample_theta, dou
     rotate(det->theta, det->phi, sample_theta, sample_phi,  &theta_product, &phi_product);
     rotate(det->theta+epsilon, det->phi, sample_theta, sample_phi,  &theta_product2, &phi_product2);
     double deriv = (scatter_theta2-scatter_theta)/(theta_product2-theta_product) * -1.0; /* Since exit angle is pi - theta_product, the derivative dtheta/dbeta is -1.0 times this derivative calculated here */
-#ifdef DEBUG
-fprintf(stderr, "Scat: %g deg, eps: %g deg, product %g deg, eps: %g deg. Deriv %.8lf (-1.0 for IBM)\n", scatter_theta/C_DEG,scatter_theta2/C_DEG, theta_product/C_DEG, theta_product2/C_DEG, deriv);
-#endif
+    DEBUGMSG("Scat: %g deg, eps: %g deg, product %g deg, eps: %g deg. Deriv %.8lf (-1.0 for IBM)", scatter_theta/C_DEG,scatter_theta2/C_DEG, theta_product/C_DEG, theta_product2/C_DEG, deriv);
 return deriv;
 }
 
@@ -66,11 +65,9 @@ double exit_angle_delta(double sample_theta, double sample_phi, const detector *
     double delta_beam = w *  geo / det->distance;
     double delta_detector = aperture_width_shape_product(det->aperture, direction) / det->distance;
     double result = sqrt(pow2(delta_beam) + pow2(delta_detector));
-#ifdef DEBUG
-    fprintf(stderr, "Direction %c: detector angles %g deg, sample angle %g deg, exit angle %g deg\n", direction, det_tilt/C_DEG, sample_tilt/C_DEG, exit/C_DEG);
-    fprintf(stderr, "cos(alpha) = %g, cos(beta) = %g, cos(beta)/cos(alpha) = %g\n", cos(sample_tilt), cos(exit), geo);
-    fprintf(stderr, "Spread of exit angle in direction '%c' due to beam %g deg, due to detector %g deg. Combined %g deg FWHM.\n", direction, delta_beam/C_DEG, delta_detector/C_DEG, result/C_DEG);
-#endif
+    DEBUGMSG("Direction %c: detector angles %g deg, sample angle %g deg, exit angle %g deg", direction, det_tilt/C_DEG, sample_tilt/C_DEG, exit/C_DEG);
+    DEBUGMSG("cos(alpha) = %g, cos(beta) = %g, cos(beta)/cos(alpha) = %g", cos(sample_tilt), cos(exit), geo);
+    DEBUGMSG("Spread of exit angle in direction '%c' due to beam %g deg, due to detector %g deg. Combined %g deg FWHM.", direction, delta_beam/C_DEG, delta_detector/C_DEG, result/C_DEG);
     return result / C_FWHM;
 }
 geostragg_vars geostragg_vars_calculate(const ion *incident, double sample_theta, double sample_phi, const detector *det, const aperture *beam_aperture, int geostragg_enabled, int beta_manual_enabled) {
@@ -85,8 +82,10 @@ geostragg_vars geostragg_vars_calculate(const ion *incident, double sample_theta
 #ifdef DEBUG
     double beta;
     beta = (C_PI - g.theta_product);
+#ifdef DEBUG_VERBOSE
     ion_print(stderr, incident);
-    fprintf(stderr, "Reaction product angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.\n", g.theta_product/C_DEG, g.phi_product/C_DEG, beta/C_DEG);
+#endif
+    DEBUGMSG("Reaction product angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.", g.theta_product/C_DEG, g.phi_product/C_DEG, beta/C_DEG);
 #endif
     if(!geostragg_enabled) { /* If geometric straggling is disabled, we have already calculated everything necessary */
         return g;
@@ -112,17 +111,14 @@ geostragg_vars geostragg_vars_calculate(const ion *incident, double sample_theta
         rotate(-1.0 * gd->delta_beta * gd->beta_deriv, g.phi_product, g.theta_product, g.phi_product, &gd->theta_product_plus, &gd->phi_product_plus); /* -1.0 again because of difference between theta and pi - theta */
         rotate(1.0 * gd->delta_beta * gd->beta_deriv, g.phi_product, g.theta_product, g.phi_product, &gd->theta_product_minus, &gd->phi_product_minus);
 
-#ifdef DEBUG
-        fprintf(stderr, "Spread in exit angle ('%c') %g deg\n", gd->direction, gd->delta_beta / C_DEG);
-        fprintf(stderr, "dBeta/dBeta_%c: %g\n", gd->direction, gd->beta_deriv); /* TODO: verify, check sign */
-        fprintf(stderr, "dTheta/dBeta_%c = %g\n", gd->direction, gd->theta_deriv); /* TODO: this should also be valid when sample_phi is not zero? */
-        fprintf(stderr, "Delta Beta_%c %g deg, Delta theta %g deg\n", gd->direction, -1.0 * gd->delta_beta * gd->beta_deriv, gd->delta_beta * gd->theta_deriv);
-        fprintf(stderr, "Reaction product (+) angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.\n", gd->theta_product_plus/C_DEG, gd->phi_product_plus/C_DEG, (C_PI - gd->theta_product_plus)/C_DEG);
-        fprintf(stderr, "Reaction product (+) scattering angle %g deg.\n", gd->theta_plus/C_DEG);
-        fprintf(stderr, "Reaction product (-) angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.\n", gd->theta_product_minus/C_DEG, gd->phi_product_minus/C_DEG, (C_PI - gd->theta_product_minus)/C_DEG);
-        fprintf(stderr, "Reaction product (-) scattering angle %g deg.\n", gd->theta_minus/C_DEG);
-        fprintf(stderr, "\n");
-#endif
+        DEBUGMSG("Spread in exit angle ('%c') %g deg", gd->direction, gd->delta_beta / C_DEG);
+        DEBUGMSG("dBeta/dBeta_%c: %g", gd->direction, gd->beta_deriv); /* TODO: verify, check sign */
+        DEBUGMSG("dTheta/dBeta_%c = %g", gd->direction, gd->theta_deriv); /* TODO: this should also be valid when sample_phi is not zero? */
+        DEBUGMSG("Delta Beta_%c %g deg, Delta theta %g deg", gd->direction, -1.0 * gd->delta_beta * gd->beta_deriv, gd->delta_beta * gd->theta_deriv);
+        DEBUGMSG("Reaction product (+) angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.", gd->theta_product_plus/C_DEG, gd->phi_product_plus/C_DEG, (C_PI - gd->theta_product_plus)/C_DEG);
+        DEBUGMSG("Reaction product (+) scattering angle %g deg.", gd->theta_plus/C_DEG);
+        DEBUGMSG("Reaction product (-) angles (in sample) %g deg and %g deg. Exit angle (beta) %g deg.", gd->theta_product_minus/C_DEG, gd->phi_product_minus/C_DEG, (C_PI - gd->theta_product_minus)/C_DEG);
+        DEBUGMSG("Reaction product (-) scattering angle %g deg.", gd->theta_minus/C_DEG);
     }
     return g;
 }
@@ -142,32 +138,8 @@ double geostragg(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop
     stop_sample_exit(stop, stragg, params_exiting, &ion, d, sample);
     double Eminus = ion.E;
     double result = pow2(Eplus - Eminus);
-#ifdef DEBUG_VERBOSE
-    fprintf(stderr, "Direction (%c), Eplus %g keV, Eminus %g keV, Straggling %g keV FWHM\n", gd->direction, Eplus/C_KEV, Eminus/C_KEV, C_FWHM*sqrt(result)/C_KEV);
-#endif
+    DEBUGVERBOSEMSG("Direction (%c), Eplus %g keV, Eminus %g keV, Straggling %g keV FWHM", gd->direction, Eplus/C_KEV, Eminus/C_KEV, C_FWHM*sqrt(result)/C_KEV);
     return result;
-}
-
-double theta_deriv_beta(const detector *det, const char direction) { /* TODO: possibly wrong sign */
-    double x = detector_angle(det, 'x');
-    double y = detector_angle(det, 'y');
-    static const double delta = 0.001*C_DEG;
-    double theta_from_rot = C_PI - theta_tilt(x, y); /* We shouldn't need to calculate this, but we do. Numerical issues? */
-    if(direction == 'x') {
-        x += delta;
-    } else if(direction == 'y') {
-        y += delta;
-    } else {
-        return 0.0;
-    }
-    double theta_eps = C_PI - theta_tilt(x, y);
-    double deriv = (theta_eps - theta_from_rot) / delta;
-#ifdef DEBUG
-    fprintf(stderr, "Theta %.5lf deg, from rotations %.5lf deg. Delta = %g deg, Theta_eps = %.5lf deg\n", det->theta/C_DEG, theta_from_rot/C_DEG, delta/C_DEG, theta_eps/C_DEG);
-    //assert(fabs(theta_from_rot - det->theta) < 1e-3); /* TODO: there is some numerical issue here */ */
-    fprintf(stderr, "Derivative %.5lf (dir '%c').\n", deriv, direction);
-#endif
-    return deriv;
 }
 
 double beta_deriv(double sample_theta, double sample_phi, const detector *det, const char direction) { /* TODO: replace by analytical formula */
@@ -186,9 +158,7 @@ double beta_deriv(double sample_theta, double sample_phi, const detector *det, c
     rotate(theta, phi, det->theta, det->phi, &theta, &phi);
     rotate(theta, phi, sample_theta, sample_phi, &theta, &phi); /* "new" Detector in sample coordinate system */
     double result = -1.0*(theta - theta_product)/delta; /* -1.0, since beta = pi - theta */
-#ifdef DEBUG
-    fprintf(stderr, "Beta deriv ('%c') got theta = %g deg (orig %g deg), diff in beta %g deg, result %g\n", direction, theta/C_DEG, theta_product/C_DEG,  (theta_product - theta)/C_DEG, result);
-#endif
+    DEBUGMSG("Beta deriv ('%c') got theta = %g deg (orig %g deg), diff in beta %g deg, result %g", direction, theta/C_DEG, theta_product/C_DEG,  (theta_product - theta)/C_DEG, result);
     return result;
 }
 

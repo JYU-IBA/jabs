@@ -47,7 +47,6 @@ double scattering_angle_exit_deriv(const ion *incident, double sample_theta, dou
 double exit_angle_delta(double sample_theta, double sample_phi, const detector *det, const aperture *beam_aperture, char direction);
 geostragg_vars geostragg_vars_calculate(const ion *incident, double sample_theta, double sample_phi, const detector *det, const aperture *beam_aperture, int geostragg_enabled, int beta_manual_enabled);
 double geostragg(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, const sample *sample, const sim_reaction *r, const geostragg_vars_dir *gd, depth d, double E_0);
-double theta_deriv_beta(const detector *det, char direction);
 double beta_deriv(double sample_theta, double sample_phi, const detector *det, char direction);
 int geostragg_vars_print(FILE *f, const geostragg_vars *g);
 double exit_angle(double sample_theta, double sample_phi, double det_theta, double det_phi);

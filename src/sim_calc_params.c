@@ -12,6 +12,7 @@
 
  */
 
+#include "jabs_debug.h"
 #include "defaults.h"
 #include "message.h"
 #include "sim_calc_params.h"
@@ -54,9 +55,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->ds_incident_stop_step_factor = DUAL_SCATTER_INCIDENT_STOP_STEP_FACTOR_DEFAULT;
     p->reaction_file_angle_tolerance = REACTION_FILE_ANGLE_TOLERANCE_DEFAULT;
     p->bricks_skip_zero_conc_ranges = FALSE;
-#ifdef DEBUG
-    fprintf(stderr, "New calc params created.\n");
-#endif
+    DEBUGSTR("New calc params created.");
     return p;
 }
 

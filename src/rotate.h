@@ -10,5 +10,4 @@ typedef struct rot_vect {
 void rotate(double theta2, double phi2, double theta1, double phi1, double *theta, double *phi);
 rot_vect rot_vect_from_angles(double theta, double phi);
 double angle_tilt(double theta, double phi, char direction);
-double theta_tilt(double tilt_x, double tilt_y);
 #endif // JABS_ROTATE_H

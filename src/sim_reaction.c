@@ -14,6 +14,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include "jabs_debug.h"
 #include "spectrum.h"
 #include "sim_reaction.h"
 
@@ -26,15 +27,13 @@ sim_reaction *sim_reaction_init(const ion *incident_ion, const jibal_isotope *is
     sim_r->r = r;
     ion *p = &sim_r->p;
     ion_reset(p);
-    sim_r->empty = TRUE;
+    sim_r->n_convolution_calls = 0;
     sim_r->max_depth = 0.0;
     sim_r->i_isotope = sample->n_isotopes; /* Intentionally not valid */
 
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
         if(sample->isotopes[i_isotope] == r->target) {
-#ifdef DEBUG
-            fprintf(stderr, "Reaction target isotope %s is isotope number %zu in sample.\n", r->target->name, i_isotope);
-#endif
+            DEBUGMSG("Reaction target isotope %s is isotope number %zu in sample.", r->target->name, i_isotope);
             sim_r->i_isotope = i_isotope;
         }
     }
@@ -91,9 +90,7 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_
 
     if(!reaction_is_possible(sim_r->r, params, theta)) {
         sim_r->stop = TRUE;
-#ifdef DEBUG
-        fprintf(stderr, "Reaction not possible, returning.\n");
-#endif
+        DEBUGSTR("Reaction not possible, returning.");
         return;
     }
     if(type == REACTION_RBS) {
@@ -115,9 +112,7 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_
         sim_r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0)); /* Factors for Andersen correction */
         sim_r->r_VE_factor2 = pow2(0.5 / sin(sim_r->theta_cm / 2.0));
     }
-#ifdef DEBUG
-    fprintf(stderr, "Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g (valid for RBS and ERD). Q = %g MeV.\n", sim_r->theta/C_DEG, sim_r->theta_cm/C_DEG, sim_r->K, sim_r->r->Q / C_MEV);
-#endif
+    DEBUGMSG("Reaction recalculated, theta = %g deg, theta_cm = %g deg, K = %g (valid for RBS and ERD). Q = %g MeV.", sim_r->theta/C_DEG, sim_r->theta_cm/C_DEG, sim_r->K, sim_r->r->Q / C_MEV);
 }
 
 void sim_reaction_reset_bricks(sim_reaction *sim_r) {
@@ -226,7 +221,7 @@ void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *inci
 }
 
 void sim_reaction_print_bricks(FILE *f, const sim_reaction *r, double psr) {
-    fprintf(f, "#Reaction %s %s\n", reaction_name(r->r), r->r->target->name);
+    fprintf(f, "#Reaction %s\n", reaction_name(r->r));
     if(r->r->filename) {
         fprintf(f, "#Filename: %s\n", r->r->filename);
     }

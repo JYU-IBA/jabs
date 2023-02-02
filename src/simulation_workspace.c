@@ -13,6 +13,7 @@
  */
 #include <string.h>
 #include <assert.h>
+#include "jabs_debug.h"
 #include "defaults.h"
 #include "generic.h"
 #include "message.h"
@@ -51,9 +52,7 @@ void sim_workspace_calculate_number_of_bricks(sim_workspace *ws) {
         }
     }
     ws->n_bricks = n_bricks;
-#ifdef DEBUG
-    fprintf(stderr, "Number of bricks: %zu\n", n_bricks);
-#endif
+    DEBUGMSG("Number of bricks in workspace: %zu", n_bricks);
 }
 
 sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det) {
@@ -77,14 +76,6 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->gsto = jibal->gsto;
     ws->isotopes = jibal->isotopes;
     ws->n_reactions = 0; /* Will be incremented later */
-
-#if 0
-    if(sim->n_reactions == 0) {
-        jabs_message(MSG_ERROR, stderr,  "No reactions! Will not initialize workspace if there is nothing to simulate.\n");
-        free(ws);
-        return NULL;
-    }
-#endif
 
     if(sim->params->beta_manual && sim->params->ds) {
         jabs_message(MSG_WARNING, stderr,  "Manual exit angle is enabled in addition to dual scattering. This is an unsupported combination. Manual exit angle calculation will be disabled.\n");
@@ -115,17 +106,13 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     sim_workspace_init_reactions(ws);
 
     if(ws->params->cs_adaptive) { /* Actually integrate, allocate workspace for this */
-#ifdef DEBUG
-        fprintf(stderr, "cs_n_steps = 0, allocating integration workspace w_int_cs with %zu max intervals.\n", ws->params->int_cs_max_intervals);
-#endif
+        DEBUGMSG("cs_n_steps = 0, allocating integration workspace w_int_cs with %zu max intervals.", ws->params->int_cs_max_intervals);
         ws->w_int_cs = gsl_integration_workspace_alloc(ws->params->int_cs_max_intervals);
     } else {
         ws->w_int_cs = NULL;
     }
     if(ws->params->cs_n_stragg_steps == 0) {
-#ifdef DEBUG
-        fprintf(stderr, "cs_n_stragg_steps = 0, allocating integration workspace w_int_cs_stragg with %zu max intervals.\n", ws->params->int_cs_stragg_max_intervals);
-#endif
+        DEBUGMSG("cs_n_stragg_steps = 0, allocating integration workspace w_int_cs_stragg with %zu max intervals.", ws->params->int_cs_stragg_max_intervals);
         ws->w_int_cs_stragg = gsl_integration_workspace_alloc(ws->params->int_cs_stragg_max_intervals);
     } else {
         ws->w_int_cs_stragg = NULL;
@@ -159,20 +146,16 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
     for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
         const reaction *r = sim->reactions[i_reaction];
         if(!reaction_is_possible(r, ws->params, ws->det->theta)) {
-#ifdef DEBUG
-            fprintf(stderr, "Reaction %zu (target %s, type %s) is not possible when theta = %g deg. Skipping. \n", i_reaction + 1, r->target->name,
+            DEBUGMSG("Reaction %zu (target %s, type %s) is not possible when theta = %g deg. Skipping.", i_reaction + 1, r->target->name,
                     reaction_type_to_string(r->type), ws->det->theta / C_DEG);
-#endif
             continue;
         }
         double E = reaction_product_energy(r, ws->det->theta, sim->beam_E);
         double E_safer = E + 3.0*sqrt(detector_resolution(ws->det, r->product, E)); /* Add 3x resolution sigma to max energy */
         E_safer *= 1.1; /* and 10% for good measure! */
         while(detector_calibrated(ws->det, JIBAL_ANY_Z, n_max) < E_safer && n_max <= CHANNELS_ABSOLUTE_MAX) {n_max++;} /* Increase number of channels until we hit this energy. TODO: this requires changes for ToF spectra. */
-#ifdef DEBUG
-        fprintf(stderr, "Reaction %zu (target %s, type %s), max E = %g keV -> %g keV after resolution and safety factor have been added, current n_max %zu (channels)\n", i_reaction + 1, r->target->name,
-                reaction_type_to_string(r->type), E/C_KEV, E_safer/C_KEV, n_max);
-#endif
+        DEBUGMSG("Reaction %zu: %s, max E = %g keV -> %g keV after resolution and safety factor have been added, current n_max %zu (channels)",
+                 i_reaction + 1, r->name, E / C_KEV, E_safer / C_KEV, n_max);
     }
     if(n_max == CHANNELS_ABSOLUTE_MAX)
         n_max=0;
@@ -196,9 +179,6 @@ void sim_workspace_histograms_reset(sim_workspace *ws) {
         sim_reaction *r = ws->reactions[i];
         if(!r)
             continue;
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Reaction %i:\n", i);
-#endif
         gsl_histogram_reset(r->histo);
     }
 }
@@ -209,16 +189,13 @@ size_t sim_workspace_histograms_calculate(sim_workspace *ws) {
         sim_reaction *r = ws->reactions[i];
         if(!r)
             continue;
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Reaction %i:\n", i);
-#endif
         assert(r->last_brick < r->n_bricks);
         if(r->last_brick == 0) {
             continue;
         }
         bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
         bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->params->gaussian_accurate);
-        r->empty = FALSE;
+        r->n_convolution_calls++;
         n_meaningful++;
     }
     return n_meaningful;
@@ -229,9 +206,6 @@ void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
         sim_reaction *r = ws->reactions[i];
         if(!r)
             continue;
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Reaction %i:\n", i);
-#endif
         gsl_histogram_scale(r->histo, scale);
     }
 }
@@ -246,9 +220,7 @@ int sim_workspace_print_spectra(const sim_workspace *ws, const char *filename, c
     if(histo_iter) {
         h = histo_iter;
     } else {
-#ifdef DEBUG
-        fprintf(stderr, "No stored sum spectrum in fit_data, falling back to sum spectrum in workspace.\n");
-#endif
+        DEBUGSTR("No stored sum spectrum in fit_data, falling back to sum spectrum in workspace.\n");
         h = ws->histo_sum;
     }
     if(!h) {
@@ -267,7 +239,7 @@ int sim_workspace_print_spectra(const sim_workspace *ws, const char *filename, c
             }
             for(size_t j = 0; j < ws->n_reactions; j++) {
                 const reaction *r = ws->reactions[j]->r;
-                fprintf(f, ",\"%s (%s)\"", r->target->name, reaction_name(r));
+                fprintf(f, ",\"%s (%s)\"", r->target->name, reaction_type_to_string(r->type));
             }
             fprintf(f, "\n");
         }

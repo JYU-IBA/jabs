@@ -148,7 +148,7 @@ idf_error idf_parse_energycalibrations(idf_parser *idf, xmlNode *energycalibrati
     return IDF2JBS_SUCCESS;
 }
 
-idf_error idf_parse_simple_data(idf_parser *idf, xmlNode *simple_data, const char *filename) {
+idf_error idf_parse_simple_data(xmlNode *simple_data, const char *filename) {
     if(!simple_data) {
         return IDF2JBS_FAILURE;
     }
@@ -228,7 +228,7 @@ idf_error idf_parse_data(idf_parser *idf, xmlNode *data) {
     char *datamode = idf_node_content_to_str(idf_findnode(data, "datamode"));
     if(idf_stringeq(datamode, "simple")) {
         char *simpledata_filename = idf_exp_name(idf, idf->i_spectrum);
-        if(idf_parse_simple_data(idf, idf_findnode(data, "simpledata"), simpledata_filename) == IDF2JBS_SUCCESS) {
+        if(idf_parse_simple_data(idf_findnode(data, "simpledata"), simpledata_filename) == IDF2JBS_SUCCESS) {
             idf_output_printf(idf, "load exp \"%s\"\n", simpledata_filename);
         }
         free(simpledata_filename);
@@ -398,7 +398,7 @@ idf_error idf_parse_simulation(idf_parser *idf, xmlNode *simulation) {
     char *datamode = idf_node_content_to_str(idf_findnode(simulation, "datamode"));
     if(idf_stringeq(datamode, "simple")) {
         char *simpledata_filename = idf_sim_name(idf, idf->i_spectrum);
-        if(idf_parse_simple_data(idf, idf_findnode(simulation, "simpledata"), simpledata_filename) == IDF2JBS_SUCCESS) {
+        if(idf_parse_simple_data(idf_findnode(simulation, "simpledata"), simpledata_filename) == IDF2JBS_SUCCESS) {
             idf_output_printf(idf, "load ref \"%s\"\n", simpledata_filename);
         }
         free(simpledata_filename);

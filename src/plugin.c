@@ -13,6 +13,7 @@
  */
 #include <stdlib.h>
 #include <string.h>
+#include "jabs_debug.h"
 #include "plugin.h"
 #include "generic.h"
 
@@ -33,13 +34,11 @@ jabs_plugin *jabs_plugin_open(const char *filename) {
     }
     plugin->handle = handle;
     plugin->filename = strdup(filename);
-    namef = dlsym(handle, "name");
-    versionf = dlsym(handle, "version");
-    typef = dlsym(handle, "type");
+    namef = (const char *(*)()) dlsym(handle, "name");
+    versionf = (const char *(*)()) dlsym(handle, "version");
+    typef = (jabs_plugin_type (*)()) dlsym(handle, "type");
     if(!namef || !versionf || !typef) {
-#ifdef DEBUG
-        fprintf(stderr, "Plugin does not have name or version symbol.\n");
-#endif
+        DEBUGSTR("Plugin does not have name or version symbol.");
         jabs_plugin_close(plugin);
         return NULL;
     }
@@ -82,20 +81,16 @@ const char *jabs_plugin_type_string(jabs_plugin_type type) {
 
 jabs_plugin_reaction *jabs_plugin_reaction_init(const jabs_plugin *plugin, const jibal_isotope *isotopes, const jibal_isotope *incident, const jibal_isotope *target, int *argc, char * const **argv) {
     if(!plugin) {
-#ifdef DEBUG
-        fprintf(stderr, "Plugin is NULL. Can't init.\n");
-#endif
+        DEBUGSTR("Plugin is NULL. Can't init.");
         return NULL;
     }
     if(plugin->type != JABS_PLUGIN_CS) {
         return NULL;
     }
     jabs_plugin_reaction *(*initf)(const jibal_isotope *isotopes, const jibal_isotope *incident, const jibal_isotope *target, int *argc, char * const **argv);
-    initf = dlsym(plugin->handle, "reaction_init");
+    initf = (jabs_plugin_reaction *(*)(const jibal_isotope *, const jibal_isotope *, const jibal_isotope *, int *, char * const **)) dlsym(plugin->handle, "reaction_init");
     if(!initf) {
-#ifdef DEBUG
-        fprintf(stderr, "No reaction_init in plugin.\n");
-#endif
+        DEBUGSTR("No reaction_init in plugin.\n");
         return NULL;
     }
     jabs_plugin_reaction *r = initf(isotopes, incident, target, argc, argv);
@@ -107,7 +102,7 @@ void jabs_plugin_reaction_free(const jabs_plugin *plugin, jabs_plugin_reaction *
         return;
     }
     void *(*freef)(jabs_plugin_reaction *reaction);
-    freef = dlsym(plugin->handle, "reaction_free");
+    freef = (void *(*)(jabs_plugin_reaction *)) dlsym(plugin->handle, "reaction_free");
     if(!freef) {
         return;
     }

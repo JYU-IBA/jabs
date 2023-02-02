@@ -1,9 +1,12 @@
 #include <gsl/gsl_multifit_nlinear.h>
 #include <assert.h>
+#include <string.h>
+#include "jabs_debug.h"
 #include "defaults.h"
 #include "message.h"
 #include "generic.h"
 #include "fit_params.h"
+#include "jibal_generic.h"
 
 
 fit_params *fit_params_new() {
@@ -43,16 +46,12 @@ void fit_params_update(fit_params *p) {
 
 int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor) {
     if(!value || !name) {
-#ifdef DEBUG
-        fprintf(stderr, "Didn't add a fit parameter since a NULL pointer was passed. Value = %p, name = %p (%s).\n", (void *)value, (void *)name, name);
-#endif
+        DEBUGMSG("Didn't add a fit parameter since a NULL pointer was passed. Value = %p, name = %p (%s).", (void *)value, (void *)name, name);
         return EXIT_FAILURE;
     }
     for(size_t i = 0; i < p->n; i++) {
         if(p->vars[i].value == value) {
-#ifdef DEBUG
-            fprintf(stderr, "Didn't add fit parameter %s that points to value %p since it already exists.\n", name, (void *)value);
-#endif
+            DEBUGMSG("Didn't add fit parameter %s that points to value %p since it already exists.", name, (void *)value);
             return EXIT_SUCCESS; /* Parameter already exists, don't add. */ /* TODO: maybe this requirement could be relaxed? */
         }
     }
@@ -64,23 +63,22 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
     var->unit = unit;
     var->unit_factor = unit_factor;
     var->active = FALSE;
-#ifdef DEBUG
-    fprintf(stderr, "Fit parameter %s added successfully (total %zu).\n", var->name, p->n);
-#endif
+    DEBUGMSG("Fit parameter %s added successfully (total %zu).", var->name, p->n);
     return EXIT_SUCCESS;
 }
 
 void fit_params_print(const fit_params *params, int active, const char *pattern) { /* Prints current values of all possible fit variables matching pattern. Pattern can be NULL too. */
     if(!params)
         return;
+    const char *whatkind = active ? "active" : "possible";
     if(params->n) {
         if(pattern) {
-            jabs_message(MSG_INFO, stderr, "All possible fit variables matching pattern \"%s\":\n", pattern);
+            jabs_message(MSG_INFO, stderr, "All %s fit variables matching pattern \"%s\":\n", whatkind, pattern);
         } else {
-            jabs_message(MSG_INFO, stderr, "All possible fit variables (use 'show fit variables <pattern>' to see variables matching pattern, wildcards are '*' and '?'):\n");
+            jabs_message(MSG_INFO, stderr, "All %s fit variables (use 'show fit variables <pattern>' to see variables matching pattern, wildcards are '*' and '?'):\n", whatkind);
         }
     } else {
-        jabs_message(MSG_INFO, stderr, "No fit variables.\n");
+        jabs_message(MSG_INFO, stderr, "No %s fit variables.\n", whatkind);
     }
     for(size_t i = 0; i < params->n; i++) {
         const fit_variable *var = &params->vars[i];
@@ -158,4 +156,24 @@ void fit_parameters_update_changed(const fit_params *fit_params) {
             /* var->err_rel stays the same */
         }
     }
+}
+
+
+int fit_params_enable_using_string(fit_params *params, const char *fit_vars) {
+    DEBUGMSG("fitvars = %s", fit_vars);
+    int status = EXIT_SUCCESS;
+    if(!fit_vars)
+        return EXIT_FAILURE;
+    char *token, *s, *s_orig;
+    s_orig = s = strdup(fit_vars);
+    while((token = jibal_strsep_with_quotes(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
+        if(fit_params_enable(params, token, TRUE) == 0) {
+            jabs_message(MSG_ERROR, stderr, "No matches for %s. See 'show fit variables' for a list of possible fit variables.\n", token);
+            status = EXIT_FAILURE;
+        }
+        if(status == EXIT_FAILURE)
+            break;
+    }
+    free(s_orig);
+    return status;
 }

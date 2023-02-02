@@ -18,8 +18,8 @@
 #else
 #include <unistd.h>
 #endif
-#include "win_compat.h"
 #include <jibal_generic.h>
+#include "jabs_debug.h"
 #include "message.h"
 #include "sample.h"
 #include "spectrum.h"
@@ -56,10 +56,8 @@ int script_prepare_sim_or_fit(script_session *s) {
     fit_data_histo_sum_free(fit);
     fit_data_workspaces_free(s->fit);
     sample_free(fit->sim->sample);
-#ifdef DEBUG
-    fprintf(stderr, "Original sample model:\n");
+    DEBUGSTR("Original sample model:");
     sample_model_print(NULL, fit->sm);
-#endif
     fit->sim->sample = sample_from_sample_model(fit->sm);
     if(!fit->sim->sample) {
         jabs_message(MSG_ERROR, stderr,
@@ -67,15 +65,16 @@ int script_prepare_sim_or_fit(script_session *s) {
         return -1;
     }
     if(fit->sim->n_reactions == 0) {
-        jabs_message(MSG_WARNING, stderr,
-                     "No reactions, adding some automatically. Please be aware there are commands called \"reset reactions\" and \"add reactions\".\n");
+        jabs_message(MSG_WARNING, stderr, "No reactions defined. Please be aware there are commands called \"reset reactions\" and \"add reactions\".\n");
         if(fit->sim->rbs) {
-            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim, REACTION_RBS));
-            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS_ALT, sim_cs(fit->sim, REACTION_RBS_ALT));
+            jabs_message(MSG_WARNING, stderr, "Adding RBS reactions.\n");
+            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim, REACTION_RBS), TRUE);
+            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS_ALT, sim_cs(fit->sim, REACTION_RBS_ALT), TRUE);
             /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
         }
         if(sim_do_we_need_erd(fit->sim)) {
-            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_ERD, sim_cs(fit->sim, REACTION_ERD));
+            jabs_message(MSG_WARNING, stderr, "Adding ERDA reactions.\n");
+            sim_reactions_add_auto(fit->sim, fit->sm, REACTION_ERD, sim_cs(fit->sim, REACTION_ERD), TRUE);
         }
     }
     if(fit->sim->n_reactions == 0) {
@@ -86,7 +85,7 @@ int script_prepare_sim_or_fit(script_session *s) {
     jabs_message(MSG_INFO, stderr, "Simplified sample model for simulation:\n");
     sample_print(NULL, fit->sim->sample, TRUE);
 
-    reactions_print(stderr, fit->sim->reactions, fit->sim->n_reactions);
+    reactions_print(fit->sim->reactions, fit->sim->n_reactions);
 
     if(assign_stopping(fit->jibal->gsto, fit->sim)) {
         jabs_message(MSG_ERROR, stderr,
@@ -95,12 +94,12 @@ int script_prepare_sim_or_fit(script_session *s) {
         return -1;
     }
     script_show_stopping(s, 0, NULL);
-    jibal_gsto_print_files(fit->jibal->gsto, TRUE); /* TODO: this don't use jabs_message() */
+#ifdef DEBUG
+    jibal_gsto_print_files(fit->jibal->gsto, TRUE);
+#endif
     jabs_message(MSG_VERBOSE, stderr, "Loading stopping data.\n");
     jibal_gsto_load_all(fit->jibal->gsto);
-#ifdef DEBUG
-    fprintf(stderr, "Updating calculation params before sim/fit\n");
-#endif
+    DEBUGSTR("Updating calculation params before sim/fit");
     sim_calc_params_update(fit->sim->params);
     sim_print(fit->sim);
 
@@ -190,55 +189,35 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
     return argc_orig - argc;
 }
 
-int foo(fit_params *params, const char *fit_vars) {
-#ifdef DEBUG
-    fprintf(stderr, "fitvars = %s\n", fit_vars);
-#endif
-    int status = EXIT_SUCCESS;
-    if(!fit_vars)
-        return EXIT_FAILURE;
-    char *token, *s, *s_orig;
-    s_orig = s = strdup(fit_vars);
-    while((token = jibal_strsep_with_quotes(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
-        if(fit_params_enable(params, token, TRUE) == 0) {
-            jabs_message(MSG_ERROR, stderr, "No matches for %s. See 'show fit variables' for a list of possible fit variables.\n", token);
-            status = EXIT_FAILURE;
-        }
-        if(status == EXIT_FAILURE)
-            break;
-    }
-    free(s_orig);
-    return status;
-}
-
 script_command_status script_fit(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit_data = s->fit;
+    const char *fit_usage = "Usage: fit [fitvar1,fitvar2,...]\nSee 'show fit variables' for a list of possible fit variables.\n";
     if(argc != 1) {
-        fprintf(stderr, "Usage: fit [fitvar1,fitvar2,...]\nSee 'show fit variables' for a list of possible fit variables.\n");
+        jabs_message(MSG_ERROR, stderr, fit_usage);
         return SCRIPT_COMMAND_FAILURE;
     }
     fit_params_free(fit_data->fit_params);
 
     fit_params *p_all = fit_params_all(fit_data);
-    if(foo(p_all, argv[0])) {
+    if(fit_params_enable_using_string(p_all, argv[0])) {
         jabs_message(MSG_ERROR, stderr, "Error in adding fit parameters.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     fit_params_update(p_all);
-    fit_params_print(p_all, FALSE, NULL);
+    fit_params_print(p_all, TRUE, NULL);
     fit_data->fit_params = p_all;
 
     if(fit_data->fit_params->n_active == 0) {
-        jabs_message(MSG_ERROR, stderr, "No parameters for fit.\n");
+        jabs_message(MSG_ERROR, stderr, fit_usage);
         return SCRIPT_COMMAND_FAILURE;
     }
-    jabs_message(MSG_INFO, stderr, "%zu fit parameters, %zu active.\n", fit_data->fit_params->n, fit_data->fit_params->n_active);
+    jabs_message(MSG_INFO, stderr, "%zu fit parameters possible, %zu active.\n", fit_data->fit_params->n, fit_data->fit_params->n_active);
     if(!fit_data->exp) { /* TODO: not enough to check this */
         jabs_message(MSG_ERROR, stderr, "No experimental spectrum set.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(fit_data->n_fit_ranges == 0) {
-        jabs_message(MSG_ERROR, stderr, "No fit range(s) given.\n");
+        jabs_message(MSG_ERROR, stderr, "No fit range(s) given. Use 'add fit range'.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(script_prepare_sim_or_fit(s)) {
@@ -430,9 +409,7 @@ const script_command *script_command_find(const script_command *commands, const 
         if(strncmp(c->name, cmd_string, strlen(cmd_string)) == 0) {
             found++;
             c_found = c;
-#ifdef DEBUG
-            fprintf(stderr, "Candidate for \"%s\": \"%s\".\n", cmd_string, c->name);
-#endif
+            DEBUGMSG("Candidate for \"%s\": \"%s\".", cmd_string, c->name);
             if(strlen(cmd_string) == strlen(c->name)) { /* Exact match, can not be ambiguous */
                 found = 1;
                 break;
@@ -484,9 +461,7 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
         jabs_message(MSG_ERROR, stderr, "Not enough arguments to set detector variable.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-#ifdef DEBUG
-    fprintf(stderr, "Active detector is %zu.\n", s->i_det_active);
-#endif
+    DEBUGMSG("Active detector is %zu.", s->i_det_active);
     detector *det = sim_det(s->fit->sim, s->i_det_active);
     if(!det) {
         jabs_message(MSG_ERROR, stderr, "Detector %zu does not exist.\n", s->i_det_active);
@@ -553,9 +528,7 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
 
 script_command_status script_set_detector_calibration_val(struct script_session *s, int val, int argc, char *const *argv) {
     (void) argv;
-#ifdef DEBUG
-    fprintf(stderr, "Active detector is %zu.\n", s->i_det_active);
-#endif
+    DEBUGMSG("Active detector is %zu.", s->i_det_active);
     detector *det = sim_det(s->fit->sim, s->i_det_active);
     if(!det) {
         jabs_message(MSG_ERROR, stderr, "Detector %zu does not exist.\n", s->i_det_active);
@@ -734,6 +707,7 @@ script_command_status script_disable_var(struct script_session *s, jibal_config_
 script_command_status script_execute_command(script_session *s, const char *cmd) {
     int argc = 0;
     script_command_status status;
+    DEBUGMSG("Trying to execute command %s", cmd);
     if(!s) {
         jabs_message(MSG_ERROR, stderr, "Session has not been initialized.\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -766,47 +740,41 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
     const script_command *cmds = commands;
     const script_command *c_parent = NULL;
     while(argc && cmds) { /* Arguments and subcommands remain. Try to find the right one, if possible. */
-#ifdef DEBUG
-        fprintf(stderr, "Top level script_execute_command_argv() loop, %i arguments remain (start with %s).\n", argc, argv[0]);
-#endif
+        DEBUGMSG("Top level script_execute_command_argv() loop, %i arguments remain (start with %s).", argc, argv[0]);
         const script_command *c = script_command_find(cmds, argv[0]);
         if(!c) {
-#ifdef DEBUG
-            fprintf(stderr, "Debug: Didn't find command %s.\n", argv[0]);
-#endif
+            DEBUGMSG("Didn't find command %s.", argv[0]);
             script_command_not_found(argv[0], c_parent);
             return SCRIPT_COMMAND_NOT_FOUND;
         }
         while(c) { /* Subcommand found */
             argc--;
             argv++;
-#ifdef DEBUG
-            fprintf(stderr, "Debug: Found command %s.\n", c->name);
-#endif
+            DEBUGMSG("Found command %s.", c->name);
             if(c->f) {
-#ifdef DEBUG
-                fprintf(stderr, "Debug: There is a function in command %s. Calling it with %i arguments.\n", c->name, argc);
-#endif
+                DEBUGMSG("There is a function in command %s. Calling it with %i arguments.", c->name, argc);
                 script_command_status status = c->f(s, argc, argv);
                 if(status > 0) { /* Positive numbers indicate number of arguments consumed */
                     argc -= status;
                     argv += status;
                 }
-#ifdef DEBUG
-                fprintf(stderr, "Debug: Command run, returned %i (%s). Number of arguments remaining: %i\n", status,
-                        script_command_status_to_string(status), argc);
-#endif
+                DEBUGMSG("Command run, returned %i \"%s\". Number of args remaining: %i",
+                         status, script_command_status_to_string(status), argc);
+                if(status == SCRIPT_COMMAND_RESET) { /* Special status on script_command_reset(), because now "c" pointer is freed! We must not dereference it anymore. */
+                    DEBUGSTR("Return value was SCRIPT_COMMAND_RESET");
+                    return SCRIPT_COMMAND_SUCCESS;
+                }
                 if(status < 0 && status != SCRIPT_COMMAND_NOT_FOUND) { /* Command not found is acceptable, we try to find subcommands later. All other errors cause an immediate return. */
+                    DEBUGSTR("Return value is negative, but not SCRIPT_COMMAND_NOT_FOUND");
                     return status;
                 }
                 if(status == SCRIPT_COMMAND_NOT_FOUND && argc == 0) { /* Command not found, no arguments remain, show an error. */
+                    DEBUGSTR("Return value is SCRIPT_COMMAND_NOT_FOUND and no arguments remain (argc == 0)");
                     script_command_not_found(NULL, c);
                     return status;
                 }
             } else if(c->var) {
-#ifdef DEBUG
-                fprintf(stderr, "Debug: %s is a var.\n", c->name);
-#endif
+                DEBUGMSG("%s is a var.", c->name);
                 if(!c_parent) {
                     jabs_message(MSG_ERROR, stderr,
                                  "Command/option \"%s\" is a variable, but there is no parent command at all. This is highly unusual.\n",
@@ -819,13 +787,13 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                                  c->name, c_parent->name);
                     return SCRIPT_COMMAND_FAILURE;
                 }
-#ifdef DEBUG
-                fprintf(stderr, "Debug: Using function in %s. %i arguments. Arguments start with: %s\n", c_parent->name, argc, argc?argv[0]:"(no arguments)");
-#endif
+                DEBUGMSG("Using function in %s. %i arguments. Arguments start with: %s", c_parent->name, argc, argc?argv[0]:"(no arguments)");
                 script_command_status status = c_parent->f_var(s, c->var, argc, argv);
                 if(status >= 0) { /* Positive numbers indicate number of arguments consumed */
+                    DEBUGMSG("Returned positive or zero value, %i arguments consumed.\n", status);
                     argc -= status;
                     argv += status;
+                    DEBUGMSG("Number of arguments remaining: %i.\n", argc);
                 } else {
                     return status;
                 }
@@ -842,9 +810,7 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                                  c->name, c_parent->name);
                     return SCRIPT_COMMAND_FAILURE;
                 }
-#ifdef DEBUG
-                fprintf(stderr, "Debug: Using function in %s. %i arguments. Arguments start with: %s\n", c_parent->name, argc, argc?argv[0]:"(no arguments)");
-#endif
+                DEBUGMSG("Using function in %s. %i args. Arguments start with: %s", c_parent->name, argc, argc?argv[0]:"(no args)");
                 script_command_status status = c_parent->f_val(s, c->val, argc, argv);
                 if(status >= 0) { /* Positive numbers indicate number of arguments consumed */
                     argc -= status;
@@ -853,23 +819,23 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                     return status;
                 }
             } else if(!argc) {
+                DEBUGSTR("argc == 0");
                 script_command_not_found(NULL, c); /* No function, no nothing, no arguments. */
                 return SCRIPT_COMMAND_NOT_FOUND;
             }
             if(c->subcommands) {
+                DEBUGSTR("There are subcommands.");
                 cmds = c->subcommands;
                 c_parent = c;
                 break;
             } else {
-#ifdef DEBUG
-                fprintf(stderr,"Debug: there are no subcommands in \"%s\" (this is not an error). There is a val as always: %i.\n", c->name, c->val);
-#endif
+                DEBUGMSG("there are no subcommands in \"%s\" (not an error). There is val as always: %i.", c->name, c->val);
                 c = NULL; /* Moving back to upper level. */
             }
         }
     }
     if(argc) {
-        jabs_message(MSG_ERROR, stderr, "Debug: Didn't find command or an error with \"%s\" (%i arguments remain).\n", argv[0], argc);
+        DEBUGMSG("Didn't find command or an error with \"%s\" (%i args remain).", argv[0], argc);
         return SCRIPT_COMMAND_NOT_FOUND;
     }
     return SCRIPT_COMMAND_SUCCESS;
@@ -918,6 +884,8 @@ const char *script_command_status_to_string(script_command_status status) {
             return "end-of-file";
         case SCRIPT_COMMAND_EXIT:
             return "exit";
+        case SCRIPT_COMMAND_RESET:
+            return "reset";
         default:
             break;
     }
@@ -976,9 +944,7 @@ int script_command_set_var(script_command *c, jibal_config_var_type type, void *
 void script_command_free(script_command *c) {
     if(!c)
         return;
-#ifdef DEBUG_VERBOSE
-    fprintf(stderr, "Freeing command \"%s\" (%p)\n", c->name, (void *)c);
-#endif
+    DEBUGVERBOSEMSG("Freeing command \"%s\" (%p)", c->name, (void *)c);
     free(c->var);
     free(c->help_text);
     free(c->name);
@@ -1065,9 +1031,7 @@ script_command *script_command_list_merge_sort(script_command *head) {
     script_command *next;
     result = head;
     size_t i;
-#ifdef DEBUG
-    fprintf(stderr, "Sorting command list (head %p = %s)\n", (void *)head, head->name);
-#endif
+    DEBUGVERBOSEMSG("Sorting command list (head %p = %s)", (void *)head, head->name);
     while(result != NULL) {
         next = result->next;
         result->next = NULL;
@@ -1101,11 +1065,9 @@ script_command *script_command_list_append(script_command *head, script_command 
 void script_command_list_add_command(script_command **head, script_command *c_new) {
     if(!c_new)
         return;
-#ifdef WARN_ON_DUMMY_COMMANDS
     if(!c_new->subcommands && !c_new->f && !c_new->var && !c_new->val) { /* Everything needs to be set before calling this function to avoid this warning. */
-        jabs_message(MSG_WARNING, stderr, "Warning: \"%s\" commands/option does not have subcommands and doesn't define a function, variable or a value!\n", c_new->name);
+        DEBUGMSG("Warning: \"%s\" commands/option does not have subcommands and doesn't define a function, variable or a value!", c_new->name);
     }
-#endif
     if(*head == NULL) {
         *head = c_new;
         return;
@@ -1162,27 +1124,26 @@ script_command *script_commands_create(struct script_session *s) {
     simulation *sim = fit->sim;
     script_command *head = NULL;
 
-
     script_command *c;
     script_command *c_help = script_command_new("help", "Help.", 0, &script_help);
-    script_command_list_add_command(&head, c_help);
     script_command_list_add_command(&c_help->subcommands, script_command_new("commands", "List of commands.", 0, &script_help_commands));
     script_command_list_add_command(&c_help->subcommands, script_command_new("version", "Help on (show) version.", 0, &script_help_version));
+    script_command_list_add_command(&head, c_help);
+
 
 #ifdef JABS_PLUGINS
     script_command *c_identify = script_command_new("identify", "Identify something.", 0, NULL);
-    script_command_list_add_command(&head, c_identify);
     script_command_list_add_command(&c_identify->subcommands, script_command_new("plugin", "Identify plugin.", 0, &script_identify_plugin));
+    script_command_list_add_command(&head, c_identify);
 #endif
 
     script_command *c_set = script_command_new("set", "Set something.", 0, NULL);
     c_set->f_var = &script_set_var;
-    script_command_list_add_command(&head, c_set);
     script_command_list_add_command(&c_set->subcommands, script_command_new("aperture", "Set aperture.", 0, &script_set_aperture));
+    script_command_list_add_command(&head, c_set);
 
     script_command *c_detector = script_command_new("detector", "Set detector properties.", 0, &script_set_detector);
     c_detector->f_val = &script_set_detector_val;
-    script_command_list_add_command(&c_set->subcommands, c_detector);
     script_command_list_add_command(&c_detector->subcommands, script_command_new("aperture", "Set detector aperture.", 0, &script_set_detector_aperture));
     script_command *c_calibration = script_command_new("calibration", "Set calibration.", 0, &script_set_detector_calibration);
     c_calibration->f_val = &script_set_detector_calibration_val;
@@ -1207,6 +1168,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_detector->subcommands, script_command_new("length", "Set detector length (for ToF).", 'l', NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("beta", "Set exit angle (angle of ion in sample) for this detector.", 'b', NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "Set detector azimuth angle, 0 = IBM, 90 deg = Cornell.", 'p', NULL));
+    script_command_list_add_command(&c_set->subcommands, c_detector);
 
     script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
     script_command *c_set_fit = script_command_new("fit", "Set fit related things.", 0, NULL);
@@ -1228,7 +1190,6 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_set->subcommands, c_set_simulation);
 
     script_command_list_add_command(&c_set->subcommands, script_command_new("stopping", "Set (assign) stopping or straggling.", 0, &script_set_stopping));
-    script_command_list_add_command(&c_set->subcommands, script_command_new("variable", "Set a variable.", 0, NULL));
 
     const jibal_config_var vars[] = {
             {JIBAL_CONFIG_VAR_UNIT,   "fluence",                     &sim->fluence,                             NULL},
@@ -1284,7 +1245,6 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_set->subcommands, c);
 
     script_command *c_load = script_command_new("load", "Load something.", 0, NULL);
-    script_command_list_add_command(&head, c_load);
     script_command_list_add_command(&c_load->subcommands, script_command_new("experimental", "Load an experimental spectrum.", 0, &script_load_experimental));
     script_command_list_add_command(&c_load->subcommands, script_command_new("reference", "Load a reference spectrum.", 0, &script_load_reference));
     script_command_list_add_command(&c_load->subcommands, script_command_new("script", "Load (run) a script.", 0, &script_load_script));
@@ -1295,9 +1255,9 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_reaction->subcommands, script_command_new("plugin", "Load a reaction from a plugin.", 0, &script_load_reaction_plugin));
 #endif
     script_command_list_add_command(&c_load->subcommands, script_command_new("roughness", "Load layer thickness table (roughness) from a file.", 0, &script_load_roughness));
+    script_command_list_add_command(&head, c_load); /* End of "load" commands */
 
     script_command *c_show = script_command_new("show", "Show information on things.", 0, NULL);
-    script_command_list_add_command(&head, c_show);
     script_command_list_add_command(&c_show->subcommands, script_command_new("aperture", "Show aperture.", 0, &script_show_aperture));
     script_command_list_add_command(&c_show->subcommands, script_command_new("calc_params", "Show calculation parameters.", 0, &script_show_calc_params));
     script_command_list_add_command(&c_show->subcommands, script_command_new("detector", "Show detector.", 0, &script_show_detector));
@@ -1314,41 +1274,41 @@ script_command *script_commands_create(struct script_session *s) {
 
     script_command *c_show_variable = script_command_new("variable", "Show variable.", 0, NULL);
     c_show_variable->f_var = script_show_var;
-    script_command_list_add_command(&c_show->subcommands, c_show_variable);
     c = script_command_list_from_vars_array(vars, 0);
     script_command_list_add_command(&c_show_variable->subcommands, c);
+    script_command_list_add_command(&c_show->subcommands, c_show_variable);
+    script_command_list_add_command(&head, c_show); /* End of "show" commands */
 
     script_command_list_add_command(&head, script_command_new("exit", "Exit.", 0, &script_exit));
 
     c = script_command_new("save", "Save something.", 0, NULL);
-    script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("bricks", "Save bricks.", 0, &script_save_bricks));
     script_command_list_add_command(&c->subcommands, script_command_new("calibrations", "Save detector calibrations.", 0, &script_save_calibrations));
     script_command_list_add_command(&c->subcommands, script_command_new("sample", "Save sample.", 0, &script_save_sample));
     script_command_list_add_command(&c->subcommands, script_command_new("spectra", "Save spectra.", 0, &script_save_spectra));
+    script_command_list_add_command(&head, c); /* End of "save" commands */
 
     c = script_command_new("test", "Test something.", 0, NULL);
-    script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("reference", "Test simulated spectrum against reference spectrum.", 0, &script_test_reference));
     script_command_list_add_command(&c->subcommands, script_command_new("roi", "Test ROI.", 0, &script_test_roi));
+    script_command_list_add_command(&head, c); /* End of "test" commands */
 
     c = script_command_new("add", "Add something.", 0, NULL);
-    script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("detector", "Add a detector.", 0, &script_add_detector));
 
     script_command *c_add_fit = script_command_new("fit", "Add something related to fit.", 0, NULL);
-    script_command_list_add_command(&c->subcommands, c_add_fit);
     script_command_list_add_command(&c_add_fit->subcommands, script_command_new("range", "Add a fit range", 0, &script_add_fit_range));
+    script_command_list_add_command(&c->subcommands, c_add_fit);
 
     script_command_list_add_command(&c->subcommands, script_command_new("reaction", "Add a reaction.", 0, &script_add_reaction));
     script_command_list_add_command(&c->subcommands, script_command_new("reactions", "Add reactions (of some type).", 0, &script_add_reactions));
+    script_command_list_add_command(&head, c); /* End of "add" commands */
 
     c = script_command_new("remove", "Remove something.", 0, NULL);
-    script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("reaction", "Remove reaction.", 0, &script_remove_reaction));
+    script_command_list_add_command(&head, c);
 
     c = script_command_new("reset", "Reset something (or everything).", 0, &script_reset);
-    script_command_list_add_command(&head, c);
     script_command_list_add_command(&c->subcommands, script_command_new("detectors", "Reset detectors.", 0, &script_reset_detectors));
     script_command_list_add_command(&c->subcommands, script_command_new("experimental", "Reset experimental spectra.", 0, &script_reset_experimental));
     script_command_list_add_command(&c->subcommands, script_command_new("reference", "Reset reference spectrum.", 0, &script_reset_reference));
@@ -1356,21 +1316,22 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c->subcommands, script_command_new("reactions", "Reset reactions.", 0, &script_reset_reactions));
     script_command_list_add_command(&c->subcommands, script_command_new("sample", "Reset sample.", 0, &script_reset_sample));
     script_command_list_add_command(&c->subcommands, script_command_new("stopping", "Reset stopping assignments.", 0, &script_reset_stopping));
+    script_command_list_add_command(&head, c);
 
     c = script_command_new("fit", "Do a fit.", 0, script_fit);
     script_command_list_add_command(&head, c);
 
     script_command *c_enable = script_command_new("enable", "Set boolean variable to true.", 0, NULL);
     c_enable->f_var = &script_enable_var;
-    script_command_list_add_command(&head, c_enable);
     c = script_command_list_from_vars_array(vars, JIBAL_CONFIG_VAR_BOOL);
     script_command_list_add_command(&c_enable->subcommands, c);
+    script_command_list_add_command(&head, c_enable);
 
     script_command *c_disable = script_command_new("disable", "Set boolean variable to true.", 0, NULL);
     c_disable->f_var = &script_disable_var;
-    script_command_list_add_command(&head, c_disable);
     c = script_command_list_from_vars_array(vars, JIBAL_CONFIG_VAR_BOOL);
     script_command_list_add_command(&c_disable->subcommands, c);
+    script_command_list_add_command(&head, c_disable);
 
     c = script_command_new("roi", "Show information from a region of interest.", 0, script_roi);
     script_command_list_add_command(&head, c);
@@ -1379,10 +1340,10 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&head, c);
 
     script_command *c_split = script_command_new("split", "Split something.", 0, NULL);
-    script_command_list_add_command(&head, c_split);
     script_command *c_split_sample = script_command_new("sample", "Split something sample related.", 0, NULL);
-    script_command_list_add_command(&c_split->subcommands, c_split_sample);
     script_command_list_add_command(&c_split_sample->subcommands, script_command_new("elements", "Split materials down to their constituent elements.", 0, script_split_sample_elements));
+    script_command_list_add_command(&c_split->subcommands, c_split_sample);
+    script_command_list_add_command(&head, c_split);
 
     script_command_list_add_command(&head, script_command_new("cwd", "Display current working directory.", 0, script_cwd));
     script_command_list_add_command(&head, script_command_new("pwd", "Display current working directory.", 0, script_cwd));
@@ -1404,9 +1365,7 @@ script_command *script_commands_sort_all(script_command *head) {
         if(c->subcommands && i < SCRIPT_COMMANDS_NESTED_MAX) { /* Go deeper, push existing pointer to stack */
             stack[i] = c;
             i++;
-#ifdef DEBUG
-            fprintf(stderr, "Sorting all commands, level %zu, subcommands of %s\n", i, c->name);
-#endif
+            DEBUGMSG("Sorting all commands, level %zu, subcommands of %s", i, c->name);
             c->subcommands = script_command_list_merge_sort(c->subcommands);
             c = c->subcommands;
             continue;
@@ -1440,9 +1399,7 @@ size_t script_commands_size(const script_command *commands) {
     for(const struct script_command *c = commands; c; c++) {
         n++;
     }
-#ifdef DEBUG
-    fprintf(stderr, "Commands size is %zu (%p).\n", n, (void *)commands);
-#endif
+    DEBUGMSG("Commands size is %zu (%p).", n, (void *)commands);
     return n;
 }
 
@@ -1453,15 +1410,16 @@ void script_print_command_tree(FILE *f, const struct script_command *commands) {
     size_t i = 0;
     c = stack[0];
     while(c) {
-#ifdef DEBUG
-        if(TRUE) {
-#else
         if(c->f || c->var || c->val) { /* If none of these is set, we shouldn't print the command name at all */
-#endif
             for(size_t j = 0; j < i; j++) {
                 jabs_message(MSG_INFO, f, "%s ", stack[j]->name);
             }
             jabs_message(MSG_INFO, f, "%s\n", c->name);
+        } else {
+#ifdef DEBUG
+            DEBUGSTR("The heck is this?");
+            abort();
+#endif
         }
         if(c->subcommands && i < SCRIPT_COMMANDS_NESTED_MAX) { /* Go deeper, push existing pointer to stack */
             stack[i] = c;
@@ -1653,7 +1611,6 @@ script_command_status script_reset_stopping(script_session *s, int argc, char *c
 script_command_status script_reset_experimental(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
-    struct fit_data *fit = s->fit;
     fit_data_exp_free(s->fit);
     fit_data_exp_alloc(s->fit);
     return 0;
@@ -1662,7 +1619,6 @@ script_command_status script_reset_experimental(script_session *s, int argc, cha
 script_command_status script_reset_reference(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
-    struct fit_data *fit = s->fit;
     gsl_histogram_free(s->fit->ref);
     s->fit->ref = NULL;
     return 0;
@@ -1681,9 +1637,7 @@ script_command_status script_reset(script_session *s, int argc, char *const *arg
     if(!fit) {
         return SCRIPT_COMMAND_FAILURE;
     }
-#ifdef DEBUG
-    fprintf(stderr, "Resetting everything!\n");
-#endif
+    DEBUGSTR("Resetting everything!\n");
     fit_data_fit_ranges_free(fit);
     fit_params_free(fit->fit_params);
     fit->fit_params = NULL;
@@ -1703,7 +1657,7 @@ script_command_status script_reset(script_session *s, int argc, char *const *arg
     script_commands_free(s->commands);
     s->commands = script_commands_create(s);
     jibal_gsto_assign_clear_all(s->jibal->gsto);
-    return 0;
+    return SCRIPT_COMMAND_RESET;
 }
 
 script_command_status script_show_sample(script_session *s, int argc, char *const *argv) {
@@ -1830,7 +1784,7 @@ script_command_status script_show_detector(script_session *s, int argc, char *co
     if(fit->sim->n_det == 0) {
         jabs_message(MSG_INFO, stderr, "No detectors have been defined.\n");
     } else if(argc != argc_orig || fit->sim->n_det == 1) { /* Show information on particular detector if a number was given or if we only have one detector. */
-        if(detector_print(s->jibal, NULL, sim_det(fit->sim, i_det))) {
+        if(detector_print(s->jibal, sim_det(fit->sim, i_det))) {
             jabs_message(MSG_ERROR, stderr, "No detectors set or other error.\n");
         }
     } else {
@@ -1856,7 +1810,7 @@ script_command_status script_show_reactions(script_session *s, int argc, char *c
     if(fit->sim->n_reactions == 0) {
         jabs_message(MSG_INFO, stderr, "No reactions.\n");
     }
-    reactions_print(stderr, fit->sim->reactions, fit->sim->n_reactions);
+    reactions_print(fit->sim->reactions, fit->sim->n_reactions);
     return 0;
 }
 
@@ -1951,9 +1905,7 @@ script_command_status script_set_detector_calibration(struct script_session *s, 
     } else {
         s->Z_active = JIBAL_ANY_Z;
     }
-#ifdef DEBUG
-    fprintf(stderr, "Active Z is now %i\n", s->Z_active);
-#endif
+    DEBUGMSG("Active Z is now %i", s->Z_active);
     return argc_orig - argc;
 }
 
@@ -2096,7 +2048,6 @@ script_command_status script_test_reference(struct script_session *s, int argc, 
         jabs_message(MSG_ERROR, stderr, "No simulation.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    const detector *det = sim_det(fit->sim, i_det);
     roi r = {.i_det = i_det};
     if(fit_set_roi_from_string(&r, argv[0])) {
         jabs_message(MSG_ERROR, stderr, "Could not parse range.\n");
@@ -2195,9 +2146,9 @@ script_command_status script_add_reaction(script_session *s, int argc, char *con
         r->cs = cs;
         jabs_message(MSG_VERBOSE, stderr,
                      "Reaction cross section not given or not valid, assuming default for %s: %s.\n",
-                     reaction_name(r), jabs_reaction_cs_to_string(cs));
+                     reaction_type_to_string(r->type), jabs_reaction_cs_to_string(cs));
     }
-    if(sim_reactions_add_reaction(fit->sim, r)) {
+    if(sim_reactions_add_reaction(fit->sim, r, FALSE)) {
         return SCRIPT_COMMAND_FAILURE;
     } else {
         return argc_consumed;
@@ -2218,7 +2169,7 @@ script_command_status script_add_reactions(script_session *s, int argc, char *co
             return SCRIPT_COMMAND_FAILURE;
         }
         if(type == REACTION_RBS || type == REACTION_RBS_ALT || type == REACTION_ERD) {
-            sim_reactions_add_auto(fit->sim, fit->sm, type, sim_cs(fit->sim, type));
+            sim_reactions_add_auto(fit->sim, fit->sm, type, sim_cs(fit->sim, type), FALSE);
         } else {
             jabs_message(MSG_ERROR, stderr, "Adding reactions of type %s is either not implemented or it is done by another command.\n", reaction_type_to_string(type));
             return SCRIPT_COMMAND_FAILURE;
@@ -2227,13 +2178,13 @@ script_command_status script_add_reactions(script_session *s, int argc, char *co
     }
     if(fit->sim->rbs) {
         sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS,
-                               sim_cs(fit->sim, REACTION_RBS)); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
+                               sim_cs(fit->sim, REACTION_RBS), FALSE); /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
         sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS_ALT,
-                               sim_cs(fit->sim, REACTION_RBS_ALT));
+                               sim_cs(fit->sim, REACTION_RBS_ALT), FALSE);
     }
 
     if(sim_do_we_need_erd(fit->sim)) {
-        sim_reactions_add_auto(fit->sim, fit->sm, REACTION_ERD, sim_cs(fit->sim, REACTION_ERD));
+        sim_reactions_add_auto(fit->sim, fit->sm, REACTION_ERD, sim_cs(fit->sim, REACTION_ERD), FALSE);
     }
     return 0;
 }
@@ -2410,7 +2361,7 @@ script_command_status script_load_reaction_plugin(script_session *s, int argc, c
     r->E_max = pr->E_max;
     r->filename = strdup(plugin->filename);
     r->Q = pr->Q;
-    sim_reactions_add_reaction(fit->sim, r);
+    sim_reactions_add_reaction(fit->sim, r, FALSE);
     return argc_orig; /* TODO: always consumes all arguments */
 }
 #endif
@@ -2445,6 +2396,7 @@ script_command_status script_cd(struct script_session *s, int argc, char *const 
 
 script_command_status script_idf2jbs(struct script_session *s, int argc, char * const *argv) {
     const int argc_orig = argc;
+    (void) s;
     if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: idf2jbs <idf file>\n");
         return SCRIPT_COMMAND_FAILURE;

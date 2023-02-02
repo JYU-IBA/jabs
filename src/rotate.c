@@ -108,15 +108,3 @@ double angle_tilt(double theta, double phi, char direction) { /* Directions 'x' 
     }
     return angle;
 }
-
-double theta_tilt(double tilt_x, double tilt_y) {
-    double theta = 0.0, phi = 0.0;
-    rotate(tilt_x, 0.0, theta, phi, &theta, &phi);
-    rotate(tilt_y, C_PI_2, theta, phi, &theta, &phi);
-#ifdef DEBUG
-    fprintf(stderr, "By rotating first by %.7lf deg (phi 0) and then %.7lf deg (phi 90 deg) we get angles %.7lf deg and %.7lf deg.\n",
-            tilt_x/C_DEG, tilt_y/C_DEG,
-            theta/C_DEG, phi/C_DEG);
-#endif
-    return theta;
-}
