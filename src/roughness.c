@@ -122,6 +122,7 @@ thick_prob_dist *thickness_probability_table_from_file(const char *filename) { /
         DEBUGVERBOSEMSG("Line %zu: parsed \"%s\" into %g tfu and %g", lineno, line, p->x/C_TFU, p->prob);
         n_true++;
     }
+    free(line);
     fclose(in);
     if(n_true == 0) {
         fail = TRUE;

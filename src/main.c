@@ -144,7 +144,6 @@ int main(int argc, char * const *argv) {
                 status = script_process(session);
                 DEBUGMSG("Script %i/%i given from command line has been processed. Status: %s", i+1, argc, script_command_status_to_string(status));
                 if(status != SCRIPT_COMMAND_SUCCESS) {
-
                     return status;
                 }
             }

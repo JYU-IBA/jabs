@@ -447,7 +447,7 @@ void MainWindow::plotSpectrum(size_t i_det)
                      * 3. Next reaction has different type (e.g. RBS vs ERD) or different Z
                      * */
                 if(histo) {
-                    QString name = QString("") + reaction_name(r->r) + " ";
+                    QString name = QString("") + reaction_type_to_string(r->r->type) + " ";
                     if(showThisIsotope) {
                         name.append(r->r->target->name);
                     } else {

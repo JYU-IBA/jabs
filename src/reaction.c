@@ -180,6 +180,7 @@ void reaction_free(reaction *r) {
 #endif
     free(r->cs_table);
     free(r->filename);
+    free(r->name);
     free(r);
 }
 
