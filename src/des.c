@@ -84,7 +84,7 @@ void des_table_rebuild_index(des_table *dt) {
     if(dt->depth_interval_index) {
         free(dt->depth_interval_index);
     }
-    dt->depth_interval_index = malloc(sizeof(size_t) * (dt->n_ranges + 1));
+    dt->depth_interval_index = calloc(dt->n_ranges + 1, sizeof(size_t));
 
     size_t i_range_old = dt->t[0].d.i;
     dt->depth_interval_index[i_range_old] = 0;
