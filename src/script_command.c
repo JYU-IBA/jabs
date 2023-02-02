@@ -1198,8 +1198,6 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT,   "emin",                        &sim->emin,                                NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "alpha",                       &sim->sample_theta,                        NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "phi",                         &sim->sample_phi,                          NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "channeling",                  &sim->channeling_offset,                   NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "channeling_slope",            &sim->channeling_slope,                    NULL},
             {JIBAL_CONFIG_VAR_STRING, "output",                      &s->output_filename,                       NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "erd",                         &sim->erd,                                 NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "rbs",                         &sim->rbs,                                 NULL},

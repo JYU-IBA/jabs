@@ -83,8 +83,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
             {"depthsteps",    required_argument, NULL, '8'},
             {"norbs",         no_argument,       NULL, '#'},
             {"noerd",         no_argument,       NULL, '9'},
-            {"channeling",    required_argument, NULL, 'C'},
-            {"channeling_slope",    required_argument, NULL, 3},
             {NULL, 0,                NULL,   0}
     };
     static const char *help_texts[] = {
@@ -120,8 +118,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
             "Maximum number of depth steps",
             "Don't make an RBS spectrum",
             "Don't make an ERD spectrum (ERD automatically turns on forward angles)",
-            "Ad-hoc substrate channeling yield correction (constant)",
-            "Ad-hoc substrate channeling yield correction (energy slope 1/keV)",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
@@ -152,12 +148,6 @@ void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,
                 break;
             case 'c':
                 sim->det[0]->compress = atoi(optarg);
-                break;
-            case 'C':
-                sim->channeling_offset = strtod(optarg, NULL);
-                break;
-            case 3:
-                sim->channeling_slope = strtod(optarg, NULL)/C_KEV;
                 break;
             case '3':
                 sim->fluence = strtod(optarg, NULL);

@@ -42,8 +42,6 @@ typedef struct simulation {
     double beam_E;
     double beam_E_broad; /* Variance */
     double emin;
-    double channeling_offset; /* a very ad-hoc channeling yield correction */
-    double channeling_slope;
     sim_calc_params *params;
     jabs_stop *stop;
     int erd; /* Add ERD reactions */

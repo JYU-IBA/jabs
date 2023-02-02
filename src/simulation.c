@@ -29,8 +29,6 @@ simulation *sim_init(jibal *jibal) {
     sim->beam_E = ENERGY_DEFAULT;
     sim->emin = E_MIN_DEFAULT;
     sim->beam_E_broad = 0.0;
-    sim->channeling_offset = 1.0;
-    sim->channeling_slope = 0.0;
     sim->sample = NULL; /* Needs to be set (later) */
     sim->reactions = NULL; /* Needs to be initialized after sample has been set */
     sim->n_reactions = 0;
@@ -182,12 +180,6 @@ int sim_sanity_check(
         jabs_message(MSG_ERROR, stderr, "Fluence is negative (%g).\n", sim->fluence);
         return -1;
     }
-#ifdef NO_BLOCKING
-    if(sim->channeling > 1.0) {
-        fprintf(stderr, "Channeling correction is above 1.0 (%g)\n", sim->channeling);
-        return -1;
-    }
-#endif
     return 0;
 }
 
@@ -296,10 +288,6 @@ void sim_print(const simulation *sim) {
     }
     jabs_message(MSG_INFO, stderr, "n_reactions = %zu\n", sim->n_reactions);
     jabs_message(MSG_INFO, stderr, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence * C_E * 1.0e6);
-    if(sim->channeling_offset != 1.0 || sim->channeling_slope != 0.0) {
-        jabs_message(MSG_INFO, stderr, "substrate channeling yield correction offset = %.5lf\n", sim->channeling_offset);
-        jabs_message(MSG_INFO, stderr, "substrate channeling yield correction slope = %g / keV (%e)\n", sim->channeling_slope / (1.0 / C_KEV), sim->channeling_slope);
-    }
 }
 
 void sim_sort_reactions(const simulation *sim) {

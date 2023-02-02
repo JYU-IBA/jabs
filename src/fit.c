@@ -352,8 +352,6 @@ fit_params *fit_params_all(fit_data *fit) {
     char *param_name = malloc(sizeof(char) * param_name_max_len);
     fit_params *params = fit_params_new();
     fit_params_add_parameter(params, &sim->fluence, "fluence", "", 1.0); /* This must be the first parameter always, as there is a speedup in the fit routine */
-    fit_params_add_parameter(params, &sim->channeling_offset, "channeling", "", 1.0);
-    fit_params_add_parameter(params, &sim->channeling_slope, "channeling_slope", "1/keV", 1.0 / C_KEV);
     fit_params_add_parameter(params, &sim->sample_theta, "alpha", "deg", C_DEG);
     fit_params_add_parameter(params, &sim->beam_E, "energy", "keV", C_KEV);
     for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
