@@ -42,7 +42,7 @@ typedef enum calibration_param_type {
 
 typedef struct calibration {
     calibration_type type;
-    double (*f)(const void *, double);
+    double (*f)(const void *, size_t);
     void *params;
     double resolution; /* Stored as FWHM in relevant SI units. Note that can be e.g. energy or time depending on detector type. */
     double resolution_variance; /* Calculated based on "resolution" before needed by detector_update(). */
@@ -62,10 +62,10 @@ calibration *calibration_init();
 void calibration_free(calibration *c);
 calibration *calibration_init_linear();
 calibration *calibration_init_poly(size_t n); /* n is the degree of the polynomial */
-double calibration_linear(const void *params, double x);
-double calibration_poly(const void *params, double x);
-double calibration_none(const void *params, double x);
-inline double calibration_eval(const calibration *c, double x) {return c->f(c->params, x);}
+double calibration_linear(const void *params, size_t x);
+double calibration_poly(const void *params, size_t x);
+double calibration_none(const void *params, size_t x);
+inline double calibration_eval(const calibration *c, size_t ch) {return c->f(c->params, ch);}
 int calibration_set_param(calibration *c, int i, double value);
 size_t calibration_get_number_of_params(const calibration *c);
 double calibration_get_param(const calibration *c, int i); /* get i'th param in range [0..n-1], get n by  calibration_get_number_of_params()*/
@@ -74,4 +74,5 @@ int calibration_copy_params(calibration *dst, calibration *src); /* Copies param
 const char *calibration_name(const calibration *c);
 char *calibration_to_string(const calibration *c);
 char *calibration_param_name(calibration_type type, calibration_param_type i); /* Name of i'th param (e.g. "slope"). Returns a string that can be free'd */
+int calibration_is_monotonically_increasing(const calibration *c, size_t n_channels);
 #endif //CALIB_CALIBRATION_H

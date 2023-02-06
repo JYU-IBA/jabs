@@ -6,8 +6,9 @@
 #include <jibal_units.h>
 #include "generic.h"
 #include "calibration.h"
+#include "jabs_debug.h"
 
-extern inline double calibration_eval(const calibration *c, double x);
+extern inline double calibration_eval(const calibration *c, size_t ch);
 
 calibration *calibration_init() {
     calibration *c = malloc(sizeof(calibration));
@@ -58,12 +59,12 @@ calibration *calibration_init_poly(size_t n) {
     return c;
 }
 
-double calibration_linear(const void *params, double x) {
+double calibration_linear(const void *params, size_t ch) {
     calibration_params_linear *p = (calibration_params_linear *)params;
-    return p->offset + p->slope * x;
+    return p->offset + p->slope * ch;
 }
 
-double calibration_poly(const void *params, double x) {
+double calibration_poly(const void *params, size_t x) {
     calibration_params_poly *p = (calibration_params_poly *)params;
     double mul = x;
     double sum = p->a[0];
@@ -74,9 +75,9 @@ double calibration_poly(const void *params, double x) {
     return sum;
 }
 
-double calibration_none(const void *params, double x) {
+double calibration_none(const void *params, size_t ch) {
     (void) params;
-    return x;
+    return 0.0;
 }
 
 int calibration_set_param(calibration *c, int i, double value) {
@@ -233,4 +234,27 @@ char *calibration_param_name(calibration_type type, calibration_param_type i) {
         return NULL;
     }
     return s;
+}
+
+int calibration_is_monotonically_increasing(const calibration *c, size_t n_channels) {
+    if(!c) {
+        return FALSE;
+    }
+    size_t n_params = calibration_get_number_of_params(c);
+    if(n_params < 2) { /* Calibration either constant, type is CALIBRATION_NONE or something else. */
+        return FALSE;
+    }
+    if(n_params == 2 && calibration_get_param(c, CALIBRATION_PARAM_SLOPE) > 0.0) { /* Linear calibration (also CALIBRATION_POLY with n == 2) */
+        return TRUE;
+    }
+    double y_old = calibration_eval(c, 0);
+    for(size_t i = 1; i < n_channels; i++) {
+        double y = calibration_eval(c, i);
+        if(y < y_old) {
+            DEBUGMSG("Calibration fails monotonicity check at %zu.", i);
+            return FALSE;
+        }
+        y_old = y;
+    }
+    return TRUE;
 }

@@ -77,10 +77,18 @@ int detector_sanity_check(const detector *det) {
         jabs_message(MSG_ERROR, stderr, "Warning: detector resolution (%g) is negative or not finite.\n", det->calibration->resolution);
         return -1;
     }
-    double slope = calibration_get_param(det->calibration, CALIBRATION_PARAM_SLOPE);
-    if(slope < 0.0) {
-        jabs_message(MSG_ERROR, stderr, "Warning: detector slope (%g) is negative.\n", slope);
+    if(calibration_is_monotonically_increasing(det->calibration, det->channels) == FALSE) {
+        jabs_message(MSG_ERROR, stderr, "Warning: detector default calibration is not monotonically increasing! (is slope, %g keV/ch, negative?)\n", calibration_get_param(det->calibration, CALIBRATION_PARAM_SLOPE) / C_KEV);
         return -1;
+    }
+    for(int Z = 0; Z <= (int)det->cal_Z_max; Z++) {
+        const calibration *c = detector_get_calibration(det, Z);
+        if(det->calibration == c || !c) /* Z calibration is same as default (fallback) or NULL (shouldn't happen) */
+            continue;
+        if(calibration_is_monotonically_increasing(det->calibration, det->channels) == FALSE) {
+            jabs_message(MSG_ERROR, stderr, "Warning: detector calibration for Z = %i is not monotonically increasing!\n", Z);
+            return -1;
+        }
     }
     if(det->type == DETECTOR_TOF && det->length < 1 * C_MM) {
         jabs_message(MSG_ERROR, stderr, "Warning: length (%g) is small (%g mm)\n", det->length/C_MM);
