@@ -215,7 +215,6 @@ int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range) {
         return EXIT_FAILURE;
     }
     if(range->high < range->low) {
-        jabs_message(MSG_ERROR, stderr, "Range from %zu to %zu is not valid!\n", range->low, range->high);
         return EXIT_FAILURE;
     }
     fit_data->n_fit_ranges++;
@@ -297,32 +296,32 @@ void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct r
         jabs_message(MSG_INFO, f, "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(det, JIBAL_ANY_Z, roi->high + 1) / C_KEV);
     }
     if(histo_sim) {
-        jabs_message(MSG_INFO, f, "        n_sim = %12zu\n", n_sim);
-        jabs_message(MSG_INFO, f, "          sim  = %12.8g\n", sim_cts);
+        jabs_message(MSG_INFO, f, "        n_sim = %12zu (number of channels)\n", n_sim);
+        jabs_message(MSG_INFO, f, "          sim = %12.8g (number of counts)\n", sim_cts);
     }
     if(histo_exp) {
-        jabs_message(MSG_INFO, f, "        n_exp = %12zu\n", n_exp);
-        jabs_message(MSG_INFO, f, "          exp  = %12.8g\n", exp_cts);
-        jabs_message(MSG_INFO, f, "    sqrt(exp)  = %12.5lf\n", sqrt(exp_cts));
+        jabs_message(MSG_INFO, f, "        n_exp = %12zu (number of channels)\n", n_exp);
+        jabs_message(MSG_INFO, f, "          exp = %12.8g (number of counts)\n", exp_cts);
+        jabs_message(MSG_INFO, f, "    sqrt(exp) = %12.5lf\n", sqrt(exp_cts));
     }
     if(histo_ref) {
-        jabs_message(MSG_INFO, f, "        n_ref = %12zu\n", n_ref);
-        jabs_message(MSG_INFO, f, "          ref  = %12.8g\n", ref_cts);
-        jabs_message(MSG_INFO, f, "    sqrt(ref)  = %12.5lf\n", sqrt(ref_cts));
+        jabs_message(MSG_INFO, f, "        n_ref = %12zu (number of channels)\n", n_ref);
+        jabs_message(MSG_INFO, f, "          ref = %12.8g (number of counts)\n", ref_cts);
+        jabs_message(MSG_INFO, f, "    sqrt(ref) = %12.5lf\n", sqrt(ref_cts));
     }
-    if(histo_sim && histo_exp) {
-        jabs_message(MSG_INFO, f, "      exp-sim  = %12.8g\n", exp_cts - sim_cts);
-        jabs_message(MSG_INFO, f, "      sim/exp  = %12.5lf\n", sim_cts / exp_cts);
-        jabs_message(MSG_INFO, f, "      exp/sim  = %12.5lf\n", exp_cts / sim_cts);
-        jabs_message(MSG_INFO, f, "  1/sqrt(exp)  = %12.5lf%%\n", 100.0 / sqrt(exp_cts));
-        jabs_message(MSG_INFO, f, "(exp-sim)/exp  = %12.5lf%%\n", 100.0 * (exp_cts - sim_cts) / exp_cts);
+    if(histo_sim && histo_exp && sim_cts > 0 && exp_cts > 0) {
+        jabs_message(MSG_INFO, f, "      exp-sim = %12.8g\n", exp_cts - sim_cts);
+        jabs_message(MSG_INFO, f, "      sim/exp = %12.5lf\n", sim_cts / exp_cts);
+        jabs_message(MSG_INFO, f, "      exp/sim = %12.5lf\n", exp_cts / sim_cts);
+        jabs_message(MSG_INFO, f, "  1/sqrt(exp) = %12.5lf%%\n", 100.0 / sqrt(exp_cts));
+        jabs_message(MSG_INFO, f, "(exp-sim)/exp = %12.5lf%%\n", 100.0 * (exp_cts - sim_cts) / exp_cts);
     }
-    if(histo_sim && histo_ref) {
-        jabs_message(MSG_INFO, f, "      ref-sim  = %12g\n", ref_cts - sim_cts);
-        jabs_message(MSG_INFO, f, "      sim/ref  = %12.5lf\n", sim_cts / ref_cts);
-        jabs_message(MSG_INFO, f, "      ref/sim  = %12.5lf\n", ref_cts / sim_cts);
-        jabs_message(MSG_INFO, f, "  1/sqrt(ref)  = %12.5lf%%\n", 100.0 / sqrt(ref_cts));
-        jabs_message(MSG_INFO, f, "(ref-sim)/ref  = %12.5lf%%\n", 100.0 * (ref_cts - sim_cts) / ref_cts);
+    if(histo_sim && histo_ref && sim_cts > 0 && ref_cts > 0) {
+        jabs_message(MSG_INFO, f, "      ref-sim = %12g\n", ref_cts - sim_cts);
+        jabs_message(MSG_INFO, f, "      sim/ref = %12.5lf\n", sim_cts / ref_cts);
+        jabs_message(MSG_INFO, f, "      ref/sim = %12.5lf\n", ref_cts / sim_cts);
+        jabs_message(MSG_INFO, f, "  1/sqrt(ref) = %12.5lf%%\n", 100.0 / sqrt(ref_cts));
+        jabs_message(MSG_INFO, f, "(ref-sim)/ref = %12.5lf%%\n", 100.0 * (ref_cts - sim_cts) / ref_cts);
     }
 }
 
@@ -896,6 +895,10 @@ int fit_set_roi_from_string(roi *r, const char *str) {
     str++;
     if(*str != '\0') {
         jabs_message(MSG_ERROR, stderr, "Unexpected input when parsing a range, \"%s\" at end of \"%s\"\n", str, str_orig);
+        return EXIT_FAILURE;
+    }
+    if(r->low > r->high) {
+        jabs_message(MSG_ERROR, stderr, "Range from %zu to %zu is not valid, because %zu > %zu!\n", r->low, r->high, r->low, r->high);
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

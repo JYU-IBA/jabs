@@ -386,6 +386,7 @@ script_command_status script_roi(script_session *s, int argc, char *const *argv)
     while(argc > 0) {
         roi r = {.i_det = i_det};
         if(fit_set_roi_from_string(&r, argv[0])) {
+            return SCRIPT_COMMAND_FAILURE;
             break;
         }
         fit_data_roi_print(stderr, s->fit, &r);
@@ -2230,7 +2231,7 @@ script_command_status script_add_fit_range(script_session *s, int argc, char *co
             }
         }
         if(fit_data_fit_range_add(fit, &r)) {
-            jabs_message(MSG_ERROR, stderr, "Range not valid! Failed on parsing \"%s\".\n", argv[0]);
+            jabs_message(MSG_ERROR, stderr, "Could not add range \"%s\" for some reason.\n", argv[0]);
             return SCRIPT_COMMAND_FAILURE;
         }
         n_ranges++;

@@ -494,8 +494,9 @@ void SpectrumPlot::replotAll() /* Wrapper for replot() */
 void SpectrumPlot::selectionAccepted(const QRect &rect, QMouseEvent *event)
 {
     Q_UNUSED(event)
-    int left = qFloor(xAxis->pixelToCoord(rect.left()));
-    int right = qCeil(xAxis->pixelToCoord(rect.right()));
+
+    int left = qFloor(xAxis->pixelToCoord(qMin(rect.left(), rect.right())));
+    int right = qCeil(xAxis->pixelToCoord(qMax(rect.left(), rect.right())));
     if(zoom) {
         xAxis->setRange(xAxis->pixelToCoord(rect.left()), xAxis->pixelToCoord(rect.right()));
         if(autorange) {

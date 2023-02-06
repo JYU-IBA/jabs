@@ -147,12 +147,18 @@ double spectrum_roi(const gsl_histogram *h, size_t low, size_t high) {
 }
 
 size_t spectrum_channels_in_range(const gsl_histogram *h, size_t low, size_t high) {
-    if(!h || h->n == 0)
+    if(!h || h->n == 0) {
         return 0;
-    if(low >= h->n)
+    }
+    if(high < low) {
         return 0;
-    if(high >= h->n)
+    }
+    if(low >= h->n) {
+        return 0;
+    }
+    if(high >= h->n) {
         high = h->n - 1;
+    }
     return high - low + 1;
 }
 
