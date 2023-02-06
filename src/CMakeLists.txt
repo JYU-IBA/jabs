@@ -46,3 +46,7 @@ target_link_libraries(jabs
     )
 
 install(TARGETS jabs RUNTIME DESTINATION bin)
+
+if(DEBUG_MODE)
+add_subdirectory(des_table_test)
+endif()
