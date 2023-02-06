@@ -325,7 +325,5 @@ int sim_do_we_need_erd(const simulation *sim) {
 void sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes) {
     ion_reset(ion);
     ion_set_isotope(ion, sim->beam_isotope);
-    ion->E = sim->beam_E;
-    ion->S = pow2(sim->beam_E_broad / C_FWHM);
     ion->nucl_stop = nuclear_stopping_new(ion->isotope, isotopes);
 }

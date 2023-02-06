@@ -87,6 +87,8 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         ws->params->geostragg = FALSE;
     }
     ws->ion = sim->ion; /* Shallow copy, but that is ok */
+    ws->ion.E = sim->beam_E;
+    ws->ion.S = pow2(sim->beam_E_broad / C_FWHM);
 
     sim_workspace_recalculate_n_channels(ws, sim);
 
