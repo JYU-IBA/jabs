@@ -14,7 +14,7 @@ set(CMAKE_C_STANDARD 99)
 
 configure_file(version.h.in version.h @ONLY)
 find_package(GSL 2.6 REQUIRED)
-find_package(Jibal 0.3.9 REQUIRED)
+find_package(Jibal 0.3.10 REQUIRED)
 find_package(LibXml2 REQUIRED)
 
 if(WIN32)

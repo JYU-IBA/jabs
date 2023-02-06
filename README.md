@@ -73,21 +73,18 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Multilayer foil in front of detector
  - Reading of experimental data, integer factor compress
  - Fitting to experimental spectrum (multidimensional non-linear least squares fitting)
- - Linear ad-hoc substrate channeling correction
+ - Simultaneous multi-detector simulation and fitting.
  - Faster (less accurate) modes
- - Slower (more accurate) modes
+ - Slower (more accurate) modes 
+ - Two-phase fitting, where faster physics model is used in the beginning and more accurate (user configurable) model is turned on after the first phase is starting to converge. User can skip the faster fitting phase.
  - User defined "molecules" i.e. elements with fixed concentration ratios (e.g. you can fit C in SiO2 without changing Si/O ratio)
  - Weighting of cross-sections by straggling 
  - Kinematic (geometric) broadening due to finite detector size and beam spot
- - Dual scattering model (although it is not guaranteed to be accurate)
- - Simultaneous multi-detector simulation and fitting.
  - Stopping corrections can be supplied by user (Bragg correction) for a specific layer as well as similar corrections for straggling and yield
- - Different detector calibration can be given for different particles (different proton number Z)
- - Two-phase fitting, where faster physics model is used in the beginning and more accurate (user configurable) model is turned on after the first phase is starting to converge. User can skip the faster fitting phase.
  - Testing of areal sum (counts) and residuals. Some test cases are run by the developer to check sanity and accuracy of simulations for every new release.
  - Higher accuracy mode using adaptive integration for more accurate handling of sharp peaks in cross sections (resonances) and accurate weighting of cross sections by (Gaussian) straggling.
- - Conversion tool from IDF to JaBS script (caveats; partial support in 0.6.7)
- - Simulation of large angle plural scattering (dual scattering model), with the assumption that first scattering is RBS (not ERD). DS in JaBS 0.6.7 and older is broken.
+ - Conversion tool from IDF to JaBS script (partial support)
+ - Simulation of large angle plural scattering (dual scattering model), with the assumption that first scattering is RBS (not ERD).
 
 ### Not implemented, but planned or being worked on
  - Support for more input and output data formats (CSV, ...)
