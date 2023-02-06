@@ -51,13 +51,24 @@ void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, 
                 hi = mi;
             }
         }
-        for(size_t j = lo; j < h->n; j++) {
+#ifdef DEBUG_BRICK_OUTPUT
+        double norm = 0.0;
+#endif
+        for(size_t j = lo; j < h->n - 1; j++) {
             if(h->range[j] > E_cutoff_high) /* Low energy edge of histogram is above cutoff */
                 break; /* Assumes histograms have increasing energy */
             const double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
             const double w = h->range[j + 1] - h->range[j];
             const double y = (erf_Q((b_low->E - E) / b_low->S_sum) - erf_Q((b_high->E - E) / b_high->S_sum));
-            h->bin[j] += scale * y * w * b_w_inv * b_low->Q;
+            double out = scale * y * w * b_w_inv * b_low->Q;
+            h->bin[j] += out;
+#ifdef DEBUG_BRICK_OUTPUT
+            fprintf(stdout, "BRICK %3zu %4zu %9.3lf %9.3lf %12e %12e %12e %12e %12e %12e\n", i, j, h->range[j] / C_KEV, h->range[j + 1] / C_KEV, out, h->bin[j], scale, y, w * b_w_inv, b_low->Q);
+            norm += y * w * b_w_inv;
+#endif
         }
+#ifdef DEBUG_BRICK_OUTPUT
+        fprintf(stdout, "BRICK #normalization calculated factor %.12lf relative error %.3e\nBRICK\nBRICK\n", norm, (norm-1.0));
+#endif
     }
 }

@@ -2065,7 +2065,7 @@ script_command_status script_test_reference(struct script_session *s, int argc, 
             jabs_message(MSG_ERROR, stderr, "Test failed.\n");
             return_value = SCRIPT_COMMAND_FAILURE;
         } else {
-            jabs_message(MSG_ERROR, stderr, "Test passed.\n");
+            jabs_message(MSG_INFO, stderr, "Test passed.\n");
         }
     }
     return return_value;

@@ -45,6 +45,11 @@ if(JABS_PLUGINS)
     endif()
 endif()
 
+option(BRICK_OUTPUT "Always output debug brick data (will be very verbose)" OFF)
+if(BRICK_OUTPUT)
+    add_compile_options(-DDEBUG_BRICK_OUTPUT)
+endif()
+
 add_subdirectory(gitwatcher)
 
 add_subdirectory(src)
