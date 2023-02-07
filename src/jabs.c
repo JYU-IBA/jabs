@@ -233,7 +233,13 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
     } else {
         sigmaconc = cross_section_concentration_product_stepping(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
     }
-    return sample->ranges[d_before->i].yield * sigmaconc;
+    if(sample->ranges[d_before->i].yield != 1.0 || sample->ranges[d_before->i].yield_slope != 0) {
+        double depth = (d_before->x + d_after->x) / 2.0 - sample->ranges[d_before->i].x; /* How deep are we (on average), for yield slope calculation */
+        double yield = sample->ranges[d_before->i].yield + sample->ranges[d_before->i].yield_slope * (depth / C_TFU);
+        yield = GSL_MAX_DBL(yield, 0.0); /* Don't allow negative yields */
+        sigmaconc *= yield;
+    }
+    return sigmaconc;
 }
 
 void simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {

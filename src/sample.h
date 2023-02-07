@@ -25,6 +25,7 @@ typedef struct sample_range {
     double x;
     roughness rough;
     double yield; /* Ad-hoc correction to scattering yield (cross section) */
+    double yield_slope;
     double bragg; /* Ad-hoc correction to stopping */
     double stragg; /* Ad-hoc correction to straggling */
     double density; /* Density of range (preferably of a layer) , used only to convert at./cm2 into nm if > 0.0 */
@@ -81,7 +82,8 @@ void sample_model_free(sample_model *sm);
 sample *sample_from_sample_model(const sample_model *sm);
 int sample_model_print(const char *filename, const sample_model *sm);
 size_t sample_model_number_of_rough_ranges(const sample_model *sm);
-size_t sample_model_number_of_ranges_with_non_unity_corrections(const sample_model *sm);
+size_t sample_model_number_of_ranges_with_bragg_or_stragg_corrections(const sample_model *sm);
+size_t sample_model_number_of_ranges_with_yield_corrections(const sample_model *sm);
 size_t sample_model_number_of_range_with_non_zero_density(const sample_model *sm);
 void sample_thickness_recalculate(sample *sample);
 

@@ -393,6 +393,17 @@ fit_params *fit_params_all(fit_data *fit) {
             snprintf(param_name, param_name_max_len, "yield%zu", range_index);
             fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0);
 
+            snprintf(param_name, param_name_max_len, "yield_slope%zu", range_index);
+            fit_params_add_parameter(params, &(r->yield_slope), param_name, "", 1.0);
+
+            if(i_range == sm->n_ranges - 1) { /* Last range, add chanelling "aliases" (=yield corrections) */
+                snprintf(param_name, param_name_max_len, "channeling");
+                fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0);
+
+                snprintf(param_name, param_name_max_len, "channeling_slope");
+                fit_params_add_parameter(params, &(r->yield_slope), param_name, "", 1.0);
+            }
+
             snprintf(param_name, param_name_max_len, "bragg%zu", range_index);
             fit_params_add_parameter(params, &(r->bragg), param_name, "", 1.0);
 

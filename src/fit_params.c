@@ -27,21 +27,27 @@ void fit_params_free(fit_params *p) {
     free(p);
 }
 
-void fit_params_update(fit_params *p) {
+int fit_params_update(fit_params *p) {
     if(!p)
-        return;
-
-    /* TODO: check if some ACTIVE parameters are duplicates. We don't care about inactive ones. */
-
+        return EXIT_FAILURE;
     p->n_active = 0;
-    for(size_t i = 0; i < p->n; i++) {
+    for(size_t i = 0; i < p->n; i++) { /* Count number of active variables and assign index numbers */
         if(p->vars[i].active) {
+            for(size_t j = 0; j < i; j++) { /* Check if this *active* variable is a duplicate (earlier active variable has the same value) */
+                if(!p->vars[j].active)
+                    continue;
+                if(p->vars[i].value == p->vars[j].value) {
+                    jabs_message(MSG_ERROR, stderr, "Fit parameters %s and %s can not be used simultaneously, as they are actually the same variable.\n", p->vars[i].name, p->vars[j].name);
+                    return EXIT_FAILURE;
+                }
+            }
             p->vars[i].i_v = p->n_active;
             p->n_active++;
         } else {
             p->vars[i].i_v = p->n; /* Intentionally invalid index */
         }
     }
+    return EXIT_SUCCESS;
 }
 
 int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor) {
@@ -51,8 +57,7 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
     }
     for(size_t i = 0; i < p->n; i++) {
         if(p->vars[i].value == value) {
-            DEBUGMSG("Didn't add fit parameter %s that points to value %p since it already exists.", name, (void *)value);
-            return EXIT_SUCCESS; /* Parameter already exists, don't add. */ /* TODO: maybe this requirement could be relaxed? */
+            DEBUGMSG("Fit parameter %s that points to value %p already exists. This is intentional, but beware.", name, (void *)value);
         }
     }
     p->n++;

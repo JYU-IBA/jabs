@@ -345,6 +345,7 @@ void MainWindow::on_action_Run_triggered()
         QMessageBox::critical(this, "Error", "Session not initialized.\n");
         return;
     }
+    statusBar()->showMessage(QString("Running"));
     enableRun(false);
     if(firstRun) {
         resetAll();
@@ -381,8 +382,9 @@ void MainWindow::on_action_Run_triggered()
     ui->msgTextBrowser->ensureCursorVisible();
     plotSession(/*error */);
     if(error) {
-        firstRun = true;
+        statusBar()->showMessage(QString("Error on line %1. Run aborted.").arg(lineno), 5000);
     } else {
+        statusBar()->showMessage(QString("Run successful, %1 lines processed.").arg(lineno), 2000);
         firstRun = false;
     }
 }

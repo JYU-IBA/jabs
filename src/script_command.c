@@ -203,7 +203,10 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
         jabs_message(MSG_ERROR, stderr, "Error in adding fit parameters.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    fit_params_update(p_all);
+    if(fit_params_update(p_all)) {
+        jabs_message(MSG_ERROR, stderr, "Error in updating fit params. Do you have duplicates?\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
     fit_params_print(p_all, TRUE, NULL);
     fit_data->fit_params = p_all;
 
@@ -1141,7 +1144,11 @@ script_command *script_commands_create(struct script_session *s) {
     script_command *c_set = script_command_new("set", "Set something.", 0, NULL);
     c_set->f_var = &script_set_var;
     script_command_list_add_command(&c_set->subcommands, script_command_new("aperture", "Set aperture.", 0, &script_set_aperture));
-    script_command_list_add_command(&head, c_set);
+
+    script_command *c_channeling = script_command_new("channeling", "Set channeling yield correction (i.e. last layer yield).", 0, NULL);
+    script_command_list_add_command(&c_channeling->subcommands, script_command_new("yield", "Set channeling yield (constant).", 0, &script_set_channeling_yield));
+    script_command_list_add_command(&c_channeling->subcommands, script_command_new("slope", "Set channeling yield (depth) slope.", 0, &script_set_channeling_slope));
+    script_command_list_add_command(&c_set->subcommands, c_channeling);
 
     script_command *c_detector = script_command_new("detector", "Set detector properties.", 0, &script_set_detector);
     c_detector->f_val = &script_set_detector_val;
@@ -1172,6 +1179,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_set->subcommands, c_detector);
 
     script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
+
     script_command *c_set_fit = script_command_new("fit", "Set fit related things.", 0, NULL);
     c_set_fit->f_val = &script_set_fit_val;
     script_command_list_add_command(&c_set_fit->subcommands, script_command_new("normal", "Normal two-phase fitting.", 'n', NULL));
@@ -1242,6 +1250,7 @@ script_command *script_commands_create(struct script_session *s) {
     };
     c = script_command_list_from_vars_array(vars, 0);
     script_command_list_add_command(&c_set->subcommands, c);
+    script_command_list_add_command(&head, c_set); /* End of "set" commands */
 
     script_command *c_load = script_command_new("load", "Load something.", 0, NULL);
     script_command_list_add_command(&c_load->subcommands, script_command_new("experimental", "Load an experimental spectrum.", 0, &script_load_experimental));
@@ -1825,6 +1834,34 @@ script_command_status script_set_ion(script_session *s, int argc, char *const *a
         return SCRIPT_COMMAND_FAILURE;
     }
     s->fit->sim->beam_isotope = isotope;
+    return 1;
+}
+
+script_command_status script_set_channeling_yield(script_session *s, int argc, char *const *argv) {
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: set channeling yield <yield>\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    sample_model *sm = s->fit->sm;
+    if(!sm || sm->n_ranges == 0) {
+        jabs_message(MSG_ERROR, stderr, "Sample needs to be set first.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    sm->ranges[sm->n_ranges - 1].yield = strtod(argv[0], NULL);
+    return 1;
+}
+
+script_command_status script_set_channeling_slope(script_session *s, int argc, char *const *argv) {
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: set channeling slope <slope>\nSlope is assumed to have units of 1/tfu, no unit can be provided.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    sample_model *sm = s->fit->sm;
+    if(!sm || sm->n_ranges == 0) {
+        jabs_message(MSG_ERROR, stderr, "Sample needs to be set first.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    sm->ranges[sm->n_ranges - 1].yield_slope = strtod(argv[0], NULL);
     return 1;
 }
 

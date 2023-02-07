@@ -97,6 +97,8 @@ script_command_status script_show_sample(struct script_session *s, int argc, cha
 script_command_status script_show_simulation(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_stopping(script_session *s, int argc, char * const *argv);
 script_command_status script_simulate(struct script_session *s, int argc, char * const *argv);
+script_command_status script_set_channeling_yield(script_session *s, int argc, char *const *argv);
+script_command_status script_set_channeling_slope(script_session *s, int argc, char *const *argv);
 script_command_status script_set_aperture(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_ion(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_detector(struct script_session *s, int argc, char * const *argv);

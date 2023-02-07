@@ -352,7 +352,8 @@ int sample_model_print(const char *filename, const sample_model *sm) {
         return EXIT_FAILURE;
     }
     size_t n_rl = sample_model_number_of_rough_ranges(sm);
-    size_t n_layers_corrections = sample_model_number_of_ranges_with_non_unity_corrections(sm);
+    size_t n_braggstragg = sample_model_number_of_ranges_with_bragg_or_stragg_corrections(sm);
+    size_t n_yield = sample_model_number_of_ranges_with_yield_corrections(sm);
     size_t n_nonzero_density = sample_model_number_of_range_with_non_zero_density(sm);
     switch(sm->type) {
         case SAMPLE_MODEL_NONE:
@@ -373,8 +374,11 @@ int sample_model_print(const char *filename, const sample_model *sm) {
     if(n_nonzero_density) {
         jabs_message(MSG_INFO, f, "  density");
     }
-    if(n_layers_corrections) {
+    if(n_yield) {
         jabs_message(MSG_INFO, f, "  yield");
+        jabs_message(MSG_INFO, f, "  yield_slope");
+    }
+    if(n_braggstragg) {
         jabs_message(MSG_INFO, f, "  bragg");
         jabs_message(MSG_INFO, f, "  stragg");
     }
@@ -396,8 +400,11 @@ int sample_model_print(const char *filename, const sample_model *sm) {
         if(n_nonzero_density) {
             jabs_message(MSG_INFO, f, " %8.4lf", r->density / C_G_CM3);
         }
-        if(n_layers_corrections) {
-            jabs_message(MSG_INFO, f, " %5.4lf %5.4lf %6.4lf", r->yield, r->bragg, r->stragg);
+        if(n_yield) {
+            jabs_message(MSG_INFO, f, " %5.4lf %12.8lf", r->yield, r->yield_slope);
+        }
+        if(n_braggstragg) {
+            jabs_message(MSG_INFO, f, " %5.4lf %6.4lf", r->bragg, r->stragg);
         }
         for (size_t j = 0; j < sm->n_materials; j++) {
             jabs_message(MSG_INFO, f, " %8.4lf", *sample_model_conc_bin(sm, i, j) * 100.0);
@@ -419,13 +426,25 @@ size_t sample_model_number_of_rough_ranges(const sample_model *sm) {
     return n;
 }
 
-size_t sample_model_number_of_ranges_with_non_unity_corrections(const sample_model *sm) { /* Used to determine if "yield", "bragg" or "stragg" fields need to be output by sample_model_print() */
+size_t sample_model_number_of_ranges_with_bragg_or_stragg_corrections(const sample_model *sm) { /* Used to determine if "bragg" or "stragg" fields need to be output by sample_model_print() */
     if(!sm)
         return 0;
     size_t n = 0;
     for(size_t i = 0; i < sm->n_ranges; i++) {
         const sample_range *r = &(sm->ranges[i]);
-        if(r->yield != 1.0 || r->bragg != 1.0 || r->stragg != 1.0)
+        if(r->bragg != 1.0 || r->stragg != 1.0)
+            n++;
+    }
+    return n;
+}
+
+size_t sample_model_number_of_ranges_with_yield_corrections(const sample_model *sm) { /* Used to determine if "yield", "yield_slope" fields need to be output by sample_model_print() */
+    if(!sm)
+        return 0;
+    size_t n = 0;
+    for(size_t i = 0; i < sm->n_ranges; i++) {
+        const sample_range *r = &(sm->ranges[i]);
+        if(r->yield != 1.0 || r->yield_slope != 0.0)
             n++;
     }
     return n;
@@ -469,7 +488,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
     size_t line_size = 0;
     size_t lineno = 0;
 
-    size_t i_depth = 0, i_rough = 0, i_nrough = 0, i_bragg = 0, i_yield = 0, i_stragg = 0, i_density = 0;
+    size_t i_depth = 0, i_rough = 0, i_nrough = 0, i_bragg = 0, i_yield = 0, i_yield_slope = 0, i_stragg = 0, i_density = 0;
 
     int headers = 1;
 
@@ -525,6 +544,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 sample_range *r = &sm->ranges[sm->n_ranges];
                 r->x = 0.0;
                 r->yield = 1.0;
+                r->yield_slope = 0.0;
                 r->bragg = 1.0;
                 r->stragg = 1.0;
                 r->density = 0.0;
@@ -547,6 +567,8 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 r->bragg = x;
             } else if (n == i_yield) {
                 r->yield = x;
+            } else if (n == i_yield_slope) {
+                r->yield_slope = x;
             } else if (n == i_stragg) {
                 r->stragg = x;
             } else if (n == i_density) {
@@ -647,6 +669,8 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             }
         } else if(range && strcmp((*argv)[0], "yield") == 0) {
             range->yield = strtod((*argv)[1], NULL);
+        } else if(range && strcmp((*argv)[0], "yield_slope") == 0) {
+            range->yield_slope = strtod((*argv)[1], NULL);
         } else if(range && strcmp((*argv)[0], "bragg") == 0) {
             range->bragg = strtod((*argv)[1], NULL);
         } else if(range && strcmp((*argv)[0], "stragg") == 0) {
@@ -664,6 +688,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             range->x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1]);
             range->bragg = 1.0;
             range->yield = 1.0;
+            range->yield_slope = 0.0;
             range->stragg = 1.0;
             range->density = 0.0;
             range->rough.model = ROUGHNESS_NONE;
@@ -746,6 +771,9 @@ char *sample_model_to_string(const sample_model *sm) {
         }
         if(r->yield != 1.0) {
             asprintf_append(&out, " yield %g", r->yield);
+        }
+        if(r->yield_slope != 0.0) {
+            asprintf_append(&out, " yield_slope %g", r->yield);
         }
         if(r->stragg != 1.0) {
             asprintf_append(&out, " stragg %g", r->stragg);
