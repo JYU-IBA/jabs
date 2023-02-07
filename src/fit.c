@@ -25,7 +25,6 @@
 #include <stdio.h>
 #include "win_compat.h"
 #include <string.h>
-#include <time.h>
 #include <assert.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_blas.h>
@@ -37,9 +36,11 @@
 #include "spectrum.h"
 #include "message.h"
 #include "fit.h"
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
-    clock_t start, end;
     struct fit_data *fit_data = (struct fit_data *) params;
 #ifdef DEBUG
     fprintf(stderr, "Fit iteration %zu, fit function evaluation %zu\n", fit_data->stats.iter, fit_data->stats.n_evals_iter);
@@ -89,7 +90,6 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     sample_renormalize(fit_data->sim->sample);
 
     if(fit_data_workspaces_init(fit_data)) {
-        fit_data_workspaces_free(fit_data); /* Some workspaces may have already been allocated */
         fit_data->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
     }
@@ -104,12 +104,24 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     }
 #endif
 
-    start = clock();
-    for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
+
+    size_t i_det;
+
+#pragma omp parallel default(none) private(i_det) shared(fit_data)
+#pragma omp for nowait
+    for(i_det = 0; i_det < fit_data->n_ws; i_det++) {
+        double start = jabs_clock();
+#ifdef _OPENMP
+        int tid = omp_get_thread_num();
+        DEBUGMSG("Thread id %i got detector number %zu\n", tid, i_det + 1);
+#endif
         simulate_with_ds(fit_data->ws[i_det]);
+        double end = jabs_clock();
+#pragma omp critical
+        fit_data->stats.cputime_iter += (end - start);
     }
-    end = clock();
-    fit_data->stats.cputime_iter += (((double) (end - start)) / CLOCKS_PER_SEC);
+
+
     fit_data->stats.n_evals_iter++;
 
     if(fit_data->stats.iter_call == 1) { /* First call of iter, store sum histograms to fit_data */
@@ -535,31 +547,36 @@ size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_d
     return sum;
 }
 
-int fit_data_workspaces_init(struct fit_data *fit_data) {
+sim_workspace *fit_data_workspace_init(fit_data *fit, size_t i_det) {
+    detector *det = sim_det(fit->sim, i_det);
+    if(detector_sanity_check(det)) {
+        jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!\n", i_det + 1);
+        return NULL;
+    }
+    detector_update(det);
+    spectrum_set_calibration(fit_data_exp(fit, i_det), det, JIBAL_ANY_Z); /* Update the experimental spectra calibration (using default calibration) */
+    sim_workspace *ws = sim_workspace_init(fit->jibal, fit->sim, det);
+    if(!ws) {
+        jabs_message(MSG_ERROR, stderr, "Workspace (detector %zu) failed to initialize!\n", i_det + 1);
+        return NULL;
+    }
+    return ws;
+}
+
+int fit_data_workspaces_init(fit_data *fit) {
     int status = EXIT_SUCCESS;
-    fit_data_workspaces_free(fit_data);
-    fit_data->n_ws = fit_data->sim->n_det;
-    fit_data->ws = calloc(fit_data->n_ws, sizeof(sim_workspace *));
-    if(!fit_data->ws)
-        return EXIT_FAILURE;
-    for(size_t i = 0; i < fit_data->n_ws; i++) {
-        detector *det = sim_det(fit_data->sim, i);
-        if(detector_sanity_check(det)) {
-            jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!\n", i);
+    fit->n_ws = fit->sim->n_det;
+    fit->ws = calloc(fit->n_ws, sizeof(sim_workspace *));
+    for(size_t i_det = 0; i_det < fit->n_ws; i_det++) {
+        sim_workspace *ws = fit_data_workspace_init(fit, i_det);
+        if(!ws) {
             status = EXIT_FAILURE;
             break;
         }
-        detector_update(det);
-        spectrum_set_calibration(fit_data_exp(fit_data, i), det, JIBAL_ANY_Z); /* Update the experimental spectra calibration (using default calibration) */
-        sim_workspace *ws = sim_workspace_init(fit_data->jibal, fit_data->sim, det);
-        if(!ws) {
-            jabs_message(MSG_ERROR, stderr, "Workspace %zu failed to initialize!\n", i);
-            status = EXIT_FAILURE;
-        }
-        fit_data->ws[i] = ws;
+        fit->ws[i_det] = ws;
     }
     if(status == EXIT_FAILURE) {
-        fit_data_workspaces_free(fit_data);
+        fit_data_workspaces_free(fit);
     }
     return status;
 }
@@ -570,7 +587,6 @@ void fit_data_workspaces_free(struct fit_data *fit_data) {
     }
     for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
         sim_workspace_free(fit_data->ws[i_det]);
-        fit_data->ws[i_det] = NULL;
     }
     free(fit_data->ws);
     fit_data->ws = NULL;
@@ -847,7 +863,7 @@ int fit(struct fit_data *fit_data) {
             jabs_message(MSG_ERROR, stderr, "Fit aborted in phase %i, reason: %s.\n", phase, fit_error_str(fit_data->stats.error));
             break;
         }
-        jabs_message(MSG_INFO, stderr, "Phase %i finished. CPU time used for actual simulation so far: %.3lf s.\n", phase, fit_data->stats.cputime_cumul);
+        jabs_message(MSG_INFO, stderr, "Phase %i finished. Time used for actual simulation so far: %.3lf s.\n", phase, fit_data->stats.cputime_cumul);
         fit_report_results(fit_data, w, &fdf);
     }
 

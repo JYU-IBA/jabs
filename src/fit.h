@@ -112,7 +112,8 @@ gsl_histogram *fit_data_histo_sum(const struct fit_data *fit_data, size_t i_det)
 int fit_data_add_det(struct fit_data *fit, detector *det);
 sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det);
 size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);
-int fit_data_workspaces_init(struct fit_data *fit_data); /* If any workspace initialization fails, this frees allocated memory (function below) and returns non-zero */
+sim_workspace *fit_data_workspace_init(fit_data *fit, size_t i_ws);
+int fit_data_workspaces_init(fit_data *fit);
 void fit_data_workspaces_free(struct fit_data *fit_data); /* Also sets workspace pointers to NULL */
 struct fit_stats fit_stats_init();
 int fit(struct fit_data *fit_data);

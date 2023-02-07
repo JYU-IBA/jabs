@@ -16,6 +16,7 @@ configure_file(version.h.in version.h @ONLY)
 find_package(GSL 2.6 REQUIRED)
 find_package(Jibal 0.3.10 REQUIRED)
 find_package(LibXml2 REQUIRED)
+find_package(OpenMP)
 
 if(WIN32)
     find_path(GETOPT_INCLUDE_DIR getopt.h)
@@ -44,6 +45,11 @@ target_link_libraries(jabs
     PRIVATE "$<$<BOOL:${UNIX}>:m>"
     ${GETOPT_LIBRARY} gitwatcher
     )
+
+if(OpenMP_C_FOUND)
+    target_link_libraries(jabs PUBLIC OpenMP::OpenMP_C)
+endif()
+
 
 install(TARGETS jabs RUNTIME DESTINATION bin)
 

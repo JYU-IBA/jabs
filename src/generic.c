@@ -20,6 +20,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#ifdef _OPENMP
+#include <omp.h>
+#else
+#include <time.h>
+#endif
 #include <jibal_generic.h>
 #include "jabs_debug.h"
 #include "win_compat.h"
@@ -248,4 +253,12 @@ const char *jabs_file_extension_const(const char *filename) {
     const char *ext;
     for(ext = filename + strlen(filename); ext > filename && *ext != '.'; ext--) {}
     return ext;
+}
+
+double jabs_clock() {
+#ifdef _OPENMP
+    return omp_get_wtime();
+#else
+    return clock() / CLOCKS_PER_SEC; /* TODO: replace with something that returns something comparable to omp_get_wtime() */
+#endif
 }

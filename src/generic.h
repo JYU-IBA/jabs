@@ -33,4 +33,5 @@ char *jabs_strip_newline(char *str);
 int jabs_line_is_comment(const char *line);
 char *jabs_file_extension(char *filename); /* Returns pointer in filename to the LAST dot, '.' in string filename or beginning of filename if not found. */
 const char *jabs_file_extension_const(const char *filename);
+double jabs_clock();
 #endif //JABS_GENERIC_H

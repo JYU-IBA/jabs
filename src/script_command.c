@@ -105,17 +105,17 @@ int script_prepare_sim_or_fit(script_session *s) {
 
     sim_prepare_ion(&fit->sim->ion, fit->sim, fit->jibal->isotopes);
 
-    s->start = clock();
+    s->start = jabs_clock();
     return 0;
 }
 
 int script_finish_sim_or_fit(script_session *s) {
-    s->end = clock();
-    double cputime_total = (((double) (s->end - s->start)) / CLOCKS_PER_SEC);
-    if(cputime_total > 1.0) {
-        jabs_message(MSG_INFO, stderr, "\n...finished! Total CPU time: %.3lf s.\n", cputime_total);
+    s->end = jabs_clock();
+    double time = s->end - s->start;
+    if(time > 1.0) {
+        jabs_message(MSG_INFO, stderr, "\n...finished! Total time: %.3lf s.\n", time);
     } else {
-        jabs_message(MSG_INFO, stderr, "\n...finished! Total CPU time: %.3lf ms.\n", cputime_total * 1000.0);
+        jabs_message(MSG_INFO, stderr, "\n...finished! Total time: %.3lf ms.\n", time * 1000.0);
     }
 #ifdef CLEAR_GSTO_ASSIGNMENTS_WHEN_FINISHED
     jibal_gsto_assign_clear_all(s->fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
@@ -173,11 +173,10 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
     if(script_prepare_sim_or_fit(s)) {
         return SCRIPT_COMMAND_FAILURE;
     }
+    sim_calc_params_print(fit->sim->params);
     if(fit_data_workspaces_init(fit)) {
-        jabs_message(MSG_ERROR, stderr, "Could not initialize simulation workspace(s).\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    sim_calc_params_print(fit->sim->params);
     for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
         if(simulate_with_ds(fit->ws[i_det])) {
             jabs_message(MSG_ERROR, stderr, "Simulation failed.\n");
@@ -2332,6 +2331,21 @@ script_command_status script_help_version(script_session *s, int argc, char *con
         jabs_message(MSG_INFO, stderr, "This version of JaBS is compiled from a git repository (branch %s%s).\n", git_branch(), git_dirty() ? ", dirty" : "");
         jabs_message(MSG_INFO, stderr, "Git commit %s dated %s.\n", git_commit_sha1(), git_commit_date());
     }
+#ifdef __DATE__
+    jabs_message(MSG_INFO, stderr,  "Compiled on %s\n", __DATE__);
+#endif
+#ifdef __VERSION__
+    jabs_message(MSG_INFO, stderr,  "Compiled with compiler version: %s\n", __VERSION__);
+#endif
+#ifdef _MSC_VER
+    jabs_message(MSG_INFO, stderr, "Compiled with MSVC version %s\n", _MSC_VER)
+#endif
+#ifdef JABS_PLUGINS
+    jabs_message(MSG_INFO, stderr,  "Plugin support enabled.\n");
+#endif
+#ifdef _OPENMP
+    jabs_message(MSG_INFO, stderr,  "OpenMP: %d\n", _OPENMP);
+#endif
     return SCRIPT_COMMAND_SUCCESS;
 }
 
