@@ -94,7 +94,7 @@ int sample_model_sanity_check(const sample_model *sm) {
             }
         } else if(sm->type == SAMPLE_MODEL_POINT_BY_POINT) {
             if(i && r->x < sm->ranges[i-1].x) {
-                jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (non-monotonous range at %zu).\n", i + 1);
+                jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (non-monotonous range %zu).\n", i + 1);
                 return EXIT_FAILURE;
             }
         }
@@ -105,7 +105,11 @@ int sample_model_sanity_check(const sample_model *sm) {
             }
         }
         if(r->rough.x < 0.0) {
-            jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative roughness range at %zu).\n", i + 1);
+            jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative roughness range at layer/range %zu).\n", i + 1);
+            return EXIT_FAILURE;
+        }
+        if(r->bragg < 0.0 || r->stragg < 0.0 || r->yield < 0.0) {
+            jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative ad-hoc correction parameter (bragg, stragg or yield) at layer/range %zu).\n", i + 1);
             return EXIT_FAILURE;
         }
     }
@@ -404,7 +408,7 @@ int sample_model_print(const char *filename, const sample_model *sm) {
             jabs_message(MSG_INFO, f, " %5.4lf %12.8lf", r->yield, r->yield_slope);
         }
         if(n_braggstragg) {
-            jabs_message(MSG_INFO, f, " %5.4lf %6.4lf", r->bragg, r->stragg);
+            jabs_message(MSG_INFO, f, " %6.4lf %7.4lf", r->bragg, r->stragg);
         }
         for (size_t j = 0; j < sm->n_materials; j++) {
             jabs_message(MSG_INFO, f, " %8.4lf", *sample_model_conc_bin(sm, i, j) * 100.0);
