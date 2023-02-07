@@ -555,7 +555,10 @@ int simulate_with_roughness(sim_workspace *ws) {
     }
     struct sample *sample_rough = sample_copy(ws->sample);
     size_t i_rl = 0;
-    thick_prob_dist **tpds = malloc(sizeof(thick_prob_dist *) * n_rl);
+    thick_prob_dist **tpds = calloc(n_rl, sizeof(thick_prob_dist *));
+    if(!tpds) {
+        return -1;
+    }
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
         sample_range *r = &(ws->sample->ranges[i]);
         if(r->rough.model == ROUGHNESS_NONE)
@@ -580,8 +583,12 @@ int simulate_with_roughness(sim_workspace *ws) {
     size_t iter_total = 1;
     for(i_rl = 0; i_rl < n_rl; i_rl++) { /* Calculate cumulative product (number of subspectra) */
         thick_prob_dist *tpd = tpds[i_rl];
+        if(!tpd) {
+            continue;
+        }
         tpd->modulo = iter_total;
         iter_total *= tpd->n;
+        DEBUGMSG("TPD %zu/%zu, modulo %zu, total %zu (cumulating)\n", i_rl, n_rl, tpd->modulo, iter_total)
     }
     for(size_t i_iter = 0; i_iter < iter_total; i_iter++) {
         DEBUGMSG("Roughness step %zu/%zu.", i_iter+1, iter_total);
@@ -591,6 +598,9 @@ int simulate_with_roughness(sim_workspace *ws) {
         }
         for(i_rl = 0; i_rl < n_rl; i_rl++) {
             thick_prob_dist *tpd = tpds[i_rl]; /* One particular thickness probability distribution ("i"th one) */
+            if(!tpd) {
+                continue;
+            }
             size_t j = (i_iter / tpd->modulo) % tpd->n; /* "j"th roughness element */
             thick_prob *pj = &tpds[i_rl]->p[j]; /* ..is this one */
             p *= pj->prob; /* Probability is multiplied by the "i"th roughness, element "j" to get the subspectra weight */

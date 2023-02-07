@@ -279,6 +279,9 @@ char *detector_resolution_to_string(const detector *det, int Z) {
 }
 
 void detector_update(detector *det) {
+    if(!det) {
+        return;
+    }
     det->calibration->resolution_variance = pow2(det->calibration->resolution/C_FWHM);
     DEBUGMSG("Updating detector, resolution = %g keV FWHM, variance = %g", det->calibration->resolution/C_KEV, det->calibration->resolution_variance);
     for(int Z = 1; Z  <= (int)det->cal_Z_max; Z++) {
