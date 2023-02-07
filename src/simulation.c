@@ -172,8 +172,8 @@ int sim_sanity_check(
         jabs_message(MSG_ERROR, stderr, "Neutron beams are not supported.\n");
         return -1;
     }
-    if(sim->beam_E > 1000.0 * C_MEV || sim->beam_E < 10 * C_KEV) {
-        jabs_message(MSG_ERROR, stderr, "Hmm...? Check your numbers. Your energy is %g J (%g MeV)!\n", sim->beam_E, sim->beam_E / C_MEV);
+    if(sim->beam_E >= E_MAX || sim->beam_E <= E_MIN || sim->beam_E <= sim->emin) {
+        jabs_message(MSG_ERROR, stderr, "Beam energy is %g MeV, it should be < %g MeV and > %g keV and > simulation minimum energy, which is currently set to %g keV.\n", sim->beam_E / C_MEV, E_MAX / C_MEV, E_MIN / C_KEV, sim->emin / C_KEV);
         return -1;
     }
     if(sim->fluence < 0.0) {

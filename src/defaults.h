@@ -57,7 +57,7 @@
 #define BRICKS_MAX (10000)
 #define SIMULATE_WARNING_LIMIT 10 /* Allowed number of non-critical warnings for each run of simulate() */
 /* Other constants */
-#define E_MIN (1.0 * C_KEV) /* Absolute minimum for everything */
+#define E_MIN (10.0 * C_KEV) /* Absolute minimum for everything */
 #define E_MAX (1000.0*C_MEV) /* Absolute maximum for everything */
 #define DEPTH_TOLERANCE (1.0e-6 * C_TFU)
 #define ROUGH_TOLERANCE (0.1 * C_TFU) /* Roughness below this is equivalent to none */
