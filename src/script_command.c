@@ -1567,7 +1567,13 @@ script_command_status script_load_roughness(script_session *s, int argc, char *c
     }
     range->x = thickness_probability_table_areal_density(range->rough.file->tpd); /* Update thickness of layer to correspond the average areal density */
     if(range->rough.file && range->rough.file->tpd) {
-        jabs_message(MSG_INFO, stderr, "Layer %zu: roughness from file \"%s\", containing %zu data points, loaded.\n", n + 1, range->rough.file->filename, range->rough.file->tpd->n);
+        jabs_message(MSG_INFO, stderr, "Layer %zu: roughness from file \"%s\", containing %zu data points, loaded.\n", n, range->rough.file->filename, range->rough.file->tpd->n);
+        const thick_prob_dist *tpd = range->rough.file->tpd;
+        jabs_message(MSG_INFO, stdout, "  i | thickness (tfu) | weight(%%)\n");
+        for(size_t i = 0; i < tpd->n; i++) {
+            jabs_message(MSG_INFO, stdout, "%3zu | %15.3lf | %9.3lf\n", i + 1, tpd->p[i].x / C_TFU, tpd->p[i].prob * 100.0);
+        }
+        jabs_message(MSG_INFO, stderr, "Average areal density: %g tfu\n", range->x / C_TFU);
     }
     return 2;
 }
