@@ -122,18 +122,18 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     switch(type) {
         case REACTION_ERD:
             r->product = target;
-            r->product_nucleus = incident;
+            r->residual = incident;
             break;
         case REACTION_RBS: /* Falls through */
         case REACTION_RBS_ALT:
             r->product = incident;
-            r->product_nucleus = target;
+            r->residual = target;
             break;
         case REACTION_FILE:
         case REACTION_PLUGIN:
         default:
             r->product = NULL;
-            r->product_nucleus = NULL;
+            r->residual = NULL;
             break;
     }
     reaction_generate_name(r);
@@ -253,7 +253,7 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     r->target = nuclei[0];
 #endif
     r->product = nuclei[2];
-    r->product_nucleus = nuclei[3];
+    r->residual = nuclei[3];
     if(rfile->unit == R33_UNIT_RR && r->incident != r->product) {
         jabs_message(MSG_ERROR, stderr, "R33 file is in units of ratio to Rutherford, but reaction product (%s) is not the same as target (%s). I don't know what to do.\n", r->product->name, r->target->name);
         return NULL;
@@ -320,7 +320,7 @@ double reaction_product_energy(const reaction *r, double theta, double E) { /* H
     const double m1 = r->incident->mass;
     const double m2 = r->target->mass;
     const double m3 = r->product->mass;
-    const double m4 = r->product_nucleus->mass;
+    const double m4 = r->residual->mass;
     double E_total = E + Q;
     double a13 = ((m1 * m3)/((m1 + m2)*(m3 + m4))) * (E / E_total);
     double a24 = ((m2 * m4)/((m1 + m2)*(m3 + m4))) * (1 + (m1/m2) * Q / E_total);
@@ -348,7 +348,7 @@ const char *jabs_reaction_cs_to_string(jabs_reaction_cs cs) {
 }
 
 int reaction_generate_name(reaction *r) {
-    int len = asprintf(&(r->name), "%s %s(%s,%s)%s", reaction_type_to_string(r->type), r->target->name, r->incident->name, r->product->name, r->product_nucleus->name);
+    int len = asprintf(&(r->name), "%s %s(%s,%s)%s", reaction_type_to_string(r->type), r->target->name, r->incident->name, r->product->name, r->residual->name);
     if(len < 0) {
         DEBUGSTR("Could not generate reaction name.");
         r->name = NULL;

@@ -47,11 +47,11 @@ typedef enum jabs_reaction_cs {
 typedef struct reaction {
     reaction_type type;
     char *name;
-    /* Reactions are like this: target(incident,product)product_nucleus */
+    /* Reactions are like this: target(incident,product)residual */
     const jibal_isotope *incident;
     const jibal_isotope *target;
     const jibal_isotope *product;
-    const jibal_isotope *product_nucleus; /* Typically the "heavy" reaction product (of limited interest) */
+    const jibal_isotope *residual; /* Typically the "heavy" reaction product (of limited interest) */
     jabs_reaction_cs cs; /* Cross section model to use (e.g. screening corrections) */
     char *filename; /* for REACTION_FILE and REACTION_PLUGIN */
 #ifdef JABS_PLUGINS

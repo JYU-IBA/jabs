@@ -2398,7 +2398,7 @@ script_command_status script_load_reaction_plugin(script_session *s, int argc, c
     }
     r->plugin_r = pr;
     r->product = pr->product;
-    r->product_nucleus = pr->product_heavy;
+    r->residual = pr->product_heavy;
     r->E_min = pr->E_min;
     r->E_max = pr->E_max;
     r->filename = strdup(plugin->filename);
