@@ -46,6 +46,7 @@ endif()
 find_package(GSL 2.6 REQUIRED)
 find_package(Jibal 0.3.8 REQUIRED)
 find_package(LibXml2 REQUIRED)
+find_package(OpenMP)
 
 
 if(WIN32)
@@ -144,6 +145,10 @@ target_link_libraries(qjabs
     ${GETOPT_LIBRARY}
     gitwatcher
     )
+
+if(OpenMP_C_FOUND)
+    target_link_libraries(qjabs PUBLIC OpenMP::OpenMP_C)
+endif()
 
 set_target_properties(qjabs PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME JaBS

@@ -187,6 +187,10 @@ void sim_workspace_histograms_reset(sim_workspace *ws) {
 
 size_t sim_workspace_histograms_calculate(sim_workspace *ws) {
     size_t n_meaningful = 0;
+#if 0
+#pragma omp parallel default(none) shared(ws) shared(n_meaningful)
+#pragma omp for nowait
+#endif
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = ws->reactions[i];
         if(!r)
@@ -198,6 +202,9 @@ size_t sim_workspace_histograms_calculate(sim_workspace *ws) {
         bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
         bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->emin, ws->params->gaussian_accurate);
         r->n_convolution_calls++;
+#if 0
+#pragma omp critical
+#endif
         n_meaningful++;
     }
     return n_meaningful;

@@ -103,25 +103,21 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
         }
     }
 #endif
-
-
-    size_t i_det;
-
-#pragma omp parallel default(none) private(i_det) shared(fit_data)
-#pragma omp for nowait
-    for(i_det = 0; i_det < fit_data->n_ws; i_det++) {
-        double start = jabs_clock();
+    double start = jabs_clock();
+    if(fit_data->n_ws == 1) {
+        simulate_with_ds(fit_data->ws[0]);
+    } else {
+#pragma omp parallel default(none) shared(fit_data)
+#pragma omp for
+        for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
 #ifdef _OPENMP
-        int tid = omp_get_thread_num();
-        DEBUGMSG("Thread id %i got detector number %zu\n", tid, i_det + 1);
+            DEBUGMSG("Thread id %i got detector number %zu\n", omp_get_thread_num(), i_det + 1);
 #endif
-        simulate_with_ds(fit_data->ws[i_det]);
-        double end = jabs_clock();
-#pragma omp critical
-        fit_data->stats.cputime_iter += (end - start);
+            simulate_with_ds(fit_data->ws[i_det]);
+        }
     }
-
-
+    double end = jabs_clock();
+    fit_data->stats.cputime_iter += (end - start);
     fit_data->stats.n_evals_iter++;
 
     if(fit_data->stats.iter_call == 1) { /* First call of iter, store sum histograms to fit_data */
@@ -210,7 +206,7 @@ void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear
 }
 
 void fit_iter_stats_print(const struct fit_stats *stats) {
-    jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %4zu | %13.3lf | %12.1lf |\n",
+    jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %4zu | %10.3lf | %9.1lf |\n",
                  stats->iter, 1.0 / stats->rcond, stats->norm,
                  stats->chisq_dof, stats->n_evals, stats->cputime_cumul,
                  1000.0 * stats->cputime_iter / stats->n_evals_iter);
@@ -269,8 +265,6 @@ fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
 void fit_data_defaults(fit_data *f) {
     f->n_iters_max = FIT_ITERS_MAX;
     f->xtol = FIT_XTOL;
-    f->gtol = FIT_GTOL;
-    f->ftol = FIT_FTOL;
     f->chisq_tol = FIT_CHISQ_TOL;
     f->chisq_fast_tol = FIT_FAST_CHISQ_TOL;
     f->phase_start = FIT_PHASE_FAST;
@@ -636,13 +630,15 @@ void fit_data_print(FILE *f, const struct fit_data *fit_data) {
 
 int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, double epsrel) { /* test_delta() copied from GSL convergence.c and modified */
     int ok = TRUE;
+    DEBUGVERBOSEMSG("Test deltas to x->size=%zu\n", x->size);
     for(size_t i = 0; i < x->size; i++) {
         double xi = gsl_vector_get(x, i);
         double dxi = gsl_vector_get(dx, i);
         double tolerance = epsabs + epsrel * fabs(xi);
         double rel = fabs(dxi) / tolerance; /* "How many times over the acceptable tolerance are we */
-        DEBUGVERBOSEMSG("Test delta: i %zu, xi %g, dxi %g, tolerance %g, rel %g", i, xi, dxi, tolerance, rel);
+        DEBUGVERBOSEMSG("Test delta: i %zu, xi %g, dxi %g, tolerance %g, rel %g\n", i, xi, dxi, tolerance, rel);
         if(rel >= 1.0) {
+            DEBUGVERBOSEMSG("Fails because %g > 1.0.\n", rel);
             ok = FALSE;
             break;
         }
@@ -656,7 +652,8 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
     int status = 0;
     size_t iter;
     double chisq_dof_old;
-    jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | eval | cpu cumul (s) | cpu/eval (ms)|\n");
+    jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | eval | time cumul | time eval |\n");
+    jabs_message(MSG_INFO, stderr, "     |              |                |              |      |          s |        ms |\n");
     for(iter = 0; iter <= maxiter; iter++) {
         fit_data->stats.iter_call = 0;
         fit_data->stats.iter = iter;
@@ -838,7 +835,7 @@ int fit(struct fit_data *fit_data) {
             sim_calc_params_defaults_fast(fit_data->sim->params); /* Set current parameters to be faster in phase 0. */
             xtol *= FIT_FAST_XTOL_MULTIPLIER;
             chisq_tol = fit_data->chisq_fast_tol;
-        } else if(phase == FIT_PHASE_SLOW) {
+        } else {
             sim_calc_params_copy(&p_orig, fit_data->sim->params);
         }
         sim_calc_params_update(fit_data->sim->params);

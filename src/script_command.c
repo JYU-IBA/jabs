@@ -1211,8 +1211,6 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_BOOL,   "rbs",                         &sim->rbs,                                 NULL},
             {JIBAL_CONFIG_VAR_SIZE,   "maxiter",                     &fit->n_iters_max,                         NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",                  &fit->xtol,                                NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "gtolerance",                  &fit->gtol,                                NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "ftolerance",                  &fit->ftol,                                NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",             &fit->chisq_tol,                           NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance",        &fit->chisq_fast_tol,                      NULL},
             {JIBAL_CONFIG_VAR_SIZE,   "n_bricks_max",                &sim->params->n_bricks_max,                NULL},

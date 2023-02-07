@@ -80,8 +80,6 @@ typedef struct fit_data {
     size_t n_fit_ranges;
     size_t n_iters_max; /* Maximum number of iterations, in each fit phase */
     double xtol; /* Tolerance of step size */
-    double gtol; /* Not used */
-    double ftol; /* Not used */
     double chisq_tol; /* Chi squared relative change tolerance */
     double chisq_fast_tol; /* Chi squared relative change tolerance (fast phase) */
     double dof; /* Degrees of freedom (calculated) */

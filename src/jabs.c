@@ -408,6 +408,10 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
 #ifdef DEBUG_VERBOSE
     des_table_print(stderr, dt);
 #endif
+#if 0
+#pragma omp parallel default(none) shared(ws, incident, depth_start, sample, dt, g)
+#pragma omp for nowait
+#endif
     for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
         sim_reaction *sim_r = ws->reactions[i_reaction];
         DEBUGMSG("Simulating reaction i_reaction = %zu type %s target %s (i_isotope = %zu, i_jibal = %zu) product %s (i_jibal = %zu)",

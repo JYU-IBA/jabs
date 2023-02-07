@@ -259,6 +259,6 @@ double jabs_clock() {
 #ifdef _OPENMP
     return omp_get_wtime();
 #else
-    return clock() / CLOCKS_PER_SEC; /* TODO: replace with something that returns something comparable to omp_get_wtime() */
+    return (1.0 * clock() / CLOCKS_PER_SEC); /* TODO: replace with something that returns something comparable to omp_get_wtime() */
 #endif
 }
