@@ -39,11 +39,12 @@ void sim_workspace_calculate_number_of_bricks(sim_workspace *ws) {
     } else {
         if(det->type == DETECTOR_ENERGY) {
             if(ws->params->incident_stop_params.step == 0.0) { /* Automatic incident step size */
-                n_bricks = (int) ceil(sim->beam_E / (ws->params->brick_width_sigmas * sqrt(detector_resolution(ws->det, sim->beam_isotope, sim->beam_E))) + ws->sample->n_ranges);
+                double E_min = GSL_MAX_DBL(ws->params->incident_stop_params.min, ws->params->brick_width_sigmas * sqrt(detector_resolution(ws->det, sim->beam_isotope, sim->beam_E))); /* Trying to guesstimate a lower limit for incident ion energy steps */
+                n_bricks = (int) ceil(sim->beam_E / E_min) + ws->sample->n_ranges;
             } else {
-                n_bricks = (int) ceil(sim->beam_E / ws->params->incident_stop_params.step + ws->sample->n_ranges); /* This is conservative */
+                n_bricks = (int) ceil(sim->beam_E / ws->params->incident_stop_params.step) + ws->sample->n_ranges; /* This is conservative */
             }
-        } else { /* TODO: maybe something more clever is needed here */
+        } else { /* TODO: maybe something more clever is needed here :) */
             n_bricks = BRICKS_DEFAULT;
         }
         if(n_bricks > BRICKS_MAX) {

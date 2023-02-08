@@ -1799,15 +1799,18 @@ script_command_status script_show_detector(script_session *s, int argc, char *co
             jabs_message(MSG_ERROR, stderr, "No detectors set or other error.\n");
         }
     } else {
-        jabs_message(MSG_INFO, stderr, "  # | col | theta |  phi  |  solid  |   type   | calibration\n");
+        jabs_message(MSG_INFO, stderr, "  # | col | theta |   phi |   solid |     type | resolution | calibration\n");
+        jabs_message(MSG_INFO, stderr, "    |     |   deg |   deg |     msr |          |            |            \n");
         for(size_t i = 0; i < fit->sim->n_det; i++) {
             detector *det = sim_det(fit->sim, i);
             if(!det)
                 continue;
             char *calib_str = calibration_to_string(det->calibration);
-            jabs_message(MSG_INFO, stderr, "%3zu | %3zu | %5.1lf | %5.1lf | %7.3lf | %8s | %s\n",
-                         i + 1, det->column, det->theta / C_DEG, det->phi / C_DEG, det->solid / C_MSR, detector_type_name(det), calib_str);
+            char *reso_str = detector_resolution_to_string(det, JIBAL_ANY_Z);
+            jabs_message(MSG_INFO, stderr, "%3zu | %3zu | %5.1lf | %5.1lf | %7.3lf | %8s | %10s | %s\n",
+                         i + 1, det->column, det->theta / C_DEG, det->phi / C_DEG, det->solid / C_MSR, detector_type_name(det), reso_str, calib_str);
             free(calib_str);
+            free(reso_str);
         }
         jabs_message(MSG_INFO, stderr, "Use 'show detector <number>' to get more information on a particular detector.\n");
     }

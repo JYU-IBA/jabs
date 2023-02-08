@@ -272,7 +272,7 @@ char *detector_resolution_to_string(const detector *det, int Z) {
     const calibration *c = detector_get_calibration(det, Z);
     double resolution = calibration_get_param(c, CALIBRATION_PARAM_RESOLUTION);
     char *out = NULL;
-    if(asprintf(&out, "%g%s", resolution/detector_param_unit_factor(det), detector_param_unit(det)) < 0) {
+    if(asprintf(&out, "%.4g%s", resolution/detector_param_unit_factor(det), detector_param_unit(det)) < 0) {
         return NULL;
     }
     return out;
