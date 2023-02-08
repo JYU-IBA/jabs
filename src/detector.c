@@ -68,7 +68,7 @@ const char *detector_type_name(const detector *det) {
     return detector_option[det->type].s;
 }
 
-int detector_sanity_check(const detector *det) {
+int detector_sanity_check(const detector *det, size_t n_channels) {
     if(!det) {
         jabs_message(MSG_ERROR, stderr, "No detector!\n");
         return -1;
@@ -77,8 +77,8 @@ int detector_sanity_check(const detector *det) {
         jabs_message(MSG_ERROR, stderr, "Warning: detector resolution (%g) is negative or not finite.\n", det->calibration->resolution);
         return -1;
     }
-    if(calibration_is_monotonically_increasing(det->calibration, det->channels) == FALSE) {
-        jabs_message(MSG_ERROR, stderr, "Warning: detector default calibration is not monotonically increasing! (is slope, %g keV/ch, negative?)\n", calibration_get_param(det->calibration, CALIBRATION_PARAM_SLOPE) / C_KEV);
+    if(calibration_is_monotonically_increasing(det->calibration, n_channels) == FALSE) {
+        jabs_message(MSG_ERROR, stderr, "Warning: detector default calibration is not monotonically increasing! (is slope, %g keV/ch, negative? are %zu channels too much?)\n", calibration_get_param(det->calibration, CALIBRATION_PARAM_SLOPE) / C_KEV, n_channels);
         return -1;
     }
     for(int Z = 0; Z <= (int)det->cal_Z_max; Z++) {
@@ -91,7 +91,7 @@ int detector_sanity_check(const detector *det) {
         }
     }
     if(det->type == DETECTOR_TOF && det->length < 1 * C_MM) {
-        jabs_message(MSG_ERROR, stderr, "Warning: length (%g) is small (%g mm)\n", det->length/C_MM);
+        jabs_message(MSG_ERROR, stderr, "Warning: ToF length is small (%g mm)\n", det->length/C_MM);
         return -1;
     }
     return 0;

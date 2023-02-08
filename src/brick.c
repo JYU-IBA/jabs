@@ -16,7 +16,7 @@ void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, b
     }
 }
 
-void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, const double scale, const double sigmas_cutoff, double emin, int accurate) {
+void bricks_convolute(gsl_histogram *h, const calibration *c, const brick *bricks, size_t last_brick, const double scale, const double sigmas_cutoff, double emin, int accurate) {
     double (*erf_Q)(double);
     if(accurate) {
         erf_Q = gsl_sf_erf_Q;
@@ -42,19 +42,11 @@ void bricks_convolute(gsl_histogram *h, const brick *bricks, size_t last_brick, 
             continue;
         E_cutoff_low = GSL_MAX_DBL(E_cutoff_low, emin);
         double b_w_inv = 1.0/(b_high->E - b_low->E); /* inverse of brick width (in energy) */
-        size_t lo = 0, mi, hi = h->n;
-        while(hi - lo > 1) { /* Find histogram range with E_cutoff. This should be safe. */
-            mi = (hi + lo) / 2;
-            if(E_cutoff_low >= h->range[mi]) {
-                lo = mi;
-            } else {
-                hi = mi;
-            }
-        }
+        size_t ch_start = calibration_inverse(c, E_cutoff_low, h->n);
 #ifdef DEBUG_BRICK_OUTPUT
         double norm = 0.0;
 #endif
-        for(size_t j = lo; j < h->n - 1; j++) {
+        for(size_t j = ch_start; j < h->n - 1; j++) {
             if(h->range[j] > E_cutoff_high) /* Low energy edge of histogram is above cutoff */
                 break; /* Assumes histograms have increasing energy */
             const double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */

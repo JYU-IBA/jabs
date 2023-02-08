@@ -5,10 +5,10 @@ show det
 set det type tof reso 150ps
 show det
 set det type energy
-set det calibration poly 2 10keV 2keV 0.001keV resolution 20keV
+set det channels 1024
+set det calibration poly 2 1000keV 2.5keV 0.003keV resolution 20keV
 set det calibration H linear offset 20keV slope 3keV resolution 10keV
 set sample Au 30tfu SiO2 6500tfu Si 20000tfu
 simulate
 show det
-show fit variables
 save spectra "calibration_out.csv"

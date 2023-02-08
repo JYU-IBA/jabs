@@ -1497,7 +1497,7 @@ script_command_status script_load_experimental(script_session *s, int argc, char
             } else {
                 const gsl_histogram *h = fit->exp[i_det];
                 jabs_message(MSG_VERBOSE, stderr, "Detector %zu: experimental spectrum with %zu channels loaded.\n", i_det + 1, h?h->n:0);
-                spectrum_set_calibration(fit_data_exp(fit, i_det), sim_det(fit->sim, i_det), JIBAL_ANY_Z);
+                spectrum_set_calibration(fit_data_exp(fit, i_det), detector_get_calibration(sim_det(fit->sim, i_det), JIBAL_ANY_Z));
             }
         }
     }
@@ -1974,6 +1974,10 @@ script_command_status script_set_detector_calibration_poly(struct script_session
         return SCRIPT_COMMAND_FAILURE;
     }
     size_t n = strtoull(argv[0], NULL, 10);
+    if(n == 0) {
+        jabs_message(MSG_ERROR, stderr, "Calibration should be a zero degree polynomial? Just no.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
     argc--;
     argv++;
     if(argc < (int) (n + 1)) {
@@ -1986,6 +1990,19 @@ script_command_status script_set_detector_calibration_poly(struct script_session
         calibration_set_param(c, i, jibal_get_val(s->jibal->units, UNIT_TYPE_ANY, argv[0]));
         argc--;
         argv++;
+    }
+    calibration_params_poly *params = (calibration_params_poly *) c->params;
+    for(int i = (int) n; i > 0; i--) { /* Reduce the degree of polynomial to match reality */
+        if(calibration_get_param(c, i) == 0.0) {
+            params->n--;
+        } else {
+            break;
+        }
+    }
+    if(params->n == 0) {
+        jabs_message(MSG_ERROR, stderr, "Calibration should be a zero degree polynomial? Just no.\n");
+        calibration_free(c);
+        return SCRIPT_COMMAND_FAILURE;
     }
     detector_set_calibration_Z(s->jibal->config, det, c, s->Z_active);
     return argc_orig - argc;

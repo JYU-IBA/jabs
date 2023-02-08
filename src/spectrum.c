@@ -13,6 +13,7 @@
  */
 
 #include <string.h>
+#include <assert.h>
 #include "jabs_debug.h"
 #include "generic.h"
 #include "spectrum.h"
@@ -123,12 +124,13 @@ gsl_histogram *spectrum_read_detector(const char *filename, const detector *det)
     return spectrum_read(filename, 0, det->channels, det->column, det->compress);
 }
 
-void spectrum_set_calibration(gsl_histogram *h, const detector *det, int Z) {
-    if(!h || !det)
+void spectrum_set_calibration(gsl_histogram *h, const calibration *cal) {
+    if(!h) {
         return;
-    DEBUGMSG("Updating spectrum %p, detector %p calibration. Z = %i", (void *) h, (void *) det, Z);
+    }
+    assert(cal);
     for(size_t i = 0; i < h->n + 1; i++) {
-        h->range[i] = detector_calibrated(det, Z, i);
+        h->range[i] = calibration_eval(cal, i);
     }
 }
 

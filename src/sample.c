@@ -280,7 +280,7 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
         }
     }
     size_t i = 0;
-    const jibal_isotope **isotopes = malloc(n_isotopes * sizeof(jibal_isotope *));
+    const jibal_isotope **isotopes = calloc(n_isotopes, sizeof(jibal_isotope *));
     for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
         for(size_t i_elem = 0; i_elem < sm->materials[i_mat]->n_elements; i_elem++) {
             for(size_t i_isotope = 0; i_isotope < sm->materials[i_mat]->elements[i_elem].n_isotopes; i_isotope++) {

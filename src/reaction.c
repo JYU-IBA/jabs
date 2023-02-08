@@ -242,7 +242,7 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     }
 
 
-    reaction *r = malloc(sizeof(reaction));
+    reaction *r = calloc(1, sizeof(reaction));
     r->cs = JABS_CS_NONE;
     r->type = REACTION_FILE;
 #ifdef R33_IGNORE_REACTION_STRING
@@ -267,7 +267,7 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     }
     /* TODO: copy and convert data (check units etc) */
     r->n_cs_table = rfile->n_data;
-    r->cs_table = malloc(sizeof(struct reaction_point) * r->n_cs_table);
+    r->cs_table = calloc(r->n_cs_table, sizeof(struct reaction_point));
     for(size_t i = 0; i < rfile->n_data; i++) {
         struct reaction_point *rp = &r->cs_table[i];
         rp->E = rfile->data[i][0] * rfile->enfactors[0] * C_KEV; /* TODO: other factors? */

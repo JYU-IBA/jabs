@@ -38,7 +38,7 @@ sim_reaction *sim_reaction_init(const ion *incident_ion, const jibal_isotope *is
         }
     }
     sim_r->histo = gsl_histogram_alloc(n_channels); /* free'd by sim_workspace_free */
-    spectrum_set_calibration(sim_r->histo, det, r->product->Z); /* Setting histogram with Z-specific (or as fallback, default) calibration. */
+    spectrum_set_calibration(sim_r->histo, detector_get_calibration(det, r->product->Z)); /* Setting histogram with Z-specific (or as fallback, default) calibration. */
     gsl_histogram_reset(sim_r->histo);
     sim_r->n_bricks = n_bricks;
     sim_r->bricks = calloc(sim_r->n_bricks, sizeof(brick));

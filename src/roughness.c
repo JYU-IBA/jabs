@@ -72,9 +72,7 @@ thick_prob_dist *thickness_probability_table_gamma(double thickness, double sigm
 
 
 thick_prob_dist *thickness_probability_table_new(size_t n) {
-    thick_prob_dist *tpd = malloc(sizeof(thick_prob_dist));
-    tpd->modulo = 0;
-    tpd->i_range = 0;
+    thick_prob_dist *tpd = calloc(1, sizeof(thick_prob_dist));
     tpd->n = n;
     tpd->p = calloc(n, sizeof(thick_prob));
     return tpd;

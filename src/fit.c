@@ -244,20 +244,10 @@ void fit_data_fit_ranges_free(struct fit_data *fit_data) {
 }
 
 fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
-    struct fit_data *f = malloc(sizeof(struct fit_data));
+    struct fit_data *f = calloc(1, sizeof(struct fit_data));
     f->jibal = jibal;
     f->sim = sim;
-    f->n_exp = 0;
     fit_data_exp_alloc(f);
-    f->ref = NULL;
-    f->sm = NULL; /* Can be set later. */
-    f->ws = NULL; /* Initialized later */
-    f->n_ws = 0; /* Number of allocated workspaces, initially same as number of detectors. */
-    f->fit_params = NULL; /* Holds fit parameters AFTER a fit. */
-    f->histo_sum_iter = NULL; /* Initialized later */
-    f->fit_iter_callback = NULL; /* Optional */
-    f->n_fit_ranges = 0;
-    f->fit_ranges = NULL;
     fit_data_defaults(f);
     return f;
 }
@@ -543,17 +533,17 @@ size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_d
 
 sim_workspace *fit_data_workspace_init(fit_data *fit, size_t i_det) {
     detector *det = sim_det(fit->sim, i_det);
-    if(detector_sanity_check(det)) {
-        jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!\n", i_det + 1);
-        return NULL;
-    }
-    detector_update(det);
-    spectrum_set_calibration(fit_data_exp(fit, i_det), det, JIBAL_ANY_Z); /* Update the experimental spectra calibration (using default calibration) */
     sim_workspace *ws = sim_workspace_init(fit->jibal, fit->sim, det);
     if(!ws) {
         jabs_message(MSG_ERROR, stderr, "Workspace (detector %zu) failed to initialize!\n", i_det + 1);
         return NULL;
     }
+    if(detector_sanity_check(det, ws->n_channels)) {
+        jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!\n", i_det + 1);
+        return NULL;
+    }
+    detector_update(det);
+    spectrum_set_calibration(fit_data_exp(fit, i_det), det->calibration); /* Update the experimental spectra calibration (using default calibration) */
     return ws;
 }
 

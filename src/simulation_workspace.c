@@ -64,7 +64,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         jabs_message(MSG_ERROR, stderr,  "No sample has been set. Will not initialize workspace.\n");
         return NULL;
     }
-    sim_workspace *ws = malloc(sizeof(sim_workspace));
+    sim_workspace *ws = calloc(1, sizeof(sim_workspace));
     ws->sim = sim;
     ws->emin = sim->emin;
     ws->fluence = sim->fluence;
@@ -101,7 +101,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     if(!ws->histo_sum) {
         return NULL;
     }
-    spectrum_set_calibration(ws->histo_sum, ws->det, JIBAL_ANY_Z); /* Calibration (assuming default calibration) can be set now. */
+    spectrum_set_calibration(ws->histo_sum, ws->det->calibration); /* Calibration (assuming default calibration) can be set now. */
     gsl_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
 
     sim_workspace_calculate_number_of_bricks(ws);
@@ -152,16 +152,37 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
                     reaction_type_to_string(r->type), ws->det->theta / C_DEG);
             continue;
         }
-        double E = reaction_product_energy(r, ws->det->theta, sim->beam_E);
-        double E_safer = E + 3.0*sqrt(detector_resolution(ws->det, r->product, E)); /* Add 3x resolution sigma to max energy */
+        double E = reaction_product_energy(r, ws->det->theta, sim->beam_E + ws->params->sigmas_cutoff * sqrt(sim->beam_E_broad / C_FWHM)); /* Highest energy we could possibly reach, maybe */
+        double E_safer = E + ws->params->sigmas_cutoff * sqrt(detector_resolution(ws->det, r->product, E)); /* Add resolution sigma to max energy */
         E_safer *= 1.1; /* and 10% for good measure! */
-        while(detector_calibrated(ws->det, JIBAL_ANY_Z, n_max) < E_safer && n_max <= CHANNELS_ABSOLUTE_MAX) {n_max++;} /* Increase number of channels until we hit this energy. TODO: this requires changes for ToF spectra. */
+        const calibration *cal = detector_get_calibration(ws->det, r->product->Z);
+        double E_old = calibration_eval(cal, n_max - 1);
+        while(n_max < CHANNELS_ABSOLUTE_MAX) {
+            double E_det = calibration_eval(cal, n_max);
+            if(E_det < E_old) {
+                DEBUGMSG("Monotonicity fail at %zu, %g keV < %g keV\n", n_max, E_det / C_KEV, E_old / C_KEV); /* This monotonicity check does not guarantee the monotonicity of all calibrations every time, so further checks are necessary */
+                jabs_message(MSG_ERROR, stderr, "Could not determine number of channels required in simulation while processing reaction %zu, since calibrations must be monotonous, but channel %zu gives %.14g keV, which is less than %.14g keV on the previous channel.\n", i_reaction + 1, n_max, E_det / C_KEV, E_old / C_KEV);
+                char *cal_str = calibration_to_string(cal);
+                jabs_message(MSG_ERROR, stderr, "The offending calibration is currently \"%s\"\n", cal_str);
+                free(cal_str);
+                ws->n_channels = 0;
+                return;
+            }
+            if(E_det > E_safer) {
+                break;
+            }
+            E_old = E_det;
+            n_max++;
+        } /* Increase number of channels until we hit goal energy. */
         DEBUGMSG("Reaction %zu: %s, max E = %g keV -> %g keV after resolution and safety factor have been added, current n_max %zu (channels)",
                  i_reaction + 1, r->name, E / C_KEV, E_safer / C_KEV, n_max);
     }
-    if(n_max == CHANNELS_ABSOLUTE_MAX)
-        n_max=0;
+    if(n_max >= CHANNELS_ABSOLUTE_MAX) {
+        DEBUGMSG("Number of channels in workspace would exceed the built-in limit %i!\n", CHANNELS_ABSOLUTE_MAX);
+        n_max = 0;
+    }
     ws->n_channels = n_max;
+    DEBUGMSG("Number of channels in workspace set to %zu\n", ws->n_channels);
 }
 
 void sim_workspace_calculate_sum_spectra(sim_workspace *ws) {
@@ -200,7 +221,8 @@ size_t sim_workspace_histograms_calculate(sim_workspace *ws) {
             continue;
         }
         bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
-        bricks_convolute(r->histo, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->emin, ws->params->gaussian_accurate);
+        const calibration *c = detector_get_calibration(ws->det, r->p.Z);
+        bricks_convolute(r->histo, c, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->emin, ws->params->gaussian_accurate);
         r->n_convolution_calls++;
 #if 0
 #pragma omp critical

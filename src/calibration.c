@@ -2,8 +2,10 @@
 #define _GNU_SOURCE
 #endif
 #include <stdio.h>
-#include "string.h"
+#include <assert.h>
+#include <string.h>
 #include <jibal_units.h>
+#include <jibal_phys.h>
 #include "generic.h"
 #include "calibration.h"
 #include "jabs_debug.h"
@@ -11,12 +13,11 @@
 extern inline double calibration_eval(const calibration *c, size_t ch);
 
 calibration *calibration_init() {
-    calibration *c = malloc(sizeof(calibration));
+    calibration *c = calloc(1, sizeof(calibration));
     if(!c)
         return NULL;
     c->f = calibration_none;
     c->type = CALIBRATION_NONE;
-    c->params = NULL;
     return c;
 }
 
@@ -80,6 +81,44 @@ double calibration_none(const void *params, size_t ch) {
     return 0.0;
 }
 
+size_t calibration_inverse(const calibration *cal, double E, size_t ch_max) {
+    if(cal->type == CALIBRATION_LINEAR) {
+        calibration_params_linear *p = (calibration_params_linear *) cal->params;
+        double ch = (E / p->slope - p->offset);
+        if(ch >= 0.0 && ch < ch_max) {
+            return (size_t) ch;
+        } else {
+            return 0;
+        }
+    } else if(cal->type == CALIBRATION_POLY) {
+        if(calibration_get_number_of_params(cal) == 3) {
+            const double a = calibration_get_param(cal, CALIBRATION_PARAM_OFFSET);
+            const double b = calibration_get_param(cal, CALIBRATION_PARAM_SLOPE);
+            const double c = calibration_get_param(cal, CALIBRATION_PARAM_QUAD);
+            double discriminant = pow2(b) - 4 * (a - E) * c;
+            if(c == 0.0) { /* This is annoying. */
+                return 0;
+            }
+            if(discriminant < 0) {
+                return 0;
+            } else {
+                return -b * sqrt(discriminant) / (2.0 * c);
+            }
+        }
+        size_t lo = 0, mi, hi = ch_max;
+        while(hi - lo > 1) {
+            mi = (hi + lo) / 2;
+            if(E >= calibration_eval(cal, mi)) {
+                lo = mi;
+            } else {
+                hi = mi;
+            }
+        }
+        return lo;
+    } else {
+        return 0;
+    }
+}
 int calibration_set_param(calibration *c, int i, double value) {
     if(!c || !c->params)
         return EXIT_FAILURE;
@@ -117,14 +156,10 @@ int calibration_set_param(calibration *c, int i, double value) {
 }
 
 double calibration_get_param(const calibration *c, int i) {
-    if(!c || !c->params)
-        return 0.0;
+    assert(c && c->params);
     const double *val = calibration_get_param_ref((calibration *) c, i);
-    if(val) {
-        return *val;
-    } else {
-        return 0.0;
-    }
+    assert(val);
+    return *val;
 }
 
 size_t calibration_get_number_of_params(const calibration *c) { /* Number does not include "resolution" parameter! */
@@ -236,25 +271,40 @@ char *calibration_param_name(calibration_type type, calibration_param_type i) {
     return s;
 }
 
-int calibration_is_monotonically_increasing(const calibration *c, size_t n_channels) {
-    if(!c) {
+int calibration_is_monotonically_increasing(const calibration *cal, size_t n_channels) {
+    if(!cal) {
         return FALSE;
     }
-    size_t n_params = calibration_get_number_of_params(c);
+    size_t n_params = calibration_get_number_of_params(cal);
     if(n_params < 2) { /* Calibration either constant, type is CALIBRATION_NONE or something else. */
         return FALSE;
-    }
-    if(n_params == 2 && calibration_get_param(c, CALIBRATION_PARAM_SLOPE) > 0.0) { /* Linear calibration (also CALIBRATION_POLY with n == 2) */
+    } else if(n_params == 2 && calibration_get_param(cal, CALIBRATION_PARAM_SLOPE) > 0.0) { /* Linear calibration (also CALIBRATION_POLY with n == 2) */
         return TRUE;
-    }
-    double y_old = calibration_eval(c, 0);
-    for(size_t i = 1; i < n_channels; i++) {
-        double y = calibration_eval(c, i);
-        if(y < y_old) {
-            DEBUGMSG("Calibration fails monotonicity check at %zu.", i);
+    } else if(n_params == 3) { /* Quadratic polynomial, a + b * x + c * x * x, easy enough to solve */
+        double b = calibration_get_param(cal, CALIBRATION_PARAM_SLOPE);
+        if(b <= 0.0) { /* Derivative (b + 2 * c *x) is going to be negative at least at x = 0 if b is negative. Also in practice b is always > 0! */
             return FALSE;
         }
-        y_old = y;
+        double c = calibration_get_param(cal, CALIBRATION_PARAM_QUAD);
+        if(c >= 0.0) { /* For all positive x, the derivative (b + 2 * c * x) of this parabola is positive, since b > 0 && c >= 0 */
+            return TRUE;
+        }
+        double peak_x = -b/(2.0*c); /* Parabola "top" or "bottom" at this energy, since (b + 2 * c * peak_x) = 0.0, we will have non-monotonous behaviour if this is somewhere inside [0, n_channels]. Now b is > 0 && c < 0, so peak_x > 0 */
+        if(peak_x > (n_channels + 1)) { /* +1 for GSL histogram range safety */
+            return TRUE;
+        } else {
+            return FALSE;
+        }
+    } else { /* Higher order, use brute force! */
+        double y_old = calibration_eval(cal, 0);
+        for(size_t i = 1; i <= n_channels; i++) { /* n+1, because histograms have n+1 ranges for n channels */
+            double y = calibration_eval(cal, i);
+            if(y < y_old) {
+                DEBUGMSG("Calibration fails monotonicity check at %zu, where %g keV < %g keV.", i, y / C_KEV, y_old / C_KEV);
+                return FALSE;
+            }
+            y_old = y;
+        }
+        return TRUE;
     }
-    return TRUE;
 }
