@@ -25,21 +25,24 @@ void bricks_convolute(gsl_histogram *h, const calibration *c, const brick *brick
     }
 
     for(size_t i = 1; i <= last_brick; i++) {
-        const brick *b_low = &bricks[i]; /* Low refers to lower index number (i), not to lower b->low.E! */
-        if(b_low->Q == 0.0)
+        const brick *b_low = &bricks[i]; /* Low refers to lower index number (i), not that b_low->E < b_high->E! (incident ion has lower energy as function of i, but not necessarily the detected energy of the reaction product) */
+        if(b_low->Q == 0.0) {
             continue;
+        }
         const brick *b_high = &bricks[i-1];
-        double E_cutoff_low; /* Low energy cutoff (brick) */
-        double E_cutoff_high; /* High energy cutoff (brick) */
-        if(b_low->E < b_high->E) { /* Energy increasing as brick number increases */
+        double E_low, E_cutoff_low, E_cutoff_high; /* Lower energy edge of brick, Low energy cutoff (gaussian), High energy cutoff (gaussian) */
+        if(b_low->E < b_high->E) { /* Detected energy increasing as brick number increases */
+            E_low = b_low->E;
             E_cutoff_low = b_low->E - b_low->S_sum * sigmas_cutoff;
             E_cutoff_high = b_high->E + b_high->S_sum * sigmas_cutoff;
         } else { /* Energy decreasing as brick number increases */
+            E_low = b_high->E;
             E_cutoff_low = b_high->E - b_high->S_sum * sigmas_cutoff;
             E_cutoff_high = b_low->E + b_low->S_sum * sigmas_cutoff;
         }
-        if(b_low->E < emin)
+        if(E_low < emin) { /* Brick is already partially below emin (without convolution), it's low enough! */
             continue;
+        }
         E_cutoff_low = GSL_MAX_DBL(E_cutoff_low, emin);
         double b_w_inv = 1.0/(b_high->E - b_low->E); /* inverse of brick width (in energy) */
         size_t ch_start = calibration_inverse(c, E_cutoff_low, h->n);
@@ -60,7 +63,7 @@ void bricks_convolute(gsl_histogram *h, const calibration *c, const brick *brick
 #endif
         }
 #ifdef DEBUG_BRICK_OUTPUT
-        fprintf(stdout, "BRICK #normalization calculated factor %.12lf relative error %.3e\nBRICK\nBRICK\n", norm, (norm-1.0));
+        fprintf(stdout, "BRICK #Gaussian normalization calculated factor = %.12lf, relative error from unity = %.4e\n", norm, (norm-1.0));
 #endif
     }
 }

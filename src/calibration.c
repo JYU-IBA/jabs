@@ -38,9 +38,7 @@ calibration *calibration_init_linear() {
         return NULL;
     c->f = calibration_linear;
     c->type = CALIBRATION_LINEAR;
-    calibration_params_linear *p = malloc(sizeof(calibration_params_linear));
-    p->offset = 0.0;
-    p->slope = 0.0;
+    calibration_params_linear *p = calloc(1, sizeof(calibration_params_linear));
     c->params = p;
     c->resolution = 0.0;
     c->resolution_variance = 0.0;
@@ -84,7 +82,7 @@ double calibration_none(const void *params, size_t ch) {
 size_t calibration_inverse(const calibration *cal, double E, size_t ch_max) {
     if(cal->type == CALIBRATION_LINEAR) {
         calibration_params_linear *p = (calibration_params_linear *) cal->params;
-        double ch = (E / p->slope - p->offset);
+        double ch = (E - p->offset) / p->slope;
         if(ch >= 0.0 && ch < ch_max) {
             return (size_t) ch;
         } else {

@@ -12,7 +12,7 @@ set fluence 2.0e13
 load exp "experimental.dat"
 
 #sample can be set with one command
-set sample Au 30tfu rough 20tfu n_rough 10 SiO2 6500tfu Si 10000tfu
+set sample Au 30tfu rough 20tfu n_rough 10 SiO2 6500tfu Si 20000tfu
 #or loaded from a file (tabular data)
 #load sample "sample.txt"
 

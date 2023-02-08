@@ -225,7 +225,7 @@ void sim_reaction_print_bricks(FILE *f, const sim_reaction *r, double psr) {
     if(r->r->filename) {
         fprintf(f, "#Filename: %s\n", r->r->filename);
     }
-    fprintf(f, "#brick    depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo)    S(sum) sigma*conc              Q  dE(det)/dE_0\n");
+    fprintf(f, "#brick    depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo)    S(sum) sigma*conc     Q (counts)  dE(det)/dE_0\n");
     for(size_t j = 0; j <= r->last_brick; j++) {
         brick *b = &r->bricks[j];
         fprintf(f, "%4zu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %10.3lf %14.6e %8.3lf\n",

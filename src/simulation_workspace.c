@@ -223,7 +223,13 @@ size_t sim_workspace_histograms_calculate(sim_workspace *ws) {
         }
         bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
         const calibration *c = detector_get_calibration(ws->det, r->p.Z);
+#ifdef DEBUG_BRICK_OUTPUT
+        fprintf(stdout, "BRICK #Reaction %zu: %s\n", i + 1, r->r->name);
+#endif
         bricks_convolute(r->histo, c, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->emin, ws->params->gaussian_accurate);
+#ifdef DEBUG_BRICK_OUTPUT
+        fprintf(stdout, "BRICK \nBRICK \n");
+#endif
         r->n_convolution_calls++;
 #if 0
 #pragma omp critical
@@ -311,9 +317,25 @@ int sim_workspace_print_bricks(const sim_workspace *ws, const char *filename) {
     if(!f) {
         return EXIT_FAILURE;
     }
+    fprintf(f, "#This is a bricks file containing up to %zu reactions.\n", ws->n_reactions);
+    fprintf(f, "#Each brick is convoluted with a gaussian to make an energy spectrum.\n");
+    fprintf(f, "#In case of roughness, this represents the bricks of the last simulated roughness subspectrum.\n");
+    fprintf(f, "#Turn roughness and DS off if you want to understand the contents of this file.\n");
+    fprintf(f, "#Each brick has two edges, the high energy edge and the low energy edge.\n");
+    fprintf(f, "#\"depth\" is the depth of the low energy edge in tfu (1e15 at./cm2), thick is thickness of the brick (difference in depth to high energy edge) in the same units.\n");
+    fprintf(f, "#\"E_0\" and \"S_0(el)\" are the energy and electronic energy loss straggling in keVs FWHM of the incident ion at the particular depth (low energy edge).\n");
+    fprintf(f, "#\"E_r\" and \"S_r(el)\" are the same, but for the reaction product at the particular depth. For elastic scattering E_r = K * E_0.\n");
+    fprintf(f, "#\"E(det)\" and \"S(el)\" are the same, but for the reaction product at the detector (after detector foil, if one is set).\n");
+    fprintf(f, "#\"S(geo)\" is the broadening due to finite beam spot and detector size (keV FWHM) at the surface if calculated, zero otherwise.\n");
+    fprintf(f, "#\"S(sum)\" is the sum of all broadening (electronic, geometric and detector resolution) in keV FWHM. This is the actual broadening used for convolution.\n");
+    fprintf(f, "#When convoluting, JaBS convolutes a the brick (a box from low energy to high energy edge with area of Q counts) by a gaussian with varying sigma (different S(sum) for either edge)\n");
+    fprintf(f, "#\"sigma * conc\" is the concentration of the target isotope multiplied by the (straggling weighted) cross section, in mb/sr. This is representative of the entire brick.\n");
+    fprintf(f, "#\"Q\" is the number of counts in the brick. It is the sigma*conc product multiplied by effective thickness of the brick (thick/cos(a)), number of incident particles and solid angle.\n");
+    fprintf(f, "#\"dE(det)/dE_0\" is the (estimate of) derivative dE(det)/dE_0. This is used to figure out the length of energy steps (incident energy, E_0) to take to get comfortable brick spacing.\n");
+    fprintf(f, "#Thanks for reading! If you have any questions, please email Jaakko...\n\n");
     for(size_t i = 0; i < ws->n_reactions; i++) {
-        fprintf(f, "#Reaction %zu\n", i + 1);
         const sim_reaction *r = ws->reactions[i];
+        fprintf(f, "#Reaction %zu, %zu bricks.\n", i + 1, r->last_brick);
         if(r->last_brick == 0) {
             continue;
         }

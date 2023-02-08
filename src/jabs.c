@@ -346,6 +346,7 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
         E_deriv = GSL_MIN_DBL(E_deriv, ENERGY_DERIVATIVE_MAX);
         b->deriv = E_deriv;
         b->thick = d_diff;
+        b->sc = sigma_conc;
         b->Q = ion1.inverse_cosine_theta * sigma_conc * b->thick;
         DEBUGVERBOSEMSG("%s %s %3zu %3zu:%10.3lf %3zu:%10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3e %8.3lf %2i",
                 sim_r->r->target->name, reaction_type_to_string(sim_r->r->type), i_brick,
@@ -359,7 +360,7 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
                 crossed + skipped
                 );
         assert(!isnan(ion1.E));
-        if(product_and_incident_go_in_different_directions && b->E - sqrt(b->S) < ws->emin) { /* Reaction product energy decreases as incident ion energy decreases */
+        if(product_and_incident_go_in_different_directions && b->E < ws->emin) { /* Reaction product energy decreases as incident ion energy decreases */
             sim_r->last_brick = i_brick;
             DEBUGMSG("Brick E = %g keV sufficiently below emin.", b->E / C_KEV);
             break;
