@@ -119,7 +119,8 @@ void fit_covar_print(const gsl_matrix *covar);
 
 int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x); /* Updates values in fit params as they are varied by the fit algorithm. */
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
-int fit_scale_by_variable(struct fit_data *fit, const fit_variable *var);
+int fit_speedup(fit_data *fit, const fit_variable *var, gsl_vector *f);
+int fit_speedup_fluence(struct fit_data *fit, const fit_variable *var);
 int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f);
 void fit_iter_stats_update(struct fit_data *params, const gsl_multifit_nlinear_workspace *w);
 void fit_iter_stats_print(const struct fit_stats *stats);

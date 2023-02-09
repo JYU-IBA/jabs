@@ -41,98 +41,116 @@
 #endif
 
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
-    struct fit_data *fit_data = (struct fit_data *) params;
+    struct fit_data *fit = (struct fit_data *) params;
 #ifdef DEBUG
-    fprintf(stderr, "Fit iteration %zu, fit function evaluation %zu\n", fit_data->stats.iter, fit_data->stats.n_evals_iter);
+    fprintf(stderr, "Fit iteration %zu, fit function evaluation %zu\n", fit->stats.iter, fit->stats.n_evals_iter);
 #endif
-    size_t i_v_active = fit_data->stats.iter_call - 1; /* Which variable is being varied by the fit algorithm in this particular call inside an iteration (compared to first call (== 0)) */
+    size_t i_v_active = fit->stats.iter_call - 1; /* Which variable is being varied by the fit algorithm in this particular call inside an iteration (compared to first call (== 0)) */
     fit_variable *var_active = NULL;
-    for(size_t i_v = 0; i_v < fit_data->fit_params->n; i_v++) {
-        fit_variable *var = &fit_data->fit_params->vars[i_v];
+    for(size_t i_v = 0; i_v < fit->fit_params->n; i_v++) {
+        fit_variable *var = &fit->fit_params->vars[i_v];
         if(var->i_v == i_v_active) {
             var_active = var;
             break;
         }
     }
-    fit_data->stats.iter_call++;
-    DEBUGMSG("Iter %zu (call %zu). var_active = %p (%s)", fit_data->stats.iter, fit_data->stats.iter_call, (void *)var_active, var_active?var_active->name:"none");
+    fit->stats.iter_call++;
+    DEBUGMSG("Iter %zu (call %zu). var_active = %p (%s)", fit->stats.iter, fit->stats.iter_call, (void *)var_active, var_active ? var_active->name : "none");
 
-    if(fit_parameters_set_from_vector(fit_data, x)) {
+    if(fit_parameters_set_from_vector(fit, x)) {
         return GSL_FAILURE;
     }
 
-    if(var_active && var_active->value == &fit_data->sim->fluence) {
-        if(fit_scale_by_variable(fit_data, var_active)) {
-            return GSL_FAILURE;
-        }
-        fit_data->stats.n_evals_iter++;
-        fit_data->stats.error = fit_set_residuals(fit_data, f);
-        if(fit_data->stats.error) {
-            return GSL_FAILURE;
-        } else {
-            return GSL_SUCCESS;
-        }
-    }
+    int ret = fit_speedup(fit, var_active, f);
+    if(ret < 0) {
+        fit->stats.error = FIT_ERROR_IMPOSSIBLE;
+        return GSL_FAILURE;
+    } else if(ret > 0) {
+        return GSL_SUCCESS;
+    } /* ret == 0, continue with full simulation,no speedup available for this fit variable */
 
-    sample_free(fit_data->sim->sample);
-    fit_data->sim->sample = NULL;
-    fit_data_workspaces_free(fit_data);
 
-    if(sample_model_sanity_check(fit_data->sm)) {
-        fit_data->stats.error = FIT_ERROR_SANITY;
+
+    sample_free(fit->sim->sample);
+    fit->sim->sample = NULL;
+    fit_data_workspaces_free(fit);
+
+    if(sample_model_sanity_check(fit->sm)) {
+        fit->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
     }
-    if(sim_sanity_check(fit_data->sim)) {
-        fit_data->stats.error = FIT_ERROR_SANITY;
+    if(sim_sanity_check(fit->sim)) {
+        fit->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
     }
-    fit_data->sim->sample = sample_from_sample_model(fit_data->sm);
-    sample_renormalize(fit_data->sim->sample);
+    fit->sim->sample = sample_from_sample_model(fit->sm);
+    sample_renormalize(fit->sim->sample);
 
-    if(fit_data_workspaces_init(fit_data)) {
-        fit_data->stats.error = FIT_ERROR_SANITY;
+    if(fit_data_workspaces_init(fit)) {
+        fit->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
     }
 
 #if 0 /* If and when this is enabled, make sure to calculate one complete spectrum with original emin at the end of fit */
-    for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) { /* Sets the lowest energy in each simulation according to fit ranges */
-        double emin = fit_emin(fit_data, i_det);
-        sim_workspace *ws = fit_data_ws(fit_data, i_det);
+    for(size_t i_det = 0; i_det < fit->n_ws; i_det++) { /* Sets the lowest energy in each simulation according to fit ranges */
+        double emin = fit_emin(fit, i_det);
+        sim_workspace *ws = fit_data_ws(fit, i_det);
         if(emin > ws->emin) { /* Only increase the emin, never reduce it. */
             ws->emin = emin;
         }
     }
 #endif
     double start = jabs_clock();
-    if(fit_data->n_ws == 1) {
-        simulate_with_ds(fit_data->ws[0]);
+    if(fit->n_ws == 1) {
+        simulate_with_ds(fit->ws[0]);
     } else {
-#pragma omp parallel default(none) shared(fit_data)
+#pragma omp parallel default(none) shared(fit)
 #pragma omp for
-        for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
+        for(size_t i_det = 0; i_det < fit->n_ws; i_det++) {
 #ifdef _OPENMP
             DEBUGMSG("Thread id %i got detector number %zu\n", omp_get_thread_num(), i_det + 1);
 #endif
-            simulate_with_ds(fit_data->ws[i_det]);
+            simulate_with_ds(fit->ws[i_det]);
         }
     }
     double end = jabs_clock();
-    fit_data->stats.cputime_iter += (end - start);
-    fit_data->stats.n_evals_iter++;
+    fit->stats.cputime_iter += (end - start);
+    fit->stats.n_evals_iter++;
 
-    if(fit_data->stats.iter_call == 1) { /* First call of iter, store sum histograms to fit_data */
-        fit_data_histo_sum_store(fit_data);
+    if(fit->stats.iter_call == 1) { /* First call of iter, store sum histograms to fit */
+        fit_data_histo_sum_store(fit);
     }
-    fit_data->stats.error = fit_set_residuals(fit_data, f);
-    if(fit_data->stats.error) {
+    fit->stats.error = fit_set_residuals(fit, f);
+    if(fit->stats.error) {
         return GSL_FAILURE;
     }
     return GSL_SUCCESS;
 }
 
-int fit_scale_by_variable(struct fit_data *fit, const fit_variable *var) {
+int fit_speedup(fit_data *fit, const fit_variable *var, gsl_vector *f) { /* Returns < 0 on failure, 0 if speedup is not possible and 1 if speedup was ok */
+    assert(fit);
+    if(!var) {
+        return FALSE;
+    }
+    if(var->value == &fit->sim->fluence) { /* Variable is fluence, scale histograms */
+        if(fit_speedup_fluence(fit, var)) {
+            return GSL_FAILURE;
+        }
+    } else {
+        return FALSE;
+    }
+    fit->stats.n_evals_iter++;
+    fit->stats.error = fit_set_residuals(fit, f);
+    if(fit->stats.error) {
+        return GSL_FAILURE;
+    } else {
+        return 0;
+    }
+}
+
+int fit_speedup_fluence(struct fit_data *fit, const fit_variable *var) {
     double scale = *(var->value) / var->value_iter;
-    DEBUGMSG("Varying fluence (iter %zu, call %zu) by %12.10lf (variable %s).", fit->stats.iter, fit->stats.iter_call, scale, var->name);
+    DEBUGMSG("Varying fluence (iter %zu, call %zu) by %12.10lf (variable %s).\n", fit->stats.iter, fit->stats.iter_call, scale, var->name);
     for(size_t i = 0; i < fit->n_ws; i++) {
         sim_workspace *ws = fit_data_ws(fit, i);
         sim_workspace_histograms_scale(ws, scale);
