@@ -155,11 +155,13 @@ void fit_parameters_update(const fit_params *fit_params, const gsl_multifit_nlin
         if(!var->active)
             continue;
         assert(var->i_v < fit_params->n_active);
-        var->value_final = gsl_vector_get(w->x, var->i_v);
+        double val_norm = gsl_vector_get(w->x, var->i_v); /* This is the actual fitted value, multiplier to original */
+        var->value_final = val_norm * var->value_orig; /* So we get final fitted value by multiplication */
         *(var->value) = var->value_final;
-        var->err = c * sqrt(gsl_matrix_get(covar, var->i_v, var->i_v));
-        var->err_rel = fabs(var->err / var->value_final);
-        var->sigmas = fabs(var->value_final - var->value_orig) / var->value_orig / var->err_rel;
+        double err_norm = c * sqrt(gsl_matrix_get(covar, var->i_v, var->i_v)); /* This is the absolute error of the actual fitted value */
+        var->err_rel =  err_norm / val_norm; /* Relative error is simple */
+        var->err = err_norm * var->value_orig; /* Absolute error of the fitted value is also multiplied */
+        var->sigmas = (val_norm - 1.0) / var->err_rel; /* How many standard deviations was the change in value */
     }
 }
 

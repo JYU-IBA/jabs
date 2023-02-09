@@ -259,7 +259,7 @@ int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x) {
             fit->stats.error = FIT_ERROR_SANITY;
             return GSL_FAILURE;
         }
-        *(var->value) = gsl_vector_get(x, var->i_v);
+        *(var->value) = gsl_vector_get(x, var->i_v) * var->value_orig;
         if(fit->stats.iter_call == 1) { /* Store the value of fit parameters at the first function evaluation */
             var->value_iter = *(var->value);
             var->active_iter_call = FALSE;
@@ -931,7 +931,8 @@ int fit(struct fit_data *fit_data) {
         for(size_t i = 0; i < fit_params->n; i++) { /* Set active variables to vector */
             fit_variable *var = &(fit_params->vars[i]);
             if(var->active) {
-                gsl_vector_set(x, var->i_v, *(var->value)); /* Start phase from initial or fitted (previous phase) results */
+                gsl_vector_set(x, var->i_v, *(var->value)/var->value_orig); /* We'll pass normalized values to GSL, so we are actually starting fit with always with vector full of 1.0. Next phase starts where previous ends. */
+                fprintf(stderr, "Starts with %zu: %.12g\n", var->i_v, gsl_vector_get(x, var->i_v));
             }
         }
         jabs_message(MSG_INFO, stderr, "\nInitializing fit phase %i. Xtol = %e, chisq_tol %e\n", phase, xtol, chisq_tol);
