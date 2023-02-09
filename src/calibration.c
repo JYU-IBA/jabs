@@ -76,6 +76,7 @@ double calibration_poly(const void *params, size_t x) {
 
 double calibration_none(const void *params, size_t ch) {
     (void) params;
+    (void) ch;
     return 0.0;
 }
 
@@ -263,7 +264,7 @@ char *calibration_param_name(calibration_type type, calibration_param_type i) {
     if(s) {
         return strdup(s);
     }
-    if(asprintf(&s, "calib_p%i", i) < 0) {
+    if(asprintf(&s, "p%i", i) < 0) {
         return NULL;
     }
     return s;

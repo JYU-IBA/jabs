@@ -40,46 +40,39 @@
 #include <omp.h>
 #endif
 
+
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     struct fit_data *fit = (struct fit_data *) params;
-#ifdef DEBUG
-    fprintf(stderr, "Fit iteration %zu, fit function evaluation %zu\n", fit->stats.iter, fit->stats.n_evals_iter);
-#endif
-    size_t i_v_active = fit->stats.iter_call - 1; /* Which variable is being varied by the fit algorithm in this particular call inside an iteration (compared to first call (== 0)) */
-    fit_variable *var_active = NULL;
-    for(size_t i_v = 0; i_v < fit->fit_params->n; i_v++) {
-        fit_variable *var = &fit->fit_params->vars[i_v];
-        if(var->i_v == i_v_active) {
-            var_active = var;
-            break;
-        }
-    }
     fit->stats.iter_call++;
-    DEBUGMSG("Iter %zu (call %zu). var_active = %p (%s)", fit->stats.iter, fit->stats.iter_call, (void *)var_active, var_active ? var_active->name : "none");
-
     if(fit_parameters_set_from_vector(fit, x)) {
         return GSL_FAILURE;
     }
+    fit_variable *var_active = fit_get_active_variable(fit); /* May return NULL */
+    DEBUGMSG("Iter %zu (call %zu). var_active = %p (%s)", fit->stats.iter, fit->stats.iter_call, (void *)var_active, var_active ? var_active->name : "none");
 
-    int ret = fit_speedup(fit, var_active, f);
-    if(ret < 0) {
+#ifndef NO_SPEEDUP
+    int ret = fit_speedup(fit, var_active);
+    if(ret == GSL_FAILURE) {
         fit->stats.error = FIT_ERROR_IMPOSSIBLE;
         return GSL_FAILURE;
-    } else if(ret > 0) {
-        return GSL_SUCCESS;
+    } else if(ret != FALSE) { /* Success */
+        fit->stats.n_evals_iter++;
+        fit->stats.n_speedup_evals++;
+        fit->stats.error = fit_set_residuals(fit, f);
+        if(fit->stats.error) {
+            return GSL_FAILURE;
+        } else {
+            return GSL_SUCCESS;
+        }
     } /* ret == 0, continue with full simulation,no speedup available for this fit variable */
+#endif
 
-
-
+    DEBUGSTR("Full simulation will be performed.");
     sample_free(fit->sim->sample);
     fit->sim->sample = NULL;
     fit_data_workspaces_free(fit);
 
-    if(sample_model_sanity_check(fit->sm)) {
-        fit->stats.error = FIT_ERROR_SANITY;
-        return GSL_FAILURE;
-    }
-    if(sim_sanity_check(fit->sim)) {
+    if(fit_sanity_check(fit) == GSL_FAILURE) {
         fit->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
     }
@@ -87,7 +80,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     sample_renormalize(fit->sim->sample);
 
     if(fit_data_workspaces_init(fit)) {
-        fit->stats.error = FIT_ERROR_SANITY;
+        fit->stats.error = FIT_ERROR_WORKSPACE_INITIALIZATION;
         return GSL_FAILURE;
     }
 
@@ -127,7 +120,60 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     return GSL_SUCCESS;
 }
 
-int fit_speedup(fit_data *fit, const fit_variable *var, gsl_vector *f) { /* Returns < 0 on failure, 0 if speedup is not possible and 1 if speedup was ok */
+int fit_sanity_check(const fit_data *fit) {
+    if(sample_model_sanity_check(fit->sm)) {
+        return GSL_FAILURE;
+    }
+    if(sim_sanity_check(fit->sim)) {
+        return GSL_FAILURE;
+    }
+    return GSL_SUCCESS;
+}
+
+fit_variable *fit_get_active_variable(const fit_data *fit) { /* Which variable is being varied (if only one!) by the fit algorithm in this particular call inside an iteration (compared to first call (== 0)) */
+    if(fit->stats.iter_call == 1) {
+        return NULL;
+    }
+    fit_variable *var_active = NULL;
+    size_t i_v = 0;
+    DEBUGMSG("This is iter call %zu (when numbering starts from zero), there are %zu active variables.", fit->stats.iter_call, fit->fit_params->n_active);
+    for(size_t i = 0; i < fit->fit_params->n; i++) {
+        fit_variable *var = &fit->fit_params->vars[i];
+        if(!var->active) {
+            continue;
+        }
+        double val = *(var->value);
+        if(val != var->value_iter) {
+            double ratio = val / var->value_iter;
+            if(var_active == NULL) {
+                DEBUGMSG("Fit variable candidate %s. Varied by %.12lf (rel %e), compared to original: %.12lf.", var->name, ratio, ratio - 1.0, val / var->value_orig);
+                var_active = var;
+            } else { /* var_active already set */
+                DEBUGMSG("Another variable %s varied by %.12lf (rel %e). Ignoring candidate.", var->name, ratio, ratio - 1.0);
+                var_active = NULL;
+                break;
+            }
+        }
+
+        i_v++;
+    }
+#if DEBUG_VERBOSE
+    i_v = 0;
+    for(size_t i = 0; i < fit->fit_params->n; i++) {
+        fit_variable *var = &fit->fit_params->vars[i];
+        if(!var->active) {
+            continue;
+        }
+        double val = *(var->value);
+        DEBUGVERBOSEMSG("i = %zu, i_v = %zu, var->i_v = %zu, name %s, value %g, ratio to original %lf, ratio to iter %lf\n", i, i_v, var->i_v, var->name, val, val / var->value_orig,val / var->value_iter);
+        i_v++;
+    }
+#endif
+    DEBUGMSG("Returning %s.", var_active ? var_active->name : "NULL");
+    return var_active;
+}
+
+int fit_speedup(fit_data *fit, const fit_variable *var) { /* Returns < 0 on failure, FALSE if speedup is not possible and TRUE if speedup was ok (and sum spectra have been calculated) */
     assert(fit);
     if(!var) {
         return FALSE;
@@ -136,21 +182,26 @@ int fit_speedup(fit_data *fit, const fit_variable *var, gsl_vector *f) { /* Retu
         if(fit_speedup_fluence(fit, var)) {
             return GSL_FAILURE;
         }
-    } else {
-        return FALSE;
+        return TRUE;
     }
-    fit->stats.n_evals_iter++;
-    fit->stats.error = fit_set_residuals(fit, f);
-    if(fit->stats.error) {
-        return GSL_FAILURE;
-    } else {
-        return 0;
+    for(size_t i_ws = 0; i_ws < fit->n_ws; i_ws++) {
+        sim_workspace *ws = fit->ws[i_ws];
+        calibration *cal = ws->det->calibration;
+        size_t n_cal_param = calibration_get_number_of_params(cal);
+        for(size_t i = 0; i < n_cal_param; i++) {
+            double *calparam = calibration_get_param_ref(cal, i);
+            if(var->value == calparam) {
+                /* We have a chance to speed up here (to some default calibration parameter), return TRUE if/when computation is done */
+            }
+        }
     }
+    return FALSE;
 }
 
 int fit_speedup_fluence(struct fit_data *fit, const fit_variable *var) {
     double scale = *(var->value) / var->value_iter;
     DEBUGMSG("Varying fluence (iter %zu, call %zu) by %12.10lf (variable %s).\n", fit->stats.iter, fit->stats.iter_call, scale, var->name);
+    assert(scale != 1.0);
     for(size_t i = 0; i < fit->n_ws; i++) {
         sim_workspace *ws = fit_data_ws(fit, i);
         sim_workspace_histograms_scale(ws, scale);
@@ -220,14 +271,15 @@ void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear
     fit_data->stats.norm = gsl_blas_dnrm2(f);
     fit_data->stats.chisq_dof = fit_data->stats.chisq / fit_data->dof;
     fit_data->stats.n_evals += fit_data->stats.n_evals_iter;
+    fit_data->stats.n_speedup_evals += fit_data->stats.n_speedup_evals_iter;
     fit_data->stats.cputime_cumul += fit_data->stats.cputime_iter;
 }
 
 void fit_iter_stats_print(const struct fit_stats *stats) {
-    jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %4zu | %10.3lf | %9.1lf |\n",
+    jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %11zu | %9zu | %10.3lf | %9.1lf |\n",
                  stats->iter, 1.0 / stats->rcond, stats->norm,
-                 stats->chisq_dof, stats->n_evals, stats->cputime_cumul,
-                 1000.0 * stats->cputime_iter / stats->n_evals_iter);
+                 stats->chisq_dof, stats->n_evals, stats->n_speedup_evals,
+                 stats->cputime_cumul, 1000.0 * stats->cputime_iter / stats->n_evals_iter);
 }
 
 void fit_stats_print(FILE *f, const struct fit_stats *stats) {
@@ -599,6 +651,8 @@ struct fit_stats fit_stats_init() {
     struct fit_stats s;
     s.n_evals = 0;
     s.n_evals_iter = 0;
+    s.n_speedup_evals = 0;
+    s.n_speedup_evals_iter = 0;
     s.cputime_cumul = 0.0;
     s.cputime_iter = 0.0;
     s.chisq0 = 0.0;
@@ -660,8 +714,8 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
     int status = 0;
     size_t iter;
     double chisq_dof_old;
-    jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | eval | time cumul | time eval |\n");
-    jabs_message(MSG_INFO, stderr, "     |              |                |              |      |          s |        ms |\n");
+    jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | evaluations | fast eval | time cumul | time eval |\n");
+    jabs_message(MSG_INFO, stderr, "     |              |                |              |  cumulative | cumulative|          s |        ms |\n");
     for(iter = 0; iter <= maxiter; iter++) {
         fit_data->stats.iter_call = 0;
         fit_data->stats.iter = iter;
@@ -706,7 +760,7 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
 void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspace *w, const gsl_multifit_nlinear_fdf *fdf) {
     jabs_message(MSG_INFO, stderr, "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
     jabs_message(MSG_INFO, stderr, "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
-    jabs_message(MSG_INFO, stderr, "function evaluations: %zu\n", fit->stats.n_evals);
+    jabs_message(MSG_INFO, stderr, "function evaluations: %zu, of which %zu were not full evaluations (speedup)\n", fit->stats.n_evals, fit->stats.n_speedup_evals);
 #ifdef DEBUG
     jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf->nevalf);
 #endif
@@ -972,6 +1026,8 @@ const char *fit_error_str(int error) {
             return "iteration is not making progress";
         case FIT_ERROR_SANITY:
             return "simulation failed sanity check";
+        case FIT_ERROR_WORKSPACE_INITIALIZATION:
+            return "simulation workspace could not be initialized";
         case FIT_ERROR_IMPOSSIBLE:
             return "an impossible thing has happened";
         case FIT_ERROR_ABORTED:
