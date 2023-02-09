@@ -18,17 +18,15 @@
 #include "spectrum.h"
 #include "sim_reaction.h"
 
-sim_reaction *sim_reaction_init(const ion *incident_ion, const jibal_isotope *isotopes, const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks) {
+sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks) {
     if(!r) {
         return NULL;
     }
     assert(r->product);
-    sim_reaction *sim_r = malloc(sizeof(sim_reaction));
+    sim_reaction *sim_r = calloc(1, sizeof(sim_reaction));
     sim_r->r = r;
     ion *p = &sim_r->p;
     ion_reset(p);
-    sim_r->n_convolution_calls = 0;
-    sim_r->max_depth = 0.0;
     sim_r->i_isotope = sample->n_isotopes; /* Intentionally not valid */
 
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
@@ -43,11 +41,12 @@ sim_reaction *sim_reaction_init(const ion *incident_ion, const jibal_isotope *is
     sim_r->n_bricks = n_bricks;
     sim_r->bricks = calloc(sim_r->n_bricks, sizeof(brick));
     ion_set_isotope(p, r->product);
-    if(p->isotope == incident_ion->isotope) {
-        p->nucl_stop = nuclear_stopping_shared_copy(incident_ion->nucl_stop);
-    } else {
-        p->nucl_stop = nuclear_stopping_new(p->isotope, isotopes);
-    }
+    p->nucl_stop = r->nucl_stop; /* We just borrow this */
+    assert(p->nucl_stop);
+    assert(p->nucl_stop->incident = p->isotope);
+    p->ion_gsto = r->ion_gsto; /* We just borrow this */
+    assert(p->ion_gsto);
+    assert(p->ion_gsto->incident = p->isotope);
     sim_reaction_set_cross_section_by_type(sim_r);
     return sim_r;
 }
@@ -64,7 +63,6 @@ void sim_reaction_free(sim_reaction *sim_r) {
         free(sim_r->bricks);
         sim_r->bricks = NULL;
     }
-    nuclear_stopping_free(sim_r->p.nucl_stop);
     free(sim_r);
 }
 
@@ -79,11 +77,7 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_
     sim_r->E_cm_ratio = target->mass / (incident->mass + target->mass);
     sim_r->mass_ratio = incident->mass / target->mass;
     sim_r->theta = theta;
-    if(sim_r->r->Q == 0.0) {
-        sim_r->K = reaction_product_energy(sim_r->r, sim_r->theta, 1.0);
-    } else {
-        sim_r->K = 0.0;
-    }
+    sim_r->K = 0.0;
     sim_r->cs_constant = 0.0;
     sim_r->theta_cm = 0.0; /* Will be recalculated, if possible */
     reaction_type type = sim_r->r->type;
@@ -92,6 +86,11 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_
         sim_r->stop = TRUE;
         DEBUGSTR("Reaction not possible, returning.");
         return;
+    }
+    if(sim_r->r->Q == 0.0) {
+        sim_r->K = reaction_product_energy(sim_r->r, sim_r->theta, 1.0);
+    } else {
+        sim_r->K = 0.0;
     }
     if(type == REACTION_RBS) {
         sim_r->theta_cm = sim_r->theta + asin(sim_r->mass_ratio * sin(sim_r->theta));

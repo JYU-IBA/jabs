@@ -14,8 +14,10 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
+#include <gsl/gsl_minmax.h>
 #include "ion.h"
 #include "rotate.h"
+#include "jabs_debug.h"
 
 void ion_reset(ion *ion) {
     ion->isotope = NULL;
@@ -29,7 +31,8 @@ void ion_reset(ion *ion) {
     ion->cosine_phi = 1.0;
     ion->inverse_cosine_theta = 1.0; /* These need to be set matching to the angles */
     ion->inverse_cosine_phi = 1.0;
-    ion->nucl_stop = NULL; /* Be careful, memory could leak */
+    ion->nucl_stop = NULL; /* Beware of memory leaks! */
+    ion->ion_gsto = NULL; /* Beware of memory leaks! */
 }
 
 void ion_set_isotope(ion *ion, const jibal_isotope *isotope) {
@@ -87,4 +90,50 @@ void ion_rotate(ion *ion, double theta2, double phi2) { /* Wrapper for rotate() 
 void ion_print(FILE *f, const ion *ion) {
     fprintf(f, "ion %s (Z=%i, mass=%.3lf u), E = %.3lf keV, theta = %.3lf deg (cos_theta = %.3lf, 1/cos_theta = %.3lf), phi = %.3lf deg. Nuclear stopping isotopes %zu calculated for %s.\n",
             ion->isotope->name, ion->Z, ion->mass/C_U, ion->E/C_KEV,  ion->theta/C_DEG, ion->cosine_theta, ion->inverse_cosine_theta, ion->phi/C_DEG, ion->nucl_stop->n_isotopes, ion->nucl_stop->incident->name);
+}
+
+jabs_ion_gsto *ion_gsto_new(const jibal_isotope *incident, const jibal_gsto *gsto) {
+    jabs_ion_gsto *ig = malloc(sizeof(jabs_ion_gsto));
+    ig->incident = incident;
+    ig->gsto_data = calloc(gsto->Z2_max + 1, sizeof(jabs_ion_gsto_data));
+    ig->emin = 0.0;
+    ig->refcount = 1;
+    for(int Z2 = 1; Z2 < gsto->Z2_max; Z2++) {
+        jabs_ion_gsto_data *gd = &ig->gsto_data[Z2];
+        gd->stopfile = jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, incident->Z, Z2);
+        if(gd->stopfile) {
+            gd->stopdata = jibal_gsto_file_get_data(gd->stopfile, incident->Z, Z2);
+            ig->emin = GSL_MAX(ig->emin, jibal_gsto_xunit_to_energy(gd->stopfile->xunit, gd->stopfile->xmin, incident->mass));
+            DEBUGMSG("There is some stopping %s -> Z = %i, emin (highest so far) %g keV\n", incident->name, Z2, ig->emin/C_KEV);
+        }
+        gd->straggfile = jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, incident->Z, Z2);
+        if(gd->straggfile) {
+            gd->straggdata = jibal_gsto_file_get_data(gd->straggfile, incident->Z, Z2);
+            ig->emin  = GSL_MAX(ig->emin, jibal_gsto_xunit_to_energy(gd->stopfile->xunit, gd->stopfile->xmin, incident->mass));
+        }
+    }
+    return ig;
+}
+
+jabs_ion_gsto *ion_gsto_shared(jabs_ion_gsto *ion_gsto) {
+    if(!ion_gsto) {
+        return NULL;
+    }
+    assert(ion_gsto->refcount > 0);
+    ion_gsto->refcount++;
+    DEBUGMSG("Shallow copy of ion_gsto = %p made (incident: %s), refcount is %i", (void *)ion_gsto, ion_gsto->incident->name, ion_gsto->refcount);
+    return ion_gsto;
+}
+
+void ion_gsto_free(jabs_ion_gsto *ion_gsto) {
+    if(!ion_gsto) {
+        return;
+    }
+    ion_gsto->refcount--;
+    DEBUGVERBOSEMSG("ion_gsto_free(ion_gsto = %p), incident %s, called, refcount is now %i", (void *)ion_gsto, ion_gsto->incident->name, ns->refcount);
+    assert(ion_gsto->refcount >= 0);
+    if(ion_gsto->refcount == 0) {
+        free(ion_gsto->gsto_data);
+        free(ion_gsto);
+    }
 }

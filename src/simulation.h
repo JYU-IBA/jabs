@@ -48,7 +48,7 @@ typedef struct simulation {
     int rbs; /* Add RBS reactions */
     jabs_reaction_cs cs_rbs;
     jabs_reaction_cs cs_erd;
-    ion ion; /* This ion is not to be used in calculations, it is simply copied to ws->ion */
+    ion ion; /* This ion is not to be used in calculations, it is simply copied to ws->ion. We do store the nuclear stopping (ion->nucl_stop) here too. */
 } simulation;
 
 #include "sample.h"
@@ -58,7 +58,7 @@ jabs_reaction_cs sim_cs(const simulation *sim, reaction_type type);
 int sim_reactions_add_reaction(simulation *sim, reaction *r, int silent);
 int sim_reactions_remove_reaction(simulation *sim, size_t i);
 int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jabs_reaction_cs cs, int silent); /* Add RBS or ERD reactions automagically */
-int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, const char *filename);
+int sim_reactions_add_r33(simulation *sim, const jibal_isotope *isotopes, const char *filename);
 void sim_reactions_free(simulation *sim); /* Free reactions and reset the number of reactions to zero */
 int sim_sanity_check(const simulation *sim);
 detector *sim_det(const simulation *sim, size_t i_det);
@@ -70,5 +70,6 @@ void sim_sort_reactions(const simulation *sim);
 double sim_alpha_angle(const simulation *sim);
 double sim_exit_angle(const simulation *sim, const detector *det);
 int sim_do_we_need_erd(const simulation *sim);
-void sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes);
+void sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto);
+void sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto);
 #endif // JABS_SIMULATION_H

@@ -25,7 +25,7 @@ void sim_workspace_init_reactions(sim_workspace *ws) {
     const simulation *sim = ws->sim;
     ws->reactions = calloc(sim->n_reactions, sizeof (sim_reaction *));
     for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-        ws->reactions[i_reaction] = sim_reaction_init(&ws->ion, ws->isotopes, sim->sample, ws->det, sim->reactions[i_reaction], ws->n_channels, ws->n_bricks);
+        ws->reactions[i_reaction] = sim_reaction_init(sim->sample, ws->det, sim->reactions[i_reaction], ws->n_channels, ws->n_bricks);
         ws->n_reactions++;
     }
 }
@@ -228,7 +228,7 @@ size_t sim_workspace_histograms_calculate(sim_workspace *ws) {
 #ifdef DEBUG_BRICK_OUTPUT
         fprintf(stdout, "BRICK #Reaction %zu: %s, last brick %zu\n", i + 1, r->r->name, r->last_brick);
 #endif
-        bricks_convolute(r->histo, c, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->emin, ws->params->gaussian_accurate);
+        bricks_convolute(r->histo, c, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, r->emin, ws->params->gaussian_accurate);
 #ifdef DEBUG_BRICK_OUTPUT
         fprintf(stdout, "BRICK \nBRICK \n");
 #endif

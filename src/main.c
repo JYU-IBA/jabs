@@ -80,6 +80,7 @@ int main(int argc, char * const *argv) {
     script_session *session = script_session_init(jibal, NULL);
     if(!session) {
         fprintf(stderr, "Can not initialize session.\n");
+        jibal_free(jibal);
         return EXIT_FAILURE;
     }
     struct fit_data *fit_data = session->fit;

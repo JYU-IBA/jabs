@@ -13,6 +13,8 @@
  */
 #include <assert.h>
 #include <gsl/gsl_math.h>
+#include <jibal_gsto.h>
+#include <jibal_stragg.h>
 #include "jabs_debug.h"
 #include "stop.h"
 #include "defaults.h"
@@ -112,8 +114,65 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
     return fulldepth; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
-
 double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sample, const depth depth, double E) {
+    const double em = E * incident->mass_inverse;
+    int Z2_old = 0; /* Not valid */
+    double out = 0.0;
+    int lo, hi = 0;
+    const gsto_file_t *file;
+    const double *data;
+    double unit_factor;
+    for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
+        double c;
+        const jibal_isotope *target = sample->isotopes[i_isotope];
+        if(sample->no_conc_gradients) {
+            c = *sample_conc_bin(sample, depth.i, i_isotope);
+        } else {
+            c = get_conc(sample, depth, i_isotope);
+        }
+        if(c < CONC_TOLERANCE)
+            continue;
+        int Z2 = target->Z;
+        if(Z2 != Z2_old) { /* This saves some computing time, but for electronic stopping we could just sum all isotopic concentrations (and note that those stay constant while we are doing stopping calculations) */
+            if(stop->type == GSTO_STO_TOT) {
+                file = incident->ion_gsto->gsto_data[Z2].stopfile;
+                data = incident->ion_gsto->gsto_data[Z2].stopdata;
+                if(file->stounit == GSTO_STO_UNIT_EV15CM2) {
+                    unit_factor = C_EV_TFU;
+                } else {
+                    unit_factor = 1.0;
+                }
+            } else if(stop->type == GSTO_STO_STRAGG) {
+                file = incident->ion_gsto->gsto_data[Z2].straggfile;
+                data = incident->ion_gsto->gsto_data[Z2].straggdata;
+                if(file->straggunit == GSTO_STRAGG_UNIT_BOHR) {
+                    unit_factor = jibal_stragg_bohr(incident->Z, Z2);
+                } else {
+                    unit_factor = 1.0;
+                }
+            }
+            lo = jibal_gsto_em_to_index(file, em);
+            hi = lo + 1;
+        }
+        double S = unit_factor * jibal_linear_interpolation(file->em[lo], file->em[hi], data[lo], data[hi], em); /* TODO: check boundaries (low energy should be ok, but high maybe not) */
+
+        if(stop->type == GSTO_STO_TOT) {
+            S += ion_nuclear_stop(incident, target, stop->nuclear_stopping_accurate);
+        }
+        out += c * S;
+    }
+    switch(stop->type) {
+        case GSTO_STO_ELE:
+        case GSTO_STO_TOT:
+            return out * sample->ranges[depth.i].bragg;
+        case GSTO_STO_STRAGG:
+            return out * sample->ranges[depth.i].stragg;
+        default:
+            return out;
+    }
+}
+
+double stop_sample_old(const jabs_stop *stop, const ion *incident, const sample *sample, const depth depth, double E) {
     const double em = E * incident->mass_inverse;
     double S1 = 0.0;
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
@@ -160,20 +219,20 @@ double stop_step_calc(const jabs_stop_step_params *params, const ion *ion) {
     return step;
 }
 
-void stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, const depth depth_start, const sample *sample) {
+int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, const depth depth_start, const sample *sample) {
     depth d = depth_start;
     while(1) { /* Exit from sample (hopefully) */
         if(p->inverse_cosine_theta > 0.0 && d.x >= (sample->thickness - DEPTH_TOLERANCE)) { /* Exit through back (transmission) */
-            break;
+            return 0;
         }
         if(p->inverse_cosine_theta < 0.0 && d.x <= DEPTH_TOLERANCE) { /* Exit (surface, front of sample) */
-            break;
+            return 0;
         }
         double E_step = stop_step_calc(params_exiting, p);
         depth d_after = stop_step(stop, stragg, p, sample, d, E_step);
         if(p->E < stop->emin) {
             DEBUGVERBOSEMSG("Energy %g keV below EMIN when surfacing from %.3lf tfu, break break.", p->E / C_KEV, d_after.x / C_TFU);
-            return;
+            return -1;
         }
         d = d_after;
     }

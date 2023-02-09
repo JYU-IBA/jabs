@@ -50,10 +50,12 @@ nuclear_stopping *nuclear_stopping_new(const jibal_isotope *incident, const jiba
 }
 
 nuclear_stopping *nuclear_stopping_shared_copy(nuclear_stopping *ns) {
+    assert(ns);
     if(!ns) {
         return NULL;
     }
     DEBUGMSG("Shallow copy of ns = %p made (incident: %s), refcount is %i", (void *)ns, ns->incident->name, ns->refcount);
+    assert(ns->refcount > 0);
     ns->refcount += 1;
     return ns;
 }

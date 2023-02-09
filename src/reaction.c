@@ -33,7 +33,10 @@ void reactions_print(reaction * const * reactions, size_t n_reactions) {
 #endif
             continue;
         }
-        jabs_message(MSG_INFO, stderr, "%3zu: %16s", i + 1, reaction_name(r));
+        jabs_message(MSG_INFO, stderr, "%3zu: %s", i + 1, reaction_name(r));
+#ifdef DEBUG
+        jabs_message(MSG_INFO, stderr, " Reaction product stopping emin %g keV ", r->ion_gsto->emin / C_KEV); /* This is only valid after sim has been prepared */
+#endif
         if(r->E_min > E_MIN || r->E_max < E_MAX) {
             jabs_message(MSG_INFO, stderr, ", E = [%.6g MeV, %.6g MeV]", r->E_min / C_MEV, r->E_max / C_MEV);
         }
@@ -45,12 +48,12 @@ void reactions_print(reaction * const * reactions, size_t n_reactions) {
         }
 #ifdef JABS_PLUGINS
         else if(r->type == REACTION_PLUGIN) {
-            jabs_message(MSG_INFO, stderr, " Plugin \"%s\" filename \"%s\".\n", r->plugin->name, r->filename);
+            jabs_message(MSG_INFO, stderr, ", Plugin \"%s\" filename \"%s\".\n", r->plugin->name, r->filename);
         }
 #endif
         else if(r->type == REACTION_RBS || r->type == REACTION_RBS_ALT || r->type == REACTION_ERD){
             assert(r->Q == 0.0);
-            jabs_message(MSG_INFO, stderr, " %s cross sections (built-in).", jabs_reaction_cs_to_string(r->cs));
+            jabs_message(MSG_INFO, stderr, ", %s cross sections (built-in).", jabs_reaction_cs_to_string(r->cs));
             jabs_message(MSG_INFO, stderr, "\n");
         }
     }
@@ -116,6 +119,7 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     r->plugin = NULL;
     r->plugin_r = NULL;
 #endif
+    r->nucl_stop = NULL; /* Will be handled when reaction is prepared */
     r->E_min = E_MIN;
     r->E_max = E_MAX;
     r->Q = 0.0;
@@ -179,6 +183,8 @@ void reaction_free(reaction *r) {
     jabs_plugin_reaction_free(r->plugin, r->plugin_r);
     jabs_plugin_close(r->plugin);
 #endif
+    nuclear_stopping_free(r->nucl_stop);
+    ion_gsto_free(r->ion_gsto);
     free(r->cs_table);
     free(r->filename);
     free(r->name);
@@ -281,6 +287,7 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     }
     r->E_min = r->cs_table[0].E;
     r->E_max = r->cs_table[r->n_cs_table - 1].E;
+    r->nucl_stop = NULL; /* Will be handled when reaction is added */
     reaction_generate_name(r);
     return r;
 }
@@ -348,7 +355,7 @@ const char *jabs_reaction_cs_to_string(jabs_reaction_cs cs) {
 }
 
 int reaction_generate_name(reaction *r) {
-    int len = asprintf(&(r->name), "%s %s(%s,%s)%s", reaction_type_to_string(r->type), r->target->name, r->incident->name, r->product->name, r->residual->name);
+    int len = asprintf(&(r->name), "%-4s %s(%s,%s)%s", reaction_type_to_string(r->type), r->target->name, r->incident->name, r->product->name, r->residual->name);
     if(len < 0) {
         DEBUGSTR("Could not generate reaction name.");
         r->name = NULL;

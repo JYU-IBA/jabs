@@ -38,9 +38,10 @@ typedef struct sim_reaction {
     double cs_constant; /* Non-energy dependent Rutherford cross section terms for RBS or ERD */
     double r_VE_factor; /* Andersen correction factor r_VE = this / E_cm */
     double r_VE_factor2;
+    double emin; /* Calculated */
 } sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
 
-sim_reaction *sim_reaction_init(const ion *incident_ion, const jibal_isotope *isotopes, const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks);
+sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks);
 void sim_reaction_free(sim_reaction *sim_r);
 void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_calc_params *params, double theta, double E_min, double E_max);
 void sim_reaction_reset_bricks(sim_reaction *sim_r);

@@ -64,6 +64,14 @@ int script_prepare_sim_or_fit(script_session *s) {
                      "Could not make a sample based on model description. This should never happen.\n");
         return -1;
     }
+    for(size_t i = 0; i < fit->sim->n_reactions; i++) {
+        const reaction *r = fit->sim->reactions[i];
+        if(r->incident != fit->sim->beam_isotope) {
+            jabs_message(MSG_INFO, stderr, "Reaction %i is for an incident %s, but this simulation should be for %s. Try \"reset reactions\".\n", i + 1, r->incident->name, fit->sim->beam_isotope);
+            return EXIT_FAILURE;
+        }
+    }
+
     if(fit->sim->n_reactions == 0) {
         jabs_message(MSG_WARNING, stderr, "No reactions defined. Please be aware there are commands called \"reset reactions\" and \"add reactions\".\n");
         if(fit->sim->rbs) {
@@ -85,8 +93,6 @@ int script_prepare_sim_or_fit(script_session *s) {
     jabs_message(MSG_INFO, stderr, "Simplified sample model for simulation:\n");
     sample_print(NULL, fit->sim->sample, TRUE);
 
-    reactions_print(fit->sim->reactions, fit->sim->n_reactions);
-
     if(assign_stopping(fit->jibal->gsto, fit->sim)) {
         jabs_message(MSG_ERROR, stderr,
                      "Could not assign stopping or straggling. Failure. Provide more data, check that JIBAL Z2_max is sufficiently large (currently %i) or disable unwanted reactions (e.g. ERD).\n",
@@ -103,7 +109,13 @@ int script_prepare_sim_or_fit(script_session *s) {
     sim_calc_params_update(fit->sim->params);
     sim_print(fit->sim);
 
-    sim_prepare_ion(&fit->sim->ion, fit->sim, fit->jibal->isotopes);
+    sim_prepare_ion(&fit->sim->ion, fit->sim, fit->jibal->isotopes, fit->jibal->gsto);
+    if(fit->sim->ion.ion_gsto->emin > fit->sim->emin) {
+        jabs_message(MSG_WARNING, stderr, "Stopping data (see above) has minimum energy for incident %s is %g keV for some target element(s), which is more than current workspace minimum energy of %g keV.\n",
+                     fit->sim->ion.isotope->name, fit->sim->ion.ion_gsto->emin / C_KEV, fit->sim->emin / C_KEV);
+    }
+    sim_prepare_reactions(fit->sim, fit->jibal->isotopes, fit->jibal->gsto);
+    reactions_print(fit->sim->reactions, fit->sim->n_reactions);
 
     s->start = jabs_clock();
     return 0;
@@ -122,7 +134,6 @@ int script_finish_sim_or_fit(script_session *s) {
 #endif
 
     struct fit_data *fit = s->fit;
-    nuclear_stopping_free(fit->sim->ion.nucl_stop);
     if(fit->sim->n_det == 1) { /* TODO: This is primarily used for command line mode, but multidetector mode could be supported. */
         size_t i_det = 0;
         sim_workspace *ws = fit_data_ws(fit, i_det);
@@ -1839,7 +1850,15 @@ script_command_status script_set_ion(script_session *s, int argc, char *const *a
         jabs_message(MSG_ERROR, stderr, "No such isotope: %s\n", argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
-    s->fit->sim->beam_isotope = isotope;
+
+    if(s->fit->sim->beam_isotope != isotope) {
+        s->fit->sim->beam_isotope = isotope;
+        if(s->fit->sim->n_reactions > 0) {
+            jabs_message(MSG_WARNING, stderr, "Reactions were reset automatically, since the ion was changed.\n");
+            sim_reactions_free(fit->sim);
+        }
+    }
+
     return 1;
 }
 

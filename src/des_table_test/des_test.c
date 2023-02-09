@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
     des_table *dt = des_table_compute(&ws->stop, &ws->stragg, ws->params, sample, &testion, depth_start, ws->emin);
     des_table_print(stderr, dt);
     reaction *r = reaction_make(testion.isotope, jibal_isotope_find(jibal->isotopes, "28Si", 0, 0), REACTION_RBS, JABS_CS_ANDERSEN);
-    sim_reaction *sim_r = sim_reaction_init(&testion, jibal->isotopes, sample, ws->det, r, ws->n_channels, ws->n_bricks);
+    sim_reaction *sim_r = sim_reaction_init(sample, ws->det, r, ws->n_channels, ws->n_bricks);
     geostragg_vars g = geostragg_vars_calculate(&testion, 0.0, 0.0, ws->det, NULL, FALSE, FALSE);
     simulate_reaction(&testion, depth_start, ws, sample, dt, &g, sim_r);
     return EXIT_SUCCESS;

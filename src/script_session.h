@@ -24,5 +24,4 @@ script_session *script_session_init(jibal *jibal, simulation *sim); /* sim can b
 void script_session_free(script_session *s);
 int script_session_load_script(script_session *s, const char *filename);
 int script_get_detector_number(const simulation *sim, int allow_empty, int *argc, char * const **argv, size_t *i_det);
-
 #endif //JABS_SCRIPT_SESSION_H

@@ -1,9 +1,24 @@
 #ifndef JABS_ION_H
 #define JABS_ION_H
 #include <jibal_masses.h>
+#include <jibal_gsto.h>
 #include "nuclear_stopping.h"
 
-typedef struct {
+typedef struct jabs_gsto_assignment {
+        const gsto_file_t *stopfile;
+        const double *stopdata;
+        const gsto_file_t *straggfile;
+        const double *straggdata;
+} jabs_ion_gsto_data;
+
+typedef struct jabs_ion_gsto {
+    jabs_ion_gsto_data *gsto_data; /* Array of gsto->Z2_max + 1 elements */
+    double emin;
+    const jibal_isotope *incident;
+    int refcount;
+} jabs_ion_gsto;
+
+typedef struct ion {
     const jibal_isotope *isotope;
     double E;
     double S;
@@ -17,6 +32,7 @@ typedef struct {
     double cosine_phi;
     double inverse_cosine_phi;
     nuclear_stopping *nucl_stop;
+    jabs_ion_gsto *ion_gsto;
 } ion;
 
 void ion_reset(ion *ion);
@@ -25,4 +41,7 @@ void ion_set_angle(ion *ion, double theta, double phi);
 double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, int accurate);
 void ion_rotate(ion *ion, double theta2, double phi2);
 void ion_print(FILE *f, const ion *ion);
+jabs_ion_gsto *ion_gsto_new(const jibal_isotope *incident, const jibal_gsto *gsto);
+jabs_ion_gsto *ion_gsto_shared(jabs_ion_gsto *ion_gsto);
+void ion_gsto_free(jabs_ion_gsto *ion_gsto);
 #endif // JABS_ION_H

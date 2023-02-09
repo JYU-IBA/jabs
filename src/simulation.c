@@ -20,8 +20,11 @@
 #include "geostragg.h"
 
 simulation *sim_init(jibal *jibal) {
-    simulation *sim = malloc(sizeof(simulation));
+    simulation *sim = calloc(1, sizeof(simulation));
     sim->beam_isotope = jibal_isotope_find(jibal->isotopes, NULL, 2, 4);
+    if(!sim->beam_isotope) {
+        return NULL;
+    }
     sim->beam_aperture = NULL;
     sim->sample_theta = ALPHA_DEFAULT; /* These defaults are for IBM geometry */
     sim->sample_phi = 0.0;
@@ -39,6 +42,7 @@ simulation *sim_init(jibal *jibal) {
     sim->erd = TRUE;
     sim->cs_rbs = jabs_reaction_cs_from_jibal_cs(jibal->config->cs_rbs);
     sim->cs_erd = jabs_reaction_cs_from_jibal_cs(jibal->config->cs_erd);
+    ion_reset(&sim->ion);
     sim_det_add(sim, detector_default(NULL));
     return sim;
 }
@@ -59,6 +63,8 @@ void sim_free(simulation *sim) {
     }
     free(sim->reactions);
     sim_calc_params_free(sim->params);
+    nuclear_stopping_free(sim->ion.nucl_stop);
+    ion_gsto_free(sim->ion.ion_gsto);
     free(sim);
 }
 
@@ -95,13 +101,13 @@ int sim_reactions_remove_reaction(simulation *sim, size_t i) {
     return EXIT_SUCCESS;
 }
 
-int sim_reactions_add_r33(simulation *sim, const jibal_isotope *jibal_isotopes, const char *filename) {
+int sim_reactions_add_r33(simulation *sim, const jibal_isotope *isotopes, const char *filename) {
     r33_file *rfile = r33_file_read(filename);
     if(!rfile) {
         jabs_message(MSG_ERROR, stderr, "Could not load R33 from file \"%s\".\n", filename);
         return EXIT_FAILURE;
     }
-    reaction *r = r33_file_to_reaction(jibal_isotopes, rfile);
+    reaction *r = r33_file_to_reaction(isotopes, rfile);
     r33_file_free(rfile);
     if(!r) {
         jabs_message(MSG_ERROR, stderr, "Could not convert R33 file to a reaction!\n");
@@ -322,8 +328,27 @@ int sim_do_we_need_erd(const simulation *sim) {
     return forward_angles; /* If any detector is in forward angle, we might need ERD */
 }
 
-void sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes) {
+void sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto) {
+    nuclear_stopping_free(ion->nucl_stop);
+    ion_gsto_free(ion->ion_gsto);
     ion_reset(ion);
     ion_set_isotope(ion, sim->beam_isotope);
-    ion->nucl_stop = nuclear_stopping_new(ion->isotope, isotopes);
+    ion->nucl_stop = nuclear_stopping_new(sim->beam_isotope, isotopes);
+    ion->ion_gsto = ion_gsto_new(sim->beam_isotope, gsto);
+    assert(ion->nucl_stop && ion->ion_gsto);
+}
+
+void sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto) {
+    for(size_t i = 0; i < sim->n_reactions; i++) {
+        reaction *r = sim->reactions[i];
+        nuclear_stopping_free(r->nucl_stop);
+        ion_gsto_free(r->ion_gsto);
+        if(r->product == sim->beam_isotope) {
+            r->nucl_stop = nuclear_stopping_shared_copy(sim->ion.nucl_stop);
+            r->ion_gsto = ion_gsto_shared(sim->ion.ion_gsto);
+        } else {
+            r->nucl_stop = nuclear_stopping_new(r->product, isotopes);
+            r->ion_gsto = ion_gsto_new(r->product, gsto);
+        }
+    }
 }

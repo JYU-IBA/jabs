@@ -24,10 +24,14 @@
 script_session *script_session_init(jibal *jibal, simulation *sim) {
     if(!jibal)
         return NULL;
-    struct script_session *s = malloc(sizeof(struct script_session));
+    struct script_session *s = calloc(1, sizeof(struct script_session));
     s->jibal = jibal;
     if(!sim) { /* Sim shouldn't be NULL. If it is, we make a new one. */
         sim = sim_init(jibal);
+    }
+    if(!sim) { /* If it still NULL, something is wrong. */
+        free(s);
+        return NULL;
     }
     s->fit_iter_callback = NULL;
     s->fit = fit_data_new(jibal, sim); /* Not just fit, but this conveniently holds everything we need. */
@@ -68,6 +72,7 @@ void script_session_free(script_session *s) {
     free(s->output_filename);
     fit_data_workspaces_free(s->fit);
     fit_data_exp_free(s->fit);
+
     sim_free(s->fit->sim);
     sample_model_free(s->fit->sm);
     fit_data_free(s->fit);

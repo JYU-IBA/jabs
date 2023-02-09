@@ -24,6 +24,7 @@ void fit_params_free(fit_params *p) {
         free(p->vars[i].name); /* This should be fit_variable_free(), but then p->vars should probably be an array of pointers, too). */
     }
     free(p->vars);
+    free(p->vars_active_iter_call);
     free(p);
 }
 

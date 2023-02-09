@@ -2,8 +2,8 @@
 set ion 35Cl
 set energy 8.5MeV
 set geostragg true
-set sample Al2O3 1000tfu Si 10000tfu
-
+set sample Au 1tfu Al2O3 1000tfu Si 10000tfu
+set emin 10keV
 set alpha 70deg
 #See how to use a ToF detector from another example
 set det resolution 15keV theta 40deg

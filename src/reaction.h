@@ -64,6 +64,8 @@ typedef struct reaction {
     double Q;
     double E_min;
     double E_max;
+    nuclear_stopping *nucl_stop; /* Nuclear stopping for reaction product, may be shared. Can be calculated for a reaction, since this is quite universal. */
+    jabs_ion_gsto *ion_gsto;
 } reaction;
 
 

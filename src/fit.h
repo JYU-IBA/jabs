@@ -95,7 +95,6 @@ typedef struct fit_data {
     int magic_bricks;
 } fit_data;
 
-
 fit_data *fit_data_new(const jibal *jibal, simulation *sim);
 void fit_data_defaults(fit_data *f);
 void fit_data_free(struct fit_data *fit); /* Doesn't free everything in fit_data. Does free fit_params and fit_ranges */

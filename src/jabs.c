@@ -244,7 +244,11 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
 
 void simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
     ion ion1 = *incident; /* Shallow copy */
-    simulate_init_reaction(sim_r, sample, ws->params, g, ws->emin, ion1.E);
+    sim_r->emin = GSL_MAX_DBL(ws->emin, incident->ion_gsto->emin);
+    sim_r->emin = GSL_MAX_DBL(sim_r->emin, sim_r->p.ion_gsto->emin);
+    DEBUGMSG("E_min = %g keV\n", sim_r->emin / C_KEV);
+    simulate_init_reaction(sim_r, sample, ws->params, g, sim_r->emin, ion1.E);
+
     if(sim_r->stop) {
         sim_r->last_brick = 0;
         return;
@@ -252,7 +256,10 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
     depth d_before, d_after = depth_start;
     size_t i_des = 0;
     brick *b = NULL, *b_prev = NULL;
-    int skipped, crossed, last = FALSE;
+    int skipped, last = FALSE;
+#ifdef DEBUG
+    int crossed;
+#endif
     sim_r->last_brick = 0;
     const des *des_min = des_table_min_energy_bin(dt);
     int product_and_incident_go_in_different_directions = (incident->inverse_cosine_theta * sim_r->p.inverse_cosine_theta < 0.0); /* false when transmission, true usually. */
@@ -260,7 +267,9 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
     for(size_t i_brick = 0; i_brick < sim_r->n_bricks; i_brick++) {
         assert(ion1.S >= 0.0);
         skipped = FALSE;
+#ifdef DEBUG
         crossed = FALSE;
+#endif
         b_prev = b;
         b = &sim_r->bricks[i_brick];
         d_before = d_after;
@@ -285,7 +294,9 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
                 }
             }
             d_before.i = d_after.i;
+#ifdef DEBUG
             crossed = TRUE;
+#endif
         }
         assert(ion1.S >= 0.0);
         b->d = d_after;
@@ -300,7 +311,9 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
         b->E_r = sim_r->p.E;
         b->S_r = sim_r->p.S;
 
-        stop_sample_exit(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, &sim_r->p, d_after, sample);
+        if(stop_sample_exit(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, &sim_r->p, d_after, sample) != 0) {
+            DEBUGSTR("Stop before exit.");
+        }
 
         if(ws->det->foil) { /* Energy loss in detector foil */
             depth d_foil = {.i = 0, .x = 0.0};
@@ -360,9 +373,9 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
                 crossed + skipped
                 );
         assert(!isnan(ion1.E));
-        if(product_and_incident_go_in_different_directions && b->E < ws->emin) { /* Reaction product energy decreases as incident ion energy decreases */
+        if(product_and_incident_go_in_different_directions && b->E < sim_r->emin) { /* Reaction product energy decreases as incident ion energy decreases */
             sim_r->last_brick = i_brick;
-            DEBUGMSG("Brick E = %g keV sufficiently below emin.", b->E / C_KEV);
+            DEBUGMSG("Brick E = %g keV sufficiently below emin %g keV.", b->E / C_KEV, sim_r->emin / C_KEV);
             break;
         }
         if(ion1.inverse_cosine_theta > 0.0 && d_after.x >= sim_r->max_depth) {
