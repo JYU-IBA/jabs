@@ -20,6 +20,8 @@ typedef struct fit_params {
     size_t n; /* Number of function parameters */
     size_t n_active; /* Recalculated by fit_params_update() */
     fit_variable *vars; /* Note that this is NOT an array of pointers. It has n elements. */
+    size_t n_active_iter_call;
+    fit_variable **vars_active_iter_call; /* This IS an array of pointers to vars. It has up to n_active elements, of which n_active_iter_call are set. It is allocated by fit_params_update() and it is meaningful during fitting. */
 } fit_params;
 
 fit_params *fit_params_new();

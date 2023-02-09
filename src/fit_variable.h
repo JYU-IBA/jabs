@@ -20,7 +20,7 @@ typedef struct fit_variable {
     double *value; /* Pointer to a value. This is not allocated or free'd by fitting related methods. */
     double value_orig;
     double value_final;
-    double value_iter;
+    double value_iter; /* On first call of fit_function(), store *value to this */
     double err; /* Error estimate of fit will be stored here. */
     double err_rel; /* Relative error */
     double sigmas; /* Change, relative to error */
@@ -28,6 +28,7 @@ typedef struct fit_variable {
     const char *unit;
     double unit_factor;
     int active; /* Set to FALSE by default, if this variable is to be used it should be set to TRUE */
+    int active_iter_call; /* The *value is different from value_iter, i.e. the value is being changed by the fit algorithm */
     size_t i_v; /* Index in fit */
 } fit_variable;
 

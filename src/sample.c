@@ -473,6 +473,17 @@ void sample_thickness_recalculate(sample *sample) {
     sample->thickness = sample->ranges[sample->n_ranges - 1].x;
 }
 
+size_t sample_number_of_rough_ranges(const sample *sample) {
+    if(!sample)
+        return 0;
+    size_t n = 0;
+    for(size_t i = 0; i < sample->n_ranges; i++) {
+        if(sample->ranges[i].rough.model != ROUGHNESS_NONE)
+            n++;
+    }
+    return n;
+}
+
 sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
     FILE *in;
     if(!filename)

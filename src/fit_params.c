@@ -31,6 +31,7 @@ int fit_params_update(fit_params *p) {
     if(!p)
         return EXIT_FAILURE;
     p->n_active = 0;
+    p->n_active_iter_call = 0;
     for(size_t i = 0; i < p->n; i++) { /* Count number of active variables and assign index numbers */
         if(p->vars[i].active) {
             for(size_t j = 0; j < i; j++) { /* Check if this *active* variable is a duplicate (earlier active variable has the same value) */
@@ -46,6 +47,12 @@ int fit_params_update(fit_params *p) {
         } else {
             p->vars[i].i_v = p->n; /* Intentionally invalid index */
         }
+    }
+    free(p->vars_active_iter_call);
+    if(p->n_active) {
+        p->vars_active_iter_call = calloc(p->n_active, sizeof(fit_variable *));
+    } else {
+        p->vars_active_iter_call = NULL;
     }
     return EXIT_SUCCESS;
 }
@@ -64,10 +71,17 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
     p->vars = realloc(p->vars, sizeof(fit_variable) * p->n);
     fit_variable *var = &(p->vars[p->n - 1]);
     var->value = value;
+    var->value_final = 0.0;
+    var->value_iter = 0.0;
+    var->err = 0.0;
+    var->err_rel = 0.0;
+    var->sigmas = 0.0;
     var->name = strdup_non_null(name);
     var->unit = unit;
     var->unit_factor = unit_factor;
     var->active = FALSE;
+    var->active_iter_call = FALSE;
+    var->i_v = 0;
     DEBUGMSG("Fit parameter %s added successfully (total %zu).", var->name, p->n);
     return EXIT_SUCCESS;
 }

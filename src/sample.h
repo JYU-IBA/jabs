@@ -81,11 +81,12 @@ size_t sample_model_element_count(const sample_model *sm);
 void sample_model_free(sample_model *sm);
 sample *sample_from_sample_model(const sample_model *sm);
 int sample_model_print(const char *filename, const sample_model *sm);
-size_t sample_model_number_of_rough_ranges(const sample_model *sm);
+size_t sample_model_number_of_rough_ranges(const sample_model *sm); /* May change to real sample, since minor roughness can be neglected. */
 size_t sample_model_number_of_ranges_with_bragg_or_stragg_corrections(const sample_model *sm);
 size_t sample_model_number_of_ranges_with_yield_corrections(const sample_model *sm);
 size_t sample_model_number_of_range_with_non_zero_density(const sample_model *sm);
 void sample_thickness_recalculate(sample *sample);
+size_t sample_number_of_rough_ranges(const sample *sample);
 
 depth depth_seek(const sample *sample, double x);
 inline double depth_diff(const depth a, const depth b) {

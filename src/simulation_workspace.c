@@ -187,18 +187,20 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
 }
 
 void sim_workspace_calculate_sum_spectra(sim_workspace *ws) {
-    double sum;
-    for(size_t i = 0; i < ws->histo_sum->n; i++) {
-        sum = 0.0;
-        for(size_t j = 0; j < ws->n_reactions; j++) {
-            if(ws->reactions[j]->histo && i < ws->reactions[j]->histo->n)
-                sum += ws->reactions[j]->histo->bin[i];
+    for(size_t j = 0; j < ws->n_reactions; j++) {
+        sim_reaction *sim_r = ws->reactions[j];
+        if(sim_r->n_convolution_calls == 0 || !sim_r->histo) {
+            continue;
         }
-        ws->histo_sum->bin[i] = sum;
+        size_t n = GSL_MIN(ws->histo_sum->n, sim_r->histo->n);
+        for(size_t i = 0; i < n; i++) {
+            ws->histo_sum->bin[i] += sim_r->histo->bin[i];
+        }
     }
 }
 
 void sim_workspace_histograms_reset(sim_workspace *ws) {
+    gsl_histogram_reset(ws->histo_sum);
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = ws->reactions[i];
         if(!r)
@@ -224,7 +226,7 @@ size_t sim_workspace_histograms_calculate(sim_workspace *ws) {
         bricks_calculate_sigma(ws->det, r->p.isotope, r->bricks, r->last_brick);
         const calibration *c = detector_get_calibration(ws->det, r->p.Z);
 #ifdef DEBUG_BRICK_OUTPUT
-        fprintf(stdout, "BRICK #Reaction %zu: %s\n", i + 1, r->r->name);
+        fprintf(stdout, "BRICK #Reaction %zu: %s, last brick %zu\n", i + 1, r->r->name, r->last_brick);
 #endif
         bricks_convolute(r->histo, c, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->emin, ws->params->gaussian_accurate);
 #ifdef DEBUG_BRICK_OUTPUT
@@ -242,7 +244,7 @@ size_t sim_workspace_histograms_calculate(sim_workspace *ws) {
 void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = ws->reactions[i];
-        if(!r)
+        if(!r || !r->histo)
             continue;
         gsl_histogram_scale(r->histo, scale);
     }

@@ -12,7 +12,9 @@ extern inline double erf_Q_fast(double x) { /* Approximative gaussian CDF */
 
 void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, brick *bricks, size_t last_brick) {
     for(size_t i = 0; i <= last_brick; i++) {
+        //double old = bricks[i].S_sum;
         bricks[i].S_sum = sqrt(bricks[i].S + detector_resolution(det, isotope, bricks[i].E) + bricks[i].S_geo_x + bricks[i].S_geo_y);
+        //fprintf(stderr, " %zu: old S_sum = %.12g keV, new = %.12g keV\n", i, old / C_KEV, bricks[i].S_sum / C_KEV);
     }
 }
 

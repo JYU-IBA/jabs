@@ -44,19 +44,17 @@
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     struct fit_data *fit = (struct fit_data *) params;
     fit->stats.iter_call++;
+    DEBUGMSG("Fit iteration %zu call %zu\n", fit->stats.iter, fit->stats.iter_call);
     if(fit_parameters_set_from_vector(fit, x)) {
         return GSL_FAILURE;
     }
-    fit_variable *var_active = fit_get_active_variable(fit); /* May return NULL */
-    DEBUGMSG("Iter %zu (call %zu). var_active = %p (%s)", fit->stats.iter, fit->stats.iter_call, (void *)var_active, var_active ? var_active->name : "none");
 
-#ifndef NO_SPEEDUP
-    int ret = fit_speedup(fit, var_active);
+#if 1
+    int ret = fit_speedup(fit);
     if(ret == GSL_FAILURE) {
         fit->stats.error = FIT_ERROR_IMPOSSIBLE;
         return GSL_FAILURE;
     } else if(ret != FALSE) { /* Success */
-        fit->stats.n_evals_iter++;
         fit->stats.n_speedup_evals++;
         fit->stats.error = fit_set_residuals(fit, f);
         if(fit->stats.error) {
@@ -67,7 +65,6 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     } /* ret == 0, continue with full simulation,no speedup available for this fit variable */
 #endif
 
-    DEBUGSTR("Full simulation will be performed.");
     sample_free(fit->sim->sample);
     fit->sim->sample = NULL;
     fit_data_workspaces_free(fit);
@@ -112,6 +109,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
 
     if(fit->stats.iter_call == 1) { /* First call of iter, store sum histograms to fit */
         fit_data_histo_sum_store(fit);
+        fit->magic_bricks = TRUE;
     }
     fit->stats.error = fit_set_residuals(fit, f);
     if(fit->stats.error) {
@@ -130,69 +128,69 @@ int fit_sanity_check(const fit_data *fit) {
     return GSL_SUCCESS;
 }
 
-fit_variable *fit_get_active_variable(const fit_data *fit) { /* Which variable is being varied (if only one!) by the fit algorithm in this particular call inside an iteration (compared to first call (== 0)) */
-    if(fit->stats.iter_call == 1) {
-        return NULL;
-    }
-    fit_variable *var_active = NULL;
-    size_t i_v = 0;
-    DEBUGMSG("This is iter call %zu (when numbering starts from zero), there are %zu active variables.", fit->stats.iter_call, fit->fit_params->n_active);
-    for(size_t i = 0; i < fit->fit_params->n; i++) {
-        fit_variable *var = &fit->fit_params->vars[i];
-        if(!var->active) {
-            continue;
-        }
-        double val = *(var->value);
-        if(val != var->value_iter) {
-            double ratio = val / var->value_iter;
-            if(var_active == NULL) {
-                DEBUGMSG("Fit variable candidate %s. Varied by %.12lf (rel %e), compared to original: %.12lf.", var->name, ratio, ratio - 1.0, val / var->value_orig);
-                var_active = var;
-            } else { /* var_active already set */
-                DEBUGMSG("Another variable %s varied by %.12lf (rel %e). Ignoring candidate.", var->name, ratio, ratio - 1.0);
-                var_active = NULL;
-                break;
-            }
-        }
-
-        i_v++;
-    }
-#if DEBUG_VERBOSE
-    i_v = 0;
-    for(size_t i = 0; i < fit->fit_params->n; i++) {
-        fit_variable *var = &fit->fit_params->vars[i];
-        if(!var->active) {
-            continue;
-        }
-        double val = *(var->value);
-        DEBUGVERBOSEMSG("i = %zu, i_v = %zu, var->i_v = %zu, name %s, value %g, ratio to original %lf, ratio to iter %lf\n", i, i_v, var->i_v, var->name, val, val / var->value_orig,val / var->value_iter);
-        i_v++;
-    }
-#endif
-    DEBUGMSG("Returning %s.", var_active ? var_active->name : "NULL");
-    return var_active;
-}
-
-int fit_speedup(fit_data *fit, const fit_variable *var) { /* Returns < 0 on failure, FALSE if speedup is not possible and TRUE if speedup was ok (and sum spectra have been calculated) */
+int fit_speedup(fit_data *fit) { /* Returns < 0 on failure, FALSE if speedup is not possible and TRUE if speedup was ok (and sum spectra have been calculated) */
     assert(fit);
-    if(!var) {
+    size_t n_active = fit->fit_params->n_active_iter_call;
+    if(n_active == 0) {
+        DEBUGSTR("No active fit parameters (those being varied during this call)! This is normal on first call of the iteration, but not after that.");
         return FALSE;
     }
-    if(var->value == &fit->sim->fluence) { /* Variable is fluence, scale histograms */
-        if(fit_speedup_fluence(fit, var)) {
+    fit_variable **vars = fit->fit_params->vars_active_iter_call;
+    if(!vars) {
+        return FALSE;
+    }
+    if(n_active == 1 && vars[0]->value == &fit->sim->fluence) { /* Only one variable and it is fluence, just scale histograms */
+        if(fit_speedup_fluence(fit, vars[0])) {
             return GSL_FAILURE;
         }
         return TRUE;
     }
-    for(size_t i_ws = 0; i_ws < fit->n_ws; i_ws++) {
+    return FALSE;
+    for(size_t i_ws = 0; i_ws < fit->n_ws; i_ws++) { /* Try to figure out if (re-)convoluting the spectra is enough (for a workspace) */
         sim_workspace *ws = fit->ws[i_ws];
+        if(ws->params->ds) { /* Reconvolution needs nice bricks. DS breaks them. */
+            continue;
+        }
+        if(sample_number_of_rough_ranges(ws->sample) != 0) {  /* Reconvolution needs nice bricks. Roughness breaks them. */
+            continue;
+        }
+        if(!fit->magic_bricks) { /* Sadly, we can only do speedups if magic (bricks were created by the first call of the iteration) is preserved. */
+            continue;
+        }
+        size_t n_cal_params_active = 0; /* In this workspace! */
         calibration *cal = ws->det->calibration;
         size_t n_cal_param = calibration_get_number_of_params(cal);
-        for(size_t i = 0; i < n_cal_param; i++) {
-            double *calparam = calibration_get_param_ref(cal, i);
-            if(var->value == calparam) {
-                /* We have a chance to speed up here (to some default calibration parameter), return TRUE if/when computation is done */
+        for(int i_cal_param = CALIBRATION_PARAM_RESOLUTION; i_cal_param < (int) n_cal_param; i_cal_param++) {
+            double *calparam = calibration_get_param_ref(cal, i_cal_param);
+            for(size_t i_var = 0; i_var < n_active; i_var++) {
+                if(vars[i_var]->value == calparam) {
+                    //fprintf(stderr, "Variable %s is a good match with detector calibration parameter %i\n", vars[i_var]->name, i_cal_param);
+                    n_cal_params_active++;
+                }
             }
+        }
+        if(n_active == n_cal_params_active) { /* Just reconvolution is enough. */
+            fprintf(stderr, "Just reconvoluting, since out of %zu parameters being varied, all %zu are related to workspace %zu detector calibration. These are their names:\n", n_active, n_cal_params_active, i_ws + 1);
+            for(size_t i_var = 0; i_var < n_active; i_var++) {
+                fit_variable *var = vars[i_var];
+                fprintf(stderr, " %s, being currently %g (%g keV maybe), and being varied by %e\n", var->name, *(var->value),  *(var->value)/C_KEV, ((*var->value)/var->value_iter) - 1.0);
+            }
+            fprintf(stderr, "\n");
+            double sum_before = gsl_histogram_sum(ws->histo_sum);
+            if(detector_sanity_check(ws->det, ws->n_channels) != 0) {
+                fprintf(stderr, "Detector failed sanity check.\n");
+                return GSL_FAILURE;
+            }
+            sim_workspace_histograms_reset(ws);
+            detector_update(sim_det(fit->sim, i_ws)); /* ws->det is const, workaround. This should update the resolution variance if det->resolution is changed */
+            sim_workspace_histograms_calculate(ws); /* This uses old bricks, hopefully they are valid! (with roughness or DS probably not!) */
+            sim_workspace_calculate_sum_spectra(ws);
+            double sum_after = gsl_histogram_sum(ws->histo_sum);
+            fprintf(stderr, "Sum before %.12g, sum after %.12g\n", sum_before, sum_after);
+            return TRUE;
+        } else {
+            //fprintf(stderr, "Doin nothing, since %zu != %zu, i_ws = %zu\n", n_active, n_cal_params_active, i_ws + 1);
+            return FALSE;
         }
     }
     return FALSE;
@@ -200,12 +198,15 @@ int fit_speedup(fit_data *fit, const fit_variable *var) { /* Returns < 0 on fail
 
 int fit_speedup_fluence(struct fit_data *fit, const fit_variable *var) {
     double scale = *(var->value) / var->value_iter;
-    DEBUGMSG("Varying fluence (iter %zu, call %zu) by %12.10lf (variable %s).\n", fit->stats.iter, fit->stats.iter_call, scale, var->name);
+    //fprintf(stderr, "Varying fluence (iter %zu, call %zu) by %12.10lf (variable %s).\n", fit->stats.iter, fit->stats.iter_call, scale, var->name);
     assert(scale != 1.0);
     for(size_t i = 0; i < fit->n_ws; i++) {
         sim_workspace *ws = fit_data_ws(fit, i);
+        //fprintf(stderr, "Histo sum before %.12g\n", gsl_histogram_sum(ws->histo_sum));
+        gsl_histogram_reset(ws->histo_sum);
         sim_workspace_histograms_scale(ws, scale);
         sim_workspace_calculate_sum_spectra(ws);
+        //fprintf(stderr, "Histo sum after %.12g\n", gsl_histogram_sum(ws->histo_sum));
     }
     return GSL_SUCCESS;
 }
@@ -245,21 +246,43 @@ int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f) {
 }
 
 int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x) {
+    fit->fit_params->n_active_iter_call = 0;
+    DEBUGMSG("Fit iteration has %zu active parameters from a total of %zu possible.", fit->fit_params->n_active, fit->fit_params->n)
     for(size_t i = 0; i < fit->fit_params->n; i++) {
         fit_variable *var = &fit->fit_params->vars[i];
-        if(var->active) {
-            if(!isfinite(*(var->value))) {
-                DEBUGMSG("Fit iteration %zu, call %zu, fit variable %zu (%s) is not finite.", fit->stats.iter, fit->stats.iter_call, var->i_v, var->name);
-                fit->stats.error = FIT_ERROR_SANITY;
-                return GSL_FAILURE;
-            }
-            *(var->value) = gsl_vector_get(x, var->i_v);
-            if(fit->stats.iter_call == 1) { /* Store the value of fit parameters at the first function evaluation */
-                var->value_iter = *(var->value);
-            }
-            DEBUGMSG("  i_v=%zu orig=%12.10lf iter=%12.10lf", var->i_v, *(var->value)/var->value_orig, *(var->value)/var->value_iter);
+        if(!var->active) {
+            var->active_iter_call = FALSE; /* Not active variables can never be active. */
+            continue;
+        }
+        if(!isfinite(*(var->value))) {
+            DEBUGMSG("Fit iteration %zu, call %zu, fit variable %zu (%s) is not finite.", fit->stats.iter, fit->stats.iter_call, var->i_v, var->name);
+            fit->stats.error = FIT_ERROR_SANITY;
+            return GSL_FAILURE;
+        }
+        *(var->value) = gsl_vector_get(x, var->i_v);
+        if(fit->stats.iter_call == 1) { /* Store the value of fit parameters at the first function evaluation */
+            var->value_iter = *(var->value);
+            var->active_iter_call = FALSE;
+        } else if(var->value_iter != *(var->value)) { /* On subsequent calls, value can be changed from stored value by the fitting algorithm */
+            var->active_iter_call = TRUE;
+            fit->fit_params->n_active_iter_call++;
+            DEBUGMSG(" %s  i_v=%zu orig=%12.10lf iter=%12.10lf", var->name, var->i_v, *(var->value) / var->value_orig, *(var->value) / var->value_iter);
+        } else { /* Or not. */
+            var->active_iter_call = FALSE;
+        }
+
+    }
+    DEBUGMSG("Fit iteration has %zu parameters that are being varied this function call.", fit->fit_params->n_active_iter_call)
+    assert(fit->fit_params->n_active_iter_call <= fit->fit_params->n_active);
+    size_t i_active_iter = 0;
+    for(size_t i = 0; i < fit->fit_params->n; i++) {
+        fit_variable *var = &fit->fit_params->vars[i];
+        if(var->active_iter_call) {
+            fit->fit_params->vars_active_iter_call[i_active_iter] = var;
+            i_active_iter++;
         }
     }
+    assert(fit->fit_params->n_active_iter_call == i_active_iter);
     return GSL_SUCCESS;
 }
 
@@ -603,6 +626,7 @@ size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_d
 
 sim_workspace *fit_data_workspace_init(fit_data *fit, size_t i_det) {
     detector *det = sim_det(fit->sim, i_det);
+    detector_update(det); /* Necessary for workspace_init, which in turn is necessary to get number of channels for sanity check, which would be useful for detector_update... */
     sim_workspace *ws = sim_workspace_init(fit->jibal, fit->sim, det);
     if(!ws) {
         jabs_message(MSG_ERROR, stderr, "Workspace (detector %zu) failed to initialize!\n", i_det + 1);
@@ -612,7 +636,6 @@ sim_workspace *fit_data_workspace_init(fit_data *fit, size_t i_det) {
         jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!\n", i_det + 1);
         return NULL;
     }
-    detector_update(det);
     spectrum_set_calibration(fit_data_exp(fit, i_det), det->calibration); /* Update the experimental spectra calibration (using default calibration) */
     return ws;
 }
@@ -636,7 +659,9 @@ int fit_data_workspaces_init(fit_data *fit) {
 }
 
 void fit_data_workspaces_free(struct fit_data *fit_data) {
+    assert(fit_data);
     if(!fit_data->ws) {
+        fit_data->n_ws = 0;
         return;
     }
     for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
@@ -723,6 +748,7 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
             chisq_dof_old = fit_data->stats.chisq_dof;
             fit_data->stats.cputime_iter = 0.0;
             fit_data->stats.n_evals_iter = 0;
+            fit_data->magic_bricks = FALSE;
             status = gsl_multifit_nlinear_iterate(w);
             DEBUGMSG("Iteration status %i (%s)", status, gsl_strerror(status));
         }
@@ -760,7 +786,8 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
 void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspace *w, const gsl_multifit_nlinear_fdf *fdf) {
     jabs_message(MSG_INFO, stderr, "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
     jabs_message(MSG_INFO, stderr, "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
-    jabs_message(MSG_INFO, stderr, "function evaluations: %zu, of which %zu were not full evaluations (speedup)\n", fit->stats.n_evals, fit->stats.n_speedup_evals);
+    jabs_message(MSG_INFO, stderr, "function evaluations: %zu\n", fit->stats.n_evals);
+    jabs_message(MSG_INFO, stderr, "function evaluations (speedup): %zu\n", fit->stats.n_speedup_evals);
 #ifdef DEBUG
     jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf->nevalf);
 #endif
