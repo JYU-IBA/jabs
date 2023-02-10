@@ -651,7 +651,8 @@ int simulate_with_roughness(sim_workspace *ws) {
 
 int simulate_with_ds(sim_workspace *ws) {
     if(!ws) {
-        jabs_message(MSG_ERROR, stderr, "No workspace, no simulation.\n");
+        jabs_message(MSG_ERROR, stderr, "Congratulations, you've found a bug in %s.", __LINE__);
+        abort();
         return EXIT_FAILURE;
     }
     double fluence = ws->fluence;

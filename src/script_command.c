@@ -117,7 +117,10 @@ int script_prepare_sim_or_fit(script_session *s) {
     sim_prepare_reactions(fit->sim, fit->jibal->isotopes, fit->jibal->gsto);
     reactions_print(fit->sim->reactions, fit->sim->n_reactions);
     fit->n_ws = fit->sim->n_det;
+    fit->n_ws_active = 0;
     fit->ws = calloc(fit->n_ws, sizeof(sim_workspace *));
+    fit->ws_val = calloc(fit->n_ws, sizeof(fit_data_workspace_val *));
+    fit->ws_active = calloc(fit->n_ws, sizeof(sim_workspace *));
     s->start = jabs_clock();
     return 0;
 }
@@ -225,8 +228,6 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
         jabs_message(MSG_ERROR, stderr, fit_usage);
         return SCRIPT_COMMAND_FAILURE;
     }
-
-
 
     jabs_message(MSG_INFO, stderr, "%zu fit parameters possible, %zu active.\n", fit_data->fit_params->n, fit_data->fit_params->n_active);
     if(!fit_data->exp) { /* TODO: not enough to check this */

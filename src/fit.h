@@ -69,6 +69,10 @@ typedef struct roi {
     size_t high;
 } roi;
 
+typedef struct fit_data_workspace_val {
+    int active_iter_call; /* Workspace should be (re)simulated */
+} fit_data_workspace_val;
+
 typedef struct fit_data {
     gsl_histogram **exp; /* experimental data to be fitted, array of n_exp elements */
     size_t n_exp; /* same as sim->n_det, but this keeps track on how many spectra we have allocated in exp and ref */
@@ -78,7 +82,10 @@ typedef struct fit_data {
     sample_model *sm;
     fit_params *fit_params; /* Allocated with fit_data_new() and freed by fit_data_free() */
     sim_workspace **ws; /* Allocated and leaked by fitting function! An array of n_ws. */
+    fit_data_workspace_val *ws_val; /* Fitting and workspace (ws above) related (temporary) values, that are not fit parameters */
     size_t n_ws;
+    sim_workspace **ws_active; /* Same pointers as in ws, but n_ws_active ( < n_ws). Note that ws[i] != ws_active[i] unless all workspaces are active! */
+    size_t n_ws_active;
     struct roi *fit_ranges; /* Array of fit_range, size n_fit_ranges, freed by fit_data_free() */
     size_t n_fit_ranges;
     size_t n_iters_max; /* Maximum number of iterations, in each fit phase */
@@ -89,8 +96,9 @@ typedef struct fit_data {
     struct fit_stats stats; /* Fit statistics, updated as we iterate */
     int phase_start; /* Fit phase to start from (see FIT_PHASE -defines) */
     int phase_stop; /* Inclusive */
-    gsl_histogram **histo_sum_iter; /* Array of histograms, updates every iter. */
-    size_t n_histo_sum;
+    gsl_histogram **histo_sum_iter; /* Array of histograms (n_ws, one for each workspace), updates every iter. */
+    size_t n_histo_sum; /* n_ws when histograms were copied */
+    gsl_vector *f_iter; /* Residuals on first iter */
     int (*fit_iter_callback)(struct fit_stats stats);
     int magic_bricks;
 } fit_data;
@@ -124,10 +132,12 @@ void fit_covar_print(const gsl_matrix *covar);
 
 int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x); /* Updates values in fit params as they are varied by the fit algorithm. */
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
+int fit_init_active_workspaces(fit_data *fit);
 int fit_sanity_check(const fit_data *fit);
 int fit_speedup(fit_data *fit);
 int fit_speedup_fluence(struct fit_data *fit, const fit_variable *var);
-int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f);
+int fit_set_residuals_detector(const fit_data *fit, gsl_vector *f, size_t i_det);
+int fit_set_residuals(const fit_data *fit, gsl_vector *f);
 void fit_iter_stats_update(struct fit_data *params, const gsl_multifit_nlinear_workspace *w);
 void fit_iter_stats_print(const struct fit_stats *stats);
 void fit_stats_print(FILE *f, const struct fit_stats *stats);
