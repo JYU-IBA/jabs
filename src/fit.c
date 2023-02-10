@@ -820,7 +820,7 @@ int fit(struct fit_data *fit_data) {
     gsl_multifit_nlinear_parameters fdf_params = gsl_multifit_nlinear_default_parameters();
     fdf_params.trs = gsl_multifit_nlinear_trs_lm;
     fdf_params.solver = gsl_multifit_nlinear_solver_qr;
-    fdf_params.h_df = sqrt(GSL_DBL_EPSILON) * 100.0;
+    fdf_params.h_df = sqrt(GSL_DBL_EPSILON) * 10.0;
     struct fit_params *fit_params = fit_data->fit_params;
     if(!fit_params || fit_params->n_active == 0) {
         jabs_message(MSG_ERROR, stderr, "No parameters to fit.\n");
