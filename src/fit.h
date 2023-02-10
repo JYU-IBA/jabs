@@ -49,6 +49,8 @@ struct fit_stats {
     int phase;
     size_t n_evals;
     size_t n_evals_iter; /* Number of function evaluations per iteration */
+    size_t n_workspaces;
+    size_t n_workspaces_iter; /* Number of workspaces (detectors) actually simulated per iteration */
     size_t n_speedup_evals;
     size_t n_speedup_evals_iter;
     double cputime_cumul;

@@ -48,13 +48,10 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
         return GSL_FAILURE;
     }
 
-
-    fprintf(stderr, "Fit iteration %zu call %zu. Size of vector x: %zu, f: %zu. Of %zu active fit parameters, %zu are being varied this function call.\n",
+    DEBUGMSG("Fit iteration %zu call %zu. Size of vector x: %zu, f: %zu. Of %zu active fit parameters, %zu are being varied this function call.",
             fit->stats.iter, fit->stats.iter_call, x->size, f->size, fit->fit_params->n_active, fit->fit_params->n_active_iter_call);
 
-
-
-#if 0
+#if 0 /* Effect of varying some parameters (if only one at a time) can be easily "simulated", e.g. varying fluence. This code is for that. Workspace initialization has changed, so this no longer works without modifications. */
     int ret = fit_speedup(fit);
     if(ret == GSL_FAILURE) {
         fit->stats.error = FIT_ERROR_IMPOSSIBLE;
@@ -114,12 +111,13 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     double end = jabs_clock();
     fit->stats.cputime_iter += (end - start);
     fit->stats.n_evals_iter++;
+    fit->stats.n_workspaces_iter += fit->n_ws_active;
     if(fit->n_ws == fit->n_ws_active) { /* All workspaces were active, just set f vector */
         fit->stats.error = fit_set_residuals(fit, f);
-        fprintf(stderr, "Set residuals for all workspaces.\n");
+        DEBUGMSG("Set residuals for all workspaces.");
         if(fit->stats.iter_call == 1) { /* First call of iter, store sum histograms and f vector to fit */
             fit_data_histo_sum_store(fit);
-            fprintf(stderr, "First call of iter, storing f vector.\n");
+            DEBUGMSG("First call of iter, storing f vector.");
             gsl_vector_memcpy(fit->f_iter, f);
             fit->magic_bricks = TRUE;
         }
@@ -129,7 +127,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     } else { /* Partial update, copy stored f vector and update only stuff we just simulated */
         assert(fit->stats.iter_call > 1);
         gsl_vector_memcpy(f, fit->f_iter);
-        fprintf(stderr, "Set residuals for some workspaces.\n");
+        DEBUGMSG("Set residuals for some workspaces.");
         for(size_t i_ws = 0; i_ws < fit->n_ws; i_ws++) {
             if(fit->ws_val[i_ws].active_iter_call) {
                 fit->stats.error = fit_set_residuals_detector(fit, f, i_ws); /* i_ws instead of ws, because exp is stored in fit->exp array */
@@ -139,7 +137,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
             }
         }
     }
-    fprintf(stderr, "Successful fit function call.\n\n");
+    DEBUGMSG("Successful fit function call.");
     return GSL_SUCCESS;
 }
 
@@ -168,14 +166,11 @@ int fit_init_active_workspaces(fit_data *fit) {
     }
     for(size_t i = 0; i < fit->fit_params->n_active_iter_call; i++) { /* Print active variables */
         fit_variable *var = fit->fit_params->vars_active_iter_call[i];
-        fprintf(stderr, "    %zu/%zu: %26s (%18.12g, first call %18.12g, rel %18.12e)\n",
+        DEBUGMSG("    %zu/%zu: %26s (%18.12g, first call %18.12g, rel %18.12e)",
                 i + 1, fit->fit_params->n_active_iter_call, var->name, *(var->value), var->value_iter, *(var->value) / var->value_iter - 1.0);
-        if(i == fit->fit_params->n_active_iter_call - 1) {
-            fprintf(stderr, "\n");
-        }
     }
 
-    fprintf(stderr, "Active workspaces:");
+    DEBUGMSG("Active workspaces:");
     fit->n_ws_active = 0;
     for(size_t i_ws = 0; i_ws < fit->n_ws; i_ws++) { /* Count number of active workspaces, fill an array of them */
         fit_data_workspace_val *v = &fit->ws_val[i_ws];
@@ -186,16 +181,12 @@ int fit_init_active_workspaces(fit_data *fit) {
             }
             fit->ws_active[fit->n_ws_active] = fit->ws[i_ws];
             fit->n_ws_active++;
-            fprintf(stderr, " WS%zu", i_ws + 1);
+            DEBUGMSG("WS%zu", i_ws + 1);
         } else {
-            if(fit->ws[i_ws] != NULL) {
-                fprintf(stderr, "\nWorkspace %zu / %zu is not null! It should be!\n", i_ws + 1, fit->n_ws);
-            }
             assert(fit->ws[i_ws] == NULL); /* These should have been reset */
         }
     }
-    fprintf(stderr, " (total %zu out of %zu)\n\n", fit->n_ws_active, fit->n_ws);
-
+    DEBUGMSG("total %zu out of %zu workspaces.", fit->n_ws_active, fit->n_ws);
     return 0;
 }
 
@@ -413,6 +404,7 @@ void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear
     fit_data->stats.norm = gsl_blas_dnrm2(f);
     fit_data->stats.chisq_dof = fit_data->stats.chisq / fit_data->dof;
     fit_data->stats.n_evals += fit_data->stats.n_evals_iter;
+    fit_data->stats.n_workspaces += fit_data->stats.n_workspaces_iter;
     fit_data->stats.n_speedup_evals += fit_data->stats.n_speedup_evals_iter;
     fit_data->stats.cputime_cumul += fit_data->stats.cputime_iter;
 }
@@ -420,7 +412,7 @@ void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear
 void fit_iter_stats_print(const struct fit_stats *stats) {
     jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %11zu | %9zu | %10.3lf | %9.1lf |\n",
                  stats->iter, 1.0 / stats->rcond, stats->norm,
-                 stats->chisq_dof, stats->n_evals, stats->n_speedup_evals,
+                 stats->chisq_dof, stats->n_evals, stats->n_workspaces,
                  stats->cputime_cumul, 1000.0 * stats->cputime_iter / stats->n_evals_iter);
 }
 
@@ -816,6 +808,8 @@ struct fit_stats fit_stats_init() {
     struct fit_stats s;
     s.n_evals = 0;
     s.n_evals_iter = 0;
+    s.n_workspaces = 0;
+    s.n_workspaces_iter = 0;
     s.n_speedup_evals = 0;
     s.n_speedup_evals_iter = 0;
     s.cputime_cumul = 0.0;
@@ -879,7 +873,7 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
     int status = 0;
     size_t iter;
     double chisq_dof_old;
-    jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | evaluations | fast eval | time cumul | time eval |\n");
+    jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | evaluations |   spectra | time cumul | time eval |\n");
     jabs_message(MSG_INFO, stderr, "     |              |                |              |  cumulative | cumulative|          s |        ms |\n");
     for(iter = 0; iter <= maxiter; iter++) {
         fit_data->stats.iter_call = 0;
@@ -888,6 +882,7 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
             chisq_dof_old = fit_data->stats.chisq_dof;
             fit_data->stats.cputime_iter = 0.0;
             fit_data->stats.n_evals_iter = 0;
+            fit_data->stats.n_workspaces_iter = 0;
             fit_data->magic_bricks = FALSE;
             status = gsl_multifit_nlinear_iterate(w);
             DEBUGMSG("Iteration status %i (%s)", status, gsl_strerror(status));
@@ -927,7 +922,7 @@ void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspac
     jabs_message(MSG_INFO, stderr, "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
     jabs_message(MSG_INFO, stderr, "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
     jabs_message(MSG_INFO, stderr, "function evaluations: %zu\n", fit->stats.n_evals);
-    jabs_message(MSG_INFO, stderr, "function evaluations (speedup): %zu\n", fit->stats.n_speedup_evals);
+    jabs_message(MSG_INFO, stderr, "number of spectra simulated: %zu\n", fit->stats.n_workspaces);
 #ifdef DEBUG
     jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf->nevalf);
 #endif
@@ -958,8 +953,8 @@ int fit(struct fit_data *fit_data) {
     gsl_multifit_nlinear_workspace *w;
     gsl_multifit_nlinear_parameters fdf_params = gsl_multifit_nlinear_default_parameters();
     fdf_params.trs = gsl_multifit_nlinear_trs_lm;
-    fdf_params.solver = gsl_multifit_nlinear_solver_svd;
-    //fdf_params.h_df = sqrt(GSL_DBL_EPSILON) * 10.0;
+    fdf_params.solver = gsl_multifit_nlinear_solver_qr;
+    fdf_params.h_df = sqrt(GSL_DBL_EPSILON) * 10.0;
     struct fit_params *fit_params = fit_data->fit_params;
     if(!fit_params || fit_params->n_active == 0) {
         jabs_message(MSG_ERROR, stderr, "No parameters to fit.\n");
