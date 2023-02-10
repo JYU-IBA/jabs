@@ -30,6 +30,7 @@ typedef struct fit_variable {
     int active; /* Set to FALSE by default, if this variable is to be used it should be set to TRUE */
     int active_iter_call; /* The *value is different from value_iter, i.e. the value is being changed by the fit algorithm */
     size_t i_v; /* Index in fit */
+    size_t i_det; /* For detector parameters, [0,sim->n_det). Set to sim->n_det or higher to mean all workspaces. */
 } fit_variable;
 
 #endif // JABS_FIT_VARIABLE_H

@@ -55,6 +55,9 @@ int script_prepare_sim_or_fit(script_session *s) {
     }
     fit_data_histo_sum_free(fit);
     fit_data_workspaces_free(s->fit);
+    free(s->fit->ws);
+    s->fit->ws = NULL;
+    s->fit->n_ws = 0;
     sample_free(fit->sim->sample);
     DEBUGSTR("Original sample model:");
     sample_model_print(NULL, fit->sm);
@@ -116,7 +119,8 @@ int script_prepare_sim_or_fit(script_session *s) {
     }
     sim_prepare_reactions(fit->sim, fit->jibal->isotopes, fit->jibal->gsto);
     reactions_print(fit->sim->reactions, fit->sim->n_reactions);
-
+    fit->n_ws = fit->sim->n_det;
+    fit->ws = calloc(fit->n_ws, sizeof(sim_workspace *));
     s->start = jabs_clock();
     return 0;
 }
@@ -214,16 +218,19 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
         return SCRIPT_COMMAND_FAILURE;
     }
     if(fit_params_update(p_all)) {
-        jabs_message(MSG_ERROR, stderr, "Error in updating fit params. Do you have duplicates?\n");
+        jabs_message(MSG_ERROR, stderr, "Error in checking fit parameters.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    fit_params_print(p_all, TRUE, NULL);
+    fit_params_print(p_all, TRUE, NULL, fit_data->sim->n_det);
     fit_data->fit_params = p_all;
 
     if(fit_data->fit_params->n_active == 0) {
         jabs_message(MSG_ERROR, stderr, fit_usage);
         return SCRIPT_COMMAND_FAILURE;
     }
+
+
+
     jabs_message(MSG_INFO, stderr, "%zu fit parameters possible, %zu active.\n", fit_data->fit_params->n, fit_data->fit_params->n_active);
     if(!fit_data->exp) { /* TODO: not enough to check this */
         jabs_message(MSG_ERROR, stderr, "No experimental spectrum set.\n");
@@ -1610,6 +1617,8 @@ script_command_status script_reset_fit(script_session *s, int argc, char *const 
     fit_params_free(s->fit->fit_params);
     s->fit->fit_params = NULL;
     fit_data_workspaces_free(s->fit);
+    free(s->fit->ws);
+    s->fit->ws = NULL;
     fit_data_histo_sum_free(s->fit);
     return 0;
 }
@@ -1660,13 +1669,19 @@ script_command_status script_reset(script_session *s, int argc, char *const *arg
         return SCRIPT_COMMAND_FAILURE;
     }
     DEBUGSTR("Resetting everything!\n");
-    fit_data_fit_ranges_free(fit);
-    fit_params_free(fit->fit_params);
-    fit->fit_params = NULL;
     fit_data_exp_free(fit);
     gsl_histogram_free(fit->ref);
     fit->ref = NULL;
+
+    fit_data_fit_ranges_free(fit);
+    fit_params_free(fit->fit_params);
+    fit->fit_params = NULL;
     fit_data_workspaces_free(fit);
+    free(fit->ws);
+    fit->ws = NULL;
+    fit->n_ws = 0;
+    fit_data_histo_sum_free(fit);
+
     sample_model_free(fit->sm);
     fit->sm = NULL;
     sim_free(fit->sim);
@@ -1766,7 +1781,7 @@ script_command_status script_show_fit_variables(script_session *s, int argc, cha
         argv++;
         argc--;
     }
-    fit_params_print(p_all, FALSE, pattern);
+    fit_params_print(p_all, FALSE, pattern, s->fit->sim->n_det);
     fit_params_free(p_all);
     return argc_orig - argc;
 }

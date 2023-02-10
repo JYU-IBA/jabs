@@ -34,19 +34,25 @@ int fit_params_update(fit_params *p) {
     p->n_active = 0;
     p->n_active_iter_call = 0;
     for(size_t i = 0; i < p->n; i++) { /* Count number of active variables and assign index numbers */
-        if(p->vars[i].active) {
+        fit_variable *var = &p->vars[i];
+        var->active_iter_call = FALSE;
+        if(var->active) {
             for(size_t j = 0; j < i; j++) { /* Check if this *active* variable is a duplicate (earlier active variable has the same value) */
                 if(!p->vars[j].active)
                     continue;
-                if(p->vars[i].value == p->vars[j].value) {
-                    jabs_message(MSG_ERROR, stderr, "Fit parameters %s and %s can not be used simultaneously, as they are actually the same variable.\n", p->vars[i].name, p->vars[j].name);
+                if(var->value == p->vars[j].value) {
+                    jabs_message(MSG_ERROR, stderr, "Fit parameters %s and %s can not be used simultaneously, as they are actually the same variable.\n", var->name, p->vars[j].name);
                     return EXIT_FAILURE;
                 }
             }
-            p->vars[i].i_v = p->n_active;
+            if(*(var->value) == 0.0) {
+                jabs_message(MSG_ERROR, stderr, "Fit parameter %s has a zero value, which is not allowed for fitting. Try changing it a little bit or don't fit it.\n", var->name);
+                return EXIT_FAILURE;
+            }
+            var->i_v = p->n_active;
             p->n_active++;
         } else {
-            p->vars[i].i_v = p->n; /* Intentionally invalid index */
+            var->i_v = p->n; /* Intentionally invalid index */
         }
     }
     free(p->vars_active_iter_call);
@@ -58,7 +64,7 @@ int fit_params_update(fit_params *p) {
     return EXIT_SUCCESS;
 }
 
-int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor) {
+int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor, size_t i_det) {
     if(!value || !name) {
         DEBUGMSG("Didn't add a fit parameter since a NULL pointer was passed. Value = %p, name = %p (%s).", (void *)value, (void *)name, name);
         return EXIT_FAILURE;
@@ -83,11 +89,12 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
     var->active = FALSE;
     var->active_iter_call = FALSE;
     var->i_v = 0;
+    var->i_det = i_det;
     DEBUGMSG("Fit parameter %s added successfully (total %zu).", var->name, p->n);
     return EXIT_SUCCESS;
 }
 
-void fit_params_print(const fit_params *params, int active, const char *pattern) { /* Prints current values of all possible fit variables matching pattern. Pattern can be NULL too. */
+void fit_params_print(const fit_params *params, int active, const char *pattern, size_t n_det) { /* Prints current values of all possible fit variables matching pattern. Pattern can be NULL too. */
     if(!params)
         return;
     const char *whatkind = active ? "active" : "possible";
@@ -106,7 +113,7 @@ void fit_params_print(const fit_params *params, int active, const char *pattern)
             continue;
         if(pattern && !is_match(var->name, pattern))
             continue;
-        jabs_message(MSG_INFO, stderr, "%s %24s = %g %s\n", var->active ? "X" : " ", var->name, *(var->value) / var->unit_factor, var->unit);
+        jabs_message(MSG_INFO, stderr, "%s %24s = %g %s %s\n", var->active ? "X" : "  ", var->name, *(var->value) / var->unit_factor, var->unit, var->i_det < n_det ? "(detector specific variable)":"");
     }
 }
 

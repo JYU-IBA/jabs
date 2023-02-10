@@ -44,7 +44,7 @@
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     struct fit_data *fit = (struct fit_data *) params;
     fit->stats.iter_call++;
-    DEBUGMSG("Fit iteration %zu call %zu\n", fit->stats.iter, fit->stats.iter_call);
+    DEBUGMSG("Fit iteration %zu call %zu. Size of vector x: %zu, f: %zu.\n", fit->stats.iter, fit->stats.iter_call, x->size, f->size);
     if(fit_parameters_set_from_vector(fit, x)) {
         return GSL_FAILURE;
     }
@@ -229,6 +229,10 @@ int fit_set_residuals(const struct fit_data *fit_data, gsl_vector *f) {
         assert(ws);
         gsl_histogram *exp = fit_data->exp[range->i_det];
         assert(exp);
+        if(range->high >= exp->n) {
+            jabs_message(MSG_ERROR, stderr, "Fit range %zu high channel is %zu, but experimental spectrum has only %zu channels!\n", i_range + 1, exp->n);
+            return FIT_ERROR_IMPOSSIBLE;
+        }
         for(size_t i = range->low; i <= range->high; i++) {
             if(i >= ws->n_channels) { /* Outside range of simulated spectrum */
                 gsl_vector_set(f, i_vec, exp->bin[i]);
@@ -360,6 +364,7 @@ void fit_data_free(fit_data *fit) {
     fit_params_free(fit->fit_params);
     fit_data_fit_ranges_free(fit);
     fit_data_histo_sum_free(fit);
+    free(fit->ws);
     free(fit);
 }
 
@@ -439,9 +444,9 @@ fit_params *fit_params_all(fit_data *fit) {
     size_t param_name_max_len = 256; /* Laziness. We use a fixed size temporary string. snprintf is used, so no overflows should occur, but very long names may be truncated. */
     char *param_name = malloc(sizeof(char) * param_name_max_len);
     fit_params *params = fit_params_new();
-    fit_params_add_parameter(params, &sim->fluence, "fluence", "", 1.0); /* This must be the first parameter always, as there is a speedup in the fit routine */
-    fit_params_add_parameter(params, &sim->sample_theta, "alpha", "deg", C_DEG);
-    fit_params_add_parameter(params, &sim->beam_E, "energy", "keV", C_KEV);
+    fit_params_add_parameter(params, &sim->fluence, "fluence", "", 1.0, sim->n_det); /* This must be the first parameter always, as there is a speedup in the fit routine */
+    fit_params_add_parameter(params, &sim->sample_theta, "alpha", "deg", C_DEG, sim->n_det);
+    fit_params_add_parameter(params, &sim->beam_E, "energy", "keV", C_KEV, sim->n_det);
     for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
         detector *det = sim_det(sim, i_det);
         char *det_name = NULL;
@@ -449,7 +454,7 @@ fit_params *fit_params_all(fit_data *fit) {
             return NULL;
         }
         snprintf(param_name, param_name_max_len, "%ssolid", det_name);
-        fit_params_add_parameter(params, &det->solid, param_name, "msr", C_MSR);
+        fit_params_add_parameter(params, &det->solid, param_name, "msr", C_MSR, i_det);
 
         for(int Z = JIBAL_ANY_Z; Z <= det->cal_Z_max; Z++) {
             calibration *c = detector_get_calibration(det, Z);
@@ -465,7 +470,7 @@ fit_params *fit_params_all(fit_data *fit) {
                          (Z == JIBAL_ANY_Z) ? "" : jibal_element_name(fit->jibal->elements, Z),
                          calib_param_name);
                 free(calib_param_name);
-                fit_params_add_parameter(params, calibration_get_param_ref(c, i), param_name, "keV", C_KEV);
+                fit_params_add_parameter(params, calibration_get_param_ref(c, i), param_name, "keV", C_KEV, i_det);
             }
         }
         free(det_name);
@@ -476,38 +481,38 @@ fit_params *fit_params_all(fit_data *fit) {
             size_t range_index = i_range + 1; /* Human readable indexing */
             if(r->x > 0.0) {
                 snprintf(param_name, param_name_max_len, "thick%zu", range_index);
-                fit_params_add_parameter(params, &(r->x), param_name, "tfu", C_TFU);
+                fit_params_add_parameter(params, &(r->x), param_name, "tfu", C_TFU, sim->n_det);
             }
 
             snprintf(param_name, param_name_max_len, "yield%zu", range_index);
-            fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0);
+            fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0, sim->n_det);
 
             snprintf(param_name, param_name_max_len, "yield_slope%zu", range_index);
-            fit_params_add_parameter(params, &(r->yield_slope), param_name, "", 1.0);
+            fit_params_add_parameter(params, &(r->yield_slope), param_name, "", 1.0, sim->n_det);
 
             if(i_range == sm->n_ranges - 1) { /* Last range, add chanelling "aliases" (=yield corrections) */
                 snprintf(param_name, param_name_max_len, "channeling");
-                fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0);
+                fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0, sim->n_det);
 
                 snprintf(param_name, param_name_max_len, "channeling_slope");
-                fit_params_add_parameter(params, &(r->yield_slope), param_name, "", 1.0);
+                fit_params_add_parameter(params, &(r->yield_slope), param_name, "", 1.0, sim->n_det);
             }
 
             snprintf(param_name, param_name_max_len, "bragg%zu", range_index);
-            fit_params_add_parameter(params, &(r->bragg), param_name, "", 1.0);
+            fit_params_add_parameter(params, &(r->bragg), param_name, "", 1.0, sim->n_det);
 
             snprintf(param_name, param_name_max_len, "stragg%zu", range_index);
-            fit_params_add_parameter(params, &(r->stragg), param_name, "", 1.0);
+            fit_params_add_parameter(params, &(r->stragg), param_name, "", 1.0, sim->n_det);
 
             if(r->rough.model != ROUGHNESS_NONE && r->rough.x > 0.0) {
                 snprintf(param_name, param_name_max_len, "rough%zu", range_index);
-                fit_params_add_parameter(params, &(r->rough.x), param_name, "tfu", C_TFU);
+                fit_params_add_parameter(params, &(r->rough.x), param_name, "tfu", C_TFU, sim->n_det);
             }
             for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
                 if(*sample_model_conc_bin(sm, i_range, i_mat) < CONC_TOLERANCE) /* Don't add fit variables for negative, zero or very low concentrations. */
                     continue;
                 snprintf(param_name, param_name_max_len, "conc%zu_%s", range_index, sm->materials[i_mat]->name);
-                fit_params_add_parameter(params, sample_model_conc_bin(sm, i_range, i_mat), param_name, "%", C_PERCENT);
+                fit_params_add_parameter(params, sample_model_conc_bin(sm, i_range, i_mat), param_name, "%", C_PERCENT, sim->n_det);
             }
         }
     }
@@ -642,8 +647,7 @@ sim_workspace *fit_data_workspace_init(fit_data *fit, size_t i_det) {
 
 int fit_data_workspaces_init(fit_data *fit) {
     int status = EXIT_SUCCESS;
-    fit->n_ws = fit->sim->n_det;
-    fit->ws = calloc(fit->n_ws, sizeof(sim_workspace *));
+
     for(size_t i_det = 0; i_det < fit->n_ws; i_det++) {
         sim_workspace *ws = fit_data_workspace_init(fit, i_det);
         if(!ws) {
@@ -661,15 +665,12 @@ int fit_data_workspaces_init(fit_data *fit) {
 void fit_data_workspaces_free(struct fit_data *fit_data) {
     assert(fit_data);
     if(!fit_data->ws) {
-        fit_data->n_ws = 0;
         return;
     }
     for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
         sim_workspace_free(fit_data->ws[i_det]);
+        fit_data->ws[i_det] = NULL;
     }
-    free(fit_data->ws);
-    fit_data->ws = NULL;
-    fit_data->n_ws = 0;
 }
 
 struct fit_stats fit_stats_init() {
@@ -818,7 +819,8 @@ int fit(struct fit_data *fit_data) {
     gsl_multifit_nlinear_workspace *w;
     gsl_multifit_nlinear_parameters fdf_params = gsl_multifit_nlinear_default_parameters();
     fdf_params.trs = gsl_multifit_nlinear_trs_lm;
-    fdf_params.solver = gsl_multifit_nlinear_solver_svd; /* Robust? */
+    fdf_params.solver = gsl_multifit_nlinear_solver_qr;
+    fdf_params.h_df = sqrt(GSL_DBL_EPSILON) * 100.0;
     struct fit_params *fit_params = fit_data->fit_params;
     if(!fit_params || fit_params->n_active == 0) {
         jabs_message(MSG_ERROR, stderr, "No parameters to fit.\n");
