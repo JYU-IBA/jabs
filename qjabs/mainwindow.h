@@ -39,6 +39,7 @@ public:
 public slots:
     void openFile(const QString &filename);
     void runRoi(const QString &roi);
+    void updateListOfVisibleGraphs();
 
 private slots:
     void on_actionPreferences_triggered();
@@ -106,7 +107,7 @@ private:
     int closeSession();
     static QString makeFileLink(const QString &filename);
     void setNeedsSaving(bool value);
-    void updateListOfVisibleGraphs();
+
     Ui::MainWindow *ui;
     FitDialog *fitDialog;
     PlotDialog *plotDialog;

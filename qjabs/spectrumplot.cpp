@@ -341,6 +341,7 @@ void SpectrumPlot::legendClicked(QCPLegend *legend, QCPAbstractLegendItem *item,
         updateVerticalRange();
     }
     replot(QCustomPlot::rpQueuedReplot);
+    emit graphVisibilityChanged();
 }
 
 void SpectrumPlot::updateVerticalRange(bool force)

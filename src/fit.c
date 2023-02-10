@@ -289,31 +289,27 @@ int fit_set_residuals_detector(const fit_data *fit, gsl_vector *f, size_t i_det)
     assert(ws);
     assert(exp);
     size_t i_vec = 0;
-    size_t i_set = 0, i_set_outside = 0;
     for(size_t i_range = 0; i_range < fit->n_fit_ranges; i_range++) {
         roi *range = &fit->fit_ranges[i_range];
         size_t l = range->high - range->low + 1;
         if(range->i_det != i_det) { /* This is not the (fit range for a given) detector we are looking for */
             i_vec += l;
         } else {
-            fprintf(stderr, "Range %zu matches, setting vector starting from i_vec = %zu\n", i_range, i_vec);
+            DEBUGMSG("Range %zu matches, setting vector starting from i_vec = %zu", i_range, i_vec);
             for(size_t i = range->low; i <= range->high; i++) {
                 if(i >= ws->histo_sum->n) { /* Outside range of simulated spectrum (simulated is zero) */
                     gsl_vector_set(f, i_vec, exp->bin[i]);
-                    i_set_outside++;
                 } else {
                     gsl_vector_set(f, i_vec, exp->bin[i] - ws->histo_sum->bin[i]);
-                    i_set++;
                 }
                 i_vec++;
             }
         }
     }
     if(i_vec != f->size) {
-        fprintf(stderr, "Mismatch between i_vec = %zu and f->size = %zu.\n", i_vec, f->size);
+        DEBUGMSG("Mismatch between i_vec = %zu and f->size = %zu.", i_vec, f->size);
         return FIT_ERROR_IMPOSSIBLE;
     }
-    fprintf(stderr, "Set %zu channels and %zu outside simulated.\n", i_set, i_set_outside);
     return FIT_ERROR_NONE;
 }
 

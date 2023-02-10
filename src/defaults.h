@@ -71,9 +71,9 @@
 #define DUAL_SCATTER_INCIDENT_STOP_STEP_FACTOR_DEFAULT (2.0)
 #define FIT_ITERS_MAX 100
 #define FIT_XTOL (1e-7)
-#define FIT_FAST_XTOL_MULTIPLIER (1.0e2)
+#define FIT_FAST_XTOL_MULTIPLIER (1.0)
 #define FIT_CHISQ_TOL (1e-7) /* Relative change in chi squared to stop fitting */
-#define FIT_FAST_CHISQ_TOL (1e-3)  /* Relative change in chi squared to stop fitting (fast fitting phase). This can be quite large, as turning on better physics changes the chisq. */
+#define FIT_FAST_CHISQ_TOL (1e-4)  /* Relative change in chi squared to stop fitting (fast fitting phase). This can be quite large, as turning on better physics changes the chisq. */
 #define SIGMAS_CUTOFF (5.0)
 #define SIGMAS_FAST_CUTOFF (3.5)
 #define CS_CONC_MAX_INTEGRATION_INTERVALS 100

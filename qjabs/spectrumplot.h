@@ -40,6 +40,7 @@ signals:
     void rangeSelected(QString);
     void energyAxisSet(bool);
     void legendMoved(bool outside);
+    void graphVisibilityChanged(); /* One of the graphs was enabled / disabled (by clicking on the legend) */
 
 public slots:
     void setLogScale(bool value);

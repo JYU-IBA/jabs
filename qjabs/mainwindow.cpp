@@ -70,6 +70,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->widget, &SpectrumPlot::rangeSelected, this, &MainWindow::runRoi);
     connect(ui->widget, &SpectrumPlot::energyAxisSet, this, &MainWindow::onEnergyAxisSet);
     connect(ui->widget, &SpectrumPlot::legendMoved, this, &MainWindow::onSpectrumLegendMoved);
+    connect(ui->widget, &SpectrumPlot::graphVisibilityChanged, this, &MainWindow::updateListOfVisibleGraphs);
 
     ui->msgTextBrowser->append("\n");
     ui->msgTextBrowser->ensureCursorVisible();
