@@ -67,7 +67,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
 
     sample_free(fit->sim->sample);
     fit->sim->sample = NULL;
-    fit_data_workspaces_free(fit);
+    fit_data_workspaces_reset(fit);
 
     if(fit_sanity_check(fit) == GSL_FAILURE) {
         fit->stats.error = FIT_ERROR_SANITY;
@@ -77,6 +77,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     sample_renormalize(fit->sim->sample);
 
     if(fit_data_workspaces_init(fit)) {
+        DEBUGSTR("Workspace init fails.");
         fit->stats.error = FIT_ERROR_WORKSPACE_INITIALIZATION;
         return GSL_FAILURE;
     }
@@ -361,11 +362,19 @@ void fit_data_defaults(fit_data *f) {
 void fit_data_free(fit_data *fit) {
     if(!fit)
         return;
-    fit_params_free(fit->fit_params);
-    fit_data_fit_ranges_free(fit);
-    fit_data_histo_sum_free(fit);
-    free(fit->ws);
+    fit_data_reset(fit);
     free(fit);
+}
+
+void fit_data_reset(fit_data *fit) {
+    if(!fit) {
+        return;
+    }
+    fit_data_fit_ranges_free(fit);
+    fit_params_free(fit->fit_params);
+    fit->fit_params = NULL;
+    fit_data_workspaces_free(fit);
+    fit_data_histo_sum_free(fit);
 }
 
 void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct roi *roi) {
@@ -646,8 +655,11 @@ sim_workspace *fit_data_workspace_init(fit_data *fit, size_t i_det) {
 }
 
 int fit_data_workspaces_init(fit_data *fit) {
+    if(!fit->ws) {
+        DEBUGSTR("No fit workspace array has been allocated!");
+        return EXIT_FAILURE;
+    }
     int status = EXIT_SUCCESS;
-
     for(size_t i_det = 0; i_det < fit->n_ws; i_det++) {
         sim_workspace *ws = fit_data_workspace_init(fit, i_det);
         if(!ws) {
@@ -657,19 +669,30 @@ int fit_data_workspaces_init(fit_data *fit) {
         fit->ws[i_det] = ws;
     }
     if(status == EXIT_FAILURE) {
-        fit_data_workspaces_free(fit);
+        fit_data_workspaces_reset(fit);
     }
     return status;
 }
 
-void fit_data_workspaces_free(struct fit_data *fit_data) {
-    assert(fit_data);
-    if(!fit_data->ws) {
+void fit_data_workspaces_free(struct fit_data *fit) {
+    assert(fit);
+    if(!fit->ws) {
         return;
     }
-    for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
-        sim_workspace_free(fit_data->ws[i_det]);
-        fit_data->ws[i_det] = NULL;
+    fit_data_workspaces_reset(fit);
+    free(fit->ws);
+    fit->ws = NULL;
+    fit->n_ws = 0;
+}
+
+void fit_data_workspaces_reset(fit_data *fit) {
+    if(!fit->ws) {
+        DEBUGSTR("Could not reset workspaces, because workspace array has not been allocated!");
+        return;
+    }
+    for(size_t i_det = 0; i_det < fit->n_ws; i_det++) {
+        sim_workspace_free(fit->ws[i_det]);
+        fit->ws[i_det] = NULL;
     }
 }
 

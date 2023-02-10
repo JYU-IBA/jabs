@@ -97,7 +97,8 @@ typedef struct fit_data {
 
 fit_data *fit_data_new(const jibal *jibal, simulation *sim);
 void fit_data_defaults(fit_data *f);
-void fit_data_free(struct fit_data *fit); /* Doesn't free everything in fit_data. Does free fit_params and fit_ranges */
+void fit_data_free(fit_data *fit); /* Doesn't free everything in fit, like sm, jibal, ... */
+void fit_data_reset(fit_data *fit);
 void fit_data_print(FILE *f, const struct fit_data *fit_data);
 void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct roi *roi);
 gsl_histogram *fit_data_exp(const struct fit_data *fit_data, size_t i_det);
@@ -115,7 +116,8 @@ sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det);
 size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);
 sim_workspace *fit_data_workspace_init(fit_data *fit, size_t i_ws);
 int fit_data_workspaces_init(fit_data *fit);
-void fit_data_workspaces_free(struct fit_data *fit_data); /* Also sets workspace pointers to NULL */
+void fit_data_workspaces_free(fit_data *fit); /* Also sets workspace pointers to NULL */
+void fit_data_workspaces_reset(fit_data *fit);
 struct fit_stats fit_stats_init();
 int fit(struct fit_data *fit_data);
 void fit_covar_print(const gsl_matrix *covar);

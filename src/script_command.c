@@ -55,9 +55,6 @@ int script_prepare_sim_or_fit(script_session *s) {
     }
     fit_data_histo_sum_free(fit);
     fit_data_workspaces_free(s->fit);
-    free(s->fit->ws);
-    s->fit->ws = NULL;
-    s->fit->n_ws = 0;
     sample_free(fit->sim->sample);
     DEBUGSTR("Original sample model:");
     sample_model_print(NULL, fit->sm);
@@ -1613,13 +1610,7 @@ script_command_status script_reset_detectors(script_session *s, int argc, char *
 script_command_status script_reset_fit(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
-    fit_data_fit_ranges_free(s->fit);
-    fit_params_free(s->fit->fit_params);
-    s->fit->fit_params = NULL;
-    fit_data_workspaces_free(s->fit);
-    free(s->fit->ws);
-    s->fit->ws = NULL;
-    fit_data_histo_sum_free(s->fit);
+    fit_data_reset(s->fit);
     return 0;
 }
 
@@ -1672,15 +1663,6 @@ script_command_status script_reset(script_session *s, int argc, char *const *arg
     fit_data_exp_free(fit);
     gsl_histogram_free(fit->ref);
     fit->ref = NULL;
-
-    fit_data_fit_ranges_free(fit);
-    fit_params_free(fit->fit_params);
-    fit->fit_params = NULL;
-    fit_data_workspaces_free(fit);
-    free(fit->ws);
-    fit->ws = NULL;
-    fit->n_ws = 0;
-    fit_data_histo_sum_free(fit);
 
     sample_model_free(fit->sm);
     fit->sm = NULL;
