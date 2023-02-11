@@ -62,11 +62,13 @@ typedef struct script_command {
     jibal_config_var *var;
     int val;
     struct script_command *next;
+    int argc_min; /* Minimum number of arguments to run f. Set to zero to handle argc < argc_min in f. */
 } script_command;
 
 struct help_topic {
     const char *name;
     const char *help_text;
 };
+
 
 #endif // JABS_SCRIPT_GENERIC_H

@@ -36,10 +36,14 @@ public:
     int fitCallback(fit_stats stats);
     ~MainWindow();
 
+signals:
+    void runFinished();
+
 public slots:
     void openFile(const QString &filename);
     void runRoi(const QString &roi);
     void updateListOfVisibleGraphs();
+    void scrollMsgBoxToBottom();
 
 private slots:
     void on_actionPreferences_triggered();
@@ -53,8 +57,6 @@ private slots:
     void on_action_Plot_triggered();
 
     void on_action_Run_triggered();
-
-    void on_plotSpinBox_valueChanged(int arg1);
 
     void plotSpectrum(size_t i_det);
 
@@ -94,6 +96,11 @@ private slots:
 
     void onSpectrumLegendMoved(bool outside);
 
+    void updateDetectorList();
+
+    void on_comboBox_currentIndexChanged(int index);
+
+
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);
@@ -107,6 +114,7 @@ private:
     int closeSession();
     static QString makeFileLink(const QString &filename);
     void setNeedsSaving(bool value);
+    void showInitialMessages();
 
     Ui::MainWindow *ui;
     FitDialog *fitDialog;
@@ -126,5 +134,6 @@ private:
     int plotIsotopesZ;
     QSettings settings;
     QStringList visibleGraphs;
+    int warningCounter;
 };
 #endif // MAINWINDOW_H

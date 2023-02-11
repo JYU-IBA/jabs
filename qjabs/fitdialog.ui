@@ -17,13 +17,13 @@
    <bool>false</bool>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <item row="0" column="0">
-    <widget class="QLabel" name="label">
-     <property name="styleSheet">
-      <string notr="true">font-size: 16pt</string>
+   <item row="3" column="0">
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
      </property>
-     <property name="text">
-      <string>Fitting. Please wait...</string>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Abort</set>
      </property>
     </widget>
    </item>
@@ -58,6 +58,9 @@
        </property>
        <property name="buttonSymbols">
         <enum>QAbstractSpinBox::NoButtons</enum>
+       </property>
+       <property name="maximum">
+        <number>99999999</number>
        </property>
       </widget>
      </item>
@@ -136,20 +139,20 @@
      </item>
     </layout>
    </item>
+   <item row="0" column="0">
+    <widget class="QLabel" name="label">
+     <property name="styleSheet">
+      <string notr="true">font-size: 16pt</string>
+     </property>
+     <property name="text">
+      <string>Fitting. Please wait...</string>
+     </property>
+    </widget>
+   </item>
    <item row="2" column="0">
     <widget class="QCheckBox" name="plotCheckBox">
      <property name="text">
       <string>Plot while fitting</string>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="0">
-    <widget class="QDialogButtonBox" name="buttonBox">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-     <property name="standardButtons">
-      <set>QDialogButtonBox::Abort</set>
      </property>
     </widget>
    </item>

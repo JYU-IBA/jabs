@@ -1,6 +1,6 @@
 #!/usr/bin/env jabs
 set ds true
-set ion a
+set ion a #That's 4He!
 set energy 1MeV
 set det theta 160deg
 set alpha 7deg

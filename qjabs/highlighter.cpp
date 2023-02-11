@@ -68,7 +68,7 @@ Highlighter::Highlighter(QTextDocument *parent)
     singleLineCommentFormat.setForeground(Qt::gray);
     commandFormat.setForeground(Qt::darkBlue);
     commandFormat.setFontWeight(QFont::Bold);
-    variableFormat.setForeground(Qt::darkYellow);
+    variableFormat.setForeground(Qt::darkMagenta);
     variableFormat.setFontWeight(QFont::StyleItalic);
 }
 
@@ -84,11 +84,6 @@ void Highlighter::highlightBlock(const QString &text)
         setCurrentBlockState(0);
         return;
     }
-    if(text.at(0) == '#') {
-        setFormat(0, len, singleLineCommentFormat);
-        setCurrentBlockState(0);
-        return;
-    }
     int argc = 0;
     char *s_out;
     char **argv = string_to_argv(qPrintable(text), &argc, &s_out);
@@ -96,23 +91,27 @@ void Highlighter::highlightBlock(const QString &text)
         return;
 
     }
-    highlightArgv(argc, argv);
-    argv_free(argv, s_out);
-    setCurrentBlockState(0);
-
-    return;
-
-    for (const HighlightingRule &rule : qAsConst(highlightingRules)) {
-        QRegularExpressionMatchIterator matchIterator = rule.pattern.globalMatch(text);
-        while (matchIterator.hasNext()) {
-            QRegularExpressionMatch match = matchIterator.next();
-            setFormat(match.capturedStart(), match.capturedLength(), rule.format);
+    if(argc == 0) { /* Begins with a comment, the whole line is a comment. */
+        setFormat(0, len, singleLineCommentFormat);
+    } else {
+        highlightArgv(argc, argv); /* Highlights individual arguments */
+        size_t last_pos = argv[argc - 1] - argv[0] + strlen(argv[argc - 1]); /* Last character, after parsing to argument vector, is this far in one the line */
+        if(text.at(last_pos) == '"') { /* Argument vector parser changes last quote to '\0', but we don't want to mark it as a comment */
+            last_pos++;
+        }
+        if(last_pos != len) {/* Where the argument vector parser stopped, comments begin */
+            setFormat(last_pos, len - last_pos, singleLineCommentFormat);
         }
     }
+    argv_free(argv, s_out);
     setCurrentBlockState(0);
+    return;
 }
 
 void Highlighter::highlightArgv(int argc, char **argv) {
+    if(!argc) {
+        return;
+    }
     const script_command *cmds = session->commands;
     const script_command *c_parent = NULL;
     const char *argv_start = argv[0];

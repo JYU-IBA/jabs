@@ -75,13 +75,13 @@ int script_prepare_sim_or_fit(script_session *s) {
     if(fit->sim->n_reactions == 0) {
         jabs_message(MSG_WARNING, stderr, "No reactions defined. Please be aware there are commands called \"reset reactions\" and \"add reactions\".\n");
         if(fit->sim->rbs) {
-            jabs_message(MSG_WARNING, stderr, "Adding RBS reactions.\n");
+            jabs_message(MSG_INFO, stderr, "Adding RBS reactions.\n");
             sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS, sim_cs(fit->sim, REACTION_RBS), TRUE);
             sim_reactions_add_auto(fit->sim, fit->sm, REACTION_RBS_ALT, sim_cs(fit->sim, REACTION_RBS_ALT), TRUE);
             /* TODO: loop over all detectors and add reactions that are possible (one reaction for all detectors) */
         }
         if(sim_do_we_need_erd(fit->sim)) {
-            jabs_message(MSG_WARNING, stderr, "Adding ERDA reactions.\n");
+            jabs_message(MSG_INFO, stderr, "Adding ERDA reactions.\n");
             sim_reactions_add_auto(fit->sim, fit->sm, REACTION_ERD, sim_cs(fit->sim, REACTION_ERD), TRUE);
         }
     }
@@ -166,7 +166,7 @@ void script_command_not_found(const char *cmd, const script_command *c_parent) {
             size_t matches = script_command_print_possible_matches_if_ambiguous(c_parent->subcommands, cmd);
             if(matches == 0) {
                 jabs_message(MSG_ERROR, stderr, "Following subcommands of \"%s\" are recognized:\n", c_parent->name);
-                script_commands_print(stderr, c_parent->subcommands);
+                script_commands_print(c_parent->subcommands);
             }
         }
     } else {
@@ -422,6 +422,12 @@ script_command_status script_exit(script_session *s, int argc, char *const *argv
 }
 
 const script_command *script_command_find(const script_command *commands, const char *cmd_string) {
+    if(!cmd_string) {
+        return NULL;
+    }
+    if(*cmd_string == '\0' || *cmd_string == '#') {
+        return NULL;
+    }
     int found = 0;
     const script_command *c_found = NULL;
     for(const script_command *c = commands; c; c = c->next) {
@@ -486,11 +492,14 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
         jabs_message(MSG_ERROR, stderr, "Detector %zu does not exist.\n", s->i_det_active);
         return SCRIPT_COMMAND_FAILURE;
     }
+    DEBUGMSG("Some kind of value to be converted: \"%s\"", argv[0]);
     double *value_double = NULL;
     size_t *value_size = NULL;
+    char unit_type = UNIT_TYPE_ANY;
     switch(val) {
         case 'b': /* beta */
             value_double = &(det->beta);
+            unit_type = UNIT_TYPE_ANGLE;
             break;
         case 'c': /* column */
             value_size = &(det->column);
@@ -503,6 +512,7 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
             break;
         case 'd': /* distance */
             value_double = &(det->distance);
+            unit_type = UNIT_TYPE_DISTANCE;
             break;
         case 't': /* type */
             det->type = jibal_option_get_value(detector_option, argv[0]);
@@ -513,24 +523,31 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
             break;
         case 'S': /* slope, this is for backwards compatibility (and ease of use with linear calibration) */
             value_double = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE);
+            unit_type = UNIT_TYPE_ANY; /* Could be time or energy */
             break;
         case 'O': /* offset, this is for backwards compatibility */
             value_double = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET);
+            unit_type = UNIT_TYPE_ANY;
             break;
         case 'r': /* resolution */
             value_double = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION);
+            unit_type = UNIT_TYPE_ANY;
             break;
         case 's': /* solid */
             value_double = &(det->solid);
+            unit_type = UNIT_TYPE_SOLID_ANGLE;
             break;
         case 'T': /* theta */
             value_double = &(det->theta);
+            unit_type = UNIT_TYPE_ANGLE;
             break;
         case 'l': /* length */
             value_double = &(det->length);
+            unit_type = UNIT_TYPE_DISTANCE;
             break;
         case 'p': /* phi */
             value_double = &(det->phi);
+            unit_type = UNIT_TYPE_ANGLE;
             break;
         default:
             jabs_message(MSG_ERROR, stderr, "Unhandled value %i in script_set_detector_val. Report to developer.\n", val);
@@ -538,9 +555,17 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
             break;
     }
     if(value_double) {
-        *value_double = jibal_get_val(s->jibal->units, 0, argv[0]);
+        if(jabs_unit_convert(s->jibal->units, unit_type, argv[0], value_double) < 0) {
+            return SCRIPT_COMMAND_FAILURE;
+        }
     } else if(value_size) {
-        *value_size = strtoull(argv[0], NULL, 10);
+        char *end;
+        size_t val_converted_ull = strtoull(argv[0], &end, 10);
+        if(*end == '\0') {
+            *value_size = val_converted_ull;
+        } else {
+            jabs_message(MSG_ERROR, stderr, "Conversion of \"%s\" to unsigned integer failed.\n", argv[0]);
+        }
     }
     return 1; /* Number of arguments */
 }
@@ -576,22 +601,25 @@ script_command_status script_set_detector_calibration_val(struct script_session 
         jabs_message(MSG_ERROR, stderr, "No calibration set for element = %s\n", jibal_element_name(s->jibal->elements, s->Z_active));
         return SCRIPT_COMMAND_FAILURE;
     }
-    double value_double = jibal_get_val(s->jibal->units, 0, argv[0]);
+    double value_dbl;
+    if(jabs_unit_convert(s->jibal->units, UNIT_TYPE_ANY, argv[0], &value_dbl) < 0) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
     switch(val) {
         case 's': /* slope */
-            if(calibration_set_param(c, CALIBRATION_PARAM_SLOPE, value_double)) {
+            if(calibration_set_param(c, CALIBRATION_PARAM_SLOPE, value_dbl)) {
                 jabs_message(MSG_ERROR, stderr, "Can not set calibration slope.\n");
                 return SCRIPT_COMMAND_FAILURE;
             }
             return 1;
         case 'o': /* offset */
-            if(calibration_set_param(c, CALIBRATION_PARAM_OFFSET, value_double)) {
+            if(calibration_set_param(c, CALIBRATION_PARAM_OFFSET, value_dbl)) {
                 jabs_message(MSG_ERROR, stderr, "Can not set calibration offset.\n");
                 return SCRIPT_COMMAND_FAILURE;
             }
             return 1;
         case 'r': /* resolution */
-            if(calibration_set_param(c, CALIBRATION_PARAM_RESOLUTION, value_double)) {
+            if(calibration_set_param(c, CALIBRATION_PARAM_RESOLUTION, value_dbl)) {
                 jabs_message(MSG_ERROR, stderr, "Can not set calibration resolution.\n");
                 return SCRIPT_COMMAND_FAILURE;
             }
@@ -660,7 +688,14 @@ script_command_status script_set_simulation_val(struct script_session *s, int va
     return SCRIPT_COMMAND_SUCCESS;
 }
 
-
+script_command_status script_set_charge(struct script_session *s, int argc, char *const *argv) {
+    double charge;
+    if(jabs_unit_convert(s->jibal->units, UNIT_TYPE_CHARGE, argv[0], &charge) < 0) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    s->fit->sim->fluence = charge / C_E;
+    return 1;
+}
 script_command_status script_show_var(struct script_session *s, jibal_config_var *var, int argc, char *const *argv) {
     (void) argv;
     (void) argc;
@@ -686,7 +721,12 @@ script_command_status script_show_var(struct script_session *s, jibal_config_var
             jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
             break;
         case JIBAL_CONFIG_VAR_UNIT:
-            jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
+            if(var->unit) {
+                jabs_message(MSG_INFO, stderr, "%s = %g %s\n", var->name,
+                             *((double *) var->variable) / jibal_units_get(s->jibal->units, var->unit_type, var->unit), var->unit);
+            } else {
+                jabs_message(MSG_INFO, stderr, "%s = %g\n", var->name, *((double *) var->variable));
+            }
             break;
         case JIBAL_CONFIG_VAR_OPTION:
             jabs_message(MSG_INFO, stderr, "%s = %s\n", var->name,
@@ -760,6 +800,9 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
     const script_command *c_parent = NULL;
     while(argc && cmds) { /* Arguments and subcommands remain. Try to find the right one, if possible. */
         DEBUGMSG("Top level script_execute_command_argv() loop, %i arguments remain (start with %s).", argc, argv[0]);
+        if(jabs_line_is_comment(argv[0])) {
+            return SCRIPT_COMMAND_SUCCESS;
+        }
         const script_command *c = script_command_find(cmds, argv[0]);
         if(!c) {
             DEBUGMSG("Didn't find command %s.", argv[0]);
@@ -771,6 +814,10 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
             argv++;
             DEBUGMSG("Found command %s.", c->name);
             if(c->f) {
+                if(argc < c->argc_min) {
+                    jabs_message(MSG_ERROR, stderr, "Not enough arguments for command \"%s\", expected minimum of %i\n", c->name, c->argc_min);
+                    return EXIT_FAILURE;
+                }
                 DEBUGMSG("There is a function in command %s. Calling it with %i arguments.", c->name, argc);
                 script_command_status status = c->f(s, argc, argv);
                 if(status > 0) { /* Positive numbers indicate number of arguments consumed */
@@ -920,7 +967,7 @@ const char *script_command_status_to_string(script_command_status status) {
     return "unknown";
 }
 
-script_command *script_command_new(const char *name, const char *help_text, int val, script_command_status (*f)(struct script_session *, int, char *const *)) {
+script_command *script_command_new(const char *name, const char *help_text, int val, int argc_min, script_command_status (*f)(struct script_session *, int, char *const *)) {
     if(!name)
         return NULL;
     script_command *c = malloc(sizeof(script_command));
@@ -934,6 +981,7 @@ script_command *script_command_new(const char *name, const char *help_text, int 
     c->val = val;
     c->subcommands = NULL;
     c->next = NULL;
+    c->argc_min = argc_min;
     return c;
 }
 
@@ -948,12 +996,14 @@ int script_command_set_function(script_command *c, script_command_status (*f)(st
     return EXIT_SUCCESS;
 }
 
-int script_command_set_var(script_command *c, jibal_config_var_type type, void *variable, const jibal_option *option_list) {
+int script_command_set_var(script_command *c, jibal_config_var_type type, void *variable, const jibal_option *option_list, const char *unit, char unit_type) {
     if(!c->var) {
         c->var = malloc(sizeof(jibal_config_var));
     }
     c->var->variable = variable;
     c->var->type = type;
+    c->var->unit = unit;
+    c->var->unit_type = unit_type;
     c->var->name = c->name; /* The pointer is shared, so "var" doesn't get its own */
     c->var->option_list = option_list;
     c->f = NULL; /* These guys can't coexist */
@@ -1104,35 +1154,22 @@ void script_command_list_add_command(script_command **head, script_command *c_ne
     }
 }
 
-script_command *script_command_list_from_command_array(const script_command *commands) {
-    if(!commands)
-        return NULL;
-    script_command *head = NULL;
-    script_command *tail = NULL;
-    for(const script_command *c = commands; c->name != NULL; c++) {
-        script_command *c_new = script_command_new(c->name, c->help_text, c->val, c->f);
-        if(c->var) {
-            script_command_set_var(c_new, c->var->type, c->var->variable, c->var->option_list);
-        }
-        if(!head) {
-            head = c_new;
-            tail = c_new;
-            continue;
-        }
-        tail->next = c_new;
-        tail = c_new;
-    }
-    return head;
-}
-
 script_command *script_command_list_from_vars_array(const jibal_config_var *vars, jibal_config_var_type type) {
     script_command *head = NULL;
     for(const jibal_config_var *var = vars; var->type != 0; var++) {
         if(type != 0 && var->type != type) { /* Restrict by type */
             continue;
         }
-        script_command *c = script_command_new(var->name, jibal_config_var_type_name(var->type), 0, NULL);
-        script_command_set_var(c, var->type, var->variable, var->option_list);
+        script_command *c;
+        if(var->type == JIBAL_CONFIG_VAR_UNIT) {
+            char *help_text;
+            int ret = asprintf(&help_text, "value with unit (type %c, at least unit %s is appropriate)", var->unit_type, var->unit);
+            c  = script_command_new(var->name, help_text, 0, 0, NULL);
+            free(help_text);
+        } else {
+            c = script_command_new(var->name, jibal_config_var_type_name(var->type), 0, 0, NULL);
+        }
+        script_command_set_var(c, var->type, var->variable, var->option_list, var->unit, var->unit_type);
         script_command_list_add_command(&head, c);
     }
     return head;
@@ -1144,236 +1181,237 @@ script_command *script_commands_create(struct script_session *s) {
     script_command *head = NULL;
 
     script_command *c;
-    script_command *c_help = script_command_new("help", "Help.", 0, &script_help);
-    script_command_list_add_command(&c_help->subcommands, script_command_new("commands", "List of commands.", 0, &script_help_commands));
-    script_command_list_add_command(&c_help->subcommands, script_command_new("version", "Help on (show) version.", 0, &script_help_version));
+    script_command *c_help = script_command_new("help", "Help.", 0, 0, &script_help);
+    script_command_list_add_command(&c_help->subcommands, script_command_new("commands", "List of commands.", 0, 0, &script_help_commands));
+    script_command_list_add_command(&c_help->subcommands, script_command_new("version", "Help on (show) version.", 0, 0, &script_help_version));
     script_command_list_add_command(&head, c_help);
 
 
 #ifdef JABS_PLUGINS
-    script_command *c_identify = script_command_new("identify", "Identify something.", 0, NULL);
-    script_command_list_add_command(&c_identify->subcommands, script_command_new("plugin", "Identify plugin.", 0, &script_identify_plugin));
+    script_command *c_identify = script_command_new("identify", "Identify something.", 0, 0, NULL);
+    script_command_list_add_command(&c_identify->subcommands, script_command_new("plugin", "Identify plugin.", 0, 0, &script_identify_plugin));
     script_command_list_add_command(&head, c_identify);
 #endif
 
-    script_command *c_set = script_command_new("set", "Set something.", 0, NULL);
+    script_command *c_set = script_command_new("set", "Set something.", 0, 0, NULL);
     c_set->f_var = &script_set_var;
-    script_command_list_add_command(&c_set->subcommands, script_command_new("aperture", "Set aperture.", 0, &script_set_aperture));
+    script_command_list_add_command(&c_set->subcommands, script_command_new("aperture", "Set aperture.", 0, 0, &script_set_aperture));
+    script_command_list_add_command(&c_set->subcommands, script_command_new("charge", "Set charge.", 0, 1, &script_set_charge)); /* Fluence is fundamental, this is for convenience */
 
-    script_command *c_channeling = script_command_new("channeling", "Set channeling yield correction (i.e. last layer yield).", 0, NULL);
-    script_command_list_add_command(&c_channeling->subcommands, script_command_new("yield", "Set channeling yield (constant).", 0, &script_set_channeling_yield));
-    script_command_list_add_command(&c_channeling->subcommands, script_command_new("slope", "Set channeling yield (depth) slope.", 0, &script_set_channeling_slope));
+    script_command *c_channeling = script_command_new("channeling", "Set channeling yield correction (i.e. last layer yield).", 0, 0, NULL);
+    script_command_list_add_command(&c_channeling->subcommands, script_command_new("yield", "Set channeling yield (constant).", 0, 0, &script_set_channeling_yield));
+    script_command_list_add_command(&c_channeling->subcommands, script_command_new("slope", "Set channeling yield (depth) slope.", 0, 0, &script_set_channeling_slope));
     script_command_list_add_command(&c_set->subcommands, c_channeling);
 
-    script_command *c_detector = script_command_new("detector", "Set detector properties.", 0, &script_set_detector);
+    script_command *c_detector = script_command_new("detector", "Set detector properties.", 0, 0, &script_set_detector);
     c_detector->f_val = &script_set_detector_val;
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("aperture", "Set detector aperture.", 0, &script_set_detector_aperture));
-    script_command *c_calibration = script_command_new("calibration", "Set calibration.", 0, &script_set_detector_calibration);
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("aperture", "Set detector aperture.", 0, 0, &script_set_detector_aperture));
+    script_command *c_calibration = script_command_new("calibration", "Set calibration.", 0, 0, &script_set_detector_calibration);
     c_calibration->f_val = &script_set_detector_calibration_val;
     script_command_list_add_command(&c_detector->subcommands, c_calibration);
-    script_command_list_add_command(&c_calibration->subcommands, script_command_new("linear", "Set the calibration to be linear (default).", 'L', NULL));
-    script_command_list_add_command(&c_calibration->subcommands, script_command_new("slope", "Set the slope of a linear calibration.", 's', NULL));
-    script_command_list_add_command(&c_calibration->subcommands, script_command_new("offset", "Set the offset of a linear calibration.", 'o', NULL));
-    script_command_list_add_command(&c_calibration->subcommands, script_command_new("resolution", "Set the resolution.", 'r', NULL));
-    script_command_list_add_command(&c_calibration->subcommands, script_command_new("poly", "Set the calibration to be a polynomial.", 0, &script_set_detector_calibration_poly));
+    script_command_list_add_command(&c_calibration->subcommands, script_command_new("linear", "Set the calibration to be linear (default).", 'L', 0, NULL));
+    script_command_list_add_command(&c_calibration->subcommands, script_command_new("slope", "Set the slope of a linear calibration.", 's', 0, NULL));
+    script_command_list_add_command(&c_calibration->subcommands, script_command_new("offset", "Set the offset of a linear calibration.", 'o', 0, NULL));
+    script_command_list_add_command(&c_calibration->subcommands, script_command_new("resolution", "Set the resolution.", 'r', 0, NULL));
+    script_command_list_add_command(&c_calibration->subcommands, script_command_new("poly", "Set the calibration to be a polynomial.", 0, 0, &script_set_detector_calibration_poly));
 
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("column", "Set column number (for data input).", 'c', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("channels", "Set number of channels.", 'h', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("compress", "Set compress (summing of channels).", 'C', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("distance", "Set detector distance from target.", 'd', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("foil", "Set detector foil.", 0, &script_set_detector_foil));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("type", "Set detector type.", 't', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("slope", "Set detector calibration slope.", 'S', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("offset", "Set detector calibration offset.", 'O', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("resolution", "Set detector resolution (FWHM).", 'r', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("solid", "Set detector solid angle.", 's', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("theta", "Set detector (scattering) angle.", 'T', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("length", "Set detector length (for ToF).", 'l', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("beta", "Set exit angle (angle of ion in sample) for this detector (manually).", 'b', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "Set detector azimuth angle, 0 = IBM, 90 deg = Cornell.", 'p', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("name", "Set detector name.", 0, &script_set_detector_name));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("column", "Set column number (for data input).", 'c', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("channels", "Set number of channels.", 'h', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("compress", "Set compress (summing of channels).", 'C', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("distance", "Set detector distance from target.", 'd', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("foil", "Set detector foil.", 0, 0, &script_set_detector_foil));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("type", "Set detector type.", 't', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("slope", "Set detector calibration slope.", 'S', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("offset", "Set detector calibration offset.", 'O', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("resolution", "Set detector resolution (FWHM).", 'r', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("solid", "Set detector solid angle.", 's', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("theta", "Set detector (scattering) angle.", 'T', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("length", "Set detector length (for ToF).", 'l', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("beta", "Set exit angle (angle of ion in sample) for this detector (manually).", 'b', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "Set detector azimuth angle, 0 = IBM, 90 deg = Cornell.", 'p', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("name", "Set detector name.", 0, 0, &script_set_detector_name));
     script_command_list_add_command(&c_set->subcommands, c_detector);
 
-    script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
+    script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, 0, &script_set_ion));
 
-    script_command *c_set_fit = script_command_new("fit", "Set fit related things.", 0, NULL);
+    script_command *c_set_fit = script_command_new("fit", "Set fit related things.", 0, 0, NULL);
     c_set_fit->f_val = &script_set_fit_val;
-    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("normal", "Normal two-phase fitting.", 'n', NULL));
-    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("slow", "One phase fitting (slow phase only).", 's', NULL));
-    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("fast", "One phase fitting (fast phase only).", 'f', NULL));
+    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("normal", "Normal two-phase fitting.", 'n', 0, NULL));
+    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("slow", "One phase fitting (slow phase only).", 's', 0, NULL));
+    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("fast", "One phase fitting (fast phase only).", 'f', 0, NULL));
     script_command_list_add_command(&c_set->subcommands, c_set_fit);
 
-    script_command_list_add_command(&c_set->subcommands, script_command_new("sample", "Set sample.", 0, &script_set_sample));
+    script_command_list_add_command(&c_set->subcommands, script_command_new("sample", "Set sample.", 0, 0, &script_set_sample));
 
-    script_command *c_set_simulation = script_command_new("simulation", "Set simulation related things.", 0, NULL);
+    script_command *c_set_simulation = script_command_new("simulation", "Set simulation related things.", 0, 0, NULL);
     c_set_simulation->f_val = &script_set_simulation_val;
-    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("defaults", "Set default calculation parameters.", 'd', NULL));
-    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("brisk", "Set slightly faster calculation parameters.", 'b', NULL));
-    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("fast", "Set fast calculation parameters.", 'f', NULL));
-    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("accurate", "Set the most accurate calculation parameters.", 'a', NULL));
-    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("improved", "Set more accurate calculation parameters.", 'i', NULL));
+    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("defaults", "Set default calculation parameters.", 'd', 0, NULL));
+    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("brisk", "Set slightly faster calculation parameters.", 'b', 0, NULL));
+    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("fast", "Set fast calculation parameters.", 'f', 0, NULL));
+    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("accurate", "Set the most accurate calculation parameters.", 'a', 0, NULL));
+    script_command_list_add_command(&c_set_simulation->subcommands, script_command_new("improved", "Set more accurate calculation parameters.", 'i', 0, NULL));
     script_command_list_add_command(&c_set->subcommands, c_set_simulation);
 
-    script_command_list_add_command(&c_set->subcommands, script_command_new("stopping", "Set (assign) stopping or straggling.", 0, &script_set_stopping));
+    script_command_list_add_command(&c_set->subcommands, script_command_new("stopping", "Set (assign) stopping or straggling.", 0, 0, &script_set_stopping));
 
     const jibal_config_var vars[] = {
-            {JIBAL_CONFIG_VAR_UNIT,   "fluence",                     &sim->fluence,                             NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "energy",                      &sim->beam_E,                              NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",                &sim->beam_E_broad,                        NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "emin",                        &sim->emin,                                NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "alpha",                       &sim->sample_theta,                        NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "phi",                         &sim->sample_phi,                          NULL},
-            {JIBAL_CONFIG_VAR_STRING, "output",                      &s->output_filename,                       NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "erd",                         &sim->erd,                                 NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "rbs",                         &sim->rbs,                                 NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "maxiter",                     &fit->n_iters_max,                         NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",                  &fit->xtol,                                NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",             &fit->chisq_tol,                           NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance",        &fit->chisq_fast_tol,                      NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "n_bricks_max",                &sim->params->n_bricks_max,                NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "ds",                          &sim->params->ds,                          NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "rk4",                         &sim->params->rk4,                         NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "brick_width_sigmas",          &sim->params->brick_width_sigmas,          NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "sigmas_cutoff",               &sim->params->sigmas_cutoff,               NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step",          &sim->params->incident_stop_params.step,   NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_sigmas",   &sim->params->incident_stop_params.sigmas, NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_min",      &sim->params->incident_stop_params.min,    NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_max",      &sim->params->incident_stop_params.max,    NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step",           &sim->params->exiting_stop_params.step,    NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_sigmas",    &sim->params->exiting_stop_params.sigmas,  NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_min",       &sim->params->exiting_stop_params.min,      NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_max",       &sim->params->exiting_stop_params.max,      NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "ds_incident_stop_step_factor",&sim->params->ds_incident_stop_step_factor, NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "nuclear_stopping_accurate",   &sim->params->nuclear_stopping_accurate,    NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy",        &sim->params->mean_conc_and_energy,         NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "geostragg",                   &sim->params->geostragg,                    NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",                 &sim->params->beta_manual,                  NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "cs_n_stragg_steps",           &sim->params->cs_n_stragg_steps,            NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "gaussian_accurate",           &sim->params->gaussian_accurate,            NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "int_cs_max_intervals",        &sim->params->int_cs_max_intervals,         NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_accuracy",             &sim->params->int_cs_accuracy,              NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "int_cs_stragg_max_intervals", &sim->params->int_cs_stragg_max_intervals,  NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_stragg_accuracy",      &sim->params->int_cs_stragg_accuracy,      NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "cs_adaptive",                 &sim->params->cs_adaptive,                 NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "cs_energy_step_max",          &sim->params->cs_energy_step_max,          NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "cs_depth_step_max",           &sim->params->cs_depth_step_max,           NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "cs_stragg_step_sigmas",       &sim->params->cs_stragg_step_sigmas,       NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "reaction_file_angle_tolerance", &sim->params->reaction_file_angle_tolerance, NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "bricks_skip_zero_conc_ranges",  &sim->params->bricks_skip_zero_conc_ranges,  NULL},
-            {JIBAL_CONFIG_VAR_NONE,   NULL,                          NULL,                                      NULL}
+            {JIBAL_CONFIG_VAR_UNIT,   "fluence",                       "",    UNIT_TYPE_ANY,    &sim->fluence,                               NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "energy",                        "keV", UNIT_TYPE_ENERGY, &sim->beam_E,                                NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",                  "keV", UNIT_TYPE_ENERGY, &sim->beam_E_broad,                          NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "emin",                          "keV", UNIT_TYPE_ENERGY, &sim->emin,                                  NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "alpha",                         "deg", UNIT_TYPE_ANGLE,  &sim->sample_theta,                          NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "phi",                           "deg", UNIT_TYPE_ANGLE,  &sim->sample_phi,                            NULL},
+            {JIBAL_CONFIG_VAR_STRING, "output",                        0, 0,                    &s->output_filename,                         NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "erd",                           0, 0,                    &sim->erd,                                   NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "rbs",                           0, 0,                    &sim->rbs,                                   NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "maxiter",                       0, 0,                    &fit->n_iters_max,                           NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",                    0, 0,                    &fit->xtol,                                  NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",               0, 0,                    &fit->chisq_tol,                             NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance",          0, 0,                    &fit->chisq_fast_tol,                        NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "n_bricks_max",                  0, 0,                    &sim->params->n_bricks_max,                  NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "ds",                            0, 0,                    &sim->params->ds,                            NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "rk4",                           0, 0,                    &sim->params->rk4,                           NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "brick_width_sigmas",            0, 0,                    &sim->params->brick_width_sigmas,            NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "sigmas_cutoff",                 0, 0,                    &sim->params->sigmas_cutoff,                 NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step",            "keV", UNIT_TYPE_ENERGY, &sim->params->incident_stop_params.step,     NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_sigmas",     0, 0,                    &sim->params->incident_stop_params.sigmas,   NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_min",        "keV", UNIT_TYPE_ENERGY, &sim->params->incident_stop_params.min,      NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_max",        "keV", UNIT_TYPE_ENERGY, &sim->params->incident_stop_params.max,      NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step",             "keV", UNIT_TYPE_ENERGY, &sim->params->exiting_stop_params.step,      NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_sigmas",      0, 0,                    &sim->params->exiting_stop_params.sigmas,    NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_min",         "keV", UNIT_TYPE_ENERGY, &sim->params->exiting_stop_params.min,       NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_max",         "keV", UNIT_TYPE_ENERGY, &sim->params->exiting_stop_params.max,       NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "ds_incident_stop_step_factor",  0, 0,                    &sim->params->ds_incident_stop_step_factor,  NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "nuclear_stopping_accurate",     0, 0,                    &sim->params->nuclear_stopping_accurate,     NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy",          0, 0,                    &sim->params->mean_conc_and_energy,          NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "geostragg",                     0, 0,                    &sim->params->geostragg,                     NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",                   "deg", UNIT_TYPE_ANGLE,  &sim->params->beta_manual,                   NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "cs_n_stragg_steps",             0, 0,                    &sim->params->cs_n_stragg_steps,             NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "gaussian_accurate",             0, 0,                    &sim->params->gaussian_accurate,             NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "int_cs_max_intervals",          0, 0,                    &sim->params->int_cs_max_intervals,          NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_accuracy",               0, 0,                    &sim->params->int_cs_accuracy,               NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "int_cs_stragg_max_intervals",   0, 0,                    &sim->params->int_cs_stragg_max_intervals,   NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_stragg_accuracy",        0, 0,                    &sim->params->int_cs_stragg_accuracy,        NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "cs_adaptive",                   0, 0,                    &sim->params->cs_adaptive,                   NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "cs_energy_step_max",            0, 0,                    &sim->params->cs_energy_step_max,            NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "cs_depth_step_max",             0, 0,                    &sim->params->cs_depth_step_max,             NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "cs_stragg_step_sigmas",         0, 0,                    &sim->params->cs_stragg_step_sigmas,         NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "reaction_file_angle_tolerance", 0, 0,                    &sim->params->reaction_file_angle_tolerance, NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "bricks_skip_zero_conc_ranges",  0, 0,                    &sim->params->bricks_skip_zero_conc_ranges,  NULL},
+            {JIBAL_CONFIG_VAR_NONE, NULL,                              0, 0, NULL,                                                           NULL}
     };
     c = script_command_list_from_vars_array(vars, 0);
     script_command_list_add_command(&c_set->subcommands, c);
     script_command_list_add_command(&head, c_set); /* End of "set" commands */
 
-    script_command *c_load = script_command_new("load", "Load something.", 0, NULL);
-    script_command_list_add_command(&c_load->subcommands, script_command_new("experimental", "Load an experimental spectrum.", 0, &script_load_experimental));
-    script_command_list_add_command(&c_load->subcommands, script_command_new("reference", "Load a reference spectrum.", 0, &script_load_reference));
-    script_command_list_add_command(&c_load->subcommands, script_command_new("script", "Load (run) a script.", 0, &script_load_script));
-    script_command_list_add_command(&c_load->subcommands, script_command_new("sample", "Load a sample.", 0, &script_load_sample));
-    script_command *c_reaction = script_command_new("reaction", "Load a reaction from R33 file.", 0, &script_load_reaction);
+    script_command *c_load = script_command_new("load", "Load something.", 0, 0, NULL);
+    script_command_list_add_command(&c_load->subcommands, script_command_new("experimental", "Load an experimental spectrum.", 0, 0, &script_load_experimental));
+    script_command_list_add_command(&c_load->subcommands, script_command_new("reference", "Load a reference spectrum.", 0, 0, &script_load_reference));
+    script_command_list_add_command(&c_load->subcommands, script_command_new("script", "Load (run) a script.", 0, 0, &script_load_script));
+    script_command_list_add_command(&c_load->subcommands, script_command_new("sample", "Load a sample.", 0, 0, &script_load_sample));
+    script_command *c_reaction = script_command_new("reaction", "Load a reaction from R33 file.", 0, 0, &script_load_reaction);
     script_command_list_add_command(&c_load->subcommands, c_reaction);
 #ifdef JABS_PLUGINS
-    script_command_list_add_command(&c_reaction->subcommands, script_command_new("plugin", "Load a reaction from a plugin.", 0, &script_load_reaction_plugin));
+    script_command_list_add_command(&c_reaction->subcommands, script_command_new("plugin", "Load a reaction from a plugin.", 0, 0, &script_load_reaction_plugin));
 #endif
-    script_command_list_add_command(&c_load->subcommands, script_command_new("roughness", "Load layer thickness table (roughness) from a file.", 0, &script_load_roughness));
+    script_command_list_add_command(&c_load->subcommands, script_command_new("roughness", "Load layer thickness table (roughness) from a file.", 0, 0, &script_load_roughness));
     script_command_list_add_command(&head, c_load); /* End of "load" commands */
 
-    script_command *c_show = script_command_new("show", "Show information on things.", 0, NULL);
-    script_command_list_add_command(&c_show->subcommands, script_command_new("aperture", "Show aperture.", 0, &script_show_aperture));
-    script_command_list_add_command(&c_show->subcommands, script_command_new("calc_params", "Show calculation parameters.", 0, &script_show_calc_params));
-    script_command_list_add_command(&c_show->subcommands, script_command_new("detector", "Show detector.", 0, &script_show_detector));
+    script_command *c_show = script_command_new("show", "Show information on things.", 0, 0, NULL);
+    script_command_list_add_command(&c_show->subcommands, script_command_new("aperture", "Show aperture.", 0, 0, &script_show_aperture));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("calc_params", "Show calculation parameters.", 0, 0, &script_show_calc_params));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("detector", "Show detector.", 0, 0, &script_show_detector));
 
-    script_command *c_fit = script_command_new("fit", "Show fit results.", 0, &script_show_fit);
+    script_command *c_fit = script_command_new("fit", "Show fit results.", 0, 0, &script_show_fit);
     script_command_list_add_command(&c_show->subcommands, c_fit);
-    script_command_list_add_command(&c_fit->subcommands, script_command_new("variables", "Show possible fit variables.", 0, &script_show_fit_variables));
-    script_command_list_add_command(&c_fit->subcommands, script_command_new("ranges", "Show fit ranges.", 0, &script_show_fit_ranges));
+    script_command_list_add_command(&c_fit->subcommands, script_command_new("variables", "Show possible fit variables.", 0, 0, &script_show_fit_variables));
+    script_command_list_add_command(&c_fit->subcommands, script_command_new("ranges", "Show fit ranges.", 0, 0, &script_show_fit_ranges));
 
-    script_command_list_add_command(&c_show->subcommands, script_command_new("reactions", "Show reactions.", 0, &script_show_reactions));
-    script_command_list_add_command(&c_show->subcommands, script_command_new("sample", "Show sample.", 0, &script_show_sample));
-    script_command_list_add_command(&c_show->subcommands, script_command_new("simulation", "Show simulation.", 0, &script_show_simulation));
-    script_command_list_add_command(&c_show->subcommands, script_command_new("stopping", "Show stopping (GSTO) assignments.", 0, &script_show_stopping));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("reactions", "Show reactions.", 0, 0, &script_show_reactions));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("sample", "Show sample.", 0, 0, &script_show_sample));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("simulation", "Show simulation.", 0, 0, &script_show_simulation));
+    script_command_list_add_command(&c_show->subcommands, script_command_new("stopping", "Show stopping (GSTO) assignments.", 0, 0, &script_show_stopping));
 
-    script_command *c_show_variable = script_command_new("variable", "Show variable.", 0, NULL);
+    script_command *c_show_variable = script_command_new("variable", "Show variable.", 0, 0, NULL);
     c_show_variable->f_var = script_show_var;
     c = script_command_list_from_vars_array(vars, 0);
     script_command_list_add_command(&c_show_variable->subcommands, c);
     script_command_list_add_command(&c_show->subcommands, c_show_variable);
     script_command_list_add_command(&head, c_show); /* End of "show" commands */
 
-    script_command_list_add_command(&head, script_command_new("exit", "Exit.", 0, &script_exit));
+    script_command_list_add_command(&head, script_command_new("exit", "Exit.", 0, 0, &script_exit));
 
-    c = script_command_new("save", "Save something.", 0, NULL);
-    script_command_list_add_command(&c->subcommands, script_command_new("bricks", "Save bricks.", 0, &script_save_bricks));
-    script_command_list_add_command(&c->subcommands, script_command_new("calibrations", "Save detector calibrations.", 0, &script_save_calibrations));
-    script_command_list_add_command(&c->subcommands, script_command_new("sample", "Save sample.", 0, &script_save_sample));
-    script_command_list_add_command(&c->subcommands, script_command_new("spectra", "Save spectra.", 0, &script_save_spectra));
+    c = script_command_new("save", "Save something.", 0, 0, NULL);
+    script_command_list_add_command(&c->subcommands, script_command_new("bricks", "Save bricks.", 0, 0, &script_save_bricks));
+    script_command_list_add_command(&c->subcommands, script_command_new("calibrations", "Save detector calibrations.", 0, 0, &script_save_calibrations));
+    script_command_list_add_command(&c->subcommands, script_command_new("sample", "Save sample.", 0, 0, &script_save_sample));
+    script_command_list_add_command(&c->subcommands, script_command_new("spectra", "Save spectra.", 0, 0, &script_save_spectra));
     script_command_list_add_command(&head, c); /* End of "save" commands */
 
-    c = script_command_new("test", "Test something.", 0, NULL);
-    script_command_list_add_command(&c->subcommands, script_command_new("reference", "Test simulated spectrum against reference spectrum.", 0, &script_test_reference));
-    script_command_list_add_command(&c->subcommands, script_command_new("roi", "Test ROI.", 0, &script_test_roi));
+    c = script_command_new("test", "Test something.", 0, 0, NULL);
+    script_command_list_add_command(&c->subcommands, script_command_new("reference", "Test simulated spectrum against reference spectrum.", 0, 0, &script_test_reference));
+    script_command_list_add_command(&c->subcommands, script_command_new("roi", "Test ROI.", 0, 0, &script_test_roi));
     script_command_list_add_command(&head, c); /* End of "test" commands */
 
-    c = script_command_new("add", "Add something.", 0, NULL);
-    script_command *c_add_detector = script_command_new("detector", "Add a detector.", 0, NULL);
-    script_command_list_add_command(&c_add_detector->subcommands, script_command_new("default", "Add a default detector.", 0, &script_add_detector_default));
+    c = script_command_new("add", "Add something.", 0, 0, NULL);
+    script_command *c_add_detector = script_command_new("detector", "Add a detector.", 0, 0, NULL);
+    script_command_list_add_command(&c_add_detector->subcommands, script_command_new("default", "Add a default detector.", 0, 0, &script_add_detector_default));
     script_command_list_add_command(&c->subcommands, c_add_detector);
 
 
-    script_command *c_add_fit = script_command_new("fit", "Add something related to fit.", 0, NULL);
-    script_command_list_add_command(&c_add_fit->subcommands, script_command_new("range", "Add a fit range", 0, &script_add_fit_range));
+    script_command *c_add_fit = script_command_new("fit", "Add something related to fit.", 0, 0, NULL);
+    script_command_list_add_command(&c_add_fit->subcommands, script_command_new("range", "Add a fit range", 0, 0, &script_add_fit_range));
     script_command_list_add_command(&c->subcommands, c_add_fit);
 
-    script_command_list_add_command(&c->subcommands, script_command_new("reaction", "Add a reaction.", 0, &script_add_reaction));
-    script_command_list_add_command(&c->subcommands, script_command_new("reactions", "Add reactions (of some type).", 0, &script_add_reactions));
+    script_command_list_add_command(&c->subcommands, script_command_new("reaction", "Add a reaction.", 0, 0, &script_add_reaction));
+    script_command_list_add_command(&c->subcommands, script_command_new("reactions", "Add reactions (of some type).", 0, 0, &script_add_reactions));
     script_command_list_add_command(&head, c); /* End of "add" commands */
 
-    c = script_command_new("remove", "Remove something.", 0, NULL);
-    script_command_list_add_command(&c->subcommands, script_command_new("reaction", "Remove reaction.", 0, &script_remove_reaction));
+    c = script_command_new("remove", "Remove something.", 0, 0, NULL);
+    script_command_list_add_command(&c->subcommands, script_command_new("reaction", "Remove reaction.", 0, 0, &script_remove_reaction));
     script_command_list_add_command(&head, c);
 
-    c = script_command_new("reset", "Reset something (or everything).", 0, &script_reset);
-    script_command_list_add_command(&c->subcommands, script_command_new("detectors", "Reset detectors.", 0, &script_reset_detectors));
-    script_command_list_add_command(&c->subcommands, script_command_new("experimental", "Reset experimental spectra.", 0, &script_reset_experimental));
-    script_command_list_add_command(&c->subcommands, script_command_new("reference", "Reset reference spectrum.", 0, &script_reset_reference));
-    script_command_list_add_command(&c->subcommands, script_command_new("fit", "Reset fit (ranges).", 0, &script_reset_fit));
-    script_command_list_add_command(&c->subcommands, script_command_new("reactions", "Reset reactions.", 0, &script_reset_reactions));
-    script_command_list_add_command(&c->subcommands, script_command_new("sample", "Reset sample.", 0, &script_reset_sample));
-    script_command_list_add_command(&c->subcommands, script_command_new("stopping", "Reset stopping assignments.", 0, &script_reset_stopping));
+    c = script_command_new("reset", "Reset something (or everything).", 0, 0, &script_reset);
+    script_command_list_add_command(&c->subcommands, script_command_new("detectors", "Reset detectors.", 0, 0, &script_reset_detectors));
+    script_command_list_add_command(&c->subcommands, script_command_new("experimental", "Reset experimental spectra.", 0, 0, &script_reset_experimental));
+    script_command_list_add_command(&c->subcommands, script_command_new("reference", "Reset reference spectrum.", 0, 0, &script_reset_reference));
+    script_command_list_add_command(&c->subcommands, script_command_new("fit", "Reset fit (ranges).", 0, 0, &script_reset_fit));
+    script_command_list_add_command(&c->subcommands, script_command_new("reactions", "Reset reactions.", 0, 0, &script_reset_reactions));
+    script_command_list_add_command(&c->subcommands, script_command_new("sample", "Reset sample.", 0, 0, &script_reset_sample));
+    script_command_list_add_command(&c->subcommands, script_command_new("stopping", "Reset stopping assignments.", 0, 0, &script_reset_stopping));
     script_command_list_add_command(&head, c);
 
-    c = script_command_new("fit", "Do a fit.", 0, script_fit);
+    c = script_command_new("fit", "Do a fit.", 0, 0, script_fit);
     script_command_list_add_command(&head, c);
 
-    script_command *c_enable = script_command_new("enable", "Set boolean variable to true.", 0, NULL);
+    script_command *c_enable = script_command_new("enable", "Set boolean variable to true.", 0, 0, NULL);
     c_enable->f_var = &script_enable_var;
     c = script_command_list_from_vars_array(vars, JIBAL_CONFIG_VAR_BOOL);
     script_command_list_add_command(&c_enable->subcommands, c);
     script_command_list_add_command(&head, c_enable);
 
-    script_command *c_disable = script_command_new("disable", "Set boolean variable to true.", 0, NULL);
+    script_command *c_disable = script_command_new("disable", "Set boolean variable to true.", 0, 0, NULL);
     c_disable->f_var = &script_disable_var;
     c = script_command_list_from_vars_array(vars, JIBAL_CONFIG_VAR_BOOL);
     script_command_list_add_command(&c_disable->subcommands, c);
     script_command_list_add_command(&head, c_disable);
 
-    c = script_command_new("roi", "Show information from a region of interest.", 0, script_roi);
+    c = script_command_new("roi", "Show information from a region of interest.", 0, 0, script_roi);
     script_command_list_add_command(&head, c);
 
-    c = script_command_new("simulate", "Run a simulation.", 0, script_simulate);
+    c = script_command_new("simulate", "Run a simulation.", 0, 0, script_simulate);
     script_command_list_add_command(&head, c);
 
-    script_command *c_split = script_command_new("split", "Split something.", 0, NULL);
-    script_command *c_split_sample = script_command_new("sample", "Split something sample related.", 0, NULL);
-    script_command_list_add_command(&c_split_sample->subcommands, script_command_new("elements", "Split materials down to their constituent elements.", 0, script_split_sample_elements));
+    script_command *c_split = script_command_new("split", "Split something.", 0, 0, NULL);
+    script_command *c_split_sample = script_command_new("sample", "Split something sample related.", 0, 0, NULL);
+    script_command_list_add_command(&c_split_sample->subcommands, script_command_new("elements", "Split materials down to their constituent elements.", 0, 0, script_split_sample_elements));
     script_command_list_add_command(&c_split->subcommands, c_split_sample);
     script_command_list_add_command(&head, c_split);
 
-    script_command_list_add_command(&head, script_command_new("cwd", "Display current working directory.", 0, script_cwd));
-    script_command_list_add_command(&head, script_command_new("pwd", "Display current working directory.", 0, script_cwd));
-    script_command_list_add_command(&head, script_command_new("cd", "Change current working directory.", 0, script_cd));
-    script_command_list_add_command(&head, script_command_new("idf2jbs", "Convert IDF file to a JaBS script.", 0, script_idf2jbs));
+    script_command_list_add_command(&head, script_command_new("cwd", "Display current working directory.", 0, 0, script_cwd));
+    script_command_list_add_command(&head, script_command_new("pwd", "Display current working directory.", 0, 0, script_cwd));
+    script_command_list_add_command(&head, script_command_new("cd", "Change current working directory.", 0, 0, script_cd));
+    script_command_list_add_command(&head, script_command_new("idf2jbs", "Convert IDF file to a JaBS script.", 0, 0, script_idf2jbs));
     return script_commands_sort_all(head);
 }
 
@@ -1407,13 +1445,19 @@ script_command *script_commands_sort_all(script_command *head) {
     return head;
 }
 
-void script_commands_print(FILE *f, const struct script_command *commands) {
+void script_commands_print(const struct script_command *commands) {
     if(!commands)
         return;
+    size_t len_max = 0;
     for(const struct script_command *c = commands; c; c = c->next) {
         if(!c->help_text)
             continue;
-        jabs_message(MSG_INFO, f, " %20s    %s\n", c->name, c->help_text);
+        len_max = JABS_MAX(len_max, strlen(c->name));
+    }
+    for(const struct script_command *c = commands; c; c = c->next) {
+        if(!c->help_text)
+            continue;
+        jabs_message(MSG_INFO, stderr, " %*s    %s\n", len_max, c->name, c->help_text);
     }
 }
 
@@ -2011,7 +2055,10 @@ script_command_status script_set_detector_calibration_poly(struct script_session
     calibration *c = calibration_init_poly(n);
     calibration_copy_params(c, detector_get_calibration(det, s->Z_active)); /* This, de facto, only copies resolution from old calibration, since the rest are overwritten very soon. */
     for(int i = 0; i <= (int) n; i++) {
-        calibration_set_param(c, i, jibal_get_val(s->jibal->units, UNIT_TYPE_ANY, argv[0]));
+        if(jabs_unit_convert(s->jibal->units, UNIT_TYPE_ANY, argv[0], calibration_get_param_ref(c, i)) < 0) {
+            calibration_free(c);
+            return SCRIPT_COMMAND_FAILURE;
+        }
         argc--;
         argv++;
     }
@@ -2040,6 +2087,7 @@ script_command_status script_set_detector_name(struct script_session *s, int arg
     }
     if(argc < 1) {
         jabs_message(MSG_ERROR, stderr, "Usage: set detector {<detector>} name <name>\n");
+        return SCRIPT_COMMAND_FAILURE;
     }
     if(detector_set_name(det, argv[0])) {
         jabs_message(MSG_ERROR, stderr, "Could not set name \"%s\". Please note some names are forbidden because they could be confused with detector numbers and commands.\n", argv[0]);

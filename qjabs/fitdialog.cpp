@@ -24,6 +24,11 @@ void FitDialog::updateStats(fit_stats stats)
     ui->phaseSpinBox->setValue(stats.phase);
     ui->iterSpinBox->setValue(stats.iter);
     ui->chisqDoubleSpinBox->setValue(stats.chisq_dof);
+    if(stats.chisq_dof == 0.0) {
+        ui->chisqDoubleSpinBox->setEnabled(false);
+    } else {
+        ui->chisqDoubleSpinBox->setEnabled(true);
+    }
 }
 
 FitDialog::~FitDialog()

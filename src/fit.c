@@ -232,15 +232,12 @@ int fit_speedup(fit_data *fit) { /* Returns < 0 on failure, FALSE if speedup is 
 
 int fit_speedup_fluence(struct fit_data *fit, const fit_variable *var) {
     double scale = *(var->value) / var->value_iter;
-    //fprintf(stderr, "Varying fluence (iter %zu, call %zu) by %12.10lf (variable %s).\n", fit->stats.iter, fit->stats.iter_call, scale, var->name);
     assert(scale != 1.0);
     for(size_t i = 0; i < fit->n_ws; i++) {
         sim_workspace *ws = fit_data_ws(fit, i);
-        //fprintf(stderr, "Histo sum before %.12g\n", gsl_histogram_sum(ws->histo_sum));
         gsl_histogram_reset(ws->histo_sum);
         sim_workspace_histograms_scale(ws, scale);
         sim_workspace_calculate_sum_spectra(ws);
-        //fprintf(stderr, "Histo sum after %.12g\n", gsl_histogram_sum(ws->histo_sum));
     }
     return GSL_SUCCESS;
 }

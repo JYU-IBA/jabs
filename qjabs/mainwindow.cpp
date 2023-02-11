@@ -32,13 +32,11 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowIcon(icon);
     ui->msgTextBrowser->setOpenLinks(false); /* We use the connection below to handle links */
     connect(ui->msgTextBrowser, &QTextBrowser::anchorClicked, this, &MainWindow::openLink);
+    //connect(this, &MainWindow::runFinished, this, &MainWindow::scrollMsgBoxToBottom);
     originalPath = QDir::currentPath();
     ui->splitter->setSizes(QList<int>() << 1 << 3 << 1);
     ui->splitter_2->setSizes(QList<int>() << 1 << 3);
-    ui->msgTextBrowser->insertPlainText(aboutString);
-    ui->msgTextBrowser->insertPlainText(QString(COPYRIGHT_STRING));
-    ui->msgTextBrowser->insertHtml("<p>Visit the <a href=\"https://github.com/JYU-IBA/jabs\">GitHub page</a> for latest information.</p>");
-    ui->msgTextBrowser->insertPlainText("\n\n");
+    showInitialMessages();
     ui->action_Run->setShortcutContext(Qt::ApplicationShortcut);
     ui->action_New_File->setShortcut(QKeySequence::New);
     ui->action_Open_File->setShortcut(QKeySequence::Open);
@@ -91,6 +89,7 @@ void MainWindow::addMessage(jabs_msg_level level, const char *msg)
         break;
     case MSG_WARNING:
         ui->msgTextBrowser->setTextColor(Qt::darkYellow);
+        warningCounter++;
         break;
     case MSG_DEBUG:
         ui->msgTextBrowser->setTextColor(Qt::gray);
@@ -115,7 +114,12 @@ void MainWindow::openFile(const QString &filename)
 {
     QFile file(filename);
     if(file.open(QFile::ReadOnly | QFile::Text)) {
-        ui->editor->setPlainText(file.readAll());
+        QByteArray data = file.readAll();
+        if(data.endsWith('\n')) {
+            ui->editor->setPlainText(data.sliced(0, data.size() -1));
+        } else {
+            ui->editor->setPlainText(data);
+        }
         file.close();
         setFilename(filename);
         setNeedsSaving(false);
@@ -125,7 +129,7 @@ void MainWindow::openFile(const QString &filename)
 }
 
 void MainWindow::runRoi(const QString &roi) {
-    runLine(QString("roi %1 %2").arg(ui->plotSpinBox->value()).arg(roi));
+    runLine(QString("roi %1 %2").arg(ui->comboBox->currentIndex()).arg(roi));
 }
 
 void MainWindow::plotDialogClosed()
@@ -155,10 +159,10 @@ int MainWindow::runLine(const QString &line) {
 
 void MainWindow::plotSession(bool error)
 {
+    updateDetectorList();
     if(session && session->fit && session->fit->sim && !error) {
-        ui->plotSpinBox->setMaximum(session->fit->sim->n_det);
-        ui->plotSettingsGroupBox->setVisible(session->fit->sim->n_det > 1);
-        plotSpectrum(ui->plotSpinBox->value() - 1);
+        size_t i_det = ui->comboBox->currentIndex();
+        plotSpectrum(i_det);
         if(firstRun) {
             ui->widget->resetZoom();
         }
@@ -321,14 +325,29 @@ void MainWindow::setNeedsSaving(bool value)
     updateWindowTitle();
 }
 
+void MainWindow::showInitialMessages()
+{
+    ui->msgTextBrowser->insertPlainText(aboutString);
+    ui->msgTextBrowser->insertPlainText(QString(COPYRIGHT_STRING));
+    ui->msgTextBrowser->insertHtml("<p>Visit the <a href=\"https://github.com/JYU-IBA/jabs\">GitHub page</a> for latest information.</p>");
+    ui->msgTextBrowser->insertPlainText("\n\n");
+}
+
 void MainWindow::updateListOfVisibleGraphs()
 {
-    visibleGraphs = ui->widget->visibleGraphs();
+    if(ui->widget->isVisible()) {
+        visibleGraphs = ui->widget->visibleGraphs();
+    }
+}
+
+void MainWindow::scrollMsgBoxToBottom()
+{
+    ui->msgTextBrowser->ensureCursorVisible();
+    //ui->msgTextBrowser->verticalScrollBar()->setValue(ui->msgTextBrowser->verticalScrollBar()->maximum());
 }
 
 int MainWindow::fitCallback(fit_stats stats)
 {
-    QCoreApplication::processEvents();
     if(!fitDialog) {
         fitDialog = new FitDialog();
         fitDialog->show();
@@ -337,6 +356,7 @@ int MainWindow::fitCallback(fit_stats stats)
     if(fitDialog->isPlotWhileFitting()) {
         plotSession(/*stats.error < 0*/);
     }
+    QCoreApplication::processEvents();
     return fitDialog->isAborted();
 }
 
@@ -346,7 +366,6 @@ void MainWindow::on_action_Run_triggered()
         QMessageBox::critical(this, "Error", "Session not initialized.\n");
         return;
     }
-    statusBar()->showMessage(QString("Running"));
     enableRun(false);
     if(firstRun) {
         resetAll();
@@ -359,12 +378,26 @@ void MainWindow::on_action_Run_triggered()
     QTextStream stream = QTextStream(&text, QIODevice::ReadOnly);
     size_t lineno = 0;
     bool error = false;
+    warningCounter = 0;
+    QElapsedTimer timer;
+    timer.start();
     while(!stream.atEnd() && !error) {
         QString line = stream.readLine();
         lineno++;
-#ifdef DEBUG
-        qDebug() << "Processing line " << lineno << line;
-#endif
+        QString command_str = line.split(" ").first();
+        const script_command *c = script_command_find(session->commands, qPrintable(command_str));
+        if(timer.elapsed() > 200 || c && (c->f == script_fit || c->f == script_simulate)) { /* Make sure stuff gets shown before sim or fit starts, or occasionally with a timer */
+            timer.restart();
+            if(c && c->f == script_fit) {
+                statusBar()->showMessage(QString("Running a fit."));
+            } else if(c && c->f == script_simulate) {
+                statusBar()->showMessage(QString("Running a simulation."));
+            } else {
+                statusBar()->showMessage(QString("Running."));
+            }
+            repaint();
+            QCoreApplication::processEvents();
+        }
         if(runLine(line) < 0) {
             error = true;
             break;
@@ -375,32 +408,34 @@ void MainWindow::on_action_Run_triggered()
                 break;
             }
         }
-        QCoreApplication::processEvents();
-        closeFitDialog(); /* if fit dialog was opened (by callback resulting in running this line), close it immediately*/
+        //closeFitDialog(); /* if fit dialog was opened (by callback resulting in running this line), close it immediately*/
     }
     closeFitDialog();
     enableRun(true);
-    ui->msgTextBrowser->ensureCursorVisible();
     plotSession(/*error */);
+    QString message;
     if(error) {
-        statusBar()->showMessage(QString("Error on line %1. Run aborted.").arg(lineno), 5000);
+        message = QString("Error on line %1. Run aborted.").arg(lineno);
     } else {
-        statusBar()->showMessage(QString("Run successful, %1 lines processed.").arg(lineno), 2000);
+        message = QString("Run successful, %1 lines processed.").arg(lineno);
         firstRun = false;
     }
+    if(warningCounter == 1) {
+        message.append(QString(" 1 warning."));
+    } else if(warningCounter > 1) {
+        message.append(QString(" %1 warnings.").arg(warningCounter));
+    }
+    statusBar()->showMessage(message, 5000);
+    QTimer::singleShot(0, this, &MainWindow::scrollMsgBoxToBottom); /* Messages come from queue somewhere, this makes scrolling happen after that */
+    emit runFinished();
 }
 
-
-void MainWindow::on_plotSpinBox_valueChanged(int arg1)
-{
-    plotSpectrum(arg1 - 1);
-}
 
 void MainWindow::plotSpectrum(size_t i_det)
 {
     ui->widget->clearAll();
     if(!session || !session->fit || !session->fit->sim || i_det >= session->fit->sim->n_det) {
-        ui->widget->replot();
+        ui->widget->setVisible(false);
         return;
     }
     gsl_histogram *sim_histo = fit_data_histo_sum(session->fit, i_det);
@@ -470,7 +505,10 @@ void MainWindow::plotSpectrum(size_t i_det)
         return;
     }
     ui->widget->setVisible(true);
-
+    if(ui->widget->visibleGraphs().isEmpty()) {
+        ui->widget->visibleGraphs().append("Simulated");
+        ui->widget->visibleGraphs().append("Experimental");
+    }
     for(int i = 0; i < ui->widget->graphCount(); ++i) {
         QString name = ui->widget->graph(i)->name();
         ui->widget->setGraphVisibility(ui->widget->graph(i), visibleGraphs.contains(name));
@@ -551,7 +589,7 @@ void MainWindow::on_action_New_File_triggered()
     filebasename.clear();
     QDir::setCurrent(originalPath);
     setNeedsSaving(false);
-
+    showInitialMessages();
 }
 
 
@@ -580,6 +618,7 @@ bool MainWindow::saveScriptToFile(const QString &filename)
     if(file.open(QFile::WriteOnly | QFile::Text)) {
         QTextStream stream(&file);
         stream << ui->editor->toPlainText();
+        stream << '\n';
         file.close();
     } else {
          QMessageBox::critical(this, tr("Error"), tr("Can not save to file."));
@@ -608,6 +647,7 @@ void MainWindow::resetAll()
     visibleGraphs.clear();
     visibleGraphs.append("Simulated");
     visibleGraphs.append("Experimental");
+    warningCounter = 0;
 }
 
 
@@ -618,12 +658,13 @@ void MainWindow::on_actionAbout_triggered()
 
 void MainWindow::on_commandLineEdit_returnPressed()
 {
+    warningCounter = 0;
     updateListOfVisibleGraphs();
     int status = runLine(ui->commandLineEdit->text());
     if(status == SCRIPT_COMMAND_SUCCESS) {
             ui->commandLineEdit->clear();
+            plotSession();
     }
-    plotSession(/*status < 0*/);
 }
 
 void MainWindow::on_msgTextBrowser_textChanged()
@@ -721,7 +762,7 @@ void MainWindow::on_actionIDF_triggered()
 
 void MainWindow::onEnergyAxisSet(bool value)
 {
-    size_t i_det = ui->plotSpinBox->value() - 1;
+    size_t i_det = ui->comboBox->currentIndex();
     plotSpectrum(i_det);
     ui->widget->resetZoom();
     settings.setValue("energyAxis", value);
@@ -730,5 +771,26 @@ void MainWindow::onEnergyAxisSet(bool value)
 void MainWindow::onSpectrumLegendMoved(bool outside)
 {
     settings.setValue("legendOutside", outside);
+}
+
+void MainWindow::updateDetectorList()
+{
+    if(!session || !session->fit || !session->fit->sim) {
+        ui->plotSettingsGroupBox->setVisible(false);
+        return;
+    }
+    ui->plotSettingsGroupBox->setVisible(session->fit->sim->n_det > 1);
+    int old_i_det = ui->comboBox->currentIndex();
+    ui->comboBox->clear();
+    for(size_t i_det = 0; i_det < session->fit->sim->n_det; i_det++) {
+        ui->comboBox->addItem(QString(session->fit->sim->det[i_det]->name));
+    }
+    ui->comboBox->setCurrentIndex(old_i_det < session->fit->sim->n_det ? old_i_det : 0);
+}
+
+
+void MainWindow::on_comboBox_currentIndexChanged(int index)
+{
+    plotSpectrum(index);
 }
 

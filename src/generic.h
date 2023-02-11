@@ -18,6 +18,10 @@
 #define _GNU_SOURCE
 #endif
 #include <stdio.h>
+#include <jibal_units.h>
+
+#define JABS_MAX(a,b) ((a) > (b) ? (a) : (b))
+#define JABS_MIN(a,b) ((a) < (b) ? (a) : (b))
 
 char **string_to_argv(const char *str, int *argc, char **s_out); /* Turns string str into an argument vector (output array allocated or NULL), number of arguments stored in argc. All argument strings point to one string, allocated and location stored to s_out */
 void argv_free(char **argv, char *s_out);
@@ -33,5 +37,6 @@ char *jabs_strip_newline(char *str);
 int jabs_line_is_comment(const char *line);
 char *jabs_file_extension(char *filename); /* Returns pointer in filename to the LAST dot, '.' in string filename or beginning of filename if not found. */
 const char *jabs_file_extension_const(const char *filename);
+int jabs_unit_convert(const jibal_units *units, char type, const char *str, double *out); /* Wrapper for jibal_unit_convert with error reporting via jabs_message() */
 double jabs_clock();
 #endif //JABS_GENERIC_H

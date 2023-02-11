@@ -30,6 +30,7 @@
 #include "win_compat.h"
 #include "generic.h"
 #include "defaults.h"
+#include "message.h"
 
 char **string_to_argv(const char *str, int *argc, char **s_out) { /* Returns allocated array of allocated strings, needs to be free'd (see argv_free()) */
     char *s = strdup(str);
@@ -52,7 +53,8 @@ char **string_to_argv(const char *str, int *argc, char **s_out) { /* Returns all
             continue;
         }
         out[i] = s + pos;
-        pos += strlen(out[i]);
+        size_t l = strlen(out[i]);
+        pos += l;
         i++;
     }
     if(n == 0) {
@@ -254,6 +256,36 @@ const char *jabs_file_extension_const(const char *filename) {
     for(ext = filename + strlen(filename); ext > filename && *ext != '.'; ext--) {}
     return ext;
 }
+
+int jabs_unit_convert(const jibal_units *units, char type, const char *str, double *out) {
+    int error;
+    if((error = jibal_unit_convert(units, type, str, out)) < 0) {
+        jabs_message(MSG_ERROR, stderr, "Conversion of value \"%s\" failed: %s\n", str, jibal_unit_conversion_error_string(error));
+        return error;
+    }
+    switch(type) {
+        case UNIT_TYPE_LAYER_THICKNESS:
+            if(*out < 0.1 * C_TFU) {
+                jabs_message(MSG_WARNING, stderr, "Layer thickness %g tfu (1e15 at./cm2) sounds quite small. Check your units.\n", *out / C_TFU);
+            }
+            break;
+        case UNIT_TYPE_ANGLE:
+            if(*out < -C_2PI || *out > C_2PI) {
+                jabs_message(MSG_WARNING, stderr, "Angle of %g degrees given. Check your units.\n", *out / C_DEG);
+            }
+            break;
+        case UNIT_TYPE_ENERGY:
+            if(*out > E_MAX) {
+                jabs_message(MSG_ERROR, stderr, "Energy of %g MeV given. Check your units.\n", *out / C_DEG);
+                error = -1000;
+            }
+            break;
+        default:
+            break;
+    }
+    return error;
+}
+
 
 double jabs_clock() {
 #ifdef _OPENMP

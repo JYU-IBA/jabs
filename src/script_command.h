@@ -20,8 +20,8 @@
 
 const char *script_command_status_to_string(script_command_status status);
 
-script_command *script_command_new(const char *name, const char *help_text, int val, script_command_status (*f)(struct script_session *, int, char * const *)); /* Allocates new command that doesn't do anything. Can return var. */
-int script_command_set_var(script_command *c, jibal_config_var_type type, void *variable, const jibal_option *option_list);
+script_command *script_command_new(const char *name, const char *help_text, int val, int argc_min, script_command_status (*f)(struct script_session *, int, char *const *)); /* Allocates new command that doesn't do anything. Can return var. */
+int script_command_set_var(script_command *c, jibal_config_var_type type, void *variable, const jibal_option *option_list, const char *unit, char unit_type);
 void script_command_free(script_command *c);
 void script_commands_free(script_command *head);
 
@@ -30,13 +30,12 @@ script_command *script_command_list_merge(script_command *left, script_command *
 script_command *script_command_list_merge_sort(script_command *head); /* Performs a merge sort of command list, sorts in alphabetical order by command name. Does not sort subcommands. */
 script_command *script_command_list_append(script_command *head, script_command *cmd);
 void script_command_list_add_command(script_command **head, script_command *c_new);
-script_command *script_command_list_from_command_array(const script_command *commands); /* commands is an array, must be "null-terminated" (name of last element is NULL pointer). Deep copy will be made. */
 script_command *script_command_list_from_vars_array(const jibal_config_var *vars, jibal_config_var_type type); /* vars is an array, must be "null-terminated" (name of last element is NULL pointer). Deep copy will be made. Can be restricted to type. */
 
 script_command *script_commands_create(struct script_session *s);
 script_command *script_commands_sort_all(script_command *head); /* Sorts all commands (tree) so that each subcommand (branch) is sorted by script_command_list_merge_sort() */
 int command_compare(const void *a, const void *b);
-void script_commands_print(FILE *f, const struct script_command *commands);
+void script_commands_print(const struct script_command *commands);
 size_t script_commands_size(const script_command *commands);
 void script_print_command_tree(FILE *f, const struct script_command *commands);
 script_command_status script_execute_command(struct script_session *s, const char *cmd);
@@ -46,6 +45,7 @@ const script_command *script_command_find(const script_command *commands, const 
 size_t script_command_print_possible_matches_if_ambiguous(const script_command *commands, const char *cmd_string);
 script_command_status script_set_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_show_var(struct script_session *s, jibal_config_var *var, int, char * const *);
+script_command_status script_set_charge(struct script_session *s, int argc, char *const *argv);
 script_command_status script_set_detector_val(struct script_session *s, int val, int argc, char *const *argv);
 script_command_status script_set_detector_calibration_val(struct script_session *s, int val, int argc, char *const *argv);
 script_command_status script_set_fit_val(struct script_session *s, int val, int argc, char *const *argv);
@@ -88,7 +88,6 @@ script_command_status script_save_spectra(struct script_session *s, int argc, ch
 script_command_status script_show_aperture(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_calc_params(script_session *s, int argc, char * const *argv);
 script_command_status script_show_detector(struct script_session *s, int argc, char * const *argv);
-script_command_status script_show_fit(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_fit(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_fit_variables(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_fit_ranges(struct script_session *s, int argc, char * const *argv);

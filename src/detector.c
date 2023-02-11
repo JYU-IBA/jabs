@@ -355,4 +355,5 @@ const char *detector_name(detector *det) {
             return "unnamed";
         }
     }
+    return "none";
 }

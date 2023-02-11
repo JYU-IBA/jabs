@@ -655,6 +655,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
     }
     while ((*argc) >= 2) {
         if(sm->n_ranges == n) {
+            size_t n_old = 0;
             if(n == 0) {
                 n = 8;
             } else {
@@ -663,17 +664,25 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             DEBUGMSG("(Re)allocating space for up to %zu ranges.", n);
             sm->ranges = realloc(sm->ranges, n * sizeof(sample_range));
             sm->materials = realloc(sm->materials, n * sizeof(jibal_material *));
-            if(!sm->ranges)
+            if(!sm->ranges || !sm->materials) {
                 return NULL;
+            }
+            for(size_t i = n_old; i < n; i++) { /* In case we need to bail out, set pointers to NULL so free doesn't fail */
+                sm->materials[i] = NULL;
+            }
         }
         sample_range *range = NULL;
         if(sm->n_ranges) {
             range = &sm->ranges[sm->n_ranges - 1];
         }
         if(range && (strcmp((*argv)[0], "rough") == 0 || strcmp((*argv)[0], "gamma") == 0)) {
-            range->rough.x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1]);
-            range->rough.model = ROUGHNESS_GAMMA;
-            range->rough.file = NULL;
+            if(jabs_unit_convert(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1], &range->rough.x) < 0) {
+                sample_model_free(sm);
+                return NULL;
+            } else {
+                range->rough.model = ROUGHNESS_GAMMA;
+                range->rough.file = NULL;
+            }
         } else if(range && strcmp((*argv)[0], "n_rough") == 0) {
             if(range->rough.model == ROUGHNESS_GAMMA) {
                 range->rough.n = strtoul((*argv)[1], NULL, 10);
@@ -695,7 +704,10 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
         } else if(range && strcmp((*argv)[0], "stragg") == 0) {
             range->stragg = strtod((*argv)[1], NULL);
         } else if(range && strcmp((*argv)[0], "density") == 0) {
-            range->density = jibal_get_val(jibal->units, UNIT_TYPE_DENSITY, (*argv)[1]);
+            if(jabs_unit_convert(jibal->units, UNIT_TYPE_DENSITY, (*argv)[1], &range->density) < 0) {
+                sample_model_free(sm);
+                return NULL;
+            }
         } else {
             sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, (*argv)[0]);
             if(!sm->materials[sm->n_ranges]) {
@@ -704,7 +716,10 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             }
             DEBUGMSG("Material from formula \"%s\" was created", (*argv)[0]);
             range = &sm->ranges[sm->n_ranges];
-            range->x = jibal_get_val(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1]);
+            if(jabs_unit_convert(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1], &range->x) < 0) {
+                sample_model_free(sm);
+                return NULL;
+            }
             range->bragg = 1.0;
             range->yield = 1.0;
             range->yield_slope = 0.0;
