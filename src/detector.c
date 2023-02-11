@@ -103,6 +103,7 @@ detector *detector_default(detector *det) {
     } else {
         calibration_free(det->calibration);
     }
+    det->name = NULL; /* When added, default name is given */
     det->type = DETECTOR_ENERGY;
     det->theta = DETECTOR_THETA_DEFAULT;
     det->phi = DETECTOR_PHI_DEFAULT;
@@ -130,6 +131,7 @@ void detector_free(detector *det) {
     sample_free(det->foil);
     aperture_free(det->aperture);
     detector_calibrations_free(det);
+    free(det->name);
     free(det);
 }
 
@@ -149,6 +151,7 @@ int detector_print(const jibal *jibal, const detector *det) {
         DEBUGSTR("Tried to print detector that does not exist.\n");
         return EXIT_FAILURE;
     }
+    jabs_message(MSG_INFO, stderr, "name = %s\n", det->name);
     jabs_message(MSG_INFO, stderr, "type = %s\n", detector_type_name(det));
     char *calib_str = calibration_to_string(det->calibration);
     jabs_message(MSG_INFO, stderr, "calibration = %s\n", calib_str);
@@ -314,5 +317,42 @@ double detector_param_unit_factor(const detector *det) {
             return C_KEV;
         default:
             return 1.0;
+    }
+}
+
+int detector_set_name(detector *det, const char *name) {
+    if(!name) {
+        return EXIT_FAILURE;
+    }
+    if(isdigit(*name)) {
+        return EXIT_FAILURE;
+    }
+    static const char *keywords[] = {"first", "last", "unnamed", "none",
+                                     "aperture", "beta", "calibration", "channels",
+                                     "column", "compress", "distance", "foil", "length",
+                                     "name", "offset", "phi", "resolution", "slope",
+                                     "solid", "theta", "type", 0}; /* Not allowed names */
+
+
+    for(const char **k = keywords; *k != 0; k++) {
+        if(strcmp(*k, name) == 0) {
+            return EXIT_FAILURE;
+        }
+    }
+    free(det->name);
+    det->name = strdup(name);
+    if(!det->name) {
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
+const char *detector_name(detector *det) {
+    if(det){
+        if(det->name) {
+            return det->name;
+        } else {
+            return "unnamed";
+        }
     }
 }

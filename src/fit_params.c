@@ -78,6 +78,7 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
     p->vars = realloc(p->vars, sizeof(fit_variable) * p->n);
     fit_variable *var = &(p->vars[p->n - 1]);
     var->value = value;
+    var->value_orig = 0.0;
     var->value_final = 0.0;
     var->value_iter = 0.0;
     var->err = 0.0;
@@ -88,7 +89,7 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
     var->unit_factor = unit_factor;
     var->active = FALSE;
     var->active_iter_call = FALSE;
-    var->i_v = 0;
+    var->i_v = SIZE_MAX;
     var->i_det = i_det;
     DEBUGMSG("Fit parameter %s added successfully (total %zu).", var->name, p->n);
     return EXIT_SUCCESS;
@@ -114,6 +115,7 @@ void fit_params_print(const fit_params *params, int active, const char *pattern,
         if(pattern && !is_match(var->name, pattern))
             continue;
         jabs_message(MSG_INFO, stderr, "%s %24s = %g %s %s\n", var->active ? "X" : "  ", var->name, *(var->value) / var->unit_factor, var->unit, var->i_det < n_det ? "(detector specific variable)":"");
+        DEBUGMSG("This one is %p, raw value %.12g, i_v = %zu\n", (void *)var->value, *var->value, var->i_v);
     }
 }
 

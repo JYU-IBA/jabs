@@ -52,7 +52,7 @@ script_command_status script_set_fit_val(struct script_session *s, int val, int 
 script_command_status script_set_simulation_val(struct script_session *s, int val, int argc, char *const *argv);
 script_command_status script_enable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
 script_command_status script_disable_var(struct script_session *s, jibal_config_var *var, int, char * const *);
-script_command_status script_add_detector(struct script_session *s, int argc, char * const *argv);
+script_command_status script_add_detector_default(struct script_session *s, int argc, char * const *argv);
 script_command_status script_add_fit_range(struct script_session *s, int argc, char * const *argv);
 script_command_status script_add_reaction(struct script_session *s, int argc, char * const *argv);
 script_command_status script_add_reactions(struct script_session *s, int argc, char * const *argv);
@@ -106,6 +106,7 @@ script_command_status script_set_detector_aperture(struct script_session *s, int
 script_command_status script_set_detector_calibration(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_detector_foil(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_detector_calibration_poly(struct script_session *s, int argc, char *const *argv);
+script_command_status script_set_detector_name(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_sample(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_stopping(struct script_session *s, int argc, char * const *argv);
 script_command_status script_test_reference(struct script_session *s, int argc, char * const *argv);

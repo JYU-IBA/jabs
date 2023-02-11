@@ -38,6 +38,7 @@ static const jibal_option detector_option[] = {
 };
 
 typedef struct detector {
+    char *name;
     detector_type type;
     struct calibration *calibration;
     struct calibration **calibration_Z; /* Array of calibrations for a given Z. calibration_Z[i] NULL means use default calibration for Z == i. Array is dynamically allocated (number of elements: cal_Z_max + 1) as and when required, so this should be NULL when cal_Z_max == 0. */
@@ -75,4 +76,6 @@ char *detector_resolution_to_string(const detector *det, int Z);
 void detector_update(detector *det);
 const char *detector_param_unit(const detector *det); /* return a suitable unit based on detector type, e.g. "keV" when type == DETECTOR_ENERGY. TODO: use this wisely (we can simulate energy spectra with a ToF detector!) */
 double detector_param_unit_factor(const detector *det);
+int detector_set_name(detector *det, const char *name);
+const char *detector_name(detector *det);
 #endif //JABS_DETECTOR_H

@@ -109,7 +109,11 @@ int sample_model_sanity_check(const sample_model *sm) {
             return EXIT_FAILURE;
         }
         if(r->bragg < 0.0 || r->stragg < 0.0 || r->yield < 0.0) {
-            jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative ad-hoc correction parameter (bragg, stragg or yield) at layer/range %zu).\n", i + 1);
+            jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative ad-hoc correction parameter (bragg (%g), stragg (%g) or yield (%g)) at layer/range %zu).\n",
+                         r->bragg, r->stragg, r->yield, i + 1);
+#ifdef DEBUG
+            sample_model_print("debug_sample.txt", sm);
+#endif
             return EXIT_FAILURE;
         }
     }
@@ -307,7 +311,7 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
         fprintf(stderr, "%zu: %s  (Z = %i, A = %i)\n", i, s->isotopes[i]->name, s->isotopes[i]->Z, s->isotopes[i]->A);
     }
 #endif
-    s->ranges = malloc(s->n_ranges * sizeof(struct sample_range));
+    s->ranges = calloc(s->n_ranges, sizeof(struct sample_range));
     s->cbins = calloc(s->n_ranges * s->n_isotopes, sizeof(double));
     memcpy(s->ranges, sm->ranges, sizeof (struct sample_range) * sm->n_ranges);
     for(i = 0; i < sm->n_ranges; i++) {

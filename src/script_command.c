@@ -1189,8 +1189,9 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_detector->subcommands, script_command_new("solid", "Set detector solid angle.", 's', NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("theta", "Set detector (scattering) angle.", 'T', NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("length", "Set detector length (for ToF).", 'l', NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("beta", "Set exit angle (angle of ion in sample) for this detector.", 'b', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("beta", "Set exit angle (angle of ion in sample) for this detector (manually).", 'b', NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "Set detector azimuth angle, 0 = IBM, 90 deg = Cornell.", 'p', NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("name", "Set detector name.", 0, &script_set_detector_name));
     script_command_list_add_command(&c_set->subcommands, c_detector);
 
     script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, &script_set_ion));
@@ -1315,7 +1316,10 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&head, c); /* End of "test" commands */
 
     c = script_command_new("add", "Add something.", 0, NULL);
-    script_command_list_add_command(&c->subcommands, script_command_new("detector", "Add a detector.", 0, &script_add_detector));
+    script_command *c_add_detector = script_command_new("detector", "Add a detector.", 0, NULL);
+    script_command_list_add_command(&c_add_detector->subcommands, script_command_new("default", "Add a default detector.", 0, &script_add_detector_default));
+    script_command_list_add_command(&c->subcommands, c_add_detector);
+
 
     script_command *c_add_fit = script_command_new("fit", "Add something related to fit.", 0, NULL);
     script_command_list_add_command(&c_add_fit->subcommands, script_command_new("range", "Add a fit range", 0, &script_add_fit_range));
@@ -1808,20 +1812,20 @@ script_command_status script_show_detector(script_session *s, int argc, char *co
             jabs_message(MSG_ERROR, stderr, "No detectors set or other error.\n");
         }
     } else {
-        jabs_message(MSG_INFO, stderr, "  # | col | theta |   phi |   solid |     type | resolution | calibration\n");
-        jabs_message(MSG_INFO, stderr, "    |     |   deg |   deg |     msr |          |            |            \n");
+        jabs_message(MSG_INFO, stderr, "  # |         name | col | theta |   phi |   solid |     type | resolution | calibration\n");
+        jabs_message(MSG_INFO, stderr, "    |              |     |   deg |   deg |     msr |          |            |            \n");
         for(size_t i = 0; i < fit->sim->n_det; i++) {
             detector *det = sim_det(fit->sim, i);
             if(!det)
                 continue;
             char *calib_str = calibration_to_string(det->calibration);
             char *reso_str = detector_resolution_to_string(det, JIBAL_ANY_Z);
-            jabs_message(MSG_INFO, stderr, "%3zu | %3zu | %5.1lf | %5.1lf | %7.3lf | %8s | %10s | %s\n",
-                         i + 1, det->column, det->theta / C_DEG, det->phi / C_DEG, det->solid / C_MSR, detector_type_name(det), reso_str, calib_str);
+            jabs_message(MSG_INFO, stderr, "%3zu | %12s | %3zu | %5.1lf | %5.1lf | %7.3lf | %8s | %10s | %s\n",
+                         i + 1, det->name, det->column, det->theta / C_DEG, det->phi / C_DEG, det->solid / C_MSR, detector_type_name(det), reso_str, calib_str);
             free(calib_str);
             free(reso_str);
         }
-        jabs_message(MSG_INFO, stderr, "Use 'show detector <number>' to get more information on a particular detector.\n");
+        jabs_message(MSG_INFO, stderr, "Use 'show detector <number>' to get more information on a particular detector or 'reset detectors' to remove all of them.\n");
     }
     return argc_orig - argc; /* Number of arguments */
 }
@@ -2026,6 +2030,22 @@ script_command_status script_set_detector_calibration_poly(struct script_session
     }
     detector_set_calibration_Z(s->jibal->config, det, c, s->Z_active);
     return argc_orig - argc;
+}
+
+script_command_status script_set_detector_name(struct script_session *s, int argc, char * const *argv) {
+    detector *det = sim_det(s->fit->sim, s->i_det_active);
+    if(!det) {
+        jabs_message(MSG_ERROR, stderr, "No detector(s)\n");
+        return SCRIPT_COMMAND_SUCCESS;
+    }
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, stderr, "Usage: set detector {<detector>} name <name>\n");
+    }
+    if(detector_set_name(det, argv[0])) {
+        jabs_message(MSG_ERROR, stderr, "Could not set name \"%s\". Please note some names are forbidden because they could be confused with detector numbers and commands.\n", argv[0]);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return 1;
 }
 
 script_command_status script_set_sample(script_session *s, int argc, char *const *argv) {
@@ -2265,24 +2285,12 @@ script_command_status script_add_reactions(script_session *s, int argc, char *co
     return 0;
 }
 
-script_command_status script_add_detector(script_session *s, int argc, char *const *argv) {
+script_command_status script_add_detector_default(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
-    if(argc < 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: add detector {default}\n", argv[0]);
-        return SCRIPT_COMMAND_FAILURE;
-    }
-    script_set_detector(s, argc - 1, argv + 1);
-    detector *det;
-    if(strcmp(argv[0], "default") == 0) {
-        det = detector_default(NULL);
-    } else {
-        jabs_message(MSG_WARNING, stderr, "Adding other types of detectors except default (add detector default) is currently not supported.\n");
-        return 0; /* No arguments consumed, no error */
-    }
-    if(fit_data_add_det(fit, det)) {
+    if(fit_data_add_det(fit, detector_default(NULL))) {
         return SCRIPT_COMMAND_FAILURE;
     } else {
-        return 1;
+        return 0;
     }
 }
 

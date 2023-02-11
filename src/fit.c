@@ -41,6 +41,18 @@
 #endif
 
 
+int fit_detector(const jibal *jibal, const simulation *sim, const sample *sample, detector *det) {
+    detector_update(det);
+    sim_workspace *ws = sim_workspace_init(jibal, sim, det);
+    if(detector_sanity_check(det, ws->n_channels)) {
+        jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!\n", det->name);
+        return EXIT_FAILURE;
+    }
+    //spectrum_set_calibration(fit_data_exp(fit, i_det), det->calibration);
+    return EXIT_SUCCESS;
+}
+
+
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     struct fit_data *fit = (struct fit_data *) params;
     fit->stats.iter_call++;
@@ -50,7 +62,6 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
 
     DEBUGMSG("Fit iteration %zu call %zu. Size of vector x: %zu, f: %zu. Of %zu active fit parameters, %zu are being varied this function call.",
             fit->stats.iter, fit->stats.iter_call, x->size, f->size, fit->fit_params->n_active, fit->fit_params->n_active_iter_call);
-
 #if 0 /* Effect of varying some parameters (if only one at a time) can be easily "simulated", e.g. varying fluence. This code is for that. Workspace initialization has changed, so this no longer works without modifications. */
     int ret = fit_speedup(fit);
     if(ret == GSL_FAILURE) {
@@ -114,12 +125,11 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     fit->stats.n_workspaces_iter += fit->n_ws_active;
     if(fit->n_ws == fit->n_ws_active) { /* All workspaces were active, just set f vector */
         fit->stats.error = fit_set_residuals(fit, f);
-        DEBUGMSG("Set residuals for all workspaces.");
+        DEBUGSTR("Set residuals for all workspaces.");
         if(fit->stats.iter_call == 1) { /* First call of iter, store sum histograms and f vector to fit */
             fit_data_histo_sum_store(fit);
-            DEBUGMSG("First call of iter, storing f vector.");
+            DEBUGSTR("First call of iter, storing f vector.");
             gsl_vector_memcpy(fit->f_iter, f);
-            fit->magic_bricks = TRUE;
         }
         if(fit->stats.error) {
             return GSL_FAILURE;
@@ -127,7 +137,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     } else { /* Partial update, copy stored f vector and update only stuff we just simulated */
         assert(fit->stats.iter_call > 1);
         gsl_vector_memcpy(f, fit->f_iter);
-        DEBUGMSG("Set residuals for some workspaces.");
+        DEBUGSTR("Set residuals for some workspaces.");
         for(size_t i_ws = 0; i_ws < fit->n_ws; i_ws++) {
             if(fit->ws_val[i_ws].active_iter_call) {
                 fit->stats.error = fit_set_residuals_detector(fit, f, i_ws); /* i_ws instead of ws, because exp is stored in fit->exp array */
@@ -137,7 +147,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
             }
         }
     }
-    DEBUGMSG("Successful fit function call.");
+    DEBUGSTR("Successful fit function call.");
     return GSL_SUCCESS;
 }
 
@@ -170,7 +180,7 @@ int fit_init_active_workspaces(fit_data *fit) {
                 i + 1, fit->fit_params->n_active_iter_call, var->name, *(var->value), var->value_iter, *(var->value) / var->value_iter - 1.0);
     }
 
-    DEBUGMSG("Active workspaces:");
+    DEBUGSTR("Active workspaces:");
     fit->n_ws_active = 0;
     for(size_t i_ws = 0; i_ws < fit->n_ws; i_ws++) { /* Count number of active workspaces, fill an array of them */
         fit_data_workspace_val *v = &fit->ws_val[i_ws];
@@ -216,54 +226,6 @@ int fit_speedup(fit_data *fit) { /* Returns < 0 on failure, FALSE if speedup is 
             return GSL_FAILURE;
         }
         return TRUE;
-    }
-    return FALSE;
-    for(size_t i_ws = 0; i_ws < fit->n_ws; i_ws++) { /* Try to figure out if (re-)convoluting the spectra is enough (for a workspace) */
-        sim_workspace *ws = fit->ws[i_ws];
-        if(ws->params->ds) { /* Reconvolution needs nice bricks. DS breaks them. */
-            continue;
-        }
-        if(sample_number_of_rough_ranges(ws->sample) != 0) {  /* Reconvolution needs nice bricks. Roughness breaks them. */
-            continue;
-        }
-        if(!fit->magic_bricks) { /* Sadly, we can only do speedups if magic (bricks were created by the first call of the iteration) is preserved. */
-            continue;
-        }
-        size_t n_cal_params_active = 0; /* In this workspace! */
-        calibration *cal = ws->det->calibration;
-        size_t n_cal_param = calibration_get_number_of_params(cal);
-        for(int i_cal_param = CALIBRATION_PARAM_RESOLUTION; i_cal_param < (int) n_cal_param; i_cal_param++) {
-            double *calparam = calibration_get_param_ref(cal, i_cal_param);
-            for(size_t i_var = 0; i_var < n_active; i_var++) {
-                if(vars[i_var]->value == calparam) {
-                    //fprintf(stderr, "Variable %s is a good match with detector calibration parameter %i\n", vars[i_var]->name, i_cal_param);
-                    n_cal_params_active++;
-                }
-            }
-        }
-        if(n_active == n_cal_params_active) { /* Just reconvolution is enough. */
-            fprintf(stderr, "Just reconvoluting, since out of %zu parameters being varied, all %zu are related to workspace %zu detector calibration. These are their names:\n", n_active, n_cal_params_active, i_ws + 1);
-            for(size_t i_var = 0; i_var < n_active; i_var++) {
-                fit_variable *var = vars[i_var];
-                fprintf(stderr, " %s, being currently %g (%g keV maybe), and being varied by %e\n", var->name, *(var->value),  *(var->value)/C_KEV, ((*var->value)/var->value_iter) - 1.0);
-            }
-            fprintf(stderr, "\n");
-            double sum_before = gsl_histogram_sum(ws->histo_sum);
-            if(detector_sanity_check(ws->det, ws->n_channels) != 0) {
-                fprintf(stderr, "Detector failed sanity check.\n");
-                return GSL_FAILURE;
-            }
-            sim_workspace_histograms_reset(ws);
-            detector_update(sim_det(fit->sim, i_ws)); /* ws->det is const, workaround. This should update the resolution variance if det->resolution is changed */
-            sim_workspace_histograms_calculate(ws); /* This uses old bricks, hopefully they are valid! (with roughness or DS probably not!) */
-            sim_workspace_calculate_sum_spectra(ws);
-            double sum_after = gsl_histogram_sum(ws->histo_sum);
-            fprintf(stderr, "Sum before %.12g, sum after %.12g\n", sum_before, sum_after);
-            return TRUE;
-        } else {
-            //fprintf(stderr, "Doin nothing, since %zu != %zu, i_ws = %zu\n", n_active, n_cal_params_active, i_ws + 1);
-            return FALSE;
-        }
     }
     return FALSE;
 }
@@ -372,7 +334,7 @@ int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x) {
         } else if(var->value_iter != *(var->value)) { /* On subsequent calls, value can be changed from stored value by the fitting algorithm */
             var->active_iter_call = TRUE;
             fit->fit_params->n_active_iter_call++;
-            DEBUGMSG(" %s  i_v=%zu orig=%12.10lf iter=%12.10lf", var->name, var->i_v, *(var->value) / var->value_orig, *(var->value) / var->value_iter);
+            DEBUGMSG(" %s  i_v=%zu (%p) orig=%12.10lf iter=%12.10lf", var->name, var->i_v, (void *)var->value, *(var->value) / var->value_orig, *(var->value) / var->value_iter);
         } else { /* Not active, since it's not the first call and value is the same as in the first call */
             var->active_iter_call = FALSE;
         }
@@ -590,7 +552,10 @@ fit_params *fit_params_all(fit_data *fit) {
         for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
             sample_range *r = &(sm->ranges[i_range]);
             size_t range_index = i_range + 1; /* Human readable indexing */
-            if(r->x > 0.0) {
+            if(r->x < 0.0) { /* Don't fit anything if thickness is zero (negative shouldn't be possible) */
+                continue;
+            }
+            if(r->rough.model != ROUGHNESS_FILE) { /* Layer thickness is not a parameter with arbitrary roughness from a file */
                 snprintf(param_name, param_name_max_len, "thick%zu", range_index);
                 fit_params_add_parameter(params, &(r->x), param_name, "tfu", C_TFU, sim->n_det);
             }
@@ -601,7 +566,7 @@ fit_params *fit_params_all(fit_data *fit) {
             snprintf(param_name, param_name_max_len, "yield_slope%zu", range_index);
             fit_params_add_parameter(params, &(r->yield_slope), param_name, "", 1.0, sim->n_det);
 
-            if(i_range == sm->n_ranges - 1) { /* Last range, add chanelling "aliases" (=yield corrections) */
+            if(i_range == sm->n_ranges - 1) { /* Last range, add channeling "aliases" (=yield corrections) */
                 snprintf(param_name, param_name_max_len, "channeling");
                 fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0, sim->n_det);
 
@@ -615,7 +580,7 @@ fit_params *fit_params_all(fit_data *fit) {
             snprintf(param_name, param_name_max_len, "stragg%zu", range_index);
             fit_params_add_parameter(params, &(r->stragg), param_name, "", 1.0, sim->n_det);
 
-            if(r->rough.model != ROUGHNESS_NONE && r->rough.x > 0.0) {
+            if(r->rough.model == ROUGHNESS_GAMMA && r->rough.x > 0.0) {
                 snprintf(param_name, param_name_max_len, "rough%zu", range_index);
                 fit_params_add_parameter(params, &(r->rough.x), param_name, "tfu", C_TFU, sim->n_det);
             }
@@ -879,7 +844,6 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
             fit_data->stats.cputime_iter = 0.0;
             fit_data->stats.n_evals_iter = 0;
             fit_data->stats.n_workspaces_iter = 0;
-            fit_data->magic_bricks = FALSE;
             status = gsl_multifit_nlinear_iterate(w);
             DEBUGMSG("Iteration status %i (%s)", status, gsl_strerror(status));
         }
@@ -944,63 +908,66 @@ void fit_covar_print(const gsl_matrix *covar) {
     }
 }
 
-int fit(struct fit_data *fit_data) {
+int fit(fit_data *fit) {
     const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
     gsl_multifit_nlinear_workspace *w;
     gsl_multifit_nlinear_parameters fdf_params = gsl_multifit_nlinear_default_parameters();
     fdf_params.trs = gsl_multifit_nlinear_trs_lm;
     fdf_params.solver = gsl_multifit_nlinear_solver_qr;
     fdf_params.h_df = sqrt(GSL_DBL_EPSILON) * 10.0;
-    struct fit_params *fit_params = fit_data->fit_params;
+    struct fit_params *fit_params = fit->fit_params;
     if(!fit_params || fit_params->n_active == 0) {
         jabs_message(MSG_ERROR, stderr, "No parameters to fit.\n");
         return EXIT_FAILURE;
     }
-    if(!fit_data->exp) {
+    if(!fit->exp) {
         jabs_message(MSG_ERROR, stderr, "No experimental spectrum to fit.\n");
         return EXIT_FAILURE;
     }
     gsl_multifit_nlinear_fdf fdf;
-    fdf.params = fit_data;
-    if(!fit_data->exp) {
+    fdf.params = fit;
+    if(!fit->exp) {
         jabs_message(MSG_ERROR, stderr, "No experimental data, can not fit.\n");
         return EXIT_FAILURE;
     }
-    if(!fit_data->n_fit_ranges) {
+    if(!fit->n_fit_ranges) {
         jabs_message(MSG_ERROR, stderr, "No fit range(s) given, can not fit.\n");
         return EXIT_FAILURE;
     }
 
-    for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
-        roi *range = &fit_data->fit_ranges[i];
-        jabs_message(MSG_INFO, stderr, "Fit range %zu [%zu:%zu]\n", i + 1, range->low, range->high);
+    jabs_message(MSG_INFO, stderr, "Fit ROI # | detector # | detector name |  low ch | high ch | exp counts\n");
+    for(size_t i = 0; i < fit->n_fit_ranges; i++) {
+        roi *range = &fit->fit_ranges[i];
+        jabs_message(MSG_INFO, stderr, " %8zu | %10zu | %13s | %7zu | %7zu | %10g\n",
+                     i + 1, range->i_det + 1, detector_name(sim_det(fit->sim, range->i_det)), range->low, range->high,
+                     spectrum_roi(fit_data_exp(fit, range->i_det), range->low, range->high));
     }
 
     fdf.f = &fit_function;
     fdf.df = NULL; /* Jacobian, with NULL using finite difference. */
     fdf.fvv = NULL; /* No geodesic acceleration */
-    fdf.n = fit_data_ranges_calculate_number_of_channels(fit_data);
+    fdf.n = fit_data_ranges_calculate_number_of_channels(fit);
     fdf.p = fit_params->n_active;
     if(fdf.n < fdf.p) {
         jabs_message(MSG_ERROR, stderr, "Not enough data (%zu points) for given number of free parameters (%zu)\n", fdf.n, fdf.p);
         return -1;
-    } else {
-        jabs_message(MSG_INFO, stderr, "%zu channels and %zu parameters in fit, %zu degrees of freedom.\n", fdf.n, fdf.p, fdf.n - fdf.p);
     }
+    fit->dof = fdf.n - fdf.p;
+    jabs_message(MSG_INFO, stderr, "%zu channels and %zu parameters in fit, %zu degrees of %s\n", fdf.n, fdf.p, fit->dof, fit->dof < 10000 ? "freedom.":"FREEDOOOOM!!!");
     gsl_vector *f;
     gsl_matrix *J;
-    fit_data->dof = fdf.n - fdf.p;
+
     int status;
 
-    double *weights = malloc(sizeof(double) * fdf.n);
+    double *weights = calloc(fdf.n, sizeof(double));
     if(!weights)
         return 1;
     size_t i_w = 0;
-    for(size_t i_range = 0; i_range < fit_data->n_fit_ranges; i_range++) {
-        roi *range = &fit_data->fit_ranges[i_range];
+    for(size_t i_range = 0; i_range < fit->n_fit_ranges; i_range++) {
+        roi *range = &fit->fit_ranges[i_range];
         assert(range);
-        detector *det = sim_det(fit_data->sim, range->i_det);
-        gsl_histogram *exp = fit_data_exp(fit_data, range->i_det);
+        detector *det = sim_det(fit->sim, range->i_det);
+        gsl_histogram *exp = fit_data_exp(fit, range->i_det);
         if(!det) {
             jabs_message(MSG_ERROR, stderr, "Detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
             free(weights);
@@ -1027,7 +994,7 @@ int fit(struct fit_data *fit_data) {
 
     gsl_matrix *covar = gsl_matrix_alloc(fit_params->n_active, fit_params->n_active);
     gsl_vector *x = gsl_vector_alloc(fit_params->n_active);
-    fit_data->f_iter = gsl_vector_alloc(fdf.n); /* Vector to hold f at the beginning of every iter */
+    fit->f_iter = gsl_vector_alloc(fdf.n); /* Vector to hold f at the beginning of every iter */
     for(size_t i = 0; i < fit_params->n; i++) { /* Update all (including inactives) */
         fit_variable *var = &(fit_params->vars[i]);
         var->err = 0.0;
@@ -1039,28 +1006,28 @@ int fit(struct fit_data *fit_data) {
     /* allocate workspace with default parameters */
     w = gsl_multifit_nlinear_alloc(T, &fdf_params, fdf.n, fdf.p);
 
-    sim_calc_params p_orig = *fit_data->sim->params; /* Store original values (will be used in final stage of fitting) */
-    for(int phase = fit_data->phase_start; phase <= fit_data->phase_stop; phase++) { /* Phase 1 is "fast", phase 2 normal. */
+    sim_calc_params p_orig = *fit->sim->params; /* Store original values (will be used in final stage of fitting) */
+    for(int phase = fit->phase_start; phase <= fit->phase_stop; phase++) { /* Phase 1 is "fast", phase 2 normal. */
         assert(phase >= FIT_PHASE_FAST && phase <= FIT_PHASE_SLOW);
-        double xtol = fit_data->xtol;
-        double chisq_tol = fit_data->chisq_tol;
+        double xtol = fit->xtol;
+        double chisq_tol = fit->chisq_tol;
         /* initialize solver with starting point and weights */
-        fit_data->stats = fit_stats_init();
-        fit_data->stats.phase = phase;
-        if(fit_data->fit_iter_callback) { /* First call to callback quickly (before most initialization) */
-            if(fit_data->fit_iter_callback(fit_data->stats)) {
-                fit_data->stats.error = FIT_ERROR_ABORTED;
+        fit->stats = fit_stats_init();
+        fit->stats.phase = phase;
+        if(fit->fit_iter_callback) { /* First call to callback quickly (before most initialization) */
+            if(fit->fit_iter_callback(fit->stats)) {
+                fit->stats.error = FIT_ERROR_ABORTED;
                 break;
             }
         }
         if(phase == FIT_PHASE_FAST) {
-            sim_calc_params_defaults_fast(fit_data->sim->params); /* Set current parameters to be faster in phase 0. */
+            sim_calc_params_defaults_fast(fit->sim->params); /* Set current parameters to be faster in phase 0. */
             xtol *= FIT_FAST_XTOL_MULTIPLIER;
-            chisq_tol = fit_data->chisq_fast_tol;
+            chisq_tol = fit->chisq_fast_tol;
         } else {
-            sim_calc_params_copy(&p_orig, fit_data->sim->params);
+            sim_calc_params_copy(&p_orig, fit->sim->params);
         }
-        sim_calc_params_update(fit_data->sim->params);
+        sim_calc_params_update(fit->sim->params);
         for(size_t i = 0; i < fit_params->n; i++) { /* Set active variables to vector */
             fit_variable *var = &(fit_params->vars[i]);
             if(var->active) {
@@ -1069,24 +1036,25 @@ int fit(struct fit_data *fit_data) {
         }
         jabs_message(MSG_INFO, stderr, "\nInitializing fit phase %i. Xtol = %e, chisq_tol %e\n", phase, xtol, chisq_tol);
         jabs_message(MSG_INFO, stderr, "Simulation parameters for this phase:\n");
-        sim_calc_params_print(fit_data->sim->params);
+        sim_calc_params_print(fit->sim->params);
+        jabs_message(MSG_INFO, stderr, "Initializing fit...\n");
         gsl_multifit_nlinear_winit(x, &wts.vector, &fdf, w);
-
+        jabs_message(MSG_INFO, stderr, "Done. Starting iteration.\n");
         /* compute initial cost function */
         f = gsl_multifit_nlinear_residual(w);
-        gsl_blas_ddot(f, f, &fit_data->stats.chisq0);
+        gsl_blas_ddot(f, f, &fit->stats.chisq0);
 
-        status = jabs_gsl_multifit_nlinear_driver(fit_data->n_iters_max, xtol, chisq_tol, fit_data, w); /* Fit */
-        fit_data->stats.error = status;
+        status = jabs_gsl_multifit_nlinear_driver(fit->n_iters_max, xtol, chisq_tol, fit, w); /* Fit */
+        fit->stats.error = status;
         if(status < 0) {
-            jabs_message(MSG_ERROR, stderr, "Fit aborted in phase %i, reason: %s.\n", phase, fit_error_str(fit_data->stats.error));
+            jabs_message(MSG_ERROR, stderr, "Fit aborted in phase %i, reason: %s.\n", phase, fit_error_str(fit->stats.error));
             break;
         }
-        jabs_message(MSG_INFO, stderr, "Phase %i finished. Time used for actual simulation so far: %.3lf s.\n", phase, fit_data->stats.cputime_cumul);
-        fit_report_results(fit_data, w, &fdf);
+        jabs_message(MSG_INFO, stderr, "Phase %i finished. Time used for actual simulation so far: %.3lf s.\n", phase, fit->stats.cputime_cumul);
+        fit_report_results(fit, w, &fdf);
     }
 
-    if(fit_data->stats.error < 0) { /* Revert changes on error */
+    if(fit->stats.error < 0) { /* Revert changes on error */
         for(size_t i = 0; i < fit_params->n; i++) {
             fit_variable *var = &(fit_params->vars[i]);
             *(var->value) = var->value_orig;
@@ -1097,11 +1065,11 @@ int fit(struct fit_data *fit_data) {
         gsl_multifit_nlinear_covar(J, 0.0, covar);
 
         /* compute final cost */
-        gsl_blas_ddot(f, f, &fit_data->stats.chisq);
-        fit_data->stats.chisq_dof = fit_data->stats.chisq / fit_data->dof;
+        gsl_blas_ddot(f, f, &fit->stats.chisq);
+        fit->stats.chisq_dof = fit->stats.chisq / fit->dof;
 
-        fit_parameters_update(fit_params, w, covar, fit_data->stats.chisq_dof);
-        sample_model_renormalize(fit_data->sm);
+        fit_parameters_update(fit_params, w, covar, fit->stats.chisq_dof);
+        sample_model_renormalize(fit->sm);
         fit_parameters_update_changed(fit_params); /* sample_model_renormalize() can and will change concentration values, this will recompute error (assuming relative error stays the same) */
         fit_params_print_final(fit_params);
         fit_covar_print(covar);
@@ -1109,9 +1077,9 @@ int fit(struct fit_data *fit_data) {
     gsl_multifit_nlinear_free(w);
     gsl_matrix_free(covar);
     gsl_vector_free(x);
-    gsl_vector_free(fit_data->f_iter);
+    gsl_vector_free(fit->f_iter);
     free(weights);
-    return fit_data->stats.error;
+    return fit->stats.error;
 }
 
 int fit_set_roi_from_string(roi *r, const char *str) {

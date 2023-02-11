@@ -229,6 +229,9 @@ int sim_det_add(simulation *sim, detector *det) {
     sim->det = realloc(sim->det, sizeof(detector *) * sim->n_det);
     if(!sim->det)
         return EXIT_FAILURE;
+    if(det->name == NULL) {
+        asprintf(&(det->name), "Detector %zu", sim->n_det);
+    }
     sim->det[sim->n_det - 1] = det;
     return EXIT_SUCCESS;
 }

@@ -93,11 +93,13 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
     if(*s == '\0') {
         return EXIT_FAILURE;
     }
+    int found = FALSE;
     DEBUGMSG("Trying to determine if %s is a detector number.", s);
     if(strcmp(s, "first") == 0) {
         if(sim->n_det) {
             *i_det = 0;
             DEBUGMSG("First detector, i_det = %zu", *i_det);
+            found = TRUE;
         } else {
             jabs_message(MSG_ERROR, stderr, "No detectors.\n");
             return EXIT_FAILURE;
@@ -106,21 +108,13 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
         if(sim->n_det) {
             *i_det = sim->n_det - 1;
             DEBUGMSG("Last detector, i_det = %zu", *i_det);
+            found = TRUE;
         } else {
             jabs_message(MSG_ERROR, stderr, "No detectors.\n");
             return EXIT_FAILURE;
         }
-    } else {
+    } else if(isdigit(*s)) {
         size_t number = strtoul(s, &end, 10);
-        if(end == s) { /* No digits at all! */
-            if(allow_empty) {
-                DEBUGMSG("No, but success, i_det = %zu unchanged", *i_det);
-                return EXIT_SUCCESS; /* First argument was not a number, don't change i_det! */
-            } else {
-                DEBUGMSG("No, failure, i_det = %zu unchanged", *i_det);
-                return EXIT_FAILURE;
-            }
-        }
         if(*end == '\0') { /* Entire string was valid */
             *i_det = number - 1;
             DEBUGMSG("Detector, i_det = %zu", *i_det);
@@ -128,12 +122,25 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
                 jabs_message(MSG_ERROR, stderr, "Detector number %zu is not valid (n_det = %zu).", number, sim->n_det);
                 return EXIT_FAILURE;
             }
+            found = TRUE;
         } else {
-            DEBUGMSG("Unknown failure! End points to %p, (== '%c')", (void *)end, *end);
+            jabs_message(MSG_ERROR, stderr, "I thought %s could be a detector number (maybe %zu?) but it is garbage instead. \n", s, number);
             return EXIT_FAILURE;
         }
+    } else {
+        for(size_t i = 0; i < sim->n_det; i++) {
+            if(sim->det[i]->name && strcmp(s, sim->det[i]->name) == 0) {
+                *i_det = i;
+                DEBUGMSG("Given string matches with detector %zu name.", i);
+                found = TRUE;
+                break;
+            }
+        }
     }
-    /* Branches that consumed an argument successfully lead here */
+    if(!found) {
+        return allow_empty ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
+    /* All branches that consumed an argument successfully lead here */
     (*argc)--;
     (*argv)++;
     return EXIT_SUCCESS;

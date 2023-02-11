@@ -75,7 +75,15 @@ typedef struct fit_data_workspace_val {
     int active_iter_call; /* Workspace should be (re)simulated */
 } fit_data_workspace_val;
 
+typedef struct fit_data_det {
+    detector *det;
+    gsl_histogram *exp;
+    gsl_histogram *histo_sim_sum;
+    gsl_histogram **histo_sim;
+} fit_data_det;
+
 typedef struct fit_data {
+    fit_data_det *fdd; /* Detector specific stuff */
     gsl_histogram **exp; /* experimental data to be fitted, array of n_exp elements */
     size_t n_exp; /* same as sim->n_det, but this keeps track on how many spectra we have allocated in exp and ref */
     gsl_histogram *ref; /* reference spectra, exactly one */
@@ -94,7 +102,7 @@ typedef struct fit_data {
     double xtol; /* Tolerance of step size */
     double chisq_tol; /* Chi squared relative change tolerance */
     double chisq_fast_tol; /* Chi squared relative change tolerance (fast phase) */
-    double dof; /* Degrees of freedom (calculated) */
+    size_t dof; /* Degrees of freedom (calculated) */
     struct fit_stats stats; /* Fit statistics, updated as we iterate */
     int phase_start; /* Fit phase to start from (see FIT_PHASE -defines) */
     int phase_stop; /* Inclusive */
@@ -102,7 +110,6 @@ typedef struct fit_data {
     size_t n_histo_sum; /* n_ws when histograms were copied */
     gsl_vector *f_iter; /* Residuals on first iter */
     int (*fit_iter_callback)(struct fit_stats stats);
-    int magic_bricks;
 } fit_data;
 
 fit_data *fit_data_new(const jibal *jibal, simulation *sim);
@@ -129,7 +136,7 @@ int fit_data_workspaces_init(fit_data *fit);
 void fit_data_workspaces_free(fit_data *fit); /* Also sets workspace pointers to NULL */
 void fit_data_workspaces_reset(fit_data *fit);
 struct fit_stats fit_stats_init();
-int fit(struct fit_data *fit_data);
+int fit(fit_data *fit);
 void fit_covar_print(const gsl_matrix *covar);
 
 int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x); /* Updates values in fit params as they are varied by the fit algorithm. */
