@@ -84,7 +84,10 @@ aperture *aperture_set_from_argv(const jibal *jibal, aperture *a, int * const ar
                 val = &(a->diameter);
             }
             if(val) {
-                *val = jibal_get_val(jibal->units, UNIT_TYPE_DISTANCE, (*argv)[1]);
+                if(jabs_unit_convert(jibal->units, UNIT_TYPE_DISTANCE, (*argv)[1], val) < 0) {
+                    aperture_free(a);
+                    return NULL;
+                }
                 (*argc) -= 2;
                 (*argv) += 2;
                 continue;

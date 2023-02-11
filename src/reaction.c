@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <string.h>
 #include "jabs_debug.h"
+#include "generic.h"
 #include "defaults.h"
 #include "reaction.h"
 #include "message.h"
@@ -164,11 +165,20 @@ reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incid
     (*argv) += 2;
     while ((*argc) >= 2) {
         if(strcmp((*argv)[0], "max") == 0) {
-            r->E_max = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, (*argv)[1]);
+            if(jabs_unit_convert(jibal->units, UNIT_TYPE_ENERGY, (*argv)[1], &r->E_max) < 0) {
+                reaction_free(r);
+                return NULL;
+            }
         } else if(strcmp((*argv)[0], "min") == 0) {
-            r->E_min = jibal_get_val(jibal->units, UNIT_TYPE_ENERGY, (*argv)[1]);
+            if(jabs_unit_convert(jibal->units, UNIT_TYPE_ENERGY, (*argv)[1], &r->E_min) < 0) {
+                reaction_free(r);
+                return NULL;
+            }
         } else if(strcmp((*argv)[0], "cs") == 0) {
             r->cs = jibal_option_get_value(jibal_cs_types, (*argv)[1]);
+            if(r->cs == 0) {
+                jabs_message(MSG_ERROR, stderr, "Cross section type \"%s\" not recognized.\n", (*argv)[1]);
+            }
         }
         (*argc) -= 2;
         (*argv) += 2;

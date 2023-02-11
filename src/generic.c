@@ -276,13 +276,24 @@ int jabs_unit_convert(const jibal_units *units, char type, const char *str, doub
             break;
         case UNIT_TYPE_ENERGY:
             if(*out > E_MAX) {
-                jabs_message(MSG_ERROR, stderr, "Energy of %g MeV given. Check your units.\n", *out / C_DEG);
+                jabs_message(MSG_ERROR, stderr, "Energy of %g MeV given. Check your units.\n", *out / C_MEV);
                 error = -1000;
+            }
+            break;
+        case UNIT_TYPE_DENSITY:
+            if(*out < 0.025 * C_G_CM3 || *out > 25 * C_G_CM3) {
+                jabs_message(MSG_WARNING, stderr, "Density %g g/cm3 given. Check your units.\n", *out / C_G_CM3);
+            }
+            break;
+        case UNIT_TYPE_SOLID_ANGLE:
+            if(*out < 0.001 * C_MSR || *out > 4.0 * C_PI) {
+                jabs_message(MSG_WARNING, stderr, "Solid angle %g msr given. Check your units.\n", *out / C_MSR);
             }
             break;
         default:
             break;
     }
+    DEBUGMSG("Unit conversion, type %c, string %s, output to %p should have been set to %g", type, str, (void *)out, *out);
     return error;
 }
 

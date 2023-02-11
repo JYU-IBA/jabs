@@ -2288,8 +2288,8 @@ script_command_status script_add_reaction(script_session *s, int argc, char *con
     if(r->cs == JABS_CS_NONE) {
         jabs_reaction_cs cs = sim_cs(fit->sim, r->type);
         r->cs = cs;
-        jabs_message(MSG_VERBOSE, stderr,
-                     "Reaction cross section not given or not valid, assuming default for %s: %s.\n",
+        jabs_message(MSG_WARNING, stderr,
+                     "Reaction cross section not given, assuming default for %s: %s.\n",
                      reaction_type_to_string(r->type), jabs_reaction_cs_to_string(cs));
     }
     if(sim_reactions_add_reaction(fit->sim, r, FALSE)) {
