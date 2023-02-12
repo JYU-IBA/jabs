@@ -38,6 +38,7 @@ save spectra "example_out.csv"
 save calibration "calibration_out.jbs"
 #fitted sample can be saved (and loaded back in later!)
 save sample "sample_out.txt"
-show detector
-show fit
+#show detector
+#show fit
+#show sample profile
 show fit ranges

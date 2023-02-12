@@ -206,7 +206,7 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
         jabs_message(MSG_ERROR, stderr, "Error in checking fit parameters.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    fit_params_print(p_all, TRUE, NULL, fit_data->sim->n_det);
+    fit_params_print(p_all, TRUE, NULL, fit_data->sim->n_det, MSG_VERBOSE);
     fit_params_free(fit_data->fit_params);
     fit_data->fit_params = NULL;
     fit_data->fit_params = p_all;
@@ -1786,7 +1786,7 @@ script_command_status script_show_fit_variables(script_session *s, int argc, cha
         argv++;
         argc--;
     }
-    fit_params_print(p_all, FALSE, pattern, s->fit->sim->n_det);
+    fit_params_print(p_all, FALSE, pattern, s->fit->sim->n_det, MSG_INFO);
     fit_params_free(p_all);
     return argc_orig - argc;
 }

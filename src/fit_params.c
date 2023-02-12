@@ -95,18 +95,18 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
     return EXIT_SUCCESS;
 }
 
-void fit_params_print(const fit_params *params, int active, const char *pattern, size_t n_det) { /* Prints current values of all possible fit variables matching pattern. Pattern can be NULL too. */
+void fit_params_print(const fit_params *params, int active, const char *pattern, size_t n_det, jabs_msg_level msg_level) { /* Prints current values of all possible fit variables matching pattern. Pattern can be NULL too. */
     if(!params)
         return;
     const char *whatkind = active ? "active" : "possible";
     if(params->n) {
         if(pattern) {
-            jabs_message(MSG_INFO, stderr, "All %s fit variables matching pattern \"%s\":\n", whatkind, pattern);
+            jabs_message(msg_level, stderr, "All %s fit variables matching pattern \"%s\":\n", whatkind, pattern);
         } else {
-            jabs_message(MSG_INFO, stderr, "All %s fit variables (use 'show fit variables <pattern>' to see variables matching pattern, wildcards are '*' and '?'):\n", whatkind);
+            jabs_message(msg_level, stderr, "All %s fit variables (use 'show fit variables <pattern>' to see variables matching pattern, wildcards are '*' and '?'):\n", whatkind);
         }
     } else {
-        jabs_message(MSG_INFO, stderr, "No %s fit variables.\n", whatkind);
+        jabs_message(msg_level, stderr, "No %s fit variables.\n", whatkind);
     }
     for(size_t i = 0; i < params->n; i++) {
         const fit_variable *var = &params->vars[i];
@@ -114,7 +114,7 @@ void fit_params_print(const fit_params *params, int active, const char *pattern,
             continue;
         if(pattern && !is_match(var->name, pattern))
             continue;
-        jabs_message(MSG_INFO, stderr, "%s %24s = %g %s %s\n", var->active ? "X" : "  ", var->name, *(var->value) / var->unit_factor, var->unit, var->i_det < n_det ? "(detector specific variable)":"");
+        jabs_message(msg_level, stderr, "%s %24s = %g %s %s\n", var->active && !active ? "X" : "  ", var->name, *(var->value) / var->unit_factor, var->unit, var->i_det < n_det ? "(detector specific variable)":"");
         DEBUGMSG("This one is %p, raw value %.12g, i_v = %zu\n", (void *)var->value, *var->value, var->i_v);
     }
 }
