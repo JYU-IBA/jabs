@@ -40,23 +40,11 @@ Simple Qt-based [GUI](qjabs/) is provided. Scripts can be edited and run, simula
       
 ## Interactive or scripted usage
 
-This is the preferred way of using JaBS. Some command line options (see below) can be used in conjunction with the interactive or scripted mode.
-
-Launch JaBS in interactive mode simply by running `jabs` or `jabs --interactive`. Scripts (i.e. files with commands identical to interactive mode input) can be given as command line parameters e.g. `jabs script.jbs`, piped in `jabs < script.jbs` or run using the interactive mode. Filename from command line must not be `sample` (reserved keyword for giving the sample on the command line, see below).
+Launch JaBS in interactive mode simply by running `jabs` or `jabs --interactive`. Scripts (i.e. files with commands identical to interactive mode input) can be given as command line parameters e.g. `jabs script.jbs`, piped in `jabs < script.jbs` or run using the interactive mode.
 
 The interactive mode should be self-explanatory and an internal help is provided. Please see [the example script](example/example.jbs) to get started. Note that scripts are executed in the directory where the file is located, when opened in the GUI, but in the current working directory by the command-line program. This affects loading and saving filenames.
 
-The scripting language is not a programming language, there is no flow control, new variables can not be introduced etc. This may change in the future.
-
-## Command line usage
-
-Several parameters can be set from the command line. See `jabs -h` and try something like this:
-
-~~~~
-$ ./jabs -E 2MeV --alpha=10deg --theta=170deg --out=spectrum.csv sample Au 500tfu SiO2 1000tfu Si 10000tfu
-~~~~
-
-Detector and sample can be read from files. The file formats are simple and human readable. Please see [the example](example).
+The scripting language is not a programming language, there is no flow control, new variables can not be introduced etc. However multiple simulations/fits are possible in a single file and other scripts may be loaded, which in turn may load other scripts.
 
 ## Features
 ### Implemented
@@ -85,6 +73,7 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Higher accuracy mode using adaptive integration for more accurate handling of sharp peaks in cross sections (resonances) and accurate weighting of cross sections by (Gaussian) straggling.
  - Conversion tool from IDF to JaBS script (partial support)
  - Simulation of large angle plural scattering (dual scattering model), with the assumption that first scattering is RBS (not ERD).
+ - Multiprocessor support when fitting multidetector spectra 
 
 ### Not implemented, but planned or being worked on
  - Support for more input and output data formats (CSV, ...)
@@ -94,7 +83,6 @@ Detector and sample can be read from files. The file formats are simple and huma
  - Publication quality plotting
 
 ### Distant future, if ever
- - Parallel processing of independent simulations
  - Advanced fitting algorithms
  - Fitting of spectra from different measurements (different beam, fluence etc for each simulation)
  - Turing completeness of the scripting language
@@ -106,9 +94,9 @@ Detector and sample can be read from files. The file formats are simple and huma
 
 ## Fitting
 
-The multidimensional nonlinear least-squares fitting is based on [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html).
+The multidimensional nonlinear least-squares fitting is based on Levenberg-Marquardt algorithm [GSL multifit](https://www.gnu.org/software/gsl/doc/html/nls.html).
 
-Interactive/script example:
+Example:
 
     jabs> add fit range [500:900] [1000:1200]
     jabs> fit *calib*,fluence,thick1

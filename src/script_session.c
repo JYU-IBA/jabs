@@ -40,7 +40,6 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
         free(s);
         return NULL;
     }
-    s->output_filename = NULL;
     s->file_depth = 0;
     s->files[0] = NULL;
     s->commands = script_commands_create(s);
@@ -69,7 +68,6 @@ int script_session_load_script(script_session *s, const char *filename) {
 void script_session_free(script_session *s) {
     if(!s)
         return;
-    free(s->output_filename);
     fit_data_workspaces_free(s->fit);
     fit_data_exp_free(s->fit);
 

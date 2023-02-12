@@ -34,7 +34,6 @@ typedef struct script_session {
     jibal *jibal;
     struct fit_data *fit;
     int (*fit_iter_callback)(struct fit_stats stats);
-    char *output_filename; /* File name for automatic spectra saving */ /* TODO: multidetector! */
     double start, end; /* Time */
     script_file *files[SCRIPT_FILES_NESTED_MAX];
     size_t file_depth;

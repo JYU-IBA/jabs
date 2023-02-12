@@ -136,21 +136,6 @@ int script_finish_sim_or_fit(script_session *s) {
 #ifdef CLEAR_GSTO_ASSIGNMENTS_WHEN_FINISHED
     jibal_gsto_assign_clear_all(s->fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
 #endif
-
-    struct fit_data *fit = s->fit;
-    if(fit->sim->n_det == 1) { /* TODO: This is primarily used for command line mode, but multidetector mode could be supported. */
-        size_t i_det = 0;
-        sim_workspace *ws = fit_data_ws(fit, i_det);
-        if(ws) {
-            if(s->output_filename) {
-                if(sim_workspace_print_spectra(ws, s->output_filename, fit_data_histo_sum(fit, i_det), fit_data_exp(fit, i_det))) {
-                    jabs_message(MSG_ERROR, stderr, "Could not save spectra of detector %zu to file \"%s\"\n", i_det,
-                                 s->output_filename);
-                    return EXIT_FAILURE;
-                }
-            }
-        }
-    }
     return 0;
 }
 
@@ -1261,7 +1246,6 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT,   "emin",                          "keV", UNIT_TYPE_ENERGY, &sim->emin,                                  NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "alpha",                         "deg", UNIT_TYPE_ANGLE,  &sim->sample_theta,                          NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "phi",                           "deg", UNIT_TYPE_ANGLE,  &sim->sample_phi,                            NULL},
-            {JIBAL_CONFIG_VAR_STRING, "output",                        0, 0,                    &s->output_filename,                         NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "erd",                           0, 0,                    &sim->erd,                                   NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "rbs",                           0, 0,                    &sim->rbs,                                   NULL},
             {JIBAL_CONFIG_VAR_SIZE,   "maxiter",                       0, 0,                    &fit->n_iters_max,                           NULL},

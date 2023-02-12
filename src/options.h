@@ -19,28 +19,12 @@
 typedef struct {
     int verbose;
     int interactive;
-    int rbs;
-    int erd;
-    int fit;
-    int fit_low;
-    int fit_high;
-    int ds;
-    int fast;
-    size_t depthsteps_max;
-    double incident_stop_step;
-    double exiting_stop_step;
-    char *output_filename;
-    char *exp_filename;
-    char *fit_vars;
-    char *sample_filename;
-    char **reaction_filenames;
-    size_t n_reaction_filenames;
 } cmdline_options;
 
 
 #include "simulation.h"
 
-void read_options(const jibal *jibal, simulation *sim, cmdline_options *cmd_opt,  int *argc, char * const **argv);
+void read_options(cmdline_options *cmd_opt, int *argc, char *const **argv);
 cmdline_options *cmdline_options_init();
 void cmdline_options_free(cmdline_options *cmd_opt);
 const char *jabs_version(); /* Returns "git describe" given version, fallback to jabs_version_simple() */

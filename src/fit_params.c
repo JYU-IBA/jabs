@@ -128,13 +128,21 @@ void fit_params_print_final(const fit_params *params) { /* Prints final values o
         jabs_message(MSG_INFO, stderr, "No fitted variables of total %zu.\n", params->n);
         return;
     }
-    jabs_message(MSG_INFO, stderr, "  i |                 variable |  unit |        value |      error |  rel %% |  orig. value | multipl. | sigmas |\n");
+    size_t maxlen_name = 8;
+    for(size_t i = 0; i < params->n; i++) {
+        const fit_variable *var = &params->vars[i];
+        if(!var->active)
+            continue;
+        maxlen_name = JABS_MAX(maxlen_name, strlen(var->name));
+    }
+
+    jabs_message(MSG_INFO, stderr, "  i | %*s |  unit |        value |     error |  rel %% |  orig. value | multipl. | sigmas |\n", maxlen_name, "variable");
     for(size_t i = 0; i < params->n; i++) {
         const fit_variable *var = &params->vars[i];
         if(!var->active)
             continue;
         //jabs_message(MSG_INFO, stderr, "%24s(%3s) = %12g +- %12g (%.1lf%%)\n", var->name, var->unit, var->value_final/var->unit_factor, var->err/var->unit_factor, var->err/var->value_final*100.0);
-        jabs_message(MSG_INFO, stderr, "%3zu | %24s | %5s | %12.6g | %10.4g | %6.1lf | %12.6g | %8.4lf | %6.1lf |\n", var->i_v + 1, var->name, var->unit,
+        jabs_message(MSG_INFO, stderr, "%3zu | %*s | %5s | %12.6g | %9.3g | %6.1lf | %12.6g | %8.4lf | %6.1lf |\n", var->i_v + 1, maxlen_name, var->name, var->unit,
                      var->value_final / var->unit_factor,
                      var->err / var->unit_factor,
                      100.0 * var->err_rel,
