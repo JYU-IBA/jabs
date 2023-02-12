@@ -892,37 +892,6 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
     return SCRIPT_COMMAND_SUCCESS;
 }
 
-int command_compare(const void *a, const void *b) {
-    const script_command *o_a = (const script_command *) a;
-    const script_command *o_b = (const script_command *) b;
-    return strcmp(o_a->name, o_b->name);
-}
-
-char *script_commands_list_matches(const script_command *commands, const char *str) {
-    size_t len = strlen(str);
-    size_t n = 0;
-    int found = 0;
-    for(const script_command *c = commands; c; c = c->next) {
-        if(strncmp(c->name, str, len) == 0) { /* At least partial match */
-            n += strlen(c->name) + 1;
-            found++;
-        }
-    }
-    n++;
-    char *out = malloc(sizeof(char) * n);
-    out[0] = '\0';
-    for(const script_command *c = commands; c; c = c->next) {
-        if(strncmp(c->name, str, len) == 0) { /* At least partial match */
-            strcat(out, c->name);
-            found--;
-            if(found) {
-                strcat(out, " ");
-            }
-        }
-    }
-    return out;
-}
-
 const char *script_command_status_to_string(script_command_status status) {
     switch(status) {
         case SCRIPT_COMMAND_NOT_FOUND:
@@ -1148,7 +1117,11 @@ script_command *script_command_list_from_vars_array(const jibal_config_var *vars
         script_command *c;
         if(var->type == JIBAL_CONFIG_VAR_UNIT) {
             char *help_text;
-            int ret = asprintf(&help_text, "value with unit (type %c, at least unit %s is appropriate)", var->unit_type, var->unit);
+            if(asprintf(&help_text, "value with unit (type %c, at least unit %s is appropriate)", var->unit_type, var->unit) < 0) {
+                DEBUGMSG("asprintf failed when adding command %s\n", var->name);
+                break;
+            }
+
             c  = script_command_new(var->name, help_text, 0, 0, NULL);
             free(help_text);
         } else {
@@ -1443,17 +1416,6 @@ void script_commands_print(const struct script_command *commands) {
             continue;
         jabs_message(MSG_INFO, stderr, " %*s    %s\n", len_max, c->name, c->help_text);
     }
-}
-
-size_t script_commands_size(const script_command *commands) {
-    if(!commands)
-        return 0;
-    size_t n = 0;
-    for(const struct script_command *c = commands; c; c++) {
-        n++;
-    }
-    DEBUGMSG("Commands size is %zu (%p).", n, (void *)commands);
-    return n;
 }
 
 void script_print_command_tree(FILE *f, const struct script_command *commands) {

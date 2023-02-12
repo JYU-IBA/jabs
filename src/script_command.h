@@ -34,9 +34,7 @@ script_command *script_command_list_from_vars_array(const jibal_config_var *vars
 
 script_command *script_commands_create(struct script_session *s);
 script_command *script_commands_sort_all(script_command *head); /* Sorts all commands (tree) so that each subcommand (branch) is sorted by script_command_list_merge_sort() */
-int command_compare(const void *a, const void *b);
 void script_commands_print(const struct script_command *commands);
-size_t script_commands_size(const script_command *commands);
 void script_print_command_tree(FILE *f, const struct script_command *commands);
 script_command_status script_execute_command(struct script_session *s, const char *cmd);
 script_command_status script_execute_command_argv(struct script_session *s, const script_command *commands, int argc, char **argv);

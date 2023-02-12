@@ -257,7 +257,7 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
     size_t i_des = 0;
     brick *b = NULL, *b_prev = NULL;
     int skipped, last = FALSE;
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
     int crossed;
 #endif
     sim_r->last_brick = 0;
@@ -267,7 +267,7 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
     for(size_t i_brick = 0; i_brick < sim_r->n_bricks; i_brick++) {
         assert(ion1.S >= 0.0);
         skipped = FALSE;
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
         crossed = FALSE;
 #endif
         b_prev = b;
@@ -294,7 +294,7 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
                 }
             }
             d_before.i = d_after.i;
-#ifdef DEBUG
+#ifdef DEBUG_VERBOSE
             crossed = TRUE;
 #endif
         }
