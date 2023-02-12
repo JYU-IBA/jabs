@@ -137,7 +137,7 @@ void fit_data_workspaces_free(fit_data *fit); /* Also sets workspace pointers to
 void fit_data_workspaces_reset(fit_data *fit);
 struct fit_stats fit_stats_init();
 int fit(fit_data *fit);
-void fit_covar_print(const gsl_matrix *covar);
+void fit_covar_print(const gsl_matrix *covar, jabs_msg_level msg_level);
 
 int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x); /* Updates values in fit params as they are varied by the fit algorithm. */
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
@@ -149,7 +149,7 @@ int fit_set_residuals_detector(const fit_data *fit, gsl_vector *f, size_t i_det)
 int fit_set_residuals(const fit_data *fit, gsl_vector *f);
 void fit_iter_stats_update(struct fit_data *params, const gsl_multifit_nlinear_workspace *w);
 void fit_iter_stats_print(const struct fit_stats *stats);
-void fit_stats_print(FILE *f, const struct fit_stats *stats);
+void fit_stats_print(FILE *f, const struct fit_stats *stats, jabs_msg_level msg_level);
 int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range); /* Makes a deep copy */
 void fit_data_fit_ranges_free(struct fit_data *fit_data);
 int fit_set_roi_from_string(roi *r, const char *str); /* Parses only low and high from "[low:high]". */

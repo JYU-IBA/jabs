@@ -42,11 +42,11 @@ void usage() {
 }
 
 void greeting(int interactive) {
-    fprintf(stderr, "JaBS version %s. Copyright (C) 2021 - 2023 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
-    fprintf(stderr, "Compiled using JIBAL %s, current library version %s.\n", JIBAL_VERSION, jibal_version());
-    fputs(COPYRIGHT_STRING, stderr);
+    jabs_message(MSG_IMPORTANT, stderr, "JaBS version %s. Copyright (C) 2021 - 2023 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
+    jabs_message(MSG_VERBOSE, stderr, "Compiled using JIBAL %s, current library version %s.\n", JIBAL_VERSION, jibal_version());
+    jabs_message(MSG_INFO, stderr, "%s", COPYRIGHT_STRING);
     if(interactive) {
-        fprintf(stderr, "Welcome to interactive mode.\nType \"help\" for help or run \"jabs -h\" for command line help.\n\n");
+        jabs_message(MSG_INFO, stderr, "Welcome to interactive mode.\nType \"help\" for help or run \"jabs -h\" for command line help.\n\n");
     }
 }
 

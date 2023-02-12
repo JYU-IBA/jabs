@@ -20,6 +20,7 @@
 #include <jibal_layer.h>
 #include <jibal.h>
 #include "roughness.h"
+#include "message.h"
 
 typedef struct sample_range {
     double x;
@@ -80,7 +81,7 @@ sample_model *sample_model_to_point_by_point(const sample_model *sm);
 size_t sample_model_element_count(const sample_model *sm);
 void sample_model_free(sample_model *sm);
 sample *sample_from_sample_model(const sample_model *sm);
-int sample_model_print(const char *filename, const sample_model *sm);
+int sample_model_print(const char *filename, const sample_model *sm, jabs_msg_level msg_level);
 size_t sample_model_number_of_rough_ranges(const sample_model *sm); /* May change to real sample, since minor roughness can be neglected. */
 size_t sample_model_number_of_ranges_with_bragg_or_stragg_corrections(const sample_model *sm);
 size_t sample_model_number_of_ranges_with_yield_corrections(const sample_model *sm);
@@ -101,9 +102,9 @@ sample *sample_copy(const sample *sample); /* Deep copy */
 double sample_mass_density_range(const sample *sample, size_t i_range);
 double sample_thickness_in_nm_range(const sample *sample, size_t i_range);
 double sample_areal_density_isotope_range(const sample *sample,  size_t i_isotope, size_t i_range);
-void sample_areal_densities_print(const sample *sample, int print_isotopes);
-int sample_print_thicknesses(const char *filename, const sample *sample);
-int sample_print(const sample *sample, int print_isotopes);  /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
+void sample_areal_densities_print(const sample *sample, int print_isotopes, jabs_msg_level msg_level);
+int sample_print_thicknesses(const char *filename, const sample *sample, jabs_msg_level msg_level);
+int sample_print(const sample *sample, int print_isotopes, jabs_msg_level msg_level);  /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
 void sample_free(sample *sample);
 double sample_isotope_max_depth(const sample *sample, size_t i_isotope);
 void sample_sort_isotopes(sample *sample); /* Sort isotopes. Note that you can screw up concentrations tables if you call this at the wrong time! */

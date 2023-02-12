@@ -88,9 +88,9 @@ int script_prepare_sim_or_fit(script_session *s) {
     }
     sim_sort_reactions(fit->sim);
     jabs_message(MSG_INFO, stderr, "Sample model:\n");
-    sample_model_print(NULL, fit->sm);
-    jabs_message(MSG_INFO, stderr, "Simplified sample model for simulation:\n");
-    sample_print(fit->sim->sample, TRUE);
+    sample_model_print(NULL, fit->sm, MSG_INFO);
+    jabs_message(MSG_VERBOSE, stderr, "Simplified sample model for simulation:\n");
+    sample_print(fit->sim->sample, TRUE, MSG_VERBOSE);
 
     if(assign_stopping(fit->jibal->gsto, fit->sim)) {
         jabs_message(MSG_ERROR, stderr,
@@ -129,9 +129,9 @@ int script_finish_sim_or_fit(script_session *s) {
     s->end = jabs_clock();
     double time = s->end - s->start;
     if(time > 1.0) {
-        jabs_message(MSG_INFO, stderr, "\n...finished! Total time: %.3lf s.\n", time);
+        jabs_message(MSG_IMPORTANT, stderr, "\n...finished! Total time: %.3lf s.\n", time);
     } else {
-        jabs_message(MSG_INFO, stderr, "\n...finished! Total time: %.3lf ms.\n", time * 1000.0);
+        jabs_message(MSG_IMPORTANT, stderr, "\n...finished! Total time: %.3lf ms.\n", time * 1000.0);
     }
 #ifdef CLEAR_GSTO_ASSIGNMENTS_WHEN_FINISHED
     jibal_gsto_assign_clear_all(s->fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
@@ -145,12 +145,12 @@ void script_command_not_found(const char *cmd, const script_command *c_parent) {
         if(cmd) {
             jabs_message(MSG_ERROR, stderr, "Sub-command \"%s\" is invalid!\n\n", cmd);
         } else {
-            jabs_message(MSG_ERROR, stderr, "Not enough arguments!\n\n");
+            jabs_message(MSG_ERROR, stderr, "Not enough arguments!\n");
         }
         if(c_parent->subcommands) {
             size_t matches = script_command_print_possible_matches_if_ambiguous(c_parent->subcommands, cmd);
             if(matches == 0) {
-                jabs_message(MSG_ERROR, stderr, "Following subcommands of \"%s\" are recognized:\n", c_parent->name);
+                jabs_message(MSG_INFO, stderr, "\nFollowing subcommands of \"%s\" are recognized:\n", c_parent->name);
                 script_commands_print(c_parent->subcommands);
             }
         }
@@ -177,7 +177,7 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
     if(fit_data_workspaces_init(fit)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    jabs_message(MSG_INFO, stderr, "Simulation begins...\n");
+    jabs_message(MSG_IMPORTANT, stderr, "Simulation begins...\n");
     for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
         if(simulate_with_ds(fit->ws[i_det])) {
             jabs_message(MSG_ERROR, stderr, "Simulation failed.\n");
@@ -232,14 +232,14 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
     if(fit(fit_data) < 0) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    jabs_message(MSG_INFO, stderr, "\nFinal profile:\n");
-    sample_print(fit_data->sim->sample, FALSE);
-    jabs_message(MSG_INFO, stderr, "\nFinal layer thicknesses:\n");
-    sample_print_thicknesses(NULL, fit_data->sim->sample);
-    jabs_message(MSG_INFO, stderr, "\nFinal sample model:\n");
-    sample_model_print(NULL, fit_data->sm);
+    jabs_message(MSG_VERBOSE, stderr, "\nFinal profile:\n");
+    sample_print(fit_data->sim->sample, FALSE, MSG_VERBOSE);
+    jabs_message(MSG_VERBOSE, stderr, "\nFinal layer thicknesses:\n");
+    sample_print_thicknesses(NULL, fit_data->sim->sample, MSG_VERBOSE);
+    jabs_message(MSG_VERBOSE, stderr, "\nFinal sample model:\n");
+    sample_model_print(NULL, fit_data->sm, MSG_VERBOSE);
     jabs_message(MSG_INFO, stderr, "\n");
-    fit_stats_print(stderr, &fit_data->stats);
+    fit_stats_print(stderr, &fit_data->stats, MSG_INFO);
     script_finish_sim_or_fit(s);
     return 1;
 }
@@ -296,7 +296,7 @@ script_command_status script_save_sample(script_session *s, int argc, char *cons
         jabs_message(MSG_ERROR, stderr, "No sample set.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(sample_model_print(argv[0], fit_data->sm)) {
+    if(sample_model_print(argv[0], fit_data->sm, MSG_INFO)) {
         jabs_message(MSG_ERROR, stderr, "Could not write sample to file \"%s\".\n", argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
@@ -1702,13 +1702,13 @@ script_command_status script_show_sample(script_session *s, int argc, char *cons
         free(sample_str);
 #endif
     jabs_message(MSG_INFO, stderr, "Sample model (use \"save sample\" to save):\n");
-    if(sample_model_print(NULL, fit->sm)) {
+    if(sample_model_print(NULL, fit->sm, MSG_INFO)) {
         return SCRIPT_COMMAND_FAILURE;
     }
     if(fit->sm->type == SAMPLE_MODEL_LAYERED) {
         jabs_message(MSG_INFO, stderr, "\nLayers:\n");
         sample *sample = sample_from_sample_model(fit->sm);
-        sample_print_thicknesses(NULL, sample);
+        sample_print_thicknesses(NULL, sample, MSG_INFO);
         sample_free(sample);
     }
     return 0;
@@ -1723,7 +1723,7 @@ script_command_status script_show_sample_profile(struct script_session *s, int a
         return SCRIPT_COMMAND_FAILURE;
     }
     sample *sample = sample_from_sample_model(fit->sm);
-    sample_print(sample, FALSE);
+    sample_print(sample, FALSE, MSG_INFO);
     sample_free(sample);
     return 0;
 }

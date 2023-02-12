@@ -371,9 +371,9 @@ void fit_iter_stats_print(const struct fit_stats *stats) {
                  stats->cputime_cumul, 1000.0 * stats->cputime_iter / stats->n_evals_iter);
 }
 
-void fit_stats_print(FILE *f, const struct fit_stats *stats) {
+void fit_stats_print(FILE *f, const struct fit_stats *stats, jabs_msg_level msg_level) {
     if(stats->chisq_dof > 0.0) {
-        jabs_message(MSG_INFO, f, "Final chisq/dof = %.7lf\n", stats->chisq_dof);
+        jabs_message(msg_level, f, "Final chisq/dof = %.7lf\n", stats->chisq_dof);
     }
 }
 
@@ -890,18 +890,18 @@ void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspac
 }
 
 
-void fit_covar_print(const gsl_matrix *covar) {
-    jabs_message(MSG_INFO, stderr, "\nCorrelation coefficients matrix:\n       | ");
+void fit_covar_print(const gsl_matrix *covar, jabs_msg_level msg_level) {
+    jabs_message(msg_level, stderr, "\nCorrelation coefficients matrix:\n       | ");
     for(size_t i = 0; i < covar->size1; i++) {
-        jabs_message(MSG_INFO, stderr, " %4zu  ", i + 1);
+        jabs_message(msg_level, stderr, " %4zu  ", i + 1);
     }
-    jabs_message(MSG_INFO, stderr, "\n");
+    jabs_message(msg_level, stderr, "\n");
     for(size_t i = 0; i < covar->size1; i++) {
-        jabs_message(MSG_INFO, stderr, "%6zu | ", i + 1);
+        jabs_message(msg_level, stderr, "%6zu | ", i + 1);
         for(size_t j = 0; j <= i && j < covar->size2; j++) {
-            jabs_message(MSG_INFO, stderr, " %6.3f", gsl_matrix_get(covar, i, j) / sqrt(gsl_matrix_get(covar, i, i) * gsl_matrix_get(covar, j, j)));
+            jabs_message(msg_level, stderr, " %6.3f", gsl_matrix_get(covar, i, j) / sqrt(gsl_matrix_get(covar, i, i) * gsl_matrix_get(covar, j, j)));
         }
-        jabs_message(MSG_INFO, stderr, "\n");
+        jabs_message(msg_level, stderr, "\n");
     }
 }
 
@@ -932,10 +932,10 @@ int fit(fit_data *fit) {
         return EXIT_FAILURE;
     }
 
-    jabs_message(MSG_INFO, stderr, "Fit ROI # | detector # | detector name |  low ch | high ch | exp counts\n");
+    jabs_message(MSG_VERBOSE, stderr, "Fit ROI # | detector # | detector name |  low ch | high ch | exp counts\n");
     for(size_t i = 0; i < fit->n_fit_ranges; i++) {
         roi *range = &fit->fit_ranges[i];
-        jabs_message(MSG_INFO, stderr, " %8zu | %10zu | %13s | %7zu | %7zu | %10g\n",
+        jabs_message(MSG_VERBOSE, stderr, " %8zu | %10zu | %13s | %7zu | %7zu | %10g\n",
                      i + 1, range->i_det + 1, detector_name(sim_det(fit->sim, range->i_det)), range->low, range->high,
                      spectrum_roi(fit_data_exp(fit, range->i_det), range->low, range->high));
     }
@@ -1034,9 +1034,9 @@ int fit(fit_data *fit) {
         jabs_message(MSG_INFO, stderr, "\nInitializing fit phase %i. Xtol = %e, chisq_tol %e\n", phase, xtol, chisq_tol);
         jabs_message(MSG_VERBOSE, stderr, "Simulation parameters for this phase:\n");
         sim_calc_params_print(fit->sim->params, MSG_VERBOSE);
-        jabs_message(MSG_INFO, stderr, "Initializing fit...\n");
+        jabs_message(MSG_IMPORTANT, stderr, "Initializing fit...\n");
         gsl_multifit_nlinear_winit(x, &wts.vector, &fdf, w);
-        jabs_message(MSG_INFO, stderr, "Done. Starting iteration...\n");
+        jabs_message(MSG_IMPORTANT, stderr, "Done. Starting iteration...\n");
         /* compute initial cost function */
         f = gsl_multifit_nlinear_residual(w);
         gsl_blas_ddot(f, f, &fit->stats.chisq0);
@@ -1047,7 +1047,7 @@ int fit(fit_data *fit) {
             jabs_message(MSG_ERROR, stderr, "Fit aborted in phase %i, reason: %s.\n", phase, fit_error_str(fit->stats.error));
             break;
         }
-        jabs_message(MSG_INFO, stderr, "Phase %i finished. Time used for actual simulation so far: %.3lf s.\n", phase, fit->stats.cputime_cumul);
+        jabs_message(MSG_IMPORTANT, stderr, "Phase %i finished. Time used for actual simulation so far: %.3lf s.\n", phase, fit->stats.cputime_cumul);
         fit_report_results(fit, w, &fdf);
     }
 
@@ -1069,7 +1069,7 @@ int fit(fit_data *fit) {
         sample_model_renormalize(fit->sm);
         fit_parameters_update_changed(fit_params); /* sample_model_renormalize() can and will change concentration values, this will recompute error (assuming relative error stays the same) */
         fit_params_print_final(fit_params);
-        fit_covar_print(covar);
+        fit_covar_print(covar, MSG_VERBOSE);
     }
     gsl_multifit_nlinear_free(w);
     gsl_matrix_free(covar);
