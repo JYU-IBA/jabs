@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <limits.h>
 #ifdef _OPENMP
 #include <omp.h>
 #else
@@ -313,4 +314,36 @@ double jabs_clock() {
 #else
     return (1.0 * clock() / CLOCKS_PER_SEC); /* TODO: replace with something that returns something comparable to omp_get_wtime() */
 #endif
+}
+
+int jabs_str_to_size_t(const char *str, size_t *out) {
+    if(!str) {
+        jabs_message(MSG_ERROR, stderr, "Conversion error, null pointer.\n");
+        return -1;
+    }
+    if(*str == '\0') {
+        jabs_message(MSG_ERROR, stderr, "Conversion error, empty string.\n");
+        return -1;
+    }
+    char *end;
+    long val = strtol(str, &end, 10);
+    DEBUGMSG("strtol reports %li\n", val);
+    if(*end != '\0') { /* Not entirely valid */
+        jabs_message(MSG_ERROR, stderr, "Conversion error, \"%s\" is not a valid unsigned number.\n", str);
+        return -1;
+    }
+    if(val < 0) {
+        jabs_message(MSG_ERROR, stderr, "Positive value expected, you gave \"%s\"\n", str);
+        return -1;
+    }
+    if(val == LONG_MAX) {
+        jabs_message(MSG_ERROR, stderr, "Overflow: \"%s\"\n", str);
+        return -1;
+    }
+    if((unsigned long long)val < SIZE_MAX) { /* SIZE_MAX could theoretically be quite small (65535) */
+        *out = val;
+    } else {
+        *out = SIZE_MAX;
+    }
+    return 0;
 }

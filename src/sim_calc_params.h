@@ -15,6 +15,7 @@
 #define JABS_SIM_CALC_PARAMS_H
 #include "stop.h"
 #include "prob_dist.h"
+#include "message.h"
 
 typedef struct sim_calc_params {
     int ds; /* Dual scattering true/false */
@@ -56,6 +57,6 @@ void sim_calc_params_free(sim_calc_params *p);
 void sim_calc_params_copy(const sim_calc_params *p_src, sim_calc_params *p_dst);
 void sim_calc_params_update(sim_calc_params *p); /* Computes variables that can be computed from other variables */
 void sim_calc_params_ds(sim_calc_params *p, int ds); /* if ds is TRUE, set DS parameters, otherwise no action is taken */
-void sim_calc_params_print(const sim_calc_params *params);
+void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_level);
 
 #endif //JABS_SIM_CALC_PARAMS_H

@@ -39,5 +39,6 @@ char *jabs_file_extension(char *filename); /* Returns pointer in filename to the
 const char *jabs_file_extension_const(const char *filename);
 int jabs_unit_convert(const jibal_units *units, char type, const char *str, double *out); /* Wrapper for jibal_unit_convert with error reporting using jabs_message and sanity checker (jabs_unit_sanity_check()). Negative values are errors that should not be ignored. */
 int jabs_unit_sanity_check(double value, int type); /* returns 1 if no issue was found, returns 0 and prints a warning via jabs_message() if value is suspicious, and returns -1 for really crazy stuff */
+int jabs_str_to_size_t(const char *str, size_t *out);
 double jabs_clock();
 #endif //JABS_GENERIC_H

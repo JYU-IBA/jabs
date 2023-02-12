@@ -41,6 +41,7 @@
 #include "script_session.h"
 #include "script_command.h"
 #include "idf2jbs.h"
+#include "message.h"
 
 int idf2jbs(int argc, char * const *argv) {
     char *filename_out = NULL;
@@ -84,6 +85,8 @@ int main(int argc, char * const *argv) {
     }
     cmdline_options *cmd_opt = cmdline_options_init();
     read_options(cmd_opt, &argc, &argv);
+    jabs_message_verbosity = cmd_opt->verbose;
+    DEBUGMSG("Verbosity %i", jabs_message_verbosity);
     if(argc == 0) {
         cmd_opt->interactive = TRUE;
     }

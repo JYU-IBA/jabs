@@ -12,6 +12,7 @@ extern "C" {
 int fit_iter_callback(fit_stats stats);
 }
 
+jabs_msg_level jabs_message_verbosity;
 
 
 class QJaBSApplication : public QApplication
@@ -40,6 +41,7 @@ MainWindow *mainWindow; /* Dirty trick! jabs_message needs to know the address o
 
 int main(int argc, char *argv[])
 {
+    jabs_message_verbosity = JABS_DEFAULT_VERBOSITY;
     setlocale(LC_NUMERIC,"C");
     QJaBSApplication a(argc, argv);
     setlocale(LC_NUMERIC,"C");  /* This should force C part of JaBS to use "." as a decimal separator even when locale says it is ",". */
@@ -58,6 +60,9 @@ int main(int argc, char *argv[])
 }
 
 void jabs_message(jabs_msg_level level, FILE *f, const char * format, ...) {
+    if(level < jabs_message_verbosity) {
+        return;
+    }
     va_list argp;
     va_start(argp, format);
     if(f == stderr)     {

@@ -18,12 +18,13 @@
 
 #include <jibal_defaults.h>
 
+#include "message.h"
 #include "version.h"
 #include "defaults.h"
 #include "options.h"
 #include "git.h"
 
-#define USAGE_STRING "Usage: jabs [OPTION [<argument>]] [OPTION2 ...] ... [<FILE> [<FILE2>] ...] | sample <material1> <thickness1> [<material2> <thickness2> ...]]\n\nRun without arguments or \"-i\" to use JaBS interactively, give a sample or script file(s) otherwise.\n\nExample: jabs -E 2MeV --alpha=10deg --theta=170deg --out=spectrum.csv sample Au 500tfu SiO2 1000tfu Si 10000tfu\nExample: jabs example.jbs\n"
+#define USAGE_STRING "Usage: jabs [OPTION [<argument>]] [OPTION2 ...] ... [<FILE> [<FILE2>] ...] | \n\nRun without arguments or \"-i\" to use JaBS interactively.\n\nExample: jabs example.jbs\n"
 
 const char *jabs_version() {
     if(git_populated()) {
@@ -58,10 +59,10 @@ void read_options(cmdline_options *cmd_opt, int *argc, char *const **argv) {
             {NULL, 0,                          NULL, 0}
     };
     static const char *help_texts[] = {
-            "Print this message.",
-            "Print version number.",
-            "Interactive mode. If script file(s) are given, they will be run first.",
-            "Increase or give verbosity level.",
+            "Print this message (-h).",
+            "Print version number (-V).",
+            "Interactive mode (-i). If script file(s) are given, they will be run first.",
+            "Increase verbosity (no argument) or set it (-v).",
             NULL
     }; /* It is important to have the elements of this array correspond to the elements of the long_options[] array to avoid confusion. */
     while (1) {
@@ -85,13 +86,20 @@ void read_options(cmdline_options *cmd_opt, int *argc, char *const **argv) {
                     }
                     o++;
                 }
+                fprintf(stderr, "\nExample: jabs --verbose=2 example.jbs\n");
                 exit(EXIT_SUCCESS);
             case 'V':
                 printf("%s\n", jabs_version());
                 exit(EXIT_SUCCESS);
             case 'v':
-                if (optarg)
+                if (optarg) {
                     cmd_opt->verbose = atoi(optarg);
+                    if(cmd_opt->verbose < 0) {
+                        cmd_opt->verbose = 0;
+                    } else if(cmd_opt->verbose > MSG_ERROR) {
+                        cmd_opt->verbose = cmd_opt->verbose = MSG_ERROR;
+                    }
+                }
                 else
                     cmd_opt->verbose++;
                 break;
@@ -110,6 +118,7 @@ void read_options(cmdline_options *cmd_opt, int *argc, char *const **argv) {
 cmdline_options *cmdline_options_init() {
     cmdline_options *cmd_opt = malloc(sizeof(cmdline_options));
     memset(cmd_opt, 0, sizeof(cmdline_options)); /* Everything not listed below are zero or NULL by default */
+    cmd_opt->verbose = JABS_DEFAULT_VERBOSITY;
     return cmd_opt;
 }
 

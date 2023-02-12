@@ -53,6 +53,8 @@ endif()
 
 install(TARGETS jabs RUNTIME DESTINATION bin)
 
-if(DEBUG_MODE)
-add_subdirectory(des_table_test)
+if(0)
+    if(DEBUG_MODE)
+        add_subdirectory(des_table_test)
+    endif()
 endif()

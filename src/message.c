@@ -2,8 +2,12 @@
 #include <stdarg.h>
 #include "message.h"
 
+jabs_msg_level jabs_message_verbosity;
+
 void jabs_message(jabs_msg_level level, FILE *f, const char * restrict format, ...) {
-    (void) level;
+    if(level < jabs_message_verbosity) {
+        return;
+    }
     va_list argp;
     va_start(argp, format);
     vfprintf(f, format, argp);

@@ -56,12 +56,9 @@ int script_prepare_sim_or_fit(script_session *s) {
     fit_data_histo_sum_free(fit);
     fit_data_workspaces_free(s->fit);
     sample_free(fit->sim->sample);
-    DEBUGSTR("Original sample model:");
-    sample_model_print(NULL, fit->sm);
     fit->sim->sample = sample_from_sample_model(fit->sm);
     if(!fit->sim->sample) {
-        jabs_message(MSG_ERROR, stderr,
-                     "Could not make a sample based on model description. This should never happen.\n");
+        jabs_message(MSG_ERROR, stderr, "Could not make a sample based on model description. This should never happen.\n");
         return -1;
     }
     for(size_t i = 0; i < fit->sim->n_reactions; i++) {
@@ -90,8 +87,10 @@ int script_prepare_sim_or_fit(script_session *s) {
         return EXIT_FAILURE;
     }
     sim_sort_reactions(fit->sim);
+    jabs_message(MSG_INFO, stderr, "Sample model:\n");
+    sample_model_print(NULL, fit->sm);
     jabs_message(MSG_INFO, stderr, "Simplified sample model for simulation:\n");
-    sample_print(NULL, fit->sim->sample, TRUE);
+    sample_print(fit->sim->sample, TRUE);
 
     if(assign_stopping(fit->jibal->gsto, fit->sim)) {
         jabs_message(MSG_ERROR, stderr,
@@ -107,7 +106,8 @@ int script_prepare_sim_or_fit(script_session *s) {
     jibal_gsto_load_all(fit->jibal->gsto);
     DEBUGSTR("Updating calculation params before sim/fit");
     sim_calc_params_update(fit->sim->params);
-    sim_print(fit->sim);
+    jabs_message(MSG_VERBOSE, stderr, "Simulation parameters:\n");
+    sim_print(fit->sim, MSG_VERBOSE);
 
     sim_prepare_ion(&fit->sim->ion, fit->sim, fit->jibal->isotopes, fit->jibal->gsto);
     if(fit->sim->ion.ion_gsto->emin > fit->sim->emin) {
@@ -173,10 +173,11 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
     if(script_prepare_sim_or_fit(s)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    sim_calc_params_print(fit->sim->params);
+    sim_calc_params_print(fit->sim->params, MSG_VERBOSE);
     if(fit_data_workspaces_init(fit)) {
         return SCRIPT_COMMAND_FAILURE;
     }
+    jabs_message(MSG_INFO, stderr, "Simulation begins...\n");
     for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
         if(simulate_with_ds(fit->ws[i_det])) {
             jabs_message(MSG_ERROR, stderr, "Simulation failed.\n");
@@ -195,7 +196,6 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
         jabs_message(MSG_ERROR, stderr, fit_usage);
         return SCRIPT_COMMAND_FAILURE;
     }
-    fit_params_free(fit_data->fit_params);
 
     fit_params *p_all = fit_params_all(fit_data);
     if(fit_params_enable_using_string(p_all, argv[0])) {
@@ -207,6 +207,8 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
         return SCRIPT_COMMAND_FAILURE;
     }
     fit_params_print(p_all, TRUE, NULL, fit_data->sim->n_det);
+    fit_params_free(fit_data->fit_params);
+    fit_data->fit_params = NULL;
     fit_data->fit_params = p_all;
 
     if(fit_data->fit_params->n_active == 0) {
@@ -230,20 +232,15 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
     if(fit(fit_data) < 0) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    script_finish_sim_or_fit(s);
-#ifdef PRINT_SIM_AFTER_FIT
-    jabs_message(MSG_INFO, stderr, "\nFinal parameters:\n");
-    simulation_print(stderr, fit_data->sim);
-#endif
     jabs_message(MSG_INFO, stderr, "\nFinal profile:\n");
-    sample_print(NULL, fit_data->sim->sample, FALSE);
-    sample_areal_densities_print(stderr, fit_data->sim->sample, FALSE);
+    sample_print(fit_data->sim->sample, FALSE);
     jabs_message(MSG_INFO, stderr, "\nFinal layer thicknesses:\n");
     sample_print_thicknesses(NULL, fit_data->sim->sample);
     jabs_message(MSG_INFO, stderr, "\nFinal sample model:\n");
     sample_model_print(NULL, fit_data->sm);
     jabs_message(MSG_INFO, stderr, "\n");
     fit_stats_print(stderr, &fit_data->stats);
+    script_finish_sim_or_fit(s);
     return 1;
 }
 
@@ -1164,6 +1161,7 @@ script_command *script_commands_create(struct script_session *s) {
     c_set->f_var = &script_set_var;
     script_command_list_add_command(&c_set->subcommands, script_command_new("aperture", "Set aperture.", 0, 0, &script_set_aperture));
     script_command_list_add_command(&c_set->subcommands, script_command_new("charge", "Set charge.", 0, 1, &script_set_charge)); /* Fluence is fundamental, this is for convenience */
+    script_command_list_add_command(&c_set->subcommands, script_command_new("verbosity", "Set verbosity.", 0, 1, &script_set_verbosity));
 
     script_command *c_channeling = script_command_new("channeling", "Set channeling yield correction (i.e. last layer yield).", 0, 0, NULL);
     script_command_list_add_command(&c_channeling->subcommands, script_command_new("yield", "Set channeling yield (constant).", 0, 0, &script_set_channeling_yield));
@@ -1294,7 +1292,11 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_fit->subcommands, script_command_new("ranges", "Show fit ranges.", 0, 0, &script_show_fit_ranges));
 
     script_command_list_add_command(&c_show->subcommands, script_command_new("reactions", "Show reactions.", 0, 0, &script_show_reactions));
-    script_command_list_add_command(&c_show->subcommands, script_command_new("sample", "Show sample.", 0, 0, &script_show_sample));
+
+    script_command *c_show_sample = script_command_new("sample", "Show sample.", 0, 0, &script_show_sample);
+    script_command_list_add_command(&c_show_sample->subcommands, script_command_new("profile", "Show sample profile.", 0, 0, &script_show_sample_profile));
+    script_command_list_add_command(&c_show->subcommands, c_show_sample);
+
     script_command_list_add_command(&c_show->subcommands, script_command_new("simulation", "Show simulation.", 0, 0, &script_show_simulation));
     script_command_list_add_command(&c_show->subcommands, script_command_new("stopping", "Show stopping (GSTO) assignments.", 0, 0, &script_show_stopping));
 
@@ -1686,10 +1688,13 @@ script_command_status script_reset(script_session *s, int argc, char *const *arg
 script_command_status script_show_sample(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
+    if(argc > 0) {
+        return SCRIPT_COMMAND_NOT_FOUND;
+    }
     struct fit_data *fit = s->fit;
     if(!fit->sm) {
         jabs_message(MSG_WARNING, stderr, "No sample has been set.\n");
-        return 0;
+        return SCRIPT_COMMAND_FAILURE;
     }
 #ifdef DEBUG
     char *sample_str = sample_model_to_string(fit->sm);
@@ -1709,10 +1714,24 @@ script_command_status script_show_sample(script_session *s, int argc, char *cons
     return 0;
 }
 
+script_command_status script_show_sample_profile(struct script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
+    struct fit_data *fit = s->fit;
+    if(!fit->sm) {
+        jabs_message(MSG_WARNING, stderr, "No sample has been set.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    sample *sample = sample_from_sample_model(fit->sm);
+    sample_print(sample, FALSE);
+    sample_free(sample);
+    return 0;
+}
+
 script_command_status script_show_simulation(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
-    sim_print(s->fit->sim);
+    sim_print(s->fit->sim, MSG_VERBOSE);
     return 0;
 }
 
@@ -1742,7 +1761,7 @@ script_command_status script_show_stopping(script_session *s, int argc, char *co
             jabs_message(MSG_INFO, stderr, "\n");
         }
     }
-    jabs_message(MSG_INFO, stderr, "\nTotal of %i assignments.\n", n);
+    jabs_message(MSG_INFO, stderr, "Total of %i assignments.\n", n);
     return SCRIPT_COMMAND_SUCCESS;
 }
 
@@ -1792,7 +1811,7 @@ script_command_status script_show_aperture(struct script_session *s, int argc, c
 script_command_status script_show_calc_params(script_session *s, int argc, char * const *argv) {
     (void) argv;
     const int argc_orig = argc;
-    sim_calc_params_print(s->fit->sim->params);
+    sim_calc_params_print(s->fit->sim->params, MSG_INFO);
     return argc_orig - argc;
 }
 
@@ -2125,6 +2144,24 @@ script_command_status script_set_stopping(struct script_session *s, int argc, ch
         }
     }
     return argc_orig - argc;
+}
+
+script_command_status script_set_verbosity(struct script_session *s, int argc, char * const *argv) {
+    (void) s;
+    if(argc < 1) { /* argc_min set elsewhere, this is redundant, no error reporting */
+        return EXIT_FAILURE;
+    }
+    size_t tmp = jabs_message_verbosity;
+    if(jabs_str_to_size_t(argv[0], &tmp) < 0) {
+        return EXIT_FAILURE;
+    }
+    if(tmp > MSG_ERROR) {
+        jabs_message(MSG_ERROR, stderr, "The verbosity level %zu is too high, maximum is %zu.\n", tmp, MSG_ERROR);
+        return EXIT_FAILURE;
+    }
+    jabs_message_verbosity = tmp;
+    jabs_message(MSG_INFO, stderr, "Verbosity level set to \"%s\".\n", jabs_msg_levels[jabs_message_verbosity]);
+    return 1;
 }
 
 script_command_status script_test_reference(struct script_session *s, int argc, char *const *argv) {

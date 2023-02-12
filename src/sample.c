@@ -345,7 +345,7 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
     }
 
 #ifdef DEBUG
-    sample_print(NULL, s, 0);
+    sample_print(s, 0);
 #endif
     sample_model_free(sm_copy);
     sample_thickness_recalculate(s);
@@ -866,21 +866,21 @@ double sample_areal_density_isotope_range(const sample *sample, size_t i_isotope
     return 0.5 * ( *(sample_conc_bin(sample, i_range, i_isotope)) + *(sample_conc_bin(sample, i_range-1, i_isotope))) * thickness;
 }
 
-void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes) {
+void sample_areal_densities_print(const sample *sample, int print_isotopes) {
     if(!sample)
         return;
-    jabs_message(MSG_INFO, f, "SUM (tfu)        ");
+    jabs_message(MSG_INFO, stderr, "SUM (tfu)        ");
     double sum = 0.0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         for (size_t j = 1; j < sample->n_ranges; j++) {
             sum += sample_areal_density_isotope_range(sample, i, j);
         }
         if (print_isotopes || i == sample->n_isotopes-1 || sample->isotopes[i]->Z != sample->isotopes[i+1]->Z) {
-            jabs_message(MSG_INFO, f, " %9.3lf", sum/C_TFU);
+            jabs_message(MSG_INFO, stderr, " %9.3lf", sum/C_TFU);
             sum = 0.0;
         }
     }
-    jabs_message(MSG_INFO, f, "\n");
+    jabs_message(MSG_INFO, stderr, "\n");
 }
 
 
@@ -903,41 +903,37 @@ int sample_print_thicknesses(const char *filename, const sample *sample) {
     return EXIT_SUCCESS;
 }
 
-int sample_print(const char *filename, const sample *sample, int print_isotopes) {
+int sample_print(const sample *sample, int print_isotopes) {
     if(!sample)
         return EXIT_FAILURE;
-    FILE *f = fopen_file_or_stream(filename, "w");
-    if(!f)
-        return EXIT_FAILURE;
-    jabs_message(MSG_INFO, f, "    DEPTH   ROUGH");
+    jabs_message(MSG_INFO, stderr, "    DEPTH   ROUGH");
     int Z = 0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         if(print_isotopes) {
-            jabs_message(MSG_INFO, f, " %9s", sample->isotopes[i]->name);
+            jabs_message(MSG_INFO, stderr, " %9s", sample->isotopes[i]->name);
         } else if(Z != sample->isotopes[i]->Z){
             const char *s = sample->isotopes[i]->name;
             while(*s >= '0' && *s <= '9') {s++;} /* Skip numbers, e.g. 28Si -> Si */
-            jabs_message(MSG_INFO, f, " %9s", s);
+            jabs_message(MSG_INFO, stderr, " %9s", s);
             Z = sample->isotopes[i]->Z; /* New element */
         }
     }
-    jabs_message(MSG_INFO, f, "\n");
-    jabs_message(MSG_INFO, f, "      tfu     tfu\n");
+    jabs_message(MSG_INFO, stderr, "\n");
+    jabs_message(MSG_INFO, stderr, "      tfu     tfu\n");
     for (size_t i = 0; i < sample->n_ranges; i++) {
-        jabs_message(MSG_INFO, f, "%9.3lf", sample->ranges[i].x/C_TFU);
-        jabs_message(MSG_INFO, f, " %7.3lf", sample->ranges[i].rough.x/C_TFU);
+        jabs_message(MSG_INFO, stderr, "%9.3lf", sample->ranges[i].x/C_TFU);
+        jabs_message(MSG_INFO, stderr, " %7.3lf", sample->ranges[i].rough.x/C_TFU);
         double sum = 0.0;
         for (size_t j = 0; j < sample->n_isotopes; j++) {
             sum += sample->cbins[i * sample->n_isotopes + j];
             if (print_isotopes || j == sample->n_isotopes-1 || sample->isotopes[j]->Z != sample->isotopes[j+1]->Z) { /* Last isotope or next isotope belongs to another element, print. */
-                jabs_message(MSG_INFO, f, " %9.4lf", sum * 100.0);
+                jabs_message(MSG_INFO, stderr, " %9.4lf", sum * 100.0);
                 sum = 0.0;
             }
         }
-        jabs_message(MSG_INFO, f, "\n");
+        jabs_message(MSG_INFO, stderr, "\n");
     }
-    jabs_message(MSG_INFO, f, "\n");
-    fclose_file_or_stream(f);
+    sample_areal_densities_print(sample, FALSE);
     return EXIT_SUCCESS;
 }
 

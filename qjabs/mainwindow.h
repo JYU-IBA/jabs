@@ -135,5 +135,6 @@ private:
     QSettings settings;
     QStringList visibleGraphs;
     int warningCounter;
+    int defaultVerbosity;
 };
 #endif // MAINWINDOW_H

@@ -25,10 +25,10 @@ MainWindow::MainWindow(QWidget *parent)
                        + "Using Qt version " + qVersion() + ", compiled using version " + QT_VERSION_STR + "\n\n"
                        + "Copyright 2021 - 2023 Jaakko Julin <jaakko.julin@jyu.fi>\n";
     ui->setupUi(this);
-    ui->widget->setVisible(false);
-    ui->plotSettingsGroupBox->setVisible(false); /* Will be made visible if necessary */
     QIcon icon(":/icons/jabs.svg");
     QApplication::setWindowIcon(icon);
+    ui->widget->setVisible(false);
+    ui->detectorFrame->setVisible(false); /* Will be made visible if necessary */
     setWindowIcon(icon);
     ui->msgTextBrowser->setOpenLinks(false); /* We use the connection below to handle links */
     connect(ui->msgTextBrowser, &QTextBrowser::anchorClicked, this, &MainWindow::openLink);
@@ -167,7 +167,7 @@ void MainWindow::plotSession(bool error)
             ui->widget->resetZoom();
         }
     } else {
-        ui->plotSettingsGroupBox->setVisible(false);
+        ui->detectorFrame->setVisible(false);
         ui->widget->setVisible(false);
     }
 }
@@ -317,6 +317,7 @@ void MainWindow::readSettings()
     messageFont.setFamily(messageFontFamily);
     messageFont.setPointSize(settings.value("messageFontSize", 10).toInt());
     ui->msgTextBrowser->setFont(messageFont);
+    defaultVerbosity = settings.value("defaultVerbosity", JABS_DEFAULT_VERBOSITY).toInt();
 }
 
 void MainWindow::setNeedsSaving(bool value)
@@ -355,6 +356,8 @@ int MainWindow::fitCallback(fit_stats stats)
     fitDialog->updateStats(stats);
     if(fitDialog->isPlotWhileFitting()) {
         plotSession(/*stats.error < 0*/);
+    } else {
+        ui->widget->setVisible(false);
     }
     QCoreApplication::processEvents();
     return fitDialog->isAborted();
@@ -379,15 +382,18 @@ void MainWindow::on_action_Run_triggered()
     size_t lineno = 0;
     bool error = false;
     warningCounter = 0;
-    QElapsedTimer timer;
-    timer.start();
+    jabs_message_verbosity = (jabs_msg_level) defaultVerbosity;
+    QElapsedTimer refreshTimer;
+    refreshTimer.start();
+    QElapsedTimer runTimer;
+    runTimer.start();
     while(!stream.atEnd() && !error) {
         QString line = stream.readLine();
         lineno++;
         QString command_str = line.split(" ").first();
         const script_command *c = script_command_find(session->commands, qPrintable(command_str));
-        if(timer.elapsed() > 200 || c && (c->f == script_fit || c->f == script_simulate)) { /* Make sure stuff gets shown before sim or fit starts, or occasionally with a timer */
-            timer.restart();
+        if(refreshTimer.elapsed() > 200 || c && (c->f == script_fit || c->f == script_simulate)) { /* Make sure stuff gets shown before sim or fit starts, or occasionally with a timer */
+            refreshTimer.restart();
             if(c && c->f == script_fit) {
                 statusBar()->showMessage(QString("Running a fit."));
             } else if(c && c->f == script_simulate) {
@@ -417,7 +423,7 @@ void MainWindow::on_action_Run_triggered()
     if(error) {
         message = QString("Error on line %1. Run aborted.").arg(lineno);
     } else {
-        message = QString("Run successful, %1 lines processed.").arg(lineno);
+        message = QString("Run successful in %1 seconds, %2 lines processed.").arg(runTimer.elapsed()/1000.0).arg(lineno);
         firstRun = false;
     }
     if(warningCounter == 1) {
@@ -665,6 +671,7 @@ void MainWindow::on_commandLineEdit_returnPressed()
             ui->commandLineEdit->clear();
             plotSession();
     }
+    closeFitDialog();
 }
 
 void MainWindow::on_msgTextBrowser_textChanged()
@@ -776,10 +783,10 @@ void MainWindow::onSpectrumLegendMoved(bool outside)
 void MainWindow::updateDetectorList()
 {
     if(!session || !session->fit || !session->fit->sim) {
-        ui->plotSettingsGroupBox->setVisible(false);
+        ui->detectorFrame->setVisible(false);
         return;
     }
-    ui->plotSettingsGroupBox->setVisible(session->fit->sim->n_det > 1);
+    ui->detectorFrame->setVisible(session->fit->sim->n_det > 1);
     int old_i_det = ui->comboBox->currentIndex();
     ui->comboBox->clear();
     for(size_t i_det = 0; i_det < session->fit->sim->n_det; i_det++) {

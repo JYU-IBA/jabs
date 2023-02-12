@@ -101,9 +101,9 @@ sample *sample_copy(const sample *sample); /* Deep copy */
 double sample_mass_density_range(const sample *sample, size_t i_range);
 double sample_thickness_in_nm_range(const sample *sample, size_t i_range);
 double sample_areal_density_isotope_range(const sample *sample,  size_t i_isotope, size_t i_range);
-void sample_areal_densities_print(FILE *f, const sample *sample, int print_isotopes);
+void sample_areal_densities_print(const sample *sample, int print_isotopes);
 int sample_print_thicknesses(const char *filename, const sample *sample);
-int sample_print(const char *filename, const sample *sample, int print_isotopes);  /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
+int sample_print(const sample *sample, int print_isotopes);  /* If print_isotopes is non-zero print print_isotopes individually. Isotopes must be sorted by Z, e.g. with sample_sort_isotopes() */
 void sample_free(sample *sample);
 double sample_isotope_max_depth(const sample *sample, size_t i_isotope);
 void sample_sort_isotopes(sample *sample); /* Sort isotopes. Note that you can screw up concentrations tables if you call this at the wrong time! */

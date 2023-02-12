@@ -250,53 +250,53 @@ int sim_det_set(simulation *sim, detector *det, size_t i_det) {
     return EXIT_SUCCESS;
 }
 
-void sim_print(const simulation *sim) {
+void sim_print(const simulation *sim, jabs_msg_level msg_level) {
     if(!sim) {
         return;
     }
     if(sim->beam_isotope) {
-        jabs_message(MSG_INFO, stderr, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass / C_U);
+        jabs_message(msg_level, stderr, "ion = %s (Z = %i, A = %i, mass %.3lf u)\n", sim->beam_isotope->name, sim->beam_isotope->Z, sim->beam_isotope->A, sim->beam_isotope->mass / C_U);
     } else {
-        jabs_message(MSG_INFO, stderr, "ion = None\n");
+        jabs_message(msg_level, stderr, "ion = None\n");
     }
-    jabs_message(MSG_INFO, stderr, "E = %.3lf keV\n", sim->beam_E / C_KEV);
-    jabs_message(MSG_INFO, stderr, "E_broad = %.3lf keV FWHM\n", sim->beam_E_broad / C_KEV);
-    jabs_message(MSG_INFO, stderr, "E_min = %.3lf keV\n", sim->emin / C_KEV);
-    jabs_message(MSG_INFO, stderr, "alpha = %.3lf deg\n", sim_alpha_angle(sim) / C_DEG);
-    jabs_message(MSG_INFO, stderr, "sample tilt (horizontal) = %.3lf deg\n", angle_tilt(sim->sample_theta, sim->sample_phi, 'x') / C_DEG);
-    jabs_message(MSG_INFO, stderr, "sample tilt (vertical) = %.3lf deg\n", angle_tilt(sim->sample_theta, sim->sample_phi, 'y') / C_DEG);
+    jabs_message(msg_level, stderr, "E = %.3lf keV\n", sim->beam_E / C_KEV);
+    jabs_message(msg_level, stderr, "E_broad = %.3lf keV FWHM\n", sim->beam_E_broad / C_KEV);
+    jabs_message(msg_level, stderr, "E_min = %.3lf keV\n", sim->emin / C_KEV);
+    jabs_message(msg_level, stderr, "alpha = %.3lf deg\n", sim_alpha_angle(sim) / C_DEG);
+    jabs_message(msg_level, stderr, "sample tilt (horizontal) = %.3lf deg\n", angle_tilt(sim->sample_theta, sim->sample_phi, 'x') / C_DEG);
+    jabs_message(msg_level, stderr, "sample tilt (vertical) = %.3lf deg\n", angle_tilt(sim->sample_theta, sim->sample_phi, 'y') / C_DEG);
     rot_vect v = rot_vect_from_angles(C_PI - sim->sample_theta, sim->sample_phi); /* By default our sample faces the beam and tilt angles are based on that choice. Pi is there for a reason. */
-    jabs_message(MSG_INFO, stderr, "surf normal unit vector (beam in z direction) = (%.3lf, %.3lf, %.3lf)\n", v.x, v.y, v.z);
+    jabs_message(msg_level, stderr, "surf normal unit vector (beam in z direction) = (%.3lf, %.3lf, %.3lf)\n", v.x, v.y, v.z);
     char *aperture_str = aperture_to_string(sim->beam_aperture);
-    jabs_message(MSG_INFO, stderr, "aperture = %s\n", aperture_str);
+    jabs_message(msg_level, stderr, "aperture = %s\n", aperture_str);
     free(aperture_str);
-    jabs_message(MSG_INFO, stderr, "n_detectors = %zu\n", sim->n_det);
+    jabs_message(msg_level, stderr, "n_detectors = %zu\n", sim->n_det);
     for(size_t i = 0; i < sim->n_det; i++) {
         detector *det = sim->det[i];
-        jabs_message(MSG_INFO, stderr, "DETECTOR %zu (run 'show detector %zu' for other parameters):\n", i + 1, i + 1);
-        jabs_message(MSG_INFO, stderr, "  type = %s\n", detector_type_name(det));
-        jabs_message(MSG_INFO, stderr, "  theta = %.3lf deg\n", det->theta / C_DEG);
-        jabs_message(MSG_INFO, stderr, "  phi = %.3lf deg\n", det->phi / C_DEG);
+        jabs_message(msg_level, stderr, "DETECTOR %zu (run 'show detector %zu' for other parameters):\n", i + 1, i + 1);
+        jabs_message(msg_level, stderr, "  type = %s\n", detector_type_name(det));
+        jabs_message(msg_level, stderr, "  theta = %.3lf deg\n", det->theta / C_DEG);
+        jabs_message(msg_level, stderr, "  phi = %.3lf deg\n", det->phi / C_DEG);
         if(sim->params->beta_manual) {
-            jabs_message(MSG_INFO, stderr, "  beta = %.3lf deg (calculated)\n", sim_exit_angle(sim, det) / C_DEG);
-            jabs_message(MSG_INFO, stderr, "  beta = %.3lf deg (manual)\n", det->beta / C_DEG);
+            jabs_message(msg_level, stderr, "  beta = %.3lf deg (calculated)\n", sim_exit_angle(sim, det) / C_DEG);
+            jabs_message(msg_level, stderr, "  beta = %.3lf deg (manual)\n", det->beta / C_DEG);
         } else {
-            jabs_message(MSG_INFO, stderr, "  beta = %.3lf deg\n", sim_exit_angle(sim, det) / C_DEG);
+            jabs_message(msg_level, stderr, "  beta = %.3lf deg\n", sim_exit_angle(sim, det) / C_DEG);
         }
-        jabs_message(MSG_INFO, stderr, "  angle from horizontal = %.3lf deg\n", detector_angle(det, 'x') / C_DEG);
-        jabs_message(MSG_INFO, stderr, "  angle from vertical = %.3lf deg\n", detector_angle(det, 'y') / C_DEG);
-        jabs_message(MSG_INFO, stderr, "  solid angle (given, used) = %.4lf msr\n", i, det->solid / C_MSR);
+        jabs_message(msg_level, stderr, "  angle from horizontal = %.3lf deg\n", detector_angle(det, 'x') / C_DEG);
+        jabs_message(msg_level, stderr, "  angle from vertical = %.3lf deg\n", detector_angle(det, 'y') / C_DEG);
+        jabs_message(msg_level, stderr, "  solid angle (given, used) = %.4lf msr\n", i, det->solid / C_MSR);
         if(det->distance > 1.0 * C_MM) {
-            jabs_message(MSG_INFO, stderr, "  solid angle (calculated, not used) = %.4lf msr\n", i, detector_solid_angle_calc(det) / C_MSR);
-            jabs_message(MSG_INFO, stderr, "  distance = %.3lf mm\n", i, det->distance / C_MM);
+            jabs_message(msg_level, stderr, "  solid angle (calculated, not used) = %.4lf msr\n", i, detector_solid_angle_calc(det) / C_MSR);
+            jabs_message(msg_level, stderr, "  distance = %.3lf mm\n", i, det->distance / C_MM);
             rot_vect v = rot_vect_from_angles(det->theta, det->phi);
             double r = det->distance;
-            jabs_message(MSG_INFO, stderr, "  coordinates = (%.3lf, %.3lf, %.3lf) mm\n", v.x * r / C_MM, v.y * r / C_MM, v.z * r / C_MM);
+            jabs_message(msg_level, stderr, "  coordinates = (%.3lf, %.3lf, %.3lf) mm\n", v.x * r / C_MM, v.y * r / C_MM, v.z * r / C_MM);
         }
-        jabs_message(MSG_INFO, stderr, "  particle solid angle product = %e sr\n", i, sim->fluence * det->solid);
+        jabs_message(msg_level, stderr, "  particle solid angle product = %e sr\n", i, sim->fluence * det->solid);
     }
-    jabs_message(MSG_INFO, stderr, "n_reactions = %zu\n", sim->n_reactions);
-    jabs_message(MSG_INFO, stderr, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence * C_E * 1.0e6);
+    jabs_message(msg_level, stderr, "n_reactions = %zu\n", sim->n_reactions);
+    jabs_message(msg_level, stderr, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence * C_E * 1.0e6);
 }
 
 void sim_sort_reactions(const simulation *sim) {

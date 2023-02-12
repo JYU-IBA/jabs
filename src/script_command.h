@@ -91,6 +91,7 @@ script_command_status script_show_fit_variables(struct script_session *s, int ar
 script_command_status script_show_fit_ranges(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_reactions(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_sample(struct script_session *s, int argc, char * const *argv);
+script_command_status script_show_sample_profile(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_simulation(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_stopping(script_session *s, int argc, char * const *argv);
 script_command_status script_simulate(struct script_session *s, int argc, char * const *argv);
@@ -106,6 +107,7 @@ script_command_status script_set_detector_calibration_poly(struct script_session
 script_command_status script_set_detector_name(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_sample(struct script_session *s, int argc, char * const *argv);
 script_command_status script_set_stopping(struct script_session *s, int argc, char * const *argv);
+script_command_status script_set_verbosity(struct script_session *s, int argc, char * const *argv);
 script_command_status script_test_reference(struct script_session *s, int argc, char * const *argv);
 script_command_status script_test_roi(struct script_session *s, int argc, char * const *argv);
 script_command_status script_split_sample_elements(struct script_session *s, int argc, char * const *argv);

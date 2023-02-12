@@ -630,7 +630,7 @@ int simulate_with_roughness(sim_workspace *ws) {
         }
         DEBUGMSG("Weight %.6lf.", p);
 #ifdef DEBUG
-        sample_print(NULL, sample_rough, FALSE);
+        sample_print(sample_rough, FALSE);
 #endif
         ws->fluence = p * p_sr;
         ion_set_angle(&ws->ion, 0.0, 0.0);
@@ -673,7 +673,6 @@ int simulate_with_ds(sim_workspace *ws) {
     sim_calc_params_defaults_fast(ws->params); /* This makes DS faster. Changes to ws->params are not reverted, but they don't affect original sim settings */
     ws->params->incident_stop_params.min *= 3.0;
     sim_calc_params_update(ws->params);
-    jabs_message(MSG_ERROR, stderr, "\n");
     const jibal_isotope *incident = ws->sim->beam_isotope;
     int last = FALSE;
     jabs_message(MSG_VERBOSE, stderr, "Dual scattering simulation starts.\n\n");

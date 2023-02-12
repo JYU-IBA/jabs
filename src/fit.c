@@ -1032,11 +1032,11 @@ int fit(fit_data *fit) {
             }
         }
         jabs_message(MSG_INFO, stderr, "\nInitializing fit phase %i. Xtol = %e, chisq_tol %e\n", phase, xtol, chisq_tol);
-        jabs_message(MSG_INFO, stderr, "Simulation parameters for this phase:\n");
-        sim_calc_params_print(fit->sim->params);
+        jabs_message(MSG_VERBOSE, stderr, "Simulation parameters for this phase:\n");
+        sim_calc_params_print(fit->sim->params, MSG_VERBOSE);
         jabs_message(MSG_INFO, stderr, "Initializing fit...\n");
         gsl_multifit_nlinear_winit(x, &wts.vector, &fdf, w);
-        jabs_message(MSG_INFO, stderr, "Done. Starting iteration.\n");
+        jabs_message(MSG_INFO, stderr, "Done. Starting iteration...\n");
         /* compute initial cost function */
         f = gsl_multifit_nlinear_residual(w);
         gsl_blas_ddot(f, f, &fit->stats.chisq0);

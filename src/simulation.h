@@ -65,7 +65,7 @@ detector *sim_det(const simulation *sim, size_t i_det);
 detector *sim_det_from_string(const simulation *sim, const char *s);
 int sim_det_add(simulation *sim, detector *det);
 int sim_det_set(simulation *sim, detector *det, size_t i_det); /* Will free existing detector (can be NULL too) */
-void sim_print(const simulation *sim);
+void sim_print(const simulation *sim, jabs_msg_level msg_level);
 void sim_sort_reactions(const simulation *sim);
 double sim_alpha_angle(const simulation *sim);
 double sim_exit_angle(const simulation *sim, const detector *det);

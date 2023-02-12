@@ -2,6 +2,9 @@
 #include "ui_preferencesdialog.h"
 #include <QFileDialog>
 #include <QMessageBox>
+extern "C" {
+#include "message.h"
+}
 
 PreferencesDialog::PreferencesDialog(QWidget *parent) :
     QDialog(parent),
@@ -9,10 +12,13 @@ PreferencesDialog::PreferencesDialog(QWidget *parent) :
 {
     setAttribute(Qt::WA_DeleteOnClose);
     ui->setupUi(this);
-    readSettings();
-    connect(this, &QDialog::accepted, this, &PreferencesDialog::saveSettings);
     ui->editorFontComboBox->setMinimumWidth(200);
     ui->messageFontComboBox->setMinimumWidth(200);
+    for(int i = 0; i <= MSG_ERROR; i++) {
+        ui->verbosityComboBox->addItem(QString(jabs_msg_levels[i]));
+    }
+    readSettings();
+    connect(this, &QDialog::accepted, this, &PreferencesDialog::saveSettings);
 }
 
 PreferencesDialog::~PreferencesDialog()
@@ -38,6 +44,7 @@ void PreferencesDialog::saveSettings()
     settings.setValue("editorFontSize", ui->editorfontsizeSpinBox->value());
     settings.setValue("messageFontFamily", ui->messageFontComboBox->currentFont().family());
     settings.setValue("messageFontSize", ui->messagefontsizeSpinBox->value());
+    settings.setValue("defaultVerbosity", ui->verbosityComboBox->currentIndex());
     QString newJibalConfFilename = ui->jibalconfigurationfileLineEdit->text();
     if(jibalConfFilename != newJibalConfFilename) {
         QString msg = "Please restart JaBS for the change in JIBAL configuration to take effect.";
@@ -59,6 +66,7 @@ void PreferencesDialog::readSettings()
     ui->editorfontsizeSpinBox->setValue(settings.value("editorFontSize", 11).toInt());
     ui->messageFontComboBox->setCurrentFont(QFont(settings.value("messageFontFamily", defaultFontFamily).toString()));
     ui->messagefontsizeSpinBox->setValue(settings.value("messageFontSize", 10).toInt());
+    ui->verbosityComboBox->setCurrentIndex(settings.value("defaultVerbosity", JABS_DEFAULT_VERBOSITY).toInt());
 }
 
 
