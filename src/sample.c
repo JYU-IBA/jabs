@@ -676,7 +676,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             range = &sm->ranges[sm->n_ranges - 1];
         }
         if(range && (strcmp((*argv)[0], "rough") == 0 || strcmp((*argv)[0], "gamma") == 0)) {
-            if(jabs_unit_convert(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1], &range->rough.x) < 0) {
+            if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_LAYER_THICKNESS, (*argv)[1], &range->rough.x) < 0) {
                 sample_model_free(sm);
                 return NULL;
             } else {
@@ -704,7 +704,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
         } else if(range && strcmp((*argv)[0], "stragg") == 0) {
             range->stragg = strtod((*argv)[1], NULL);
         } else if(range && strcmp((*argv)[0], "density") == 0) {
-            if(jabs_unit_convert(jibal->units, UNIT_TYPE_DENSITY, (*argv)[1], &range->density) < 0) {
+            if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_DENSITY, (*argv)[1], &range->density) < 0) {
                 sample_model_free(sm);
                 return NULL;
             }
@@ -716,7 +716,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             }
             DEBUGMSG("Material from formula \"%s\" was created", (*argv)[0]);
             range = &sm->ranges[sm->n_ranges];
-            if(jabs_unit_convert(jibal->units, UNIT_TYPE_LAYER_THICKNESS, (*argv)[1], &range->x) < 0) {
+            if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_LAYER_THICKNESS, (*argv)[1], &range->x) < 0) {
                 sample_model_free(sm);
                 return NULL;
             }

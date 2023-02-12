@@ -165,12 +165,12 @@ reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incid
     (*argv) += 2;
     while ((*argc) >= 2) {
         if(strcmp((*argv)[0], "max") == 0) {
-            if(jabs_unit_convert(jibal->units, UNIT_TYPE_ENERGY, (*argv)[1], &r->E_max) < 0) {
+            if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_ENERGY, (*argv)[1], &r->E_max) < 0) {
                 reaction_free(r);
                 return NULL;
             }
         } else if(strcmp((*argv)[0], "min") == 0) {
-            if(jabs_unit_convert(jibal->units, UNIT_TYPE_ENERGY, (*argv)[1], &r->E_min) < 0) {
+            if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_ENERGY, (*argv)[1], &r->E_min) < 0) {
                 reaction_free(r);
                 return NULL;
             }

@@ -259,42 +259,51 @@ const char *jabs_file_extension_const(const char *filename) {
 
 int jabs_unit_convert(const jibal_units *units, char type, const char *str, double *out) {
     int error;
+    DEBUGMSG("JaBS unit conversion, type '%c' (%i), string %s", type, type, str);
     if((error = jibal_unit_convert(units, type, str, out)) < 0) {
         jabs_message(MSG_ERROR, stderr, "Conversion of value \"%s\" failed: %s\n", str, jibal_unit_conversion_error_string(error));
         return error;
     }
+    DEBUGMSG("Converted output to %p should have been set to %g successfully, running sanity check.", (void *)out, *out);
+    return jabs_unit_sanity_check(*out, type);
+}
+
+int jabs_unit_sanity_check(double value, int type) {
     switch(type) {
-        case UNIT_TYPE_LAYER_THICKNESS:
-            if(*out < 0.1 * C_TFU) {
-                jabs_message(MSG_WARNING, stderr, "Layer thickness %g tfu (1e15 at./cm2) sounds quite small. Check your units.\n", *out / C_TFU);
+        case JIBAL_UNIT_TYPE_LAYER_THICKNESS:
+            if(value < 0.1 * C_TFU) {
+                jabs_message(MSG_WARNING, stderr, "Layer thickness %g tfu (1e15 at./cm2) sounds quite small. Check your units.\n", value / C_TFU);
+                return 0;
             }
             break;
-        case UNIT_TYPE_ANGLE:
-            if(*out < -C_2PI || *out > C_2PI) {
-                jabs_message(MSG_WARNING, stderr, "Angle of %g degrees given. Check your units.\n", *out / C_DEG);
+        case JIBAL_UNIT_TYPE_ANGLE:
+            if(value < -C_2PI || value> C_2PI) {
+                jabs_message(MSG_WARNING, stderr, "Angle of %g degrees given. Check your units.\n", value / C_DEG);
+                return 0;
             }
             break;
-        case UNIT_TYPE_ENERGY:
-            if(*out > E_MAX) {
-                jabs_message(MSG_ERROR, stderr, "Energy of %g MeV given. Check your units.\n", *out / C_MEV);
-                error = -1000;
+        case JIBAL_UNIT_TYPE_ENERGY:
+            if(value> E_MAX) {
+                jabs_message(MSG_ERROR, stderr, "Energy of %g MeV given. Check your units.\n", value / C_MEV);
+                return -1;
             }
             break;
-        case UNIT_TYPE_DENSITY:
-            if(*out < 0.025 * C_G_CM3 || *out > 25 * C_G_CM3) {
-                jabs_message(MSG_WARNING, stderr, "Density %g g/cm3 given. Check your units.\n", *out / C_G_CM3);
+        case JIBAL_UNIT_TYPE_DENSITY:
+            if(value< 0.025 * C_G_CM3 || value> 25 * C_G_CM3) {
+                jabs_message(MSG_WARNING, stderr, "Density %g g/cm3 given. Check your units.\n", value/ C_G_CM3);
+                return 0;
             }
             break;
-        case UNIT_TYPE_SOLID_ANGLE:
-            if(*out < 0.001 * C_MSR || *out > 4.0 * C_PI) {
-                jabs_message(MSG_WARNING, stderr, "Solid angle %g msr given. Check your units.\n", *out / C_MSR);
+        case JIBAL_UNIT_TYPE_SOLID_ANGLE:
+            if(value < 0.001 * C_MSR || value > 4.0 * C_PI) {
+                jabs_message(MSG_WARNING, stderr, "Solid angle %g msr given. Check your units.\n", value / C_MSR);
+                return 0;
             }
             break;
         default:
             break;
     }
-    DEBUGMSG("Unit conversion, type %c, string %s, output to %p should have been set to %g", type, str, (void *)out, *out);
-    return error;
+    return 1;
 }
 
 

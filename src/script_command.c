@@ -462,6 +462,12 @@ script_command_status script_set_var(struct script_session *s, jibal_config_var 
         jabs_message(MSG_ERROR, stderr, "Not enough arguments to set variable.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
+    if(var->type == JIBAL_CONFIG_VAR_UNIT) {
+        double out;
+        if(jabs_unit_convert(s->jibal->units, var->unit_type, argv[0], &out) < 0) { /* The final conversion is performed by jibal_config_var_set(), but let's check sanity first */
+            return EXIT_FAILURE;
+        }
+    }
     jibal_config_var_set(s->jibal->units, var, argv[0], NULL);
     return 1; /* Number of arguments */
 }
@@ -480,11 +486,11 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
     DEBUGMSG("Some kind of value to be converted: \"%s\"", argv[0]);
     double *value_double = NULL;
     size_t *value_size = NULL;
-    char unit_type = UNIT_TYPE_ANY;
+    char unit_type = JIBAL_UNIT_TYPE_ANY;
     switch(val) {
         case 'b': /* beta */
             value_double = &(det->beta);
-            unit_type = UNIT_TYPE_ANGLE;
+            unit_type = JIBAL_UNIT_TYPE_ANGLE;
             break;
         case 'c': /* column */
             value_size = &(det->column);
@@ -497,7 +503,7 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
             break;
         case 'd': /* distance */
             value_double = &(det->distance);
-            unit_type = UNIT_TYPE_DISTANCE;
+            unit_type = JIBAL_UNIT_TYPE_DISTANCE;
             break;
         case 't': /* type */
             det->type = jibal_option_get_value(detector_option, argv[0]);
@@ -508,31 +514,31 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
             break;
         case 'S': /* slope, this is for backwards compatibility (and ease of use with linear calibration) */
             value_double = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_SLOPE);
-            unit_type = UNIT_TYPE_ANY; /* Could be time or energy */
+            unit_type = JIBAL_UNIT_TYPE_ANY; /* Could be time or energy */
             break;
         case 'O': /* offset, this is for backwards compatibility */
             value_double = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_OFFSET);
-            unit_type = UNIT_TYPE_ANY;
+            unit_type = JIBAL_UNIT_TYPE_ANY;
             break;
         case 'r': /* resolution */
             value_double = calibration_get_param_ref(det->calibration, CALIBRATION_PARAM_RESOLUTION);
-            unit_type = UNIT_TYPE_ANY;
+            unit_type = JIBAL_UNIT_TYPE_ANY;
             break;
         case 's': /* solid */
             value_double = &(det->solid);
-            unit_type = UNIT_TYPE_SOLID_ANGLE;
+            unit_type = JIBAL_UNIT_TYPE_SOLID_ANGLE;
             break;
         case 'T': /* theta */
             value_double = &(det->theta);
-            unit_type = UNIT_TYPE_ANGLE;
+            unit_type = JIBAL_UNIT_TYPE_ANGLE;
             break;
         case 'l': /* length */
             value_double = &(det->length);
-            unit_type = UNIT_TYPE_DISTANCE;
+            unit_type = JIBAL_UNIT_TYPE_DISTANCE;
             break;
         case 'p': /* phi */
             value_double = &(det->phi);
-            unit_type = UNIT_TYPE_ANGLE;
+            unit_type = JIBAL_UNIT_TYPE_ANGLE;
             break;
         default:
             jabs_message(MSG_ERROR, stderr, "Unhandled value %i in script_set_detector_val. Report to developer.\n", val);
@@ -587,7 +593,7 @@ script_command_status script_set_detector_calibration_val(struct script_session 
         return SCRIPT_COMMAND_FAILURE;
     }
     double value_dbl;
-    if(jabs_unit_convert(s->jibal->units, UNIT_TYPE_ANY, argv[0], &value_dbl) < 0) {
+    if(jabs_unit_convert(s->jibal->units, JIBAL_UNIT_TYPE_ANY, argv[0], &value_dbl) < 0) {
         return SCRIPT_COMMAND_FAILURE;
     }
     switch(val) {
@@ -674,8 +680,9 @@ script_command_status script_set_simulation_val(struct script_session *s, int va
 }
 
 script_command_status script_set_charge(struct script_session *s, int argc, char *const *argv) {
+    (void) argc; /* argc_min set elsewhere */
     double charge;
-    if(jabs_unit_convert(s->jibal->units, UNIT_TYPE_CHARGE, argv[0], &charge) < 0) {
+    if(jabs_unit_convert(s->jibal->units, JIBAL_UNIT_TYPE_CHARGE, argv[0], &charge) < 0) {
         return SCRIPT_COMMAND_FAILURE;
     }
     s->fit->sim->fluence = charge / C_E;
@@ -685,6 +692,7 @@ script_command_status script_show_var(struct script_session *s, jibal_config_var
     (void) argv;
     (void) argc;
     (void) s;
+    DEBUGMSG("Showing var %s of type '%c' (%i)", var->name, var->unit_type, var->unit_type);
     if(var->variable == NULL)
         return SCRIPT_COMMAND_FAILURE;
     switch(var->type) {
@@ -841,10 +849,10 @@ script_command_status script_execute_command_argv(script_session *s, const scrip
                 DEBUGMSG("Using function in %s. %i arguments. Arguments start with: %s", c_parent->name, argc, argc?argv[0]:"(no arguments)");
                 script_command_status status = c_parent->f_var(s, c->var, argc, argv);
                 if(status >= 0) { /* Positive numbers indicate number of arguments consumed */
-                    DEBUGMSG("Returned positive or zero value, %i arguments consumed.\n", status);
+                    DEBUGMSG("Returned positive or zero value, %i arguments consumed.", status);
                     argc -= status;
                     argv += status;
-                    DEBUGMSG("Number of arguments remaining: %i.\n", argc);
+                    DEBUGMSG("Number of arguments remaining: %i.", argc);
                 } else {
                     return status;
                 }
@@ -961,6 +969,7 @@ int script_command_set_var(script_command *c, jibal_config_var_type type, void *
     c->var->name = c->name; /* The pointer is shared, so "var" doesn't get its own */
     c->var->option_list = option_list;
     c->f = NULL; /* These guys can't coexist */
+    DEBUGVERBOSEMSG("Added command (variable) name %s, type %i, unit %s, unit type '%c' (%i)", c->var->name, c->var->type, c->var->unit, c->var->unit_type, c->var->unit_type);
     return EXIT_SUCCESS;
 }
 
@@ -1213,49 +1222,49 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_set->subcommands, script_command_new("stopping", "Set (assign) stopping or straggling.", 0, 0, &script_set_stopping));
 
     const jibal_config_var vars[] = {
-            {JIBAL_CONFIG_VAR_UNIT,   "fluence",                       "",    UNIT_TYPE_ANY,    &sim->fluence,                               NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "energy",                        "keV", UNIT_TYPE_ENERGY, &sim->beam_E,                                NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",                  "keV", UNIT_TYPE_ENERGY, &sim->beam_E_broad,                          NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "emin",                          "keV", UNIT_TYPE_ENERGY, &sim->emin,                                  NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "alpha",                         "deg", UNIT_TYPE_ANGLE,  &sim->sample_theta,                          NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "phi",                           "deg", UNIT_TYPE_ANGLE,  &sim->sample_phi,                            NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "erd",                           0, 0,                    &sim->erd,                                   NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "rbs",                           0, 0,                    &sim->rbs,                                   NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "maxiter",                       0, 0,                    &fit->n_iters_max,                           NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",                    0, 0,                    &fit->xtol,                                  NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",               0, 0,                    &fit->chisq_tol,                             NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance",          0, 0,                    &fit->chisq_fast_tol,                        NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "n_bricks_max",                  0, 0,                    &sim->params->n_bricks_max,                  NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "ds",                            0, 0,                    &sim->params->ds,                            NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "rk4",                           0, 0,                    &sim->params->rk4,                           NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "brick_width_sigmas",            0, 0,                    &sim->params->brick_width_sigmas,            NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "sigmas_cutoff",                 0, 0,                    &sim->params->sigmas_cutoff,                 NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step",            "keV", UNIT_TYPE_ENERGY, &sim->params->incident_stop_params.step,     NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_sigmas",     0, 0,                    &sim->params->incident_stop_params.sigmas,   NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_min",        "keV", UNIT_TYPE_ENERGY, &sim->params->incident_stop_params.min,      NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_max",        "keV", UNIT_TYPE_ENERGY, &sim->params->incident_stop_params.max,      NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step",             "keV", UNIT_TYPE_ENERGY, &sim->params->exiting_stop_params.step,      NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_sigmas",      0, 0,                    &sim->params->exiting_stop_params.sigmas,    NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_min",         "keV", UNIT_TYPE_ENERGY, &sim->params->exiting_stop_params.min,       NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_max",         "keV", UNIT_TYPE_ENERGY, &sim->params->exiting_stop_params.max,       NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "ds_incident_stop_step_factor",  0, 0,                    &sim->params->ds_incident_stop_step_factor,  NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "nuclear_stopping_accurate",     0, 0,                    &sim->params->nuclear_stopping_accurate,     NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy",          0, 0,                    &sim->params->mean_conc_and_energy,          NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "geostragg",                     0, 0,                    &sim->params->geostragg,                     NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",                   "deg", UNIT_TYPE_ANGLE,  &sim->params->beta_manual,                   NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "cs_n_stragg_steps",             0, 0,                    &sim->params->cs_n_stragg_steps,             NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "gaussian_accurate",             0, 0,                    &sim->params->gaussian_accurate,             NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "int_cs_max_intervals",          0, 0,                    &sim->params->int_cs_max_intervals,          NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_accuracy",               0, 0,                    &sim->params->int_cs_accuracy,               NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "int_cs_stragg_max_intervals",   0, 0,                    &sim->params->int_cs_stragg_max_intervals,   NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_stragg_accuracy",        0, 0,                    &sim->params->int_cs_stragg_accuracy,        NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "cs_adaptive",                   0, 0,                    &sim->params->cs_adaptive,                   NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "cs_energy_step_max",            0, 0,                    &sim->params->cs_energy_step_max,            NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "cs_depth_step_max",             0, 0,                    &sim->params->cs_depth_step_max,             NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "cs_stragg_step_sigmas",         0, 0,                    &sim->params->cs_stragg_step_sigmas,         NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "reaction_file_angle_tolerance", 0, 0,                    &sim->params->reaction_file_angle_tolerance, NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "bricks_skip_zero_conc_ranges",  0, 0,                    &sim->params->bricks_skip_zero_conc_ranges,  NULL},
-            {JIBAL_CONFIG_VAR_NONE, NULL,                              0, 0, NULL,                                                           NULL}
+            {JIBAL_CONFIG_VAR_UNIT,   "fluence",                       "",    JIBAL_UNIT_TYPE_ANY,    &sim->fluence,                               NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "energy",                        "keV", JIBAL_UNIT_TYPE_ENERGY, &sim->beam_E,                                NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",                  "keV", JIBAL_UNIT_TYPE_ENERGY, &sim->beam_E_broad,                          NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "emin",                          "keV", JIBAL_UNIT_TYPE_ENERGY, &sim->emin,                                  NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "alpha",                         "deg", JIBAL_UNIT_TYPE_ANGLE,  &sim->sample_theta,                          NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "phi",                           "deg", JIBAL_UNIT_TYPE_ANGLE,  &sim->sample_phi,                            NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "erd",                           0,     0,                      &sim->erd,                                   NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "rbs",                           0,     0,                      &sim->rbs,                                   NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "maxiter",                       0,     0,                      &fit->n_iters_max,                           NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",                    0,     0,                      &fit->xtol,                                  NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",               0,     0,                      &fit->chisq_tol,                             NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance",          0,     0,                      &fit->chisq_fast_tol,                        NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "n_bricks_max",                  0,     0,                      &sim->params->n_bricks_max,                  NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "ds",                            0,     0,                      &sim->params->ds,                            NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "rk4",                           0,     0,                      &sim->params->rk4,                           NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "brick_width_sigmas",            0,     0,                      &sim->params->brick_width_sigmas,            NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "sigmas_cutoff",                 0,     0,                      &sim->params->sigmas_cutoff,                 NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step",            "keV", JIBAL_UNIT_TYPE_ENERGY, &sim->params->incident_stop_params.step,     NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_sigmas",     0,     0,                      &sim->params->incident_stop_params.sigmas,   NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_min",        "keV", JIBAL_UNIT_TYPE_ENERGY, &sim->params->incident_stop_params.min,      NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_max",        "keV", JIBAL_UNIT_TYPE_ENERGY, &sim->params->incident_stop_params.max,      NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step",             "keV", JIBAL_UNIT_TYPE_ENERGY, &sim->params->exiting_stop_params.step,      NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_sigmas",      0,     0,                      &sim->params->exiting_stop_params.sigmas,    NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_min",         "keV", JIBAL_UNIT_TYPE_ENERGY, &sim->params->exiting_stop_params.min,       NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_max",         "keV", JIBAL_UNIT_TYPE_ENERGY, &sim->params->exiting_stop_params.max,       NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "ds_incident_stop_step_factor",  0,     0,                      &sim->params->ds_incident_stop_step_factor,  NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "nuclear_stopping_accurate",     0,     0,                      &sim->params->nuclear_stopping_accurate,     NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy",          0,     0,                      &sim->params->mean_conc_and_energy,          NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "geostragg",                     0,     0,                      &sim->params->geostragg,                     NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",                   "deg", JIBAL_UNIT_TYPE_ANGLE,  &sim->params->beta_manual,                   NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "cs_n_stragg_steps",             0,     0,                      &sim->params->cs_n_stragg_steps,             NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "gaussian_accurate",             0,     0,                      &sim->params->gaussian_accurate,             NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "int_cs_max_intervals",          0,     0,                      &sim->params->int_cs_max_intervals,          NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_accuracy",               0,     0,                      &sim->params->int_cs_accuracy,               NULL},
+            {JIBAL_CONFIG_VAR_SIZE,   "int_cs_stragg_max_intervals",   0,     0,                      &sim->params->int_cs_stragg_max_intervals,   NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_stragg_accuracy",        0,     0,                      &sim->params->int_cs_stragg_accuracy,        NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "cs_adaptive",                   0,     0,                      &sim->params->cs_adaptive,                   NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "cs_energy_step_max",            0,     0,                      &sim->params->cs_energy_step_max,            NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "cs_depth_step_max",             0,     0,                      &sim->params->cs_depth_step_max,             NULL},
+            {JIBAL_CONFIG_VAR_DOUBLE, "cs_stragg_step_sigmas",         0,     0,                      &sim->params->cs_stragg_step_sigmas,         NULL},
+            {JIBAL_CONFIG_VAR_UNIT,   "reaction_file_angle_tolerance", 0,     0,                      &sim->params->reaction_file_angle_tolerance, NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "bricks_skip_zero_conc_ranges",  0,     0,                      &sim->params->bricks_skip_zero_conc_ranges,  NULL},
+            {JIBAL_CONFIG_VAR_NONE, NULL,                              0,     0, NULL,                                                             NULL}
     };
     c = script_command_list_from_vars_array(vars, 0);
     script_command_list_add_command(&c_set->subcommands, c);
@@ -1385,7 +1394,7 @@ script_command *script_commands_sort_all(script_command *head) {
         if(c->subcommands && i < SCRIPT_COMMANDS_NESTED_MAX) { /* Go deeper, push existing pointer to stack */
             stack[i] = c;
             i++;
-            DEBUGMSG("Sorting all commands, level %zu, subcommands of %s", i, c->name);
+            DEBUGVERBOSEMSG("Sorting all commands, level %zu, subcommands of %s", i, c->name);
             c->subcommands = script_command_list_merge_sort(c->subcommands);
             c = c->subcommands;
             continue;
@@ -2001,7 +2010,7 @@ script_command_status script_set_detector_calibration_poly(struct script_session
     calibration *c = calibration_init_poly(n);
     calibration_copy_params(c, detector_get_calibration(det, s->Z_active)); /* This, de facto, only copies resolution from old calibration, since the rest are overwritten very soon. */
     for(int i = 0; i <= (int) n; i++) {
-        if(jabs_unit_convert(s->jibal->units, UNIT_TYPE_ANY, argv[0], calibration_get_param_ref(c, i)) < 0) {
+        if(jabs_unit_convert(s->jibal->units, JIBAL_UNIT_TYPE_ANY, argv[0], calibration_get_param_ref(c, i)) < 0) {
             calibration_free(c);
             return SCRIPT_COMMAND_FAILURE;
         }
@@ -2280,6 +2289,8 @@ script_command_status script_add_reactions(script_session *s, int argc, char *co
 }
 
 script_command_status script_add_detector_default(script_session *s, int argc, char *const *argv) {
+    (void) argc; /* Doesn't consume arguments */
+    (void) argv;
     struct fit_data *fit = s->fit;
     if(fit_data_add_det(fit, detector_default(NULL))) {
         return SCRIPT_COMMAND_FAILURE;
