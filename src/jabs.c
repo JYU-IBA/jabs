@@ -628,9 +628,9 @@ int simulate_with_roughness(sim_workspace *ws) {
                 sample_rough->ranges[i_range].x += x_diff;
             }
         }
-        DEBUGMSG("Weight %.6lf.", p);
 #ifdef DEBUG
-        sample_print(sample_rough, FALSE);
+        jabs_message(MSG_DEBUG, stderr, "Roughness subspectrum %zu / %zu", i_iter, iter_total);
+        sample_print(sample_rough, FALSE, MSG_DEBUG);
 #endif
         ws->fluence = p * p_sr;
         ion_set_angle(&ws->ion, 0.0, 0.0);

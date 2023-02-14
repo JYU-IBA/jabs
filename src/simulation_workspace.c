@@ -94,10 +94,17 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     sim_workspace_recalculate_n_channels(ws, sim);
 
     if(ws->n_channels == 0) {
-        free(ws);
         jabs_message(MSG_ERROR, stderr,  "Number of channels in workspace is zero. Aborting initialization.\n");
+        free(ws);
         return NULL;
     }
+
+    if(detector_sanity_check(det, ws->n_channels)) {
+        jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!", det->name);
+        free(ws);
+        return NULL;
+    }
+
     ws->histo_sum = gsl_histogram_alloc(ws->n_channels);
     if(!ws->histo_sum) {
         return NULL;

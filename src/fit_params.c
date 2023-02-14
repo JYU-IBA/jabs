@@ -115,7 +115,7 @@ void fit_params_print(const fit_params *params, int active, const char *pattern,
         if(pattern && !is_match(var->name, pattern))
             continue;
         jabs_message(msg_level, stderr, "%s %24s = %g %s %s\n", var->active && !active ? "X" : "  ", var->name, *(var->value) / var->unit_factor, var->unit, var->i_det < n_det ? "(detector specific variable)":"");
-        DEBUGMSG("This one is %p, raw value %.12g, i_v = %zu\n", (void *)var->value, *var->value, var->i_v);
+        DEBUGMSG("This one is %p, raw value %.12g, i_v = %zu", (void *)var->value, *var->value, var->i_v);
     }
 }
 

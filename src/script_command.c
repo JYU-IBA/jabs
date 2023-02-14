@@ -53,8 +53,6 @@ int script_prepare_sim_or_fit(script_session *s) {
         jabs_message(MSG_ERROR, stderr, "Simulation failed sanity check.\n");
         return -1;
     }
-    fit_data_histo_sum_free(fit);
-    fit_data_workspaces_free(s->fit);
     sample_free(fit->sim->sample);
     fit->sim->sample = sample_from_sample_model(fit->sm);
     if(!fit->sim->sample) {
@@ -116,11 +114,6 @@ int script_prepare_sim_or_fit(script_session *s) {
     }
     sim_prepare_reactions(fit->sim, fit->jibal->isotopes, fit->jibal->gsto);
     reactions_print(fit->sim->reactions, fit->sim->n_reactions);
-    fit->n_ws = fit->sim->n_det;
-    fit->n_ws_active = 0;
-    fit->ws = calloc(fit->n_ws, sizeof(sim_workspace *));
-    fit->ws_val = calloc(fit->n_ws, sizeof(fit_data_workspace_val *));
-    fit->ws_active = calloc(fit->n_ws, sizeof(sim_workspace *));
     s->start = jabs_clock();
     return 0;
 }
@@ -133,6 +126,7 @@ int script_finish_sim_or_fit(script_session *s) {
     } else {
         jabs_message(MSG_IMPORTANT, stderr, "\n...finished! Total time: %.3lf ms.\n", time * 1000.0);
     }
+    fit_data_fdd_free(s->fit);
 #ifdef CLEAR_GSTO_ASSIGNMENTS_WHEN_FINISHED
     jibal_gsto_assign_clear_all(s->fit->jibal->gsto); /* Is it necessary? No. Here? No. Does it clear old stuff? Yes. */
 #endif
@@ -174,17 +168,18 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
         return SCRIPT_COMMAND_FAILURE;
     }
     sim_calc_params_print(fit->sim->params, MSG_VERBOSE);
-    if(fit_data_workspaces_init(fit)) {
-        return SCRIPT_COMMAND_FAILURE;
-    }
     jabs_message(MSG_IMPORTANT, stderr, "Simulation begins...\n");
     for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
-        if(simulate_with_ds(fit->ws[i_det])) {
+        detector_update(fit->sim->det[i_det]);
+        sim_workspace *ws = sim_workspace_init(s->jibal, fit->sim, fit->sim->det[i_det]);
+        if(simulate_with_ds(ws)) {
             jabs_message(MSG_ERROR, stderr, "Simulation failed.\n");
+            sim_workspace_free(ws);
             return SCRIPT_COMMAND_FAILURE;
         }
+        fit_data_histo_sum_store(fit, i_det, ws->histo_sum);
+        sim_workspace_free(ws);
     }
-    fit_data_histo_sum_store(fit);
     script_finish_sim_or_fit(s);
     return argc_orig - argc;
 }
@@ -252,12 +247,14 @@ script_command_status script_save_bricks(script_session *s, int argc, char *cons
         jabs_message(MSG_ERROR, stderr, "Usage: save bricks [detector] file\n");
         return SCRIPT_COMMAND_FAILURE;
     }
+#if 0 /* TODO: how to save bricks if ws is not set? */
     if(sim_workspace_print_bricks(fit_data_ws(fit, i_det), argv[0])) {
         jabs_message(MSG_ERROR, stderr,
                      "Could not save bricks of detector %zu to file \"%s\"! There should be %zu detector(s).\n",
                      i_det + 1, argv[0], fit->sim->n_det);
         return SCRIPT_COMMAND_FAILURE;
     }
+#endif
     argc--;
     argv++;
     return argc_orig - argc;
@@ -275,12 +272,14 @@ script_command_status script_save_spectra(script_session *s, int argc, char *con
         jabs_message(MSG_ERROR, stderr, "Not enough arguments for save spectra.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
+#if 0 /* TODO: workspace spectra should be save somewhere */
     if(sim_workspace_print_spectra(fit_data_ws(fit, i_det), argv[0], fit_data_histo_sum(fit, i_det), fit_data_exp(fit, i_det))) {
         jabs_message(MSG_ERROR, stderr,
                      "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n",
                      i_det + 1, argv[0], fit->sim->n_det);
         return SCRIPT_COMMAND_FAILURE;
     }
+#endif
     argc -= 1;
     return argc_orig - argc;
 }
@@ -1639,8 +1638,7 @@ script_command_status script_reset_stopping(script_session *s, int argc, char *c
 script_command_status script_reset_experimental(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
-    fit_data_exp_free(s->fit);
-    fit_data_exp_alloc(s->fit);
+    fit_data_exp_reset(s->fit);
     return 0;
 }
 
@@ -1666,7 +1664,7 @@ script_command_status script_reset(script_session *s, int argc, char *const *arg
         return SCRIPT_COMMAND_FAILURE;
     }
     DEBUGSTR("Resetting everything!\n");
-    fit_data_exp_free(fit);
+    fit_data_exp_reset(fit);
     gsl_histogram_free(fit->ref);
     fit->ref = NULL;
 
@@ -1794,7 +1792,7 @@ script_command_status script_show_fit_variables(script_session *s, int argc, cha
 script_command_status script_show_fit_ranges(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
-    fit_data_print(stderr, s->fit);
+    fit_data_print(s->fit, MSG_INFO);
     return 0;
 }
 

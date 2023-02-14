@@ -104,7 +104,7 @@ jabs_ion_gsto *ion_gsto_new(const jibal_isotope *incident, const jibal_gsto *gst
         if(gd->stopfile) {
             gd->stopdata = jibal_gsto_file_get_data(gd->stopfile, incident->Z, Z2);
             ig->emin = GSL_MAX(ig->emin, jibal_gsto_xunit_to_energy(gd->stopfile->xunit, gd->stopfile->xmin, incident->mass));
-            DEBUGMSG("There is some stopping %s -> Z = %i, emin (highest so far) %g keV\n", incident->name, Z2, ig->emin/C_KEV);
+            DEBUGMSG("There is some stopping %s -> Z = %i, emin (highest so far) %g keV", incident->name, Z2, ig->emin/C_KEV);
         }
         gd->straggfile = jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, incident->Z, Z2);
         if(gd->straggfile) {

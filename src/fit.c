@@ -41,14 +41,21 @@
 #endif
 
 
-int fit_detector(const jibal *jibal, const simulation *sim, const sample *sample, detector *det) {
-    detector_update(det);
-    sim_workspace *ws = sim_workspace_init(jibal, sim, det);
-    if(detector_sanity_check(det, ws->n_channels)) {
-        jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!\n", det->name);
+int fit_detector(const jibal *jibal, fit_data_det *fdd, const simulation *sim, size_t iter_call) {
+    detector_update(fdd->det);
+    sim_workspace *ws = sim_workspace_init(jibal, sim, fdd->det);
+    if(simulate_with_ds(ws)) {
+        DEBUGMSG("Simulation of detector %s spectrum failed!\n", fdd->det->name);
         return EXIT_FAILURE;
     }
-    //spectrum_set_calibration(fit_data_exp(fit, i_det), det->calibration);
+    fit_data_det_residual_vector_set(fdd, ws->histo_sum);
+    if(iter_call == 1) {
+        spectrum_set_calibration(fdd->exp, fdd->det->calibration);
+        gsl_vector_memcpy(fdd->f_iter, &fdd->f.vector); /* Copy residual vector, this can be used on later calls if fdd is not active */
+        fdd->histo_sum = ws->histo_sum;
+        ws->histo_sum = NULL; /* This will prevent sim_workspace_free() from freeing this! */
+    }
+    sim_workspace_free(ws);
     return EXIT_SUCCESS;
 }
 
@@ -80,7 +87,6 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
 
     sample_free(fit->sim->sample);
     fit->sim->sample = NULL;
-    fit_data_workspaces_reset(fit);
 
     if(fit_sanity_check(fit) == GSL_FAILURE) {
         fit->stats.error = FIT_ERROR_SANITY;
@@ -89,13 +95,12 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     fit->sim->sample = sample_from_sample_model(fit->sm);
     sample_renormalize(fit->sim->sample);
 
-
-    if(fit_init_active_workspaces(fit)) {
+    if(fit_determine_active_detectors(fit)) {
         fit->stats.error = FIT_ERROR_WORKSPACE_INITIALIZATION;
         return GSL_FAILURE;
     }
 
-
+    DEBUGMSG("There are %zu/%zu active detectors in this fit function call.", fit->n_fdd_active_iter_call, fit->n_fdd);
 #if 0 /* If and when this is enabled, make sure to calculate one complete spectrum with original emin at the end of fit */
     for(size_t i_det = 0; i_det < fit->n_ws; i_det++) { /* Sets the lowest energy in each simulation according to fit ranges */
         double emin = fit_emin(fit, i_det);
@@ -105,59 +110,44 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
         }
     }
 #endif
+
     double start = jabs_clock();
-    assert(fit->n_ws_active > 0 && fit->n_ws_active <= fit->n_ws);
-    if(fit->n_ws_active == 1) { /* Skip OpenMP if only one workspace */
-        simulate_with_ds(fit->ws_active[0]);
+    assert(fit->n_fdd_active_iter_call > 0 && fit->n_fdd_active_iter_call <= fit->n_fdd);
+    if(fit->n_fdd_active_iter_call == 1) { /* Skip OpenMP if only one workspace */
+        fit_detector(fit->jibal, fit->fdd_active[0], fit->sim, fit->stats.iter_call);
     } else {
 #pragma omp parallel default(none) shared(fit)
 #pragma omp for
-        for(size_t i = 0; i < fit->n_ws_active; i++) {
+        for(size_t i = 0; i < fit->n_fdd_active_iter_call; i++) {
 #ifdef _OPENMP
             DEBUGMSG("Thread id %i got %zu.", omp_get_thread_num(), i);
 #endif
-            simulate_with_ds(fit->ws_active[i]);
+            fit_detector(fit->jibal, fit->fdd_active[i], fit->sim, fit->stats.iter_call);
         }
     }
     double end = jabs_clock();
     fit->stats.cputime_iter += (end - start);
     fit->stats.n_evals_iter++;
-    fit->stats.n_workspaces_iter += fit->n_ws_active;
-    if(fit->n_ws == fit->n_ws_active) { /* All workspaces were active, just set f vector */
-        fit->stats.error = fit_set_residuals(fit, f);
-        DEBUGSTR("Set residuals for all workspaces.");
-        if(fit->stats.iter_call == 1) { /* First call of iter, store sum histograms and f vector to fit */
-            fit_data_histo_sum_store(fit);
-            DEBUGSTR("First call of iter, storing f vector.");
-            gsl_vector_memcpy(fit->f_iter, f);
+    fit->stats.n_detectors_active += fit->n_fdd_active_iter_call;
+    for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
+        if(fit->stats.iter_call == 1) {
+            fit_data_histo_sum_store(fit, i_det, fit->fdd[i_det].histo_sum);
         }
-        if(fit->stats.error) {
-            return GSL_FAILURE;
-        }
-    } else { /* Partial update, copy stored f vector and update only stuff we just simulated */
-        assert(fit->stats.iter_call > 1);
-        gsl_vector_memcpy(f, fit->f_iter);
-        DEBUGSTR("Set residuals for some workspaces.");
-        for(size_t i_ws = 0; i_ws < fit->n_ws; i_ws++) {
-            if(fit->ws_val[i_ws].active_iter_call) {
-                fit->stats.error = fit_set_residuals_detector(fit, f, i_ws); /* i_ws instead of ws, because exp is stored in fit->exp array */
-                if(fit->stats.error) {
-                    return GSL_FAILURE;
-                }
-            }
-        }
+        gsl_histogram_free(fit->fdd[i_det].histo_sum);
+        fit->fdd[i_det].histo_sum = NULL;
     }
+    gsl_vector_memcpy(f, fit->f);
     DEBUGSTR("Successful fit function call.");
     return GSL_SUCCESS;
 }
 
-int fit_init_active_workspaces(fit_data *fit) {
-    for(size_t i_ws = 0; i_ws < fit->n_ws; i_ws++) {
-        fit_data_workspace_val *v = &fit->ws_val[i_ws];
+int fit_determine_active_detectors(fit_data *fit) {
+    for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) {
+        fit_data_det *fdd = &fit->fdd[i_fdd];
         if(fit->stats.iter_call == 1) {
-            v->active_iter_call = TRUE; /* On first call, simulate everything! */
+            fdd->active_iter_call = TRUE; /* On first call, simulate everything! */
         } else {
-            v->active_iter_call = FALSE;
+            fdd->active_iter_call = FALSE;
         }
     }
     for(size_t i = 0; i < fit->fit_params->n; i++) { /* Check which workspaces need to be simulated */
@@ -165,11 +155,11 @@ int fit_init_active_workspaces(fit_data *fit) {
         if(!var->active_iter_call) {
             continue;
         }
-        if(var->i_det < fit->n_ws) {
-            fit->ws_val[var->i_det].active_iter_call = TRUE; /* Mark this workspace as needing some simulation */
-        } else if(var->i_det >= fit->n_ws) {
-            for(size_t i_ws = 0; i_ws < fit->n_ws; i_ws++) { /* Mark all workspaces */
-                fit->ws_val[i_ws].active_iter_call = TRUE;
+        if(var->i_det < fit->n_fdd) {
+            fit->fdd[var->i_det].active_iter_call = TRUE; /* Mark this workspace as needing some simulation */
+        } else if(var->i_det >= fit->n_fdd) {
+            for(size_t i_ws = 0; i_ws < fit->n_fdd; i_ws++) { /* Mark all workspaces */
+                fit->fdd[i_ws].active_iter_call = TRUE;
             }
             break; /* All marked, nothing more to mark. */
         }
@@ -180,23 +170,17 @@ int fit_init_active_workspaces(fit_data *fit) {
                 i + 1, fit->fit_params->n_active_iter_call, var->name, *(var->value), var->value_iter, *(var->value) / var->value_iter - 1.0);
     }
 
-    DEBUGSTR("Active workspaces:");
-    fit->n_ws_active = 0;
-    for(size_t i_ws = 0; i_ws < fit->n_ws; i_ws++) { /* Count number of active workspaces, fill an array of them */
-        fit_data_workspace_val *v = &fit->ws_val[i_ws];
-        if(v->active_iter_call) {
-            fit->ws[i_ws] = fit_data_workspace_init(fit, i_ws);
-            if(!fit->ws[i_ws]) {
-                return -1;
-            }
-            fit->ws_active[fit->n_ws_active] = fit->ws[i_ws];
-            fit->n_ws_active++;
-            DEBUGMSG("WS%zu", i_ws + 1);
-        } else {
-            assert(fit->ws[i_ws] == NULL); /* These should have been reset */
+    fit->n_fdd_active_iter_call = 0;
+    for(size_t i = 0; i < fit->n_fdd; i++) {
+        if(fit->fdd[i].active_iter_call) {
+            fit->fdd_active[fit->n_fdd_active_iter_call] = &fit->fdd[i];
+            fit->n_fdd_active_iter_call++;
         }
     }
-    DEBUGMSG("total %zu out of %zu workspaces.", fit->n_ws_active, fit->n_ws);
+    if(fit->n_fdd_active_iter_call == 0) {
+        DEBUGSTR("Zero active detectors. Shouldn't happen. Has everything initialized properly?");
+        return EXIT_FAILURE;
+    }
     return 0;
 }
 
@@ -208,105 +192,6 @@ int fit_sanity_check(const fit_data *fit) {
         return GSL_FAILURE;
     }
     return GSL_SUCCESS;
-}
-
-int fit_speedup(fit_data *fit) { /* Returns < 0 on failure, FALSE if speedup is not possible and TRUE if speedup was ok (and sum spectra have been calculated) */
-    assert(fit);
-    size_t n_active = fit->fit_params->n_active_iter_call;
-    if(n_active == 0) {
-        DEBUGSTR("No active fit parameters (those being varied during this call)! This is normal on first call of the iteration, but not after that.");
-        return FALSE;
-    }
-    fit_variable **vars = fit->fit_params->vars_active_iter_call;
-    if(!vars) {
-        return FALSE;
-    }
-    if(n_active == 1 && vars[0]->value == &fit->sim->fluence) { /* Only one variable and it is fluence, just scale histograms */
-        if(fit_speedup_fluence(fit, vars[0])) {
-            return GSL_FAILURE;
-        }
-        return TRUE;
-    }
-    return FALSE;
-}
-
-int fit_speedup_fluence(struct fit_data *fit, const fit_variable *var) {
-    double scale = *(var->value) / var->value_iter;
-    assert(scale != 1.0);
-    for(size_t i = 0; i < fit->n_ws; i++) {
-        sim_workspace *ws = fit_data_ws(fit, i);
-        gsl_histogram_reset(ws->histo_sum);
-        sim_workspace_histograms_scale(ws, scale);
-        sim_workspace_calculate_sum_spectra(ws);
-    }
-    return GSL_SUCCESS;
-}
-
-int fit_set_residuals_detector(const fit_data *fit, gsl_vector *f, size_t i_det) {
-    sim_workspace *ws = fit->ws[i_det];
-    gsl_histogram *exp = fit->exp[i_det];
-    assert(ws);
-    assert(exp);
-    size_t i_vec = 0;
-    for(size_t i_range = 0; i_range < fit->n_fit_ranges; i_range++) {
-        roi *range = &fit->fit_ranges[i_range];
-        size_t l = range->high - range->low + 1;
-        if(range->i_det != i_det) { /* This is not the (fit range for a given) detector we are looking for */
-            i_vec += l;
-        } else {
-            DEBUGMSG("Range %zu matches, setting vector starting from i_vec = %zu", i_range, i_vec);
-            for(size_t i = range->low; i <= range->high; i++) {
-                if(i >= ws->histo_sum->n) { /* Outside range of simulated spectrum (simulated is zero) */
-                    gsl_vector_set(f, i_vec, exp->bin[i]);
-                } else {
-                    gsl_vector_set(f, i_vec, exp->bin[i] - ws->histo_sum->bin[i]);
-                }
-                i_vec++;
-            }
-        }
-    }
-    if(i_vec != f->size) {
-        DEBUGMSG("Mismatch between i_vec = %zu and f->size = %zu.", i_vec, f->size);
-        return FIT_ERROR_IMPOSSIBLE;
-    }
-    return FIT_ERROR_NONE;
-}
-
-int fit_set_residuals(const fit_data *fit, gsl_vector *f) {
-    size_t i_vec = 0;
-    for(size_t i_range = 0; i_range < fit->n_fit_ranges; i_range++) {
-        if(i_vec >= f->size) {
-            jabs_message(MSG_ERROR, stderr, "Too many channels in fits for the residuals vector. This shouldn't happen.\n");
-            return FIT_ERROR_IMPOSSIBLE;
-        }
-
-        roi *range = &fit->fit_ranges[i_range];
-        if(range->i_det >= fit->sim->n_det) {
-            jabs_message(MSG_ERROR, stderr, "Fit range %zu has detector %zu, but we're only supposed to have %zu detectors!\n", i_range + 1, range->i_det, fit->sim->n_det);
-            return FIT_ERROR_IMPOSSIBLE;
-        }
-        sim_workspace *ws = fit->ws[range->i_det];
-        assert(ws);
-        gsl_histogram *exp = fit->exp[range->i_det];
-        assert(exp);
-        if(range->high >= exp->n) {
-            jabs_message(MSG_ERROR, stderr, "Fit range %zu high channel is %zu, but experimental spectrum has only %zu channels!\n", i_range + 1, exp->n);
-            return FIT_ERROR_IMPOSSIBLE;
-        }
-        for(size_t i = range->low; i <= range->high; i++) {
-            if(i >= ws->histo_sum->n) { /* Outside range of simulated spectrum */
-                gsl_vector_set(f, i_vec, exp->bin[i]);
-            } else {
-                gsl_vector_set(f, i_vec, exp->bin[i] - ws->histo_sum->bin[i]);
-            }
-            i_vec++;
-        }
-    }
-    if(i_vec != f->size) {
-        jabs_message(MSG_ERROR, stderr, "Not enough channels in fits for the residuals vector. This shouldn't happen.\n");
-        return FIT_ERROR_IMPOSSIBLE;
-    }
-    return FIT_ERROR_NONE;
 }
 
 int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x) {
@@ -359,15 +244,14 @@ void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear
     fit_data->stats.norm = gsl_blas_dnrm2(f);
     fit_data->stats.chisq_dof = fit_data->stats.chisq / fit_data->dof;
     fit_data->stats.n_evals += fit_data->stats.n_evals_iter;
-    fit_data->stats.n_workspaces += fit_data->stats.n_workspaces_iter;
-    fit_data->stats.n_speedup_evals += fit_data->stats.n_speedup_evals_iter;
+    fit_data->stats.n_detectors += fit_data->stats.n_detectors_active;
     fit_data->stats.cputime_cumul += fit_data->stats.cputime_iter;
 }
 
 void fit_iter_stats_print(const struct fit_stats *stats) {
     jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %11zu | %9zu | %10.3lf | %9.1lf |\n",
                  stats->iter, 1.0 / stats->rcond, stats->norm,
-                 stats->chisq_dof, stats->n_evals, stats->n_workspaces,
+                 stats->chisq_dof, stats->n_evals, stats->n_detectors,
                  stats->cputime_cumul, 1000.0 * stats->cputime_iter / stats->n_evals_iter);
 }
 
@@ -391,6 +275,7 @@ int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range) {
         return EXIT_FAILURE;
     }
     fit_data->fit_ranges[fit_data->n_fit_ranges - 1] = *range;
+    qsort(fit_data->fit_ranges, fit_data->n_fit_ranges, sizeof(roi), fit_range_compare); /* Sorting by detector is important for fit residual vector to work */
     return EXIT_SUCCESS;
 }
 
@@ -402,13 +287,31 @@ void fit_data_fit_ranges_free(struct fit_data *fit_data) {
     fit_data->n_fit_ranges = 0;
 }
 
+void fit_data_det_residual_vector_set(fit_data_det *fdd, gsl_histogram *histo_sum) { /* Sets residual vector (view) fdd->f based on histo_sum, load stored fdd->f_iter if fdd is not active */
+    if(fdd->active_iter_call == FALSE) { /* Note that on first call of iter f_iter is not yet set, so fdd MUST be active! */
+        gsl_vector_memcpy(&fdd->f.vector, fdd->f_iter);
+        return;
+    }
+    for(size_t i_range = 0; i_range < fdd->n_ranges; i_range++) {
+        const roi *range = &fdd->ranges[i_range];
+        size_t i_vec = 0;
+        for(size_t i = range->low; i <= range->high; i++) {
+            if(i >= histo_sum->n) { /* Outside range of simulated spectrum (simulated is zero) */
+                gsl_vector_set(&fdd->f.vector, i_vec, fdd->exp->bin[i]);
+            } else {
+                gsl_vector_set(&fdd->f.vector, i_vec, fdd->exp->bin[i] - histo_sum->bin[i]);
+            }
+            i_vec++;
+        }
+    }
+}
 fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
-    struct fit_data *f = calloc(1, sizeof(struct fit_data));
-    f->jibal = jibal;
-    f->sim = sim;
-    fit_data_exp_alloc(f);
-    fit_data_defaults(f);
-    return f;
+    struct fit_data *fit = calloc(1, sizeof(struct fit_data));
+    fit->jibal = jibal;
+    fit->sim = sim;
+    fit_data_exp_alloc(fit);
+    fit_data_defaults(fit);
+    return fit;
 }
 
 void fit_data_defaults(fit_data *f) {
@@ -425,6 +328,7 @@ void fit_data_free(fit_data *fit) {
         return;
     fit_data_reset(fit);
     free(fit);
+    /* free exp? */
 }
 
 void fit_data_reset(fit_data *fit) {
@@ -434,8 +338,19 @@ void fit_data_reset(fit_data *fit) {
     fit_data_fit_ranges_free(fit);
     fit_params_free(fit->fit_params);
     fit->fit_params = NULL;
-    fit_data_workspaces_free(fit);
-    fit_data_histo_sum_free(fit);
+    for(size_t i = 0; i < fit->n_histo_sum; i++) {
+        gsl_histogram_free(fit->histo_sum[i]);
+        fit->histo_sum[i] = NULL;
+    }
+    free(fit->histo_sum);
+    fit->n_histo_sum = 0;
+}
+
+void fit_data_exp_reset(fit_data *fit) {
+    for(size_t i = 0; i < fit->n_exp; i++) {
+        gsl_histogram_free(fit->exp[i]);
+        fit->exp[i] = NULL;
+    }
 }
 
 void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct roi *roi) {
@@ -489,22 +404,14 @@ void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct r
     }
 }
 
-gsl_histogram *fit_data_exp(const struct fit_data *fit_data, size_t i_det) {
-    if(!fit_data || !fit_data->exp)
+gsl_histogram *fit_data_exp(const fit_data *fit, size_t i_det) {
+    if(!fit || !fit->exp)
         return NULL;
-    if(i_det >= fit_data->sim->n_det)
+    if(i_det >= fit->sim->n_det)
         return NULL;
-    return fit_data->exp[i_det];
+    assert(fit->n_exp == fit->sim->n_det);
+    return fit->exp[i_det];
 }
-
-gsl_histogram *fit_data_sim(const struct fit_data *fit_data, size_t i_det) {
-    sim_workspace *ws = fit_data_ws(fit_data, i_det);
-    if(ws)
-        return ws->histo_sum;
-    else
-        return NULL;
-}
-
 
 fit_params *fit_params_all(fit_data *fit) {
     simulation *sim = fit->sim;
@@ -593,6 +500,70 @@ fit_params *fit_params_all(fit_data *fit) {
     return params;
 }
 
+int fit_data_fdd_init(fit_data *fit) {
+    if(!fit) {
+        return EXIT_FAILURE;
+    }
+    if(fit->fdd) {
+        free(fit->fdd);
+    }
+    size_t n_alloc = fit->sim->n_det;
+    fit->fdd = calloc(n_alloc, sizeof(fit_data_det));
+    fit->n_fdd = n_alloc;
+    fit->fdd_active = calloc(n_alloc, sizeof(fit_data_det));
+    fit->n_fdd_active_iter_call = 0;
+
+    for(size_t i_roi = 0; i_roi < fit->n_fit_ranges; i_roi++) { /* Loop over rois, fdds, count rois and n of channels */
+        const roi *roi = &fit->fit_ranges[i_roi];
+        for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) {
+            fit_data_det *fdd = &fit->fdd[i_fdd];
+            if(i_fdd != roi->i_det) { /* This ROI is not for this fdd */
+                continue;
+            }
+            fdd->n_ranges++;
+            fdd->n_ch += (roi->high - roi->low + 1);
+        }
+    }
+
+    for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) {
+        fit_data_det *fdd = &fit->fdd[i_fdd];
+        fdd->exp = fit_data_exp(fit, i_fdd);
+        fdd->det = sim_det(fit->sim, i_fdd);
+        fdd->f_iter = gsl_vector_alloc(fdd->n_ch);
+        fdd->ranges = calloc(fdd->n_ranges, sizeof(roi));
+        size_t i = 0; /* Index of fdd roi */
+        size_t i_vec = 0; /* fit residual vector index at beginning of roi */
+        for(size_t i_roi = 0; i_roi < fit->n_fit_ranges; i_roi++) {
+            const roi *roi = &fit->fit_ranges[i_roi];
+            size_t l = (roi->high - roi->low + 1);
+            if(i_fdd != roi->i_det) {
+                continue;
+            }
+            if(i == 0) {
+                fdd->f = gsl_vector_subvector(fit->f, i_vec, fdd->n_ch);
+                DEBUGMSG("FDD %zu First ROI is %zu/%zu of all, subvector offset %zu, length %zu)", i_fdd, i_roi, fit->n_fit_ranges, i_vec, fdd->n_ch);
+            }
+            fdd->ranges[i] = *roi;
+            i++;
+            i_vec += l;
+        }
+    }
+    return EXIT_SUCCESS;
+}
+
+void fit_data_fdd_free(fit_data *fit) {
+    for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) {
+        fit_data_det *fdd = &fit->fdd[i_fdd];
+        gsl_vector_free(fdd->f_iter);
+        free(fdd->ranges);
+    }
+    free(fit->fdd_active);
+    free(fit->fdd);
+    fit->fdd = NULL;
+    fit->n_fdd = 0;
+    fit->n_fdd_active_iter_call = 0;
+}
+
 void fit_data_exp_alloc(fit_data *fit) {
     if(!fit) {
         return;
@@ -606,6 +577,7 @@ void fit_data_exp_alloc(fit_data *fit) {
             fit->exp[i] = NULL;
         }
     }
+    fit->n_exp = n_alloc;
 }
 
 void fit_data_exp_free(fit_data *fit) {
@@ -635,35 +607,26 @@ int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename) 
     return EXIT_SUCCESS;
 }
 
-void fit_data_histo_sum_free(struct fit_data *fit_data) {
-    if(!fit_data->histo_sum_iter)
-        return;
-    for(size_t i = 0; i < fit_data->n_histo_sum; i++) {
-        if(fit_data->histo_sum_iter[i]) {
-            gsl_histogram_free(fit_data->histo_sum_iter[i]);
+gsl_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det) {
+    if(!fit || !fit->histo_sum)
+        return NULL;
+    if(i_det >= fit->n_histo_sum)
+        return NULL;
+    return fit->histo_sum[i_det];
+}
+
+int fit_data_histo_sum_store(fit_data *fit, size_t i_det, gsl_histogram *histo_sum) {
+    if(!fit->histo_sum) {
+        assert(fit->n_histo_sum == 0);
+        fit->histo_sum = calloc(fit->sim->n_det, sizeof(gsl_histogram *));
+        if(!fit->histo_sum) {
+            fit->n_histo_sum = 0;
+            return EXIT_FAILURE;
         }
+        fit->n_histo_sum = fit->sim->n_det;
     }
-    free(fit_data->histo_sum_iter);
-    fit_data->histo_sum_iter = NULL;
-    fit_data->n_histo_sum = 0;
-}
-
-void fit_data_histo_sum_store(struct fit_data *fit_data) {
-    fit_data_histo_sum_free(fit_data);
-    fit_data->histo_sum_iter = calloc(fit_data->n_ws, sizeof(gsl_histogram *));
-    for(size_t i_det = 0; i_det < fit_data->n_ws; i_det++) {
-        sim_workspace *ws = fit_data_ws(fit_data, i_det);
-        fit_data->histo_sum_iter[i_det] = gsl_histogram_clone(ws->histo_sum);
-    }
-    fit_data->n_histo_sum = fit_data->n_ws;
-}
-
-gsl_histogram *fit_data_histo_sum(const struct fit_data *fit_data, size_t i_det) {
-    if(!fit_data || !fit_data->histo_sum_iter)
-        return NULL;
-    if(i_det >= fit_data->n_histo_sum)
-        return NULL;
-    return fit_data->histo_sum_iter[i_det];
+    fit->histo_sum[i_det] = gsl_histogram_clone(histo_sum);
+    return EXIT_SUCCESS;
 }
 
 int fit_data_add_det(struct fit_data *fit, detector *det) {
@@ -676,12 +639,12 @@ int fit_data_add_det(struct fit_data *fit, detector *det) {
     return EXIT_SUCCESS;
 }
 
-sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det) {
-    if(!fit_data || !fit_data->ws)
+fit_data_det *fit_data_fdd(const fit_data *fit, size_t i_det) {
+    if(!fit|| !fit->fdd)
         return NULL;
-    if(i_det >= fit_data->n_ws)
+    if(i_det >= fit->n_fdd)
         return NULL;
-    return fit_data->ws[i_det];
+    return &fit->fdd[i_det];
 }
 
 
@@ -702,74 +665,12 @@ size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_d
     return sum;
 }
 
-sim_workspace *fit_data_workspace_init(fit_data *fit, size_t i_det) {
-    detector *det = sim_det(fit->sim, i_det);
-    detector_update(det); /* Necessary for workspace_init, which in turn is necessary to get number of channels for sanity check, which would be useful for detector_update... */
-    sim_workspace *ws = sim_workspace_init(fit->jibal, fit->sim, det);
-    if(!ws) {
-        jabs_message(MSG_ERROR, stderr, "Workspace (detector %zu) failed to initialize!\n", i_det + 1);
-        return NULL;
-    }
-    if(detector_sanity_check(det, ws->n_channels)) {
-        jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!\n", i_det + 1);
-        return NULL;
-    }
-    spectrum_set_calibration(fit_data_exp(fit, i_det), det->calibration); /* Update the experimental spectra calibration (using default calibration) */
-    return ws;
-}
-
-int fit_data_workspaces_init(fit_data *fit) {
-    if(!fit->ws) {
-        DEBUGSTR("No fit workspace array has been allocated!");
-        return EXIT_FAILURE;
-    }
-    int status = EXIT_SUCCESS;
-    for(size_t i_det = 0; i_det < fit->n_ws; i_det++) {
-        sim_workspace *ws = fit_data_workspace_init(fit, i_det);
-        if(!ws) {
-            status = EXIT_FAILURE;
-            break;
-        }
-        fit->ws[i_det] = ws;
-    }
-    if(status == EXIT_FAILURE) {
-        fit_data_workspaces_reset(fit);
-    }
-    return status;
-}
-
-void fit_data_workspaces_free(struct fit_data *fit) {
-    assert(fit);
-    if(!fit->ws) {
-        return;
-    }
-    fit_data_workspaces_reset(fit);
-    free(fit->ws);
-    fit->ws = NULL;
-    free(fit->ws_val);
-    fit->ws_val = NULL;
-    fit->n_ws = 0;
-}
-
-void fit_data_workspaces_reset(fit_data *fit) {
-    if(!fit->ws) {
-        DEBUGSTR("Could not reset workspaces, because workspace array has not been allocated!");
-        return;
-    }
-    for(size_t i_det = 0; i_det < fit->n_ws; i_det++) {
-        sim_workspace_free(fit->ws[i_det]);
-        fit->ws[i_det] = NULL;
-    }
-}
-
 struct fit_stats fit_stats_init() {
     struct fit_stats s;
     s.n_evals = 0;
     s.n_evals_iter = 0;
-    s.n_workspaces = 0;
-    s.n_workspaces_iter = 0;
-    s.n_speedup_evals = 0;
-    s.n_speedup_evals_iter = 0;
+    s.n_detectors = 0;
+    s.n_detectors_active = 0;
     s.cputime_cumul = 0.0;
     s.cputime_iter = 0.0;
     s.chisq0 = 0.0;
@@ -782,29 +683,26 @@ struct fit_stats fit_stats_init() {
     return s;
 }
 
-void fit_data_print(FILE *f, const struct fit_data *fit_data) {
-    if(!fit_data) {
+void fit_data_print(const fit_data *fit, jabs_msg_level msg_level) {
+    if(!fit) {
         return;
     }
-    if(fit_data->n_fit_ranges == 0) {
-        jabs_message(MSG_ERROR, f, "No fit ranges.\n");
+    if(fit->n_fit_ranges == 0) {
+        jabs_message(MSG_ERROR, stderr, "No fit ranges.\n");
         return;
     }
-    jabs_message(MSG_INFO, f, "%zu fit ranges:\n", fit_data->n_fit_ranges);
-    jabs_message(MSG_INFO, f, "  i |    low |   high |    exp cts |    sim cts | sim/exp |  sigmas |\n");
-    for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
-        roi *range = &fit_data->fit_ranges[i];
-        double exp_cts = spectrum_roi(fit_data_exp(fit_data, range->i_det), range->low, range->high);
-        double sim_cts = spectrum_roi(fit_data_histo_sum(fit_data, range->i_det), range->low, range->high);
-        if(exp_cts == 0.0) {
-            jabs_message(MSG_INFO, f, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf |         |         |\n", i + 1, range->low, range->high, exp_cts, sim_cts);
-        } else {
-            double ratio = sim_cts / exp_cts;
-            double sigmas = (sim_cts - exp_cts) / sqrt(exp_cts);
-            jabs_message(MSG_INFO, f, "%3zu | %6lu | %6lu | %10.0lf | %10.1lf | %7.5lf | %7.2lf |\n", i + 1, range->low, range->high, exp_cts, sim_cts, ratio, sigmas);
-        }
+    jabs_message(msg_level, stderr, "Fit ROI # | detector name |  low ch | high ch | exp counts | sim counts\n");
+    for(size_t i = 0; i < fit->n_fit_ranges; i++) {
+        roi *range = &fit->fit_ranges[i];
+        double exp = spectrum_roi(fit_data_exp(fit, range->i_det), range->low, range->high);
+        double sim = spectrum_roi(fit_data_histo_sum(fit, range->i_det), range->low, range->high);
+        jabs_message(msg_level, stderr, " %8zu | %13s | %7zu | %7zu | %10g | %10g\n",
+                     i + 1, detector_name(sim_det(fit->sim, range->i_det)), range->low, range->high,
+                     exp, sim);
+
     }
-    jabs_message(MSG_INFO, f, "\nFit has %zu channels total.\n", fit_data_ranges_calculate_number_of_channels(fit_data));
+
+    jabs_message(msg_level, stderr, "\nFit %zu ranges with %zu channels total.\n", fit->n_fit_ranges, fit_data_ranges_calculate_number_of_channels(fit));
 }
 
 int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, double epsrel) { /* test_delta() copied from GSL convergence.c and modified */
@@ -840,7 +738,7 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
             chisq_dof_old = fit_data->stats.chisq_dof;
             fit_data->stats.cputime_iter = 0.0;
             fit_data->stats.n_evals_iter = 0;
-            fit_data->stats.n_workspaces_iter = 0;
+            fit_data->stats.n_detectors_active = 0;
             status = gsl_multifit_nlinear_iterate(w);
             DEBUGMSG("Iteration status %i (%s)", status, gsl_strerror(status));
         }
@@ -879,7 +777,7 @@ void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspac
     jabs_message(MSG_INFO, stderr, "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
     jabs_message(MSG_INFO, stderr, "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
     jabs_message(MSG_INFO, stderr, "function evaluations: %zu\n", fit->stats.n_evals);
-    jabs_message(MSG_INFO, stderr, "number of spectra simulated: %zu\n", fit->stats.n_workspaces);
+    jabs_message(MSG_INFO, stderr, "number of spectra simulated: %zu\n", fit->stats.n_detectors);
 #ifdef DEBUG
     jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf->nevalf);
 #endif
@@ -931,15 +829,6 @@ int fit(fit_data *fit) {
         jabs_message(MSG_ERROR, stderr, "No fit range(s) given, can not fit.\n");
         return EXIT_FAILURE;
     }
-
-    jabs_message(MSG_VERBOSE, stderr, "Fit ROI # | detector # | detector name |  low ch | high ch | exp counts\n");
-    for(size_t i = 0; i < fit->n_fit_ranges; i++) {
-        roi *range = &fit->fit_ranges[i];
-        jabs_message(MSG_VERBOSE, stderr, " %8zu | %10zu | %13s | %7zu | %7zu | %10g\n",
-                     i + 1, range->i_det + 1, detector_name(sim_det(fit->sim, range->i_det)), range->low, range->high,
-                     spectrum_roi(fit_data_exp(fit, range->i_det), range->low, range->high));
-    }
-
     fdf.f = &fit_function;
     fdf.df = NULL; /* Jacobian, with NULL using finite difference. */
     fdf.fvv = NULL; /* No geodesic acceleration */
@@ -987,11 +876,15 @@ int fit(fit_data *fit) {
 #ifdef DEBUG
     fprintf(stderr, "Set %zu weights.\n", i_w);
 #endif
+
+    fit->f = gsl_vector_alloc(fdf.n);
+    if(fit_data_fdd_init(fit)) {
+        return EXIT_FAILURE;
+    }
     assert(i_w == fdf.n);
 
     gsl_matrix *covar = gsl_matrix_alloc(fit_params->n_active, fit_params->n_active);
     gsl_vector *x = gsl_vector_alloc(fit_params->n_active);
-    fit->f_iter = gsl_vector_alloc(fdf.n); /* Vector to hold f at the beginning of every iter */
     for(size_t i = 0; i < fit_params->n; i++) { /* Update all (including inactives) */
         fit_variable *var = &(fit_params->vars[i]);
         var->err = 0.0;
@@ -1070,11 +963,14 @@ int fit(fit_data *fit) {
         fit_parameters_update_changed(fit_params); /* sample_model_renormalize() can and will change concentration values, this will recompute error (assuming relative error stays the same) */
         fit_params_print_final(fit_params);
         fit_covar_print(covar, MSG_VERBOSE);
+
+        fit_data_print(fit, MSG_VERBOSE);
     }
     gsl_multifit_nlinear_free(w);
     gsl_matrix_free(covar);
     gsl_vector_free(x);
-    gsl_vector_free(fit->f_iter);
+    free(fit->f);
+    fit->f = NULL;
     free(weights);
     return fit->stats.error;
 }
@@ -1161,4 +1057,27 @@ const char *fit_error_str(int error) {
         default:
             return "unknown";
     }
+}
+
+int fit_range_compare(const void *a, const void *b) {
+    const roi *r_a = (const roi *) a;
+    const roi *r_b = (const roi *) b;
+    if(r_a->i_det < r_b->i_det) { /* i_det is size_t (unsigned) so we have to make this complicated */
+        return -1;
+    } else if(r_a->i_det > r_b->i_det){
+        return 1;
+    };
+   /* Same detector, compare by low channel */
+   if(r_a->low < r_b->low) {
+       return -1;
+   } else if(r_a->low > r_b->low) {
+       return  1;
+   }
+   /* Same low channel, compare by high channel */
+    if(r_a->high < r_b->high) {
+        return -1;
+    } else if(r_a->high > r_b->high) {
+        return  1;
+    }
+   return 0; /* Ok, they are the same */
 }

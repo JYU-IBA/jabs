@@ -112,7 +112,7 @@ int sample_model_sanity_check(const sample_model *sm) {
             jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative ad-hoc correction parameter (bragg (%g), stragg (%g) or yield (%g)) at layer/range %zu).\n",
                          r->bragg, r->stragg, r->yield, i + 1);
 #ifdef DEBUG
-            sample_model_print("debug_sample.txt", sm);
+            sample_model_print("debug_sample.txt", sm, MSG_INFO);
 #endif
             return EXIT_FAILURE;
         }
@@ -272,7 +272,7 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
     }
 #ifdef DEBUG
     fprintf(stderr, "Point-by-point sample model for simulation:\n");
-    sample_model_print(NULL, sm);
+    sample_model_print(NULL, sm, MSG_INFO);
 #endif
     size_t n_isotopes = 0;
     for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
@@ -343,10 +343,6 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
         }
         roughness_reset_if_below_tolerance(&r->rough);
     }
-
-#ifdef DEBUG
-    sample_print(s, 0);
-#endif
     sample_model_free(sm_copy);
     sample_thickness_recalculate(s);
     return s;

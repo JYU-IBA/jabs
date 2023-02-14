@@ -68,9 +68,6 @@ int script_session_load_script(script_session *s, const char *filename) {
 void script_session_free(script_session *s) {
     if(!s)
         return;
-    fit_data_workspaces_free(s->fit);
-    fit_data_exp_free(s->fit);
-
     sim_free(s->fit->sim);
     sample_model_free(s->fit->sm);
     fit_data_free(s->fit);
@@ -117,7 +114,7 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
             *i_det = number - 1;
             DEBUGMSG("Detector, i_det = %zu", *i_det);
             if(*i_det >= sim->n_det) {
-                jabs_message(MSG_ERROR, stderr, "Detector number %zu is not valid (n_det = %zu).", number, sim->n_det);
+                jabs_message(MSG_ERROR, stderr, "Detector number %zu is not valid (n_det = %zu).\n", number, sim->n_det);
                 return EXIT_FAILURE;
             }
             found = TRUE;
