@@ -292,9 +292,9 @@ void fit_data_det_residual_vector_set(fit_data_det *fdd, gsl_histogram *histo_su
         gsl_vector_memcpy(&fdd->f.vector, fdd->f_iter);
         return;
     }
+    size_t i_vec = 0;
     for(size_t i_range = 0; i_range < fdd->n_ranges; i_range++) {
         const roi *range = &fdd->ranges[i_range];
-        size_t i_vec = 0;
         for(size_t i = range->low; i <= range->high; i++) {
             if(i >= histo_sum->n) { /* Outside range of simulated spectrum (simulated is zero) */
                 gsl_vector_set(&fdd->f.vector, i_vec, fdd->exp->bin[i]);
@@ -304,6 +304,7 @@ void fit_data_det_residual_vector_set(fit_data_det *fdd, gsl_histogram *histo_su
             i_vec++;
         }
     }
+    DEBUGMSG("Set %zu elements of vector from %zu ranges.\n", i_vec, fdd->n_ranges);
 }
 fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
     struct fit_data *fit = calloc(1, sizeof(struct fit_data));
