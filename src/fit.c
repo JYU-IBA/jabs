@@ -328,8 +328,8 @@ void fit_data_free(fit_data *fit) {
     if(!fit)
         return;
     fit_data_reset(fit);
+    fit_data_exp_free(fit);
     free(fit);
-    /* free exp? */
 }
 
 void fit_data_reset(fit_data *fit) {
@@ -339,12 +339,7 @@ void fit_data_reset(fit_data *fit) {
     fit_data_fit_ranges_free(fit);
     fit_params_free(fit->fit_params);
     fit->fit_params = NULL;
-    for(size_t i = 0; i < fit->n_histo_sum; i++) {
-        gsl_histogram_free(fit->histo_sum[i]);
-        fit->histo_sum[i] = NULL;
-    }
-    free(fit->histo_sum);
-    fit->n_histo_sum = 0;
+    fit_data_histo_sum_free(fit);
 }
 
 void fit_data_exp_reset(fit_data *fit) {
@@ -556,9 +551,11 @@ void fit_data_fdd_free(fit_data *fit) {
     for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) {
         fit_data_det *fdd = &fit->fdd[i_fdd];
         gsl_vector_free(fdd->f_iter);
+        gsl_histogram_free(fdd->histo_sum);
         free(fdd->ranges);
     }
     free(fit->fdd_active);
+    fit->fdd_active = NULL;
     free(fit->fdd);
     fit->fdd = NULL;
     fit->n_fdd = 0;
@@ -584,12 +581,7 @@ void fit_data_exp_alloc(fit_data *fit) {
 void fit_data_exp_free(fit_data *fit) {
     if(!fit->exp)
         return;
-    for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
-        if(fit->exp[i_det]) {
-            gsl_histogram_free(fit->exp[i_det]);
-            fit->exp[i_det] = NULL;
-        }
-    }
+    fit_data_exp_reset(fit);
     free(fit->exp);
     fit->exp = NULL;
     fit->n_exp = 0;
@@ -617,17 +609,36 @@ gsl_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det) {
 }
 
 int fit_data_histo_sum_store(fit_data *fit, size_t i_det, gsl_histogram *histo_sum) {
-    if(!fit->histo_sum) {
-        assert(fit->n_histo_sum == 0);
-        fit->histo_sum = calloc(fit->sim->n_det, sizeof(gsl_histogram *));
-        if(!fit->histo_sum) {
-            fit->n_histo_sum = 0;
-            return EXIT_FAILURE;
-        }
-        fit->n_histo_sum = fit->sim->n_det;
-    }
+    gsl_histogram_free(fit->histo_sum[i_det]);
     fit->histo_sum[i_det] = gsl_histogram_clone(histo_sum);
+    DEBUGMSG("Histogram stored to histo sum i = %zu", i_det);
     return EXIT_SUCCESS;
+}
+
+int fit_data_histo_sum_alloc(fit_data *fit) {
+    fit_data_histo_sum_free(fit);
+    fit->histo_sum = calloc(fit->sim->n_det, sizeof(gsl_histogram *));
+    if(!fit->histo_sum) {
+        fit->n_histo_sum = 0;
+        return EXIT_FAILURE;
+    }
+    fit->n_histo_sum = fit->sim->n_det;
+    DEBUGMSG("Histo sum allocated (%p), n = %zu", (void *)fit->histo_sum, fit->n_histo_sum);
+    return EXIT_SUCCESS;
+}
+
+void fit_data_histo_sum_free(fit_data *fit) {
+    if(!fit) {
+        return;
+    }
+    DEBUGMSG("Freeing sum histograms (%zu)", fit->n_histo_sum);
+    for(size_t i = 0; i < fit->n_histo_sum; i++) {
+        gsl_histogram_free(fit->histo_sum[i]);
+        fit->histo_sum[i] = NULL;
+    }
+    free(fit->histo_sum);
+    fit->histo_sum = NULL;
+    fit->n_histo_sum = 0;
 }
 
 int fit_data_add_det(struct fit_data *fit, detector *det) {
@@ -877,7 +888,6 @@ int fit(fit_data *fit) {
 #ifdef DEBUG
     fprintf(stderr, "Set %zu weights.\n", i_w);
 #endif
-
     fit->f = gsl_vector_alloc(fdf.n);
     if(fit_data_fdd_init(fit)) {
         return EXIT_FAILURE;
@@ -935,8 +945,7 @@ int fit(fit_data *fit) {
         f = gsl_multifit_nlinear_residual(w);
         gsl_blas_ddot(f, f, &fit->stats.chisq0);
 
-        status = jabs_gsl_multifit_nlinear_driver(fit->n_iters_max, xtol, chisq_tol, fit, w); /* Fit */
-        fit->stats.error = status;
+        status = jabs_gsl_multifit_nlinear_driver(fit->n_iters_max, xtol, chisq_tol, fit, w); /* Fit */fit->stats.error = status;
         if(status < 0) {
             jabs_message(MSG_ERROR, stderr, "Fit aborted in phase %i, reason: %s.\n", phase, fit_error_str(fit->stats.error));
             break;
@@ -970,7 +979,7 @@ int fit(fit_data *fit) {
     gsl_multifit_nlinear_free(w);
     gsl_matrix_free(covar);
     gsl_vector_free(x);
-    free(fit->f);
+    gsl_vector_free(fit->f);
     fit->f = NULL;
     free(weights);
     return fit->stats.error;

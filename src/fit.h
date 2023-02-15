@@ -125,9 +125,10 @@ void fit_data_fdd_free(fit_data *fit);
 void fit_data_exp_alloc(fit_data *fit);
 void fit_data_exp_free(fit_data *fit);
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename);
-int fit_data_histo_sum_store(fit_data *fit, size_t i_det, gsl_histogram *histo_sum);
 gsl_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det);
 int fit_data_histo_sum_store(fit_data *fit, size_t i_det, gsl_histogram *histo_sum); /* Makes a deep copy of histo_sum */
+int fit_data_histo_sum_alloc(fit_data *fit);
+void fit_data_histo_sum_free(fit_data *fit);
 int fit_data_add_det(struct fit_data *fit, detector *det);
 fit_data_det *fit_data_fdd(const fit_data *fit, size_t i_det);
 size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);
