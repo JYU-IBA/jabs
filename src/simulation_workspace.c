@@ -258,19 +258,13 @@ void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
 }
 
 
-int sim_workspace_print_spectra(const sim_workspace *ws, const char *filename, const gsl_histogram *histo_iter, const gsl_histogram *exp) {
+int sim_workspace_print_spectra(const result_spectra *spectra, const char *filename) {
     char sep = ' ';
-    if(!ws) {
+    if(!spectra) {
         return EXIT_FAILURE;
     }
-    const gsl_histogram *h;
-    if(histo_iter) {
-        h = histo_iter;
-    } else {
-        DEBUGSTR("No stored sum spectrum in fit_data, falling back to sum spectrum in workspace.\n");
-        h = ws->histo_sum;
-    }
-    if(!h) {
+    if(!spectra->sum) {
+        jabs_message(MSG_ERROR, stderr, "No simulated spectrum!\n");
         return EXIT_FAILURE;
     }
     FILE *f = fopen_file_or_stream(filename, "w");
@@ -281,33 +275,32 @@ int sim_workspace_print_spectra(const sim_workspace *ws, const char *filename, c
         if(strncmp(jabs_file_extension_const(filename), ".csv", 4) == 0) { /* For CSV: print header line */
             sep = ','; /* and set the separator! */
             fprintf(f, "\"Channel\",\"Energy (keV)\",\"Simulated\"");
-            if(exp) {
+            if(spectra->exp) {
                 fprintf(f, ",\"Experimental\"");
             }
-            for(size_t j = 0; j < ws->n_reactions; j++) {
-                const reaction *r = ws->reactions[j]->r;
-                fprintf(f, ",\"%s (%s)\"", r->target->name, reaction_type_to_string(r->type));
+            for(size_t j = 0; j < spectra->n_reactions; j++) {
+                fprintf(f, ",\"%s\"", spectra->names[j]);
             }
             fprintf(f, "\n");
         }
     }
-    for(size_t i = 0; i < ws->n_channels; i++) {
-        fprintf(f, "%zu%c%.3lf%c", i, sep, detector_calibrated(ws->det, JIBAL_ANY_Z, i) / C_KEV,
+    for(size_t i = 0; i < spectra->sum->n; i++) {
+        fprintf(f, "%zu%c%.3lf%c", i, sep, spectra->sum->range[i] / C_KEV,
                 sep); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
-        if(i >= h->n || h->bin[i] == 0.0) {
+        if(i >= spectra->sum->n || spectra->sum->bin[i] == 0.0) {
             fprintf(f, "0"); /* Tidier output with a clean zero sum */
         } else {
-            fprintf(f, "%e", h->bin[i]);
+            fprintf(f, "%e", spectra->sum->bin[i]);
         }
-        if(exp) {
-            if(i < exp->n) {
-                fprintf(f, "%c%g", sep, exp->bin[i]);
+        if(spectra->exp) {
+            if(i < spectra->exp->n) {
+                fprintf(f, "%c%g", sep, spectra->exp->bin[i]);
             } else {
                 fprintf(f, "%c0", sep);
             }
         }
-        for(size_t j = 0; j < ws->n_reactions; j++) {
-            gsl_histogram *rh = ws->reactions[j]->histo; /* TODO: these don't correspond to stored sum spectrum in fit (but they should be very close!). */
+        for(size_t j = 0; j < spectra->n_reactions; j++) {
+            gsl_histogram *rh = spectra->reaction_histo[j]; /* TODO: these don't correspond to stored sum spectrum in fit (but they should be very close!). */
             if(i >= rh->n || rh->bin[i] == 0.0) {
                 fprintf(f, "%c0", sep);
             } else {

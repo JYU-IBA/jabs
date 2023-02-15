@@ -71,14 +71,15 @@ typedef struct roi {
 
 typedef struct fit_data_det {
     detector *det; /* Not stored here, same as sim->det[i_det], but we need a non-const pointer */
-    gsl_histogram *exp; /* Not stored here, same as fit->exp[i_det] */
-    gsl_histogram *histo_sum; /* Stored here from ws before ws frees it */
+    result_spectra spectra;
+    const gsl_histogram *exp; /* Not a copy! */
     roi *ranges; /* Same ranges as in fit_data, but only those relevant for "det". Full copies are made. */
     size_t n_ranges;
     size_t n_ch; /* in fit ranges */
     int active_iter_call;
     gsl_vector_view f; /* subset of fit_data->f */
     gsl_vector *f_iter; /* Stored values of f on first call of iter */
+    int error;
 } fit_data_det;
 
 typedef struct fit_data {
@@ -86,6 +87,8 @@ typedef struct fit_data {
     size_t n_fdd; /* TODO: rename */
     fit_data_det **fdd_active;
     size_t n_fdd_active_iter_call;
+    result_spectra *spectra; /* all spectra, updates every iter at the start of iter. */
+    size_t n_spectra; /* n_det (= n_fdd) when histograms were copied */
     gsl_histogram **exp; /* experimental data to be fitted, array of n_exp elements */
     size_t n_exp; /* same as sim->n_det, but this keeps track on how many spectra we have allocated in exp and ref */ /* TODO: remove */
     gsl_histogram *ref; /* reference spectra, exactly one */
@@ -103,8 +106,6 @@ typedef struct fit_data {
     struct fit_stats stats; /* Fit statistics, updated as we iterate */
     int phase_start; /* Fit phase to start from (see FIT_PHASE -defines) */
     int phase_stop; /* Inclusive */
-    gsl_histogram **histo_sum; /* Array of histograms (n_fdd (= n_det), one for each detector), updates every iter at the start of iter. */
-    size_t n_histo_sum; /* n_fdd when histograms were copied */
     int (*fit_iter_callback)(struct fit_stats stats);
     gsl_vector *f;
 } fit_data;
@@ -126,7 +127,9 @@ void fit_data_exp_alloc(fit_data *fit);
 void fit_data_exp_free(fit_data *fit);
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename);
 gsl_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det);
-int fit_data_histo_sum_store(fit_data *fit, size_t i_det, gsl_histogram *histo_sum); /* Makes a deep copy of histo_sum */
+int fit_data_spectra_copy(result_spectra *dest, const result_spectra *src);
+void fit_data_spectra_free(result_spectra *s);
+void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *s, const detector *det, const gsl_histogram *exp, const sim_workspace *ws); /* Makes deep copies of histograms */
 int fit_data_histo_sum_alloc(fit_data *fit);
 void fit_data_histo_sum_free(fit_data *fit);
 int fit_data_add_det(struct fit_data *fit, detector *det);

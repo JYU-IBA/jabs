@@ -18,6 +18,14 @@
 #include "detector.h"
 #include "simulation.h"
 
+typedef struct result_spectra {
+    gsl_histogram *exp; /* Copy */
+    gsl_histogram *sum; /* Sum of simulated spectra */
+    gsl_histogram **reaction_histo;
+    char **names;
+    size_t n_reactions;
+} result_spectra;
+
 gsl_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_max, size_t column, size_t compress);
 gsl_histogram *spectrum_read_detector(const char *filename, const detector *det);
 void spectrum_set_calibration(gsl_histogram *h, const calibration *cal);

@@ -171,14 +171,15 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
     sim_calc_params_print(fit->sim->params, MSG_VERBOSE);
     jabs_message(MSG_IMPORTANT, stderr, "Simulation begins...\n");
     for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
-        detector_update(fit->sim->det[i_det]);
-        sim_workspace *ws = sim_workspace_init(s->jibal, fit->sim, fit->sim->det[i_det]);
+        detector *det = fit->sim->det[i_det];
+        detector_update(det);
+        sim_workspace *ws = sim_workspace_init(s->jibal, fit->sim, det);
         if(simulate_with_ds(ws)) {
             jabs_message(MSG_ERROR, stderr, "Simulation failed.\n");
             sim_workspace_free(ws);
             return SCRIPT_COMMAND_FAILURE;
         }
-        fit_data_histo_sum_store(fit, i_det, ws->histo_sum);
+        fit_data_spectra_copy_to_spectra_from_ws(&fit->spectra[i_det], det, s->fit->exp[i_det], ws);
         sim_workspace_free(ws);
     }
     script_finish_sim_or_fit(s);
@@ -273,14 +274,12 @@ script_command_status script_save_spectra(script_session *s, int argc, char *con
         jabs_message(MSG_ERROR, stderr, "Not enough arguments for save spectra.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-#if 0 /* TODO: workspace spectra should be save somewhere */
-    if(sim_workspace_print_spectra(fit_data_ws(fit, i_det), argv[0], fit_data_histo_sum(fit, i_det), fit_data_exp(fit, i_det))) {
+    if(sim_workspace_print_spectra(fit->spectra, argv[0])) {
         jabs_message(MSG_ERROR, stderr,
                      "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n",
                      i_det + 1, argv[0], fit->sim->n_det);
         return SCRIPT_COMMAND_FAILURE;
     }
-#endif
     argc -= 1;
     return argc_orig - argc;
 }
