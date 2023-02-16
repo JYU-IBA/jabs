@@ -297,10 +297,10 @@ int sim_workspace_print_spectra(const result_spectra *spectra, const char *filen
         fprintf(f, "%zu%c%.3lf", ch, sep, range[ch] / C_KEV); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
         for(size_t j = 0; j < spectra->n_spectra; j++) {
             gsl_histogram *h = spectra->s[j].histo;
-            if(!h || ch >= h->n || h->bin[ch] == 0.0) {
+            if(!h || ch >= h->n) {
                 fprintf(f, "%c0", sep);
             } else {
-                fprintf(f, "%c%e", sep, h->bin[ch]);
+                fprintf(f, "%c%.8g", sep, h->bin[ch]);
             }
         }
         fprintf(f, "\n");

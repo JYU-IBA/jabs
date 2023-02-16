@@ -627,17 +627,17 @@ gsl_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det) {
 void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *spectra, const detector *det, const gsl_histogram *exp, const sim_workspace *ws) {
     spectra->n_spectra = ws->n_reactions + RESULT_SPECTRA_N_FIXED; /* Simulated, experimental + reaction spectra */
     spectra->s = calloc(spectra->n_spectra, sizeof(result_spectrum));
-    spectra->s[RESULT_SPECTRA_SIMULATED].histo = gsl_histogram_clone(ws->histo_sum);
-    spectra->s[RESULT_SPECTRA_SIMULATED].name = strdup("Simulated");
-    spectra->s[RESULT_SPECTRA_EXPERIMENTAL].histo  = exp ? gsl_histogram_clone(exp) : NULL;
-    spectra->s[RESULT_SPECTRA_EXPERIMENTAL].name = strdup("Experimental");
+    result_spectrum_set(&spectra->s[RESULT_SPECTRA_SIMULATED], ws->histo_sum, "Simulated", NULL, REACTION_NONE);
+    result_spectrum_set(&spectra->s[RESULT_SPECTRA_EXPERIMENTAL], exp, "Experimental", NULL, REACTION_NONE);
     spectrum_set_calibration(result_spectra_experimental_histo(spectra), det->calibration);
     DEBUGMSG("Copying %zu spectra (%zu reactions) from ws to spectra structure.", s->n_spectra, ws->n_reactions);
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const reaction *r = ws->reactions[i]->r;
-        size_t i_spectrum = RESULT_SPECTRA_REACTION_SPECTRUM(i);
-        spectra->s[i_spectrum].histo = gsl_histogram_clone(ws->reactions[i]->histo);
-        asprintf(&spectra->s[i_spectrum].name, ",\"%s (%s)\"", r->target->name, reaction_type_to_string(r->type));
+        result_spectrum *s = &spectra->s[RESULT_SPECTRA_REACTION_SPECTRUM(i)];
+        s->histo = gsl_histogram_clone(ws->reactions[i]->histo);
+        asprintf(&s->name, ",\"%s (%s)\"", r->target->name, reaction_type_to_string(r->type));
+        s->target_isotope = r->target;
+        s->type = r->type;
     }
 }
 

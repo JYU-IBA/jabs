@@ -39,6 +39,7 @@ void result_spectra_free(result_spectra *spectra) {
 int result_spectra_copy(result_spectra *dest, const result_spectra *src) {
     dest->n_spectra = src->n_spectra;
     dest->s = calloc(dest->n_spectra, sizeof(result_spectrum));
+    dest->iter = src->iter;
     for(size_t i = 0; i < src->n_spectra; i++) {
         result_spectrum_copy(&dest->s[i], &src->s[i]);
     }
@@ -46,14 +47,15 @@ int result_spectra_copy(result_spectra *dest, const result_spectra *src) {
 }
 
 int result_spectrum_copy(result_spectrum *dest, const result_spectrum *src) {
-    result_spectrum_set(dest, src->histo, src->name, src->target_isotope);
+    result_spectrum_set(dest, src->histo, src->name, src->target_isotope, src->type);
     return EXIT_SUCCESS;
 }
 
-int result_spectrum_set(result_spectrum *dest, const gsl_histogram *h, const char *name, const jibal_isotope *target_isotope) {
-    dest->histo = h? gsl_histogram_clone(h) : NULL;
+int result_spectrum_set(result_spectrum *dest, const gsl_histogram *h, const char *name, const jibal_isotope *target_isotope, reaction_type type) {
+    dest->histo = h ? gsl_histogram_clone(h) : NULL;
     dest->name = name ? strdup(name) : NULL;
     dest->target_isotope = target_isotope;
+    dest->type = type;
     return EXIT_SUCCESS;
 }
 
