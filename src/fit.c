@@ -52,7 +52,7 @@ int fit_detector(const jibal *jibal, fit_data_det *fdd, const simulation *sim, s
     fit_data_det_residual_vector_set(fdd, ws->histo_sum);
     if(iter_call == 1) {
         gsl_vector_memcpy(fdd->f_iter, &fdd->f.vector); /* Copy residual vector, this can be used on later calls if fdd is not active */
-        fit_data_spectra_free(&fdd->spectra);
+        result_spectra_free(&fdd->spectra);
         fit_data_spectra_copy_to_spectra_from_ws(&fdd->spectra, fdd->det, fdd->exp, ws);
     }
     sim_workspace_free(ws);
@@ -134,8 +134,8 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     if(fit->stats.iter_call == 1) {
         assert(fit->n_det_spectra == fit->n_fdd_active_iter_call == fit->sim->n_det);
         for(size_t i = 0; i < fit->n_fdd_active_iter_call; i++) {
-            fit_data_spectra_free(&fit->spectra[i]);
-            fit_data_spectra_copy(&fit->spectra[i], &fit->fdd[i].spectra);
+            result_spectra_free(&fit->spectra[i]);
+            result_spectra_copy(&fit->spectra[i], &fit->fdd[i].spectra);
         }
     }
     gsl_vector_memcpy(f, fit->f);
@@ -339,7 +339,7 @@ void fit_data_free(fit_data *fit) {
     fit_data_exp_free(fit);
     fit_data_fdd_free(fit);
     for(size_t i = 0; i < fit->n_det_spectra; i++) {
-        fit_data_spectra_free(&fit->spectra[i]);
+        result_spectra_free(&fit->spectra[i]);
     }
     free(fit->spectra);
     free(fit);
@@ -352,7 +352,7 @@ void fit_data_reset(fit_data *fit) {
     fit_data_fit_ranges_free(fit);
     fit_params_free(fit->fit_params);
     fit->fit_params = NULL;
-    fit_data_histo_sum_free(fit);
+    fit_data_spectra_free(fit);
 }
 
 void fit_data_exp_reset(fit_data *fit) {
@@ -564,7 +564,7 @@ void fit_data_fdd_free(fit_data *fit) {
     for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) {
         fit_data_det *fdd = &fit->fdd[i_fdd];
         gsl_vector_free(fdd->f_iter);
-        fit_data_spectra_free(&fdd->spectra);
+        result_spectra_free(&fdd->spectra);
         free(fdd->ranges);
     }
     free(fit->fdd_active);
@@ -620,55 +620,28 @@ gsl_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det) {
         return NULL;
     if(RESULT_SPECTRA_SIMULATED > fit->spectra[i_det].n_spectra)
         return NULL;
-    return fit->spectra[i_det].histos[RESULT_SPECTRA_SIMULATED];
+    return result_spectra_simulated_histo(&fit->spectra[i_det]);
 }
 
-int fit_data_spectra_copy(result_spectra *dest, const result_spectra *src) { /* If dest already has something, memory leaks can occur */
-    dest->n_spectra = src->n_spectra;
-    dest->histos = calloc(src->n_spectra, sizeof(gsl_histogram *));
-    dest->names = calloc(src->n_spectra, sizeof(char *));
-    for(size_t i = 0;  i < src->n_spectra; i++) {
-        dest->histos[i] = src->histos[i] ? gsl_histogram_clone(src->histos[i]) : NULL;
-        dest->names[i] = strdup_non_null(src->names[i]);
-    }
-    return EXIT_SUCCESS;
-}
-
-void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *s, const detector *det, const gsl_histogram *exp, const sim_workspace *ws) {
-    s->n_spectra = ws->n_reactions + RESULT_SPECTRA_N_FIXED; /* Simulated, experimental + reaction spectra */
-    s->histos = calloc(s->n_spectra, sizeof(gsl_histogram *));
-    s->names = calloc(s->n_spectra, sizeof(char *));
-    s->histos[RESULT_SPECTRA_SIMULATED] = gsl_histogram_clone(ws->histo_sum);
-    s->names[RESULT_SPECTRA_SIMULATED] = strdup("Simulated");
-    s->histos[RESULT_SPECTRA_EXPERIMENTAL] = exp ? gsl_histogram_clone(exp) : NULL;
-    s->names[RESULT_SPECTRA_EXPERIMENTAL] = strdup("Experimental");
-    spectrum_set_calibration(s->histos[RESULT_SPECTRA_EXPERIMENTAL], det->calibration);
+void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *spectra, const detector *det, const gsl_histogram *exp, const sim_workspace *ws) {
+    spectra->n_spectra = ws->n_reactions + RESULT_SPECTRA_N_FIXED; /* Simulated, experimental + reaction spectra */
+    spectra->s = calloc(spectra->n_spectra, sizeof(result_spectrum));
+    spectra->s[RESULT_SPECTRA_SIMULATED].histo = gsl_histogram_clone(ws->histo_sum);
+    spectra->s[RESULT_SPECTRA_SIMULATED].name = strdup("Simulated");
+    spectra->s[RESULT_SPECTRA_EXPERIMENTAL].histo  = exp ? gsl_histogram_clone(exp) : NULL;
+    spectra->s[RESULT_SPECTRA_EXPERIMENTAL].name = strdup("Experimental");
+    spectrum_set_calibration(result_spectra_experimental_histo(spectra), det->calibration);
     DEBUGMSG("Copying %zu spectra (%zu reactions) from ws to spectra structure.", s->n_spectra, ws->n_reactions);
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const reaction *r = ws->reactions[i]->r;
         size_t i_spectrum = RESULT_SPECTRA_REACTION_SPECTRUM(i);
-        s->histos[i_spectrum] = gsl_histogram_clone(ws->reactions[i]->histo);
-        asprintf(&s->names[i_spectrum], ",\"%s (%s)\"", r->target->name, reaction_type_to_string(r->type));
+        spectra->s[i_spectrum].histo = gsl_histogram_clone(ws->reactions[i]->histo);
+        asprintf(&spectra->s[i_spectrum].name, ",\"%s (%s)\"", r->target->name, reaction_type_to_string(r->type));
     }
 }
 
-void fit_data_spectra_free(result_spectra *s) { /* Note: does not free "s" */
-    if(!s) {
-        return;
-    }
-    for(size_t i = 0;  i < s->n_spectra; i++) {
-        gsl_histogram_free(s->histos[i]);
-        free(s->names[i]);
-    }
-    free(s->histos);
-    s->histos = NULL;
-    free(s->names);
-    s->names = NULL;
-    s->n_spectra = 0;
-}
-
-int fit_data_histo_sum_alloc(fit_data *fit) {
-    fit_data_histo_sum_free(fit);
+int fit_data_spectra_alloc(fit_data *fit) {
+    fit_data_spectra_free(fit);
     fit->spectra = calloc(fit->sim->n_det, sizeof(result_spectra));
     if(!fit->spectra) {
         fit->n_det_spectra = 0;
@@ -678,12 +651,12 @@ int fit_data_histo_sum_alloc(fit_data *fit) {
     return EXIT_SUCCESS;
 }
 
-void fit_data_histo_sum_free(fit_data *fit) {
+void fit_data_spectra_free(fit_data *fit) {
     if(!fit) {
         return;
     }
     for(size_t i = 0; i < fit->n_det_spectra; i++) {
-        fit_data_spectra_free(&fit->spectra[i]);
+        result_spectra_free(&fit->spectra[i]);
     }
     free(fit->spectra);
     fit->spectra = NULL;

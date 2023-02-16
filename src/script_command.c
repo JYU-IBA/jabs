@@ -114,7 +114,7 @@ int script_prepare_sim_or_fit(script_session *s) {
     }
     sim_prepare_reactions(fit->sim, fit->jibal->isotopes, fit->jibal->gsto);
     reactions_print(fit->sim->reactions, fit->sim->n_reactions);
-    fit_data_histo_sum_alloc(fit);
+    fit_data_spectra_alloc(fit);
     s->start = jabs_clock();
     return 0;
 }

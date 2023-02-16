@@ -264,7 +264,8 @@ int sim_workspace_print_spectra(const result_spectra *spectra, const char *filen
         jabs_message(MSG_ERROR, stderr, "No spectra!\n");
         return EXIT_FAILURE;
     }
-    gsl_histogram *h_sum = result_spectra_simulated(spectra);
+    gsl_histogram *h_sum = result_spectra_simulated_histo(spectra);
+    gsl_histogram *h_exp = result_spectra_experimental_histo(spectra);
     if(!h_sum) {
         jabs_message(MSG_ERROR, stderr, "No simulated spectrum!\n");
         return EXIT_FAILURE;
@@ -277,22 +278,29 @@ int sim_workspace_print_spectra(const result_spectra *spectra, const char *filen
         if(strncmp(jabs_file_extension_const(filename), ".csv", 4) == 0) { /* For CSV: print header line */
             sep = ','; /* and set the separator! */
             fprintf(f, "\"Channel\",\"Energy (keV)\"");
-            for(size_t j = 0; j < spectra->n_spectra; j++) {
-                fprintf(f, ",\"%s\"", spectra->names[j]);
+            for(size_t i_spectrum = 0; i_spectrum < spectra->n_spectra; i_spectrum++) {
+                fprintf(f, ",\"%s\"", spectra->s[i_spectrum].name);
             }
             fprintf(f, "\n");
         }
     }
-    size_t n_ch = result_spectra_n_ch(spectra);
-
-    for(size_t i = 0; i < n_ch; i++) {
-        fprintf(f, "%zu%c%.3lf%c", i, sep, h_sum->range[i] / C_KEV, sep); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
+    size_t n_ch;
+    double *range;
+    if(h_exp && h_exp->n > h_sum->n) { /* Energy for output is taken from experimental spectrum if it exists and extends to higher energy than simulated spectrum */
+        range = h_exp->range;
+        n_ch = h_exp->n;
+    } else {
+        range = h_sum->range;
+        n_ch = h_sum->n;
+    }
+    for(size_t ch = 0; ch < n_ch; ch++) {
+        fprintf(f, "%zu%c%.3lf", ch, sep, range[ch] / C_KEV); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
         for(size_t j = 0; j < spectra->n_spectra; j++) {
-            gsl_histogram *h = spectra->histos[j];
-            if(!h || i >= h->n || h->bin[i] == 0.0) {
+            gsl_histogram *h = spectra->s[j].histo;
+            if(!h || ch >= h->n || h->bin[ch] == 0.0) {
                 fprintf(f, "%c0", sep);
             } else {
-                fprintf(f, "%c%e", sep, h->bin[i]);
+                fprintf(f, "%c%e", sep, h->bin[ch]);
             }
         }
         fprintf(f, "\n");

@@ -128,11 +128,9 @@ void fit_data_exp_alloc(fit_data *fit);
 void fit_data_exp_free(fit_data *fit);
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename);
 gsl_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det);
-int fit_data_spectra_copy(result_spectra *dest, const result_spectra *src);
-void fit_data_spectra_free(result_spectra *s);
 void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *s, const detector *det, const gsl_histogram *exp, const sim_workspace *ws); /* Makes deep copies of histograms */
-int fit_data_histo_sum_alloc(fit_data *fit);
-void fit_data_histo_sum_free(fit_data *fit);
+int fit_data_spectra_alloc(fit_data *fit);
+void fit_data_spectra_free(fit_data *fit);
 int fit_data_add_det(struct fit_data *fit, detector *det);
 fit_data_det *fit_data_fdd(const fit_data *fit, size_t i_det);
 size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);
