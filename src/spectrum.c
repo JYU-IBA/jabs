@@ -20,6 +20,35 @@
 #include "message.h"
 #include "win_compat.h"
 
+size_t result_spectra_n_ch(const result_spectra *s) {
+    size_t n_ch = 0;
+    for(size_t i = 0; i < s->n_spectra; i++) {
+        if(!s->histos[i]) {
+            continue;
+        }
+        n_ch = GSL_MAX(n_ch, s->histos[i]->n);
+    }
+    return n_ch;
+}
+
+gsl_histogram *result_spectrum(const result_spectra *s, size_t i_spectrum) {
+    if(i_spectrum < s->n_spectra) {
+        return s->histos[i_spectrum];
+    }
+    return NULL;
+}
+gsl_histogram *result_spectra_reaction(const result_spectra *s, size_t i_reaction) {
+    return result_spectrum(s, RESULT_SPECTRA_N_FIXED + i_reaction);
+}
+
+gsl_histogram *result_spectra_simulated(const result_spectra *s) {
+    return result_spectrum(s, RESULT_SPECTRA_SIMULATED);
+}
+
+gsl_histogram *result_spectra_experimental(const result_spectra *s) {
+    return result_spectrum(s, RESULT_SPECTRA_EXPERIMENTAL);
+}
+
 gsl_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_max, size_t column, size_t compress) {
     char *line=NULL;
     size_t line_size=0;

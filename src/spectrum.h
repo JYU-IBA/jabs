@@ -18,13 +18,22 @@
 #include "detector.h"
 #include "simulation.h"
 
+#define RESULT_SPECTRA_SIMULATED (0)
+#define RESULT_SPECTRA_EXPERIMENTAL (1)
+#define RESULT_SPECTRA_N_FIXED (2)
+#define RESULT_SPECTRA_REACTION_SPECTRUM(x) ((x) + RESULT_SPECTRA_N_FIXED)
+
 typedef struct result_spectra {
-    gsl_histogram *exp; /* Copy */
-    gsl_histogram *sum; /* Sum of simulated spectra */
-    gsl_histogram **reaction_histo;
+    gsl_histogram **histos;
     char **names;
-    size_t n_reactions;
+    size_t n_spectra;
 } result_spectra;
+
+size_t result_spectra_n_ch(const result_spectra *s);
+gsl_histogram *result_spectrum(const result_spectra *s, size_t i_spectrum);
+gsl_histogram *result_spectra_reaction(const result_spectra *s, size_t i_reaction);
+gsl_histogram *result_spectra_simulated(const result_spectra *s);
+gsl_histogram *result_spectra_experimental(const result_spectra *s);
 
 gsl_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_max, size_t column, size_t compress);
 gsl_histogram *spectrum_read_detector(const char *filename, const detector *det);

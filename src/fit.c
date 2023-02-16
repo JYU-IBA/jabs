@@ -132,7 +132,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     fit->stats.n_evals_iter++;
     fit->stats.n_detectors_active += fit->n_fdd_active_iter_call;
     if(fit->stats.iter_call == 1) {
-        assert(fit->n_spectra == fit->n_fdd_active_iter_call == fit->sim->n_det);
+        assert(fit->n_det_spectra == fit->n_fdd_active_iter_call == fit->sim->n_det);
         for(size_t i = 0; i < fit->n_fdd_active_iter_call; i++) {
             fit_data_spectra_free(&fit->spectra[i]);
             fit_data_spectra_copy(&fit->spectra[i], &fit->fdd[i].spectra);
@@ -338,7 +338,7 @@ void fit_data_free(fit_data *fit) {
     fit_data_reset(fit);
     fit_data_exp_free(fit);
     fit_data_fdd_free(fit);
-    for(size_t i = 0; i < fit->n_spectra; i++) {
+    for(size_t i = 0; i < fit->n_det_spectra; i++) {
         fit_data_spectra_free(&fit->spectra[i]);
     }
     free(fit->spectra);
@@ -614,38 +614,41 @@ int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename) 
 }
 
 gsl_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det) {
-    if(!fit || !fit->spectra->sum)
+    if(!fit)
         return NULL;
-    if(i_det >= fit->n_spectra)
+    if(i_det >= fit->n_det_spectra)
         return NULL;
-    return fit->spectra[i_det].sum;
+    if(RESULT_SPECTRA_SIMULATED > fit->spectra[i_det].n_spectra)
+        return NULL;
+    return fit->spectra[i_det].histos[RESULT_SPECTRA_SIMULATED];
 }
 
 int fit_data_spectra_copy(result_spectra *dest, const result_spectra *src) { /* If dest already has something, memory leaks can occur */
-    dest->exp = gsl_histogram_clone(src->exp);
-    dest->sum = gsl_histogram_clone(src->sum);
-    dest->n_reactions = src->n_reactions;
-    dest->reaction_histo = calloc(src->n_reactions, sizeof(gsl_histogram *));
-    dest->names = calloc(src->n_reactions, sizeof(char *));
-    for(size_t i = 0;  i < src->n_reactions; i++) {
-        dest->reaction_histo[i] = gsl_histogram_clone(src->reaction_histo[i]);
+    dest->n_spectra = src->n_spectra;
+    dest->histos = calloc(src->n_spectra, sizeof(gsl_histogram *));
+    dest->names = calloc(src->n_spectra, sizeof(char *));
+    for(size_t i = 0;  i < src->n_spectra; i++) {
+        dest->histos[i] = src->histos[i] ? gsl_histogram_clone(src->histos[i]) : NULL;
         dest->names[i] = strdup_non_null(src->names[i]);
     }
     return EXIT_SUCCESS;
 }
 
 void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *s, const detector *det, const gsl_histogram *exp, const sim_workspace *ws) {
-    s->exp = exp ? gsl_histogram_clone(exp) : NULL;
-    spectrum_set_calibration(s->exp, det->calibration);
-    s->sum = gsl_histogram_clone(ws->histo_sum);
-    s->reaction_histo = calloc(ws->n_reactions, sizeof(gsl_histogram *));
-    s->names = calloc(ws->n_reactions, sizeof(char *));
-    s->n_reactions = ws->n_reactions;
-    DEBUGMSG("Copying %zu reactions from ws to spectra structure.", ws->n_reactions);
+    s->n_spectra = ws->n_reactions + RESULT_SPECTRA_N_FIXED; /* Simulated, experimental + reaction spectra */
+    s->histos = calloc(s->n_spectra, sizeof(gsl_histogram *));
+    s->names = calloc(s->n_spectra, sizeof(char *));
+    s->histos[RESULT_SPECTRA_SIMULATED] = gsl_histogram_clone(ws->histo_sum);
+    s->names[RESULT_SPECTRA_SIMULATED] = strdup("Simulated");
+    s->histos[RESULT_SPECTRA_EXPERIMENTAL] = exp ? gsl_histogram_clone(exp) : NULL;
+    s->names[RESULT_SPECTRA_EXPERIMENTAL] = strdup("Experimental");
+    spectrum_set_calibration(s->histos[RESULT_SPECTRA_EXPERIMENTAL], det->calibration);
+    DEBUGMSG("Copying %zu spectra (%zu reactions) from ws to spectra structure.", s->n_spectra, ws->n_reactions);
     for(size_t i = 0; i < ws->n_reactions; i++) {
-        s->reaction_histo[i] = gsl_histogram_clone(ws->reactions[i]->histo);
         const reaction *r = ws->reactions[i]->r;
-        asprintf(&s->names[i], ",\"%s (%s)\"", r->target->name, reaction_type_to_string(r->type));
+        size_t i_spectrum = RESULT_SPECTRA_REACTION_SPECTRUM(i);
+        s->histos[i_spectrum] = gsl_histogram_clone(ws->reactions[i]->histo);
+        asprintf(&s->names[i_spectrum], ",\"%s (%s)\"", r->target->name, reaction_type_to_string(r->type));
     }
 }
 
@@ -653,29 +656,25 @@ void fit_data_spectra_free(result_spectra *s) { /* Note: does not free "s" */
     if(!s) {
         return;
     }
-    gsl_histogram_free(s->exp);
-    s->exp = NULL;
-    gsl_histogram_free(s->sum);
-    s->sum = NULL;
-    for(size_t i = 0;  i < s->n_reactions; i++) {
-        gsl_histogram_free(s->reaction_histo[i]);
+    for(size_t i = 0;  i < s->n_spectra; i++) {
+        gsl_histogram_free(s->histos[i]);
         free(s->names[i]);
     }
-    free(s->reaction_histo);
-    s->reaction_histo = NULL;
+    free(s->histos);
+    s->histos = NULL;
     free(s->names);
     s->names = NULL;
-    s->n_reactions = 0;
+    s->n_spectra = 0;
 }
 
 int fit_data_histo_sum_alloc(fit_data *fit) {
     fit_data_histo_sum_free(fit);
     fit->spectra = calloc(fit->sim->n_det, sizeof(result_spectra));
     if(!fit->spectra) {
-        fit->n_spectra = 0;
+        fit->n_det_spectra = 0;
         return EXIT_FAILURE;
     }
-    fit->n_spectra = fit->sim->n_det;
+    fit->n_det_spectra = fit->sim->n_det;
     return EXIT_SUCCESS;
 }
 
@@ -683,12 +682,12 @@ void fit_data_histo_sum_free(fit_data *fit) {
     if(!fit) {
         return;
     }
-    for(size_t i = 0; i < fit->n_spectra; i++) {
+    for(size_t i = 0; i < fit->n_det_spectra; i++) {
         fit_data_spectra_free(&fit->spectra[i]);
     }
     free(fit->spectra);
     fit->spectra = NULL;
-    fit->n_spectra = 0;
+    fit->n_det_spectra = 0;
 }
 
 int fit_data_add_det(struct fit_data *fit, detector *det) {
