@@ -32,10 +32,11 @@ typedef struct {
 typedef struct result_spectra {
     result_spectrum *s;
     size_t n_spectra;
+    size_t iter; /* If fitted, which iteration this corresponds to */
 } result_spectra;
 
 result_spectra *result_spectra_alloc(size_t n);
-void result_spectra_free();
+void result_spectra_free(result_spectra *spectra);
 int result_spectra_copy(result_spectra *dest, const result_spectra *src);
 int result_spectrum_copy(result_spectrum *dest, const result_spectrum *src);
 int result_spectrum_set(result_spectrum *dest, const gsl_histogram *h, const char *name, const jibal_isotope *target_isotope);

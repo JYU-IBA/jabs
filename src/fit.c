@@ -136,6 +136,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
         for(size_t i = 0; i < fit->n_fdd_active_iter_call; i++) {
             result_spectra_free(&fit->spectra[i]);
             result_spectra_copy(&fit->spectra[i], &fit->fdd[i].spectra);
+            fit->spectra[i].iter = fit->stats.iter;
         }
     }
     gsl_vector_memcpy(f, fit->f);

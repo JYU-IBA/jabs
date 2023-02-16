@@ -24,6 +24,7 @@ result_spectra *result_spectra_alloc(size_t n) {
     result_spectra *spectra = malloc(sizeof(result_spectra));
     spectra->n_spectra = n;
     spectra->s = calloc(n, sizeof(result_spectrum));
+    spectra->iter = 0;
     return spectra;
 }
 
