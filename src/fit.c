@@ -102,12 +102,14 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
         if(!fit->sim->sample) {
             return GSL_FAILURE;
         }
-
-
+        double start = jabs_clock();
         for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) { /* TODO: compute this in parallel */
             fit_detector(fit->jibal, fit->fdd_active[i_fdd], fit->sim, 666);
         }
+        double end = jabs_clock();
+        *(var->value) = (xj) * var->value_orig; /* Remove perturbation */
         fit->stats.n_detectors_active += fit->n_fdd;
+        fit->stats.cputime_iter += (end - start);
         delta = 1.0 / delta;
         for (i = 0; i < fit->fdf->n; i++) {
             double fnext = gsl_vector_get(fit->f, i);
@@ -116,7 +118,6 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
             //gsl_matrix_set(J, i, j, out); /* i'th channel, j'th active fit parameter */
             J->data[i * J->tda + j] = out;
         }
-        *(var->value) = (xj) * var->value_orig; /* Remove perturbation */
     }
 
     for(j = 0; j < fit->fdf->p; j++) { /* Set all fit parameters based on vector x */
@@ -142,6 +143,7 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
         n_det_spec++;
     }
     DEBUGMSG("There are %zu detector specific variables we need to handle.", n_det_spec);
+    double start = jabs_clock();
     for(size_t i_param = 0; i_param < n_det_spec; i_param++) { /* TODO: parallel! */
         fit_variable *var = vars_detector_specific[i_param];
         fit_data_det *fdd = &fit->fdd[var->i_det];
@@ -155,8 +157,8 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
             delta = fit->h_df;
         }
         *(var->value) = (xj + delta) * var->value_orig;
-
         fit_detector(fit->jibal, fdd, fit->sim, 666);
+        *(var->value) = (xj) * var->value_orig;
         delta = 1.0 / delta;
         for (i = 0; i < fdd->n_ch; i++) {
             double fnext = gsl_vector_get(&fdd->f.vector, i);
@@ -164,8 +166,9 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
             //gsl_matrix_set(J, i + fdd->f_offset, j, (fnext - fi) * delta); /* i'th channel (in fit_ranges), j'th active fit parameter */
             J->data[(i + fdd->f_offset) * J->tda + j] = (fnext - fi) * delta;
         }
-        *(var->value) = (xj) * var->value_orig;
     }
+    double end = jabs_clock();
+    fit->stats.cputime_iter += (end - start);
     fit->stats.n_detectors_active += n_det_spec;
     free(vars_detector_specific);
     return GSL_SUCCESS;
