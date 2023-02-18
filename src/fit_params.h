@@ -18,7 +18,7 @@
 
 typedef struct fit_params {
     size_t n; /* Number of function parameters */
-    size_t n_active; /* Recalculated by fit_params_update() */
+    size_t n_active; /* Recalculated by fit_params_update(), same as fdf->p in multifit_nlinear */
     fit_variable *vars; /* Note that this is NOT an array of pointers. It has n elements. */
     size_t n_active_iter_call;
     fit_variable **vars_active_iter_call; /* This IS an array of pointers to vars. It has up to n_active elements, of which n_active_iter_call are set. It is allocated by fit_params_update() and it is meaningful during fitting. */
@@ -34,4 +34,5 @@ size_t fit_params_enable(fit_params *params, const char *s, int enable); /* Enab
 void fit_parameters_update(const fit_params *fit_params, const gsl_multifit_nlinear_workspace *w, const gsl_matrix *covar, double chisq_dof); /* Updates values in fit_params, computes errors */
 void fit_parameters_update_changed(const fit_params *fit_params); /* Checks if values have changed since fit_parameters_update(), computes new error */
 int fit_params_enable_using_string(fit_params *params, const char *fit_vars);
+fit_variable *fit_params_find_active(const fit_params *params, size_t i_v); /* Find active fit parameter with matching index number i_v as set by fit_params_update() */
 #endif // JABS_PARAMS_H

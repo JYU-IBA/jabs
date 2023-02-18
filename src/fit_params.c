@@ -216,3 +216,13 @@ int fit_params_enable_using_string(fit_params *params, const char *fit_vars) {
     free(s_orig);
     return status;
 }
+
+fit_variable *fit_params_find_active(const fit_params *params, size_t i_v) {
+    for(size_t i = 0; i < params->n; i++) {
+        if(params->vars[i].i_v == i_v) {
+            return &params->vars[i];
+        }
+    }
+    DEBUGMSG("Could not find active fit parameter number i_v = %zu. This is a bug.", i_v);
+    return NULL;
+}

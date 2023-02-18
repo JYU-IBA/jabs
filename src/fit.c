@@ -60,14 +60,139 @@ int fit_detector(const jibal *jibal, fit_data_det *fdd, const simulation *sim, s
     return EXIT_SUCCESS;
 }
 
+int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
+    struct fit_data *fit = (struct fit_data *) params;
+    int status = 0;
+    size_t i, j;
+    double delta;
+    /* Update fit params to match vector x */
+
+    DEBUGMSG("Computing Jacobian iter_call = %zu.", fit->stats.iter_call);
+    assert(fit->stats.iter_call >= 1); /* This function relies on data that was computed when iter_call == 1 */
+    assert(fit->fdf->p == fit->fit_params->n_active);
+    assert(fit->fdf->n == fit->f->size);
+
+    sample_free(fit->sim->sample);
+    fit->sim->sample = sample_from_sample_model(fit->sm);
+    if(!fit->sim->sample) {
+        return GSL_FAILURE;
+    }
+
+    for(j = 0; j < fit->fdf->p; j++) { /* Set all fit parameters based on vector x */
+        fit_variable *var = fit_params_find_active(fit->fit_params, j);
+        assert(var);
+        *(var->value) = gsl_vector_get(x, j) * var->value_orig;
+    }
+
+    for(j = 0; j < fit->fdf->p; j++) { /* First we handle all parameters that require simulation of all detectors */
+        fit_variable *var = fit_params_find_active(fit->fit_params, j);
+        if(var->i_det < fit->sim->n_det) { /* Detector specific variable, handle later */
+            continue;
+        }
+        DEBUGMSG("Variable %s (i_v = %zu, j = %zu) perturbation affects all detectors. Simulate all %zu.", var->name, var->i_v, j, fit->n_fdd);
+        double xj = gsl_vector_get(x, j);
+        delta = fit->h_df * fabs(xj);
+        if(delta == 0.0) {
+            delta = fit->h_df;
+        }
+        *(var->value) = (xj + delta) * var->value_orig;
+
+        sample_free(fit->sim->sample); /* TODO: resetting the sample is only necessary if var is some sample related variable */
+        fit->sim->sample = sample_from_sample_model(fit->sm);
+        if(!fit->sim->sample) {
+            return GSL_FAILURE;
+        }
+
+
+        for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) { /* TODO: compute this in parallel */
+            fit_detector(fit->jibal, fit->fdd_active[i_fdd], fit->sim, 666);
+        }
+        fit->stats.n_detectors_active += fit->n_fdd;
+        delta = 1.0 / delta;
+        for (i = 0; i < fit->fdf->n; i++) {
+            double fnext = gsl_vector_get(fit->f, i);
+            double fi = gsl_vector_get(fit->f_iter, i);
+            double out = (fnext - fi) * delta;
+            //gsl_matrix_set(J, i, j, out); /* i'th channel, j'th active fit parameter */
+            J->data[i * J->tda + j] = out;
+        }
+        *(var->value) = (xj) * var->value_orig; /* Remove perturbation */
+    }
+
+    for(j = 0; j < fit->fdf->p; j++) { /* Set all fit parameters based on vector x */
+        fit_variable *var = fit_params_find_active(fit->fit_params, j);
+        assert(var);
+        *(var->value) = gsl_vector_get(x, j) * var->value_orig;
+    }
+
+    sample_free(fit->sim->sample);
+    fit->sim->sample = sample_from_sample_model(fit->sm);
+    if(!fit->sim->sample) {
+        return GSL_FAILURE;
+    }
+
+    fit_variable **vars_detector_specific = calloc(fit->fit_params->n_active, sizeof(fit_variable *));
+    size_t n_det_spec = 0;
+    for(j = 0; j < fit->fdf->p; j++) { /* Then just detector specific stuff. We'll make a table. */
+        fit_variable *var = fit_params_find_active(fit->fit_params, j);
+        if(var->i_det >= fit->sim->n_det) { /* Already handled */
+            continue;
+        }
+        vars_detector_specific[n_det_spec] = var;
+        n_det_spec++;
+    }
+    DEBUGMSG("There are %zu detector specific variables we need to handle.", n_det_spec);
+    for(size_t i_param = 0; i_param < n_det_spec; i_param++) { /* TODO: parallel! */
+        fit_variable *var = vars_detector_specific[i_param];
+        fit_data_det *fdd = &fit->fdd[var->i_det];
+        DEBUGMSG("Variable %s (i_v = %zu) perturbation affects detector %zu. Simulate it. Residuals offset %zu length %zu.", var->name, var->i_v, var->i_det + 1, fdd->f_offset, fdd->n_ch);
+        j = var->i_v;
+        assert(j < fit->fdf->p);
+
+        double xj = gsl_vector_get(x, j);
+        delta = fit->h_df * fabs(xj);
+        if(delta == 0.0) {
+            delta = fit->h_df;
+        }
+        *(var->value) = (xj + delta) * var->value_orig;
+
+        fit_detector(fit->jibal, fdd, fit->sim, 666);
+        delta = 1.0 / delta;
+        for (i = 0; i < fdd->n_ch; i++) {
+            double fnext = gsl_vector_get(&fdd->f.vector, i);
+            double fi = gsl_vector_get(fdd->f_iter, i);
+            //gsl_matrix_set(J, i + fdd->f_offset, j, (fnext - fi) * delta); /* i'th channel (in fit_ranges), j'th active fit parameter */
+            J->data[(i + fdd->f_offset) * J->tda + j] = (fnext - fi) * delta;
+        }
+        *(var->value) = (xj) * var->value_orig;
+    }
+    fit->stats.n_detectors_active += n_det_spec;
+    free(vars_detector_specific);
+    return GSL_SUCCESS;
+}
 
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     struct fit_data *fit = (struct fit_data *) params;
     fit->stats.iter_call++;
+
+
+// #ifdef FIT_FUNCTION_RESTORES_RESIDUAL_VECTOR
+#if 1
+
+    /* This function stores in fit->f the full residual vector computed on first call (through vector views on each workspace). These contents are always set to f.
+     * On subsequent calls (like those involving Jacobian calculation) the fit->f is updated. This means fit->f contents no longer match those of the first call "x".
+     * This in practice is not a problem for the Jacobian evaluation, as the differences in fit->f cancel out for all other parameters except the one being perturbed.
+     * Enabling this bit of code might help if bugs appear, as it restores the saved residual vector. */
+    if(fit->stats.iter_call > 1) {
+        gsl_vector_memcpy(fit->f, fit->f_iter);
+    }
+#endif
+
     if(fit_parameters_set_from_vector(fit, x)) { /* This also sets some helper numbers and arrays */
         return GSL_FAILURE;
     }
 
+    //fprintf(stderr, "Fit iteration %zu call %zu\n", fit->stats.iter, fit->stats.iter_call);
     DEBUGMSG("Fit iteration %zu call %zu. Size of vector x: %zu, f: %zu. Of %zu active fit parameters, %zu are being varied this function call.",
             fit->stats.iter, fit->stats.iter_call, x->size, f->size, fit->fit_params->n_active, fit->fit_params->n_active_iter_call);
 #if 0 /* Effect of varying some parameters (if only one at a time) can be easily "simulated", e.g. varying fluence. This code is for that. Workspace initialization has changed, so this no longer works without modifications. */
@@ -86,15 +211,18 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     } /* ret == 0, continue with full simulation,no speedup available for this fit variable */
 #endif
 
-    sample_free(fit->sim->sample);
-    fit->sim->sample = NULL;
 
-    if(fit_sanity_check(fit) == GSL_FAILURE) {
+    if(sim_sanity_check(fit->sim) == GSL_FAILURE) {
         fit->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
     }
+
+    sample_free(fit->sim->sample); /* TODO: this is only necessary on first call of iter and when sample specific parameters are active */
     fit->sim->sample = sample_from_sample_model(fit->sm);
-    sample_renormalize(fit->sim->sample);
+    if(!fit->sim->sample) {
+        fit->stats.error = FIT_ERROR_SANITY;
+        return GSL_FAILURE;
+    }
 
     if(fit_determine_active_detectors(fit)) {
         fit->stats.error = FIT_ERROR_WORKSPACE_INITIALIZATION;
@@ -132,6 +260,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     fit->stats.n_evals_iter++;
     fit->stats.n_detectors_active += fit->n_fdd_active_iter_call;
     if(fit->stats.iter_call == 1) {
+        gsl_vector_memcpy(fit->f_iter, fit->f); /* Store residual vector on first call, this acts as baseline for everything we do later */
         assert(fit->n_det_spectra == fit->n_fdd_active_iter_call == fit->sim->n_det);
         for(size_t i = 0; i < fit->n_fdd_active_iter_call; i++) {
             result_spectra_free(&fit->spectra[i]);
@@ -151,15 +280,15 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
 }
 
 int fit_determine_active_detectors(fit_data *fit) {
-    for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) {
+    for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) { /* Default for detector simulatin */
         fit_data_det *fdd = &fit->fdd[i_fdd];
         if(fit->stats.iter_call == 1) {
-            fdd->active_iter_call = TRUE; /* On first call, simulate everything! */
+            fdd->active_iter_call = TRUE; /* On first call, simulate all detectors */
         } else {
-            fdd->active_iter_call = FALSE;
+            fdd->active_iter_call = FALSE; /* On subsequent alls, don't simulate by default */
         }
     }
-    for(size_t i = 0; i < fit->fit_params->n; i++) { /* Check which workspaces need to be simulated */
+    for(size_t i = 0; i < fit->fit_params->n; i++) { /* Check which workspaces need to be simulated based on fit parameters */
         fit_variable *var = &fit->fit_params->vars[i];
         if(!var->active_iter_call) {
             continue;
@@ -434,34 +563,7 @@ fit_params *fit_params_all(fit_data *fit) {
     fit_params_add_parameter(params, &sim->fluence, "fluence", "", 1.0, sim->n_det); /* This must be the first parameter always, as there is a speedup in the fit routine */
     fit_params_add_parameter(params, &sim->sample_theta, "alpha", "deg", C_DEG, sim->n_det);
     fit_params_add_parameter(params, &sim->beam_E, "energy", "keV", C_KEV, sim->n_det);
-    for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
-        detector *det = sim_det(sim, i_det);
-        char *det_name = NULL;
-        if(asprintf(&det_name, "det%zu_", i_det + 1) < 0) {
-            return NULL;
-        }
-        snprintf(param_name, param_name_max_len, "%ssolid", det_name);
-        fit_params_add_parameter(params, &det->solid, param_name, "msr", C_MSR, i_det);
 
-        for(int Z = JIBAL_ANY_Z; Z <= det->cal_Z_max; Z++) {
-            calibration *c = detector_get_calibration(det, Z);
-            if(Z != JIBAL_ANY_Z && c == det->calibration) /* No Z-specific calibration */
-                continue;
-            assert(c);
-            size_t n = calibration_get_number_of_params(c);
-            for(int i = CALIBRATION_PARAM_RESOLUTION; i < (int) n; i++) {
-                char *calib_param_name = calibration_param_name(c->type, i);
-                snprintf(param_name, param_name_max_len, "%scalib%s%s_%s",
-                         det_name,
-                         (Z == JIBAL_ANY_Z) ? "" : "_",
-                         (Z == JIBAL_ANY_Z) ? "" : jibal_element_name(fit->jibal->elements, Z),
-                         calib_param_name);
-                free(calib_param_name);
-                fit_params_add_parameter(params, calibration_get_param_ref(c, i), param_name, "keV", C_KEV, i_det);
-            }
-        }
-        free(det_name);
-    }
     if(sm) {
         for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
             sample_range *r = &(sm->ranges[i_range]);
@@ -505,6 +607,35 @@ fit_params *fit_params_all(fit_data *fit) {
                 fit_params_add_parameter(params, sample_model_conc_bin(sm, i_range, i_mat), param_name, "%", C_PERCENT, sim->n_det);
             }
         }
+    }
+
+    for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
+        detector *det = sim_det(sim, i_det);
+        char *det_name = NULL;
+        if(asprintf(&det_name, "det%zu_", i_det + 1) < 0) {
+            return NULL;
+        }
+        snprintf(param_name, param_name_max_len, "%ssolid", det_name);
+        fit_params_add_parameter(params, &det->solid, param_name, "msr", C_MSR, i_det);
+
+        for(int Z = JIBAL_ANY_Z; Z <= det->cal_Z_max; Z++) {
+            calibration *c = detector_get_calibration(det, Z);
+            if(Z != JIBAL_ANY_Z && c == det->calibration) /* No Z-specific calibration */
+                continue;
+            assert(c);
+            size_t n = calibration_get_number_of_params(c);
+            for(int i = CALIBRATION_PARAM_RESOLUTION; i < (int) n; i++) {
+                char *calib_param_name = calibration_param_name(c->type, i);
+                snprintf(param_name, param_name_max_len, "%scalib%s%s_%s",
+                         det_name,
+                         (Z == JIBAL_ANY_Z) ? "" : "_",
+                         (Z == JIBAL_ANY_Z) ? "" : jibal_element_name(fit->jibal->elements, Z),
+                         calib_param_name);
+                free(calib_param_name);
+                fit_params_add_parameter(params, calibration_get_param_ref(c, i), param_name, "keV", C_KEV, i_det);
+            }
+        }
+        free(det_name);
     }
     free(param_name);
     return params;
@@ -550,8 +681,9 @@ int fit_data_fdd_init(fit_data *fit) {
                 continue;
             }
             if(i == 0) {
-                fdd->f = gsl_vector_subvector(fit->f, i_vec, fdd->n_ch);
-                DEBUGMSG("FDD %zu First ROI is %zu/%zu of all, subvector offset %zu, length %zu)", i_fdd, i_roi, fit->n_fit_ranges, i_vec, fdd->n_ch);
+                fdd->f_offset = i_vec;
+                fdd->f = gsl_vector_subvector(fit->f, fdd->f_offset, fdd->n_ch);
+                DEBUGMSG("FDD %zu First ROI is %zu/%zu of all, subvector offset %zu, length %zu)", i_fdd, i_roi, fit->n_fit_ranges, fdd->f_offset, fdd->n_ch);
             }
             fdd->ranges[i] = *roi;
             i++;
@@ -630,7 +762,7 @@ void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *spectra, const det
     result_spectrum_set(&spectra->s[RESULT_SPECTRA_SIMULATED], ws->histo_sum, "Simulated", NULL, REACTION_NONE);
     result_spectrum_set(&spectra->s[RESULT_SPECTRA_EXPERIMENTAL], exp, "Experimental", NULL, REACTION_NONE);
     spectrum_set_calibration(result_spectra_experimental_histo(spectra), det->calibration);
-    DEBUGMSG("Copying %zu spectra (%zu reactions) from ws to spectra structure.", s->n_spectra, ws->n_reactions);
+    DEBUGMSG("Copying %zu spectra (%zu reactions) from ws to spectra structure.", spectra->n_spectra, ws->n_reactions);
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const reaction *r = ws->reactions[i]->r;
         result_spectrum *s = &spectra->s[RESULT_SPECTRA_REACTION_SPECTRUM(i)];
@@ -812,11 +944,11 @@ void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspac
     jabs_message(MSG_INFO, stderr, "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
     jabs_message(MSG_INFO, stderr, "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
     jabs_message(MSG_INFO, stderr, "function evaluations: %zu\n", fit->stats.n_evals);
-    jabs_message(MSG_INFO, stderr, "number of spectra simulated: %zu\n", fit->stats.n_detectors);
 #ifdef DEBUG
     jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf->nevalf);
 #endif
     jabs_message(MSG_INFO, stderr, "Jacobian evaluations: %zu\n", fdf->nevaldf);
+    jabs_message(MSG_INFO, stderr, "number of spectra simulated: %zu\n", fit->stats.n_detectors);
     jabs_message(MSG_INFO, stderr, "reason for stopping: %s\n", fit_error_str(fit->stats.error));
     jabs_message(MSG_INFO, stderr, "initial |f(x)| = %f\n", sqrt(fit->stats.chisq0));
     jabs_message(MSG_INFO, stderr, "final   |f(x)| = %f\n", sqrt(fit->stats.chisq));
@@ -839,12 +971,6 @@ void fit_covar_print(const gsl_matrix *covar, jabs_msg_level msg_level) {
 }
 
 int fit(fit_data *fit) {
-    const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
-    gsl_multifit_nlinear_workspace *w;
-    gsl_multifit_nlinear_parameters fdf_params = gsl_multifit_nlinear_default_parameters();
-    fdf_params.trs = gsl_multifit_nlinear_trs_lm;
-    fdf_params.solver = gsl_multifit_nlinear_solver_qr;
-    fdf_params.h_df = sqrt(GSL_DBL_EPSILON) * 10.0;
     struct fit_params *fit_params = fit->fit_params;
     if(!fit_params || fit_params->n_active == 0) {
         jabs_message(MSG_ERROR, stderr, "No parameters to fit.\n");
@@ -854,36 +980,10 @@ int fit(fit_data *fit) {
         jabs_message(MSG_ERROR, stderr, "No experimental spectrum to fit.\n");
         return EXIT_FAILURE;
     }
-    gsl_multifit_nlinear_fdf fdf;
-    fdf.params = fit;
-    if(!fit->exp) {
-        jabs_message(MSG_ERROR, stderr, "No experimental data, can not fit.\n");
-        return EXIT_FAILURE;
-    }
     if(!fit->n_fit_ranges) {
         jabs_message(MSG_ERROR, stderr, "No fit range(s) given, can not fit.\n");
         return EXIT_FAILURE;
     }
-    fdf.f = &fit_function;
-    fdf.df = NULL; /* Jacobian, with NULL using finite difference. */
-    fdf.fvv = NULL; /* No geodesic acceleration */
-    fdf.n = fit_data_ranges_calculate_number_of_channels(fit);
-    fdf.p = fit_params->n_active;
-    if(fdf.n < fdf.p) {
-        jabs_message(MSG_ERROR, stderr, "Not enough data (%zu points) for given number of free parameters (%zu)\n", fdf.n, fdf.p);
-        return -1;
-    }
-    fit->dof = fdf.n - fdf.p;
-    jabs_message(MSG_INFO, stderr, "%zu channels and %zu parameters in fit, %zu degrees of %s\n", fdf.n, fdf.p, fit->dof, fit->dof < 10000 ? "freedom.":"FREEDOOOOM!!!");
-    gsl_vector *f;
-    gsl_matrix *J;
-
-    int status;
-
-    double *weights = calloc(fdf.n, sizeof(double));
-    if(!weights)
-        return 1;
-    size_t i_w = 0;
     for(size_t i_range = 0; i_range < fit->n_fit_ranges; i_range++) {
         roi *range = &fit->fit_ranges[i_range];
         assert(range);
@@ -891,15 +991,47 @@ int fit(fit_data *fit) {
         gsl_histogram *exp = fit_data_exp(fit, range->i_det);
         if(!det) {
             jabs_message(MSG_ERROR, stderr, "Detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
-            free(weights);
-            return 1;
+            return EXIT_FAILURE;
         }
         if(!exp) {
             jabs_message(MSG_ERROR, stderr, "Experimental spectrum for detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
-            free(weights);
-            return 1;
+            return EXIT_FAILURE;
         }
-        for(size_t i = range->low; i <= range->high && i < det->channels; i++) {
+    }
+    const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
+    gsl_multifit_nlinear_workspace *w;
+    gsl_multifit_nlinear_parameters fdf_params = gsl_multifit_nlinear_default_parameters();
+    fdf_params.trs = gsl_multifit_nlinear_trs_lm;
+    fdf_params.solver = gsl_multifit_nlinear_solver_qr;
+    fdf_params.h_df = sqrt(GSL_DBL_EPSILON) * 10.0;
+    gsl_multifit_nlinear_fdf *fdf = malloc(sizeof(gsl_multifit_nlinear_fdf));
+    fdf->params = fit;
+    fit->fdf = fdf;
+    fdf->f = &fit_function;
+    fdf->df = &fit_deriv_function; /*  &fit_deriv_function to use our own finite difference to determine Jacobian, NULL to use GSL. */
+    fdf->fvv = NULL; /* No geodesic acceleration */
+    fdf->n = fit_data_ranges_calculate_number_of_channels(fit);
+    fdf->p = fit_params->n_active;
+    if(fdf->n < fdf->p) {
+        jabs_message(MSG_ERROR, stderr, "Not enough data (%zu points) for given number of free parameters (%zu)\n", fdf->n, fdf->p);
+        free(fdf);
+        return -1;
+    }
+    fit->dof = fdf->n - fdf->p;
+    fit->h_df = fdf_params.h_df;
+    jabs_message(MSG_INFO, stderr, "%zu channels and %zu parameters in fit, %zu degrees of %s\n", fdf->n, fdf->p, fit->dof, fit->dof < 10000 ? "freedom.":"FREEDOOOOM!!!");
+    gsl_vector *f;
+    gsl_matrix *J;
+    int status;
+    double *weights = calloc(fdf->n, sizeof(double));
+    if(!weights)
+        return 1;
+    size_t i_w = 0;
+    for(size_t i_range = 0; i_range < fit->n_fit_ranges; i_range++) {
+        roi *range = &fit->fit_ranges[i_range];
+        assert(range);
+        gsl_histogram *exp = fit_data_exp(fit, range->i_det);
+        for(size_t i = range->low; i <= range->high && i < exp->n; i++) {
             if(exp->bin[i] > 1.0) {
                 weights[i_w] = 1.0 / (exp->bin[i]);
             } else {
@@ -911,11 +1043,12 @@ int fit(fit_data *fit) {
 #ifdef DEBUG
     fprintf(stderr, "Set %zu weights.\n", i_w);
 #endif
-    fit->f = gsl_vector_alloc(fdf.n);
+    fit->f = gsl_vector_alloc(fdf->n);
+    fit->f_iter = gsl_vector_alloc(fdf->n);
     if(fit_data_fdd_init(fit)) {
         return EXIT_FAILURE;
     }
-    assert(i_w == fdf.n);
+    assert(i_w == fdf->n);
 
     gsl_matrix *covar = gsl_matrix_alloc(fit_params->n_active, fit_params->n_active);
     gsl_vector *x = gsl_vector_alloc(fit_params->n_active);
@@ -927,8 +1060,7 @@ int fit(fit_data *fit) {
 
     gsl_vector_view wts = gsl_vector_view_array(weights, i_w);
 
-    /* allocate workspace with default parameters */
-    w = gsl_multifit_nlinear_alloc(T, &fdf_params, fdf.n, fdf.p);
+    w = gsl_multifit_nlinear_alloc(T, &fdf_params, fdf->n, fdf->p);
 
     sim_calc_params p_orig = *fit->sim->params; /* Store original values (will be used in final stage of fitting) */
     for(int phase = fit->phase_start; phase <= fit->phase_stop; phase++) { /* Phase 1 is "fast", phase 2 normal. */
@@ -962,7 +1094,7 @@ int fit(fit_data *fit) {
         jabs_message(MSG_VERBOSE, stderr, "Simulation parameters for this phase:\n");
         sim_calc_params_print(fit->sim->params, MSG_VERBOSE);
         jabs_message(MSG_IMPORTANT, stderr, "Initializing fit...\n");
-        gsl_multifit_nlinear_winit(x, &wts.vector, &fdf, w);
+        gsl_multifit_nlinear_winit(x, &wts.vector, fdf, w);
         jabs_message(MSG_IMPORTANT, stderr, "Done. Starting iteration...\n");
         /* compute initial cost function */
         f = gsl_multifit_nlinear_residual(w);
@@ -974,7 +1106,7 @@ int fit(fit_data *fit) {
             break;
         }
         jabs_message(MSG_IMPORTANT, stderr, "Phase %i finished. Time used for actual simulation so far: %.3lf s.\n", phase, fit->stats.cputime_cumul);
-        fit_report_results(fit, w, &fdf);
+        fit_report_results(fit, w, fdf);
     }
 
     if(fit->stats.error < 0) { /* Revert changes on error */
@@ -1005,6 +1137,7 @@ int fit(fit_data *fit) {
     gsl_vector_free(fit->f);
     fit->f = NULL;
     free(weights);
+    free(fdf);
     return fit->stats.error;
 }
 

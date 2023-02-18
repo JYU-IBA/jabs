@@ -77,9 +77,10 @@ typedef struct fit_data_det {
     roi *ranges; /* Same ranges as in fit_data, but only those relevant for "det". Full copies are made. */
     size_t n_ranges;
     size_t n_ch; /* in fit ranges */
-    int active_iter_call;
+    size_t f_offset;
     gsl_vector_view f; /* subset of fit_data->f */
     gsl_vector *f_iter; /* Stored values of f on first call of iter */
+    int active_iter_call;
     int error;
 } fit_data_det;
 
@@ -103,12 +104,15 @@ typedef struct fit_data {
     double xtol; /* Tolerance of step size */
     double chisq_tol; /* Chi squared relative change tolerance */
     double chisq_fast_tol; /* Chi squared relative change tolerance (fast phase) */
+    gsl_multifit_nlinear_fdf *fdf;
     size_t dof; /* Degrees of freedom (calculated) */
     struct fit_stats stats; /* Fit statistics, updated as we iterate */
     int phase_start; /* Fit phase to start from (see FIT_PHASE -defines) */
     int phase_stop; /* Inclusive */
     int (*fit_iter_callback)(struct fit_stats stats);
     gsl_vector *f;
+    gsl_vector *f_iter;
+    double h_df;
 } fit_data;
 
 void fit_data_det_residual_vector_set(fit_data_det *fdd, gsl_histogram *histo_sum);

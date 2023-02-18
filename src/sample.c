@@ -85,6 +85,10 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
 }
 
 int sample_model_sanity_check(const sample_model *sm) {
+    if(!sm) {
+        jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (null pointer).\n");
+        return EXIT_FAILURE;
+    }
     for(size_t i = 0; i < sm->n_ranges; i++) {
         const sample_range *r = &sm->ranges[i];
         if(sm->type == SAMPLE_MODEL_LAYERED) {
@@ -152,6 +156,9 @@ void sample_model_renormalize(sample_model *sm) {
 }
 
 void sample_renormalize(sample *sample) {
+    if(!sample) {
+        return;
+    }
     for(size_t i = 0; i < sample->n_ranges; i++) {
         double sum = 0.0;
         for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
@@ -242,21 +249,9 @@ sample_model *sample_model_to_point_by_point(const sample_model *sm) { /* Conver
 }
 
 sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize concentrations! */
-    if(!sm)
+    if(sample_model_sanity_check(sm)) {
         return NULL;
-#ifdef DEBUG
-    fprintf(stderr, "Sample model is type %i, it has %zu materials and %zu ranges.\n", sm->type, sm->n_materials, sm->n_ranges);
-    for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
-        fprintf(stderr, "Material %zu is %s. There are %zu elements.\n", i_mat, sm->materials[i_mat]->name, sm->materials[i_mat]->n_elements);
-        for(size_t i_elem = 0; i_elem < sm->materials[i_mat]->n_elements; i_elem++) {
-            fprintf(stderr, "  element %zu (%s: Z = %i): %zu isotopes.\n",  i_mat, sm->materials[i_mat]->elements[i_elem].name, sm->materials[i_mat]->elements[i_elem].Z, sm->materials[i_mat]->elements[i_elem].n_isotopes);
-            for(size_t i_isotope = 0; i_isotope < sm->materials[i_mat]->elements[i_elem].n_isotopes; i_isotope++) {
-                const jibal_isotope *isotope = sm->materials[i_mat]->elements[i_elem].isotopes[i_isotope];
-                fprintf(stderr, "    isotope %zu: %s, A=%i, abundance %g, conc %g\n", i_isotope, isotope->name, isotope->A, isotope->abundance, sm->materials[i_mat]->elements[i_elem].concs[i_isotope]);
-            }
-        }
     }
-#endif
     sample *s = malloc(sizeof(sample));
     sample_model *sm_copy = NULL;
     if(sm->type == SAMPLE_MODEL_LAYERED) {
@@ -345,6 +340,7 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
     }
     sample_model_free(sm_copy);
     sample_thickness_recalculate(s);
+    sample_renormalize(s);
     return s;
 }
 
