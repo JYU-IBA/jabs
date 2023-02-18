@@ -60,6 +60,7 @@ typedef struct calibration_params_poly {
 
 calibration *calibration_init();
 void calibration_free(calibration *c);
+calibration *calibration_clone(const calibration *c_orig); /* TODO: unfinished! */
 calibration *calibration_init_linear();
 calibration *calibration_init_poly(size_t n); /* n is the degree of the polynomial */
 double calibration_linear(const void *params, size_t x);

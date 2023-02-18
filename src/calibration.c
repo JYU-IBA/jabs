@@ -21,6 +21,18 @@ calibration *calibration_init() {
     return c;
 }
 
+calibration *calibration_clone(const calibration *c_orig) {
+    calibration *c = malloc(sizeof(calibration));
+    *c = *c_orig;
+    if(c->type == CALIBRATION_POLY) {
+        calibration_params_poly *p_orig = (calibration_params_poly *) c_orig->params;
+        /* TODO: copy p_orig.a */
+    } else {
+        /* TODO: copy params from c_orig to c */
+    }
+    return c;
+}
+
 void calibration_free(calibration *c) {
     if(!c)
         return;

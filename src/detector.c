@@ -357,3 +357,18 @@ const char *detector_name(detector *det) {
     }
     return "none";
 }
+
+detector *detector_clone(const detector *det_orig) {
+    detector *det = malloc(sizeof(detector));
+    *det = *det_orig;
+    det->calibration = calibration_clone(det_orig->calibration);
+    if(det->calibration_Z) {
+        for(int Z = 0;  Z <= det->cal_Z_max; Z++) {
+            det->calibration_Z[Z] = calibration_clone(det_orig->calibration_Z[Z]);
+        }
+    }
+    /* TODO: clone aperture */
+    /* TODO: clone foil */
+    detector_update(det);
+    return det;
+}

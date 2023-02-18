@@ -71,7 +71,7 @@ typedef struct roi {
 } roi;
 
 typedef struct fit_data_det {
-    detector *det; /* Not stored here, same as sim->det[i_det], but we need a non-const pointer */
+    detector *det; /* Not stored here, same as sim->det[i_det], but we need a non-const pointer. TODO: make a copy */
     result_spectra spectra;
     const gsl_histogram *exp; /* Not a copy! */
     roi *ranges; /* Same ranges as in fit_data, but only those relevant for "det". Full copies are made. */
@@ -81,7 +81,6 @@ typedef struct fit_data_det {
     gsl_vector_view f; /* subset of fit_data->f */
     gsl_vector *f_iter; /* Stored values of f on first call of iter */
     int active_iter_call;
-    int error;
 } fit_data_det;
 
 typedef struct fit_data {
@@ -115,7 +114,7 @@ typedef struct fit_data {
     double h_df;
 } fit_data;
 
-void fit_data_det_residual_vector_set(fit_data_det *fdd, gsl_histogram *histo_sum);
+void fit_data_det_residual_vector_set(const fit_data_det *fdd, const gsl_histogram *histo_sum, gsl_vector *f);
 fit_data *fit_data_new(const jibal *jibal, simulation *sim);
 void fit_data_defaults(fit_data *f);
 void fit_data_free(fit_data *fit); /* Doesn't free everything in fit, like sm, jibal, ... */
