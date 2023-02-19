@@ -546,7 +546,7 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
 
 int simulate_with_roughness(sim_workspace *ws) {
     int status = 0;
-    double p_sr = ws->sim->fluence;
+    const double fluence_original = ws->fluence;
     size_t n_rl = 0; /* Number of rough layers */
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
         sample_range *r = &(ws->sample->ranges[i]);
@@ -632,7 +632,7 @@ int simulate_with_roughness(sim_workspace *ws) {
         jabs_message(MSG_DEBUG, stderr, "Roughness subspectrum %zu / %zu", i_iter, iter_total);
         sample_print(sample_rough, FALSE, MSG_DEBUG);
 #endif
-        ws->fluence = p * p_sr;
+        ws->fluence = p * fluence_original;
         ion_set_angle(&ws->ion, 0.0, 0.0);
         ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
         sample_thickness_recalculate(sample_rough);
@@ -646,13 +646,13 @@ int simulate_with_roughness(sim_workspace *ws) {
     }
     sample_free(sample_rough);
     free(tpds);
+    ws->fluence = fluence_original;
     return status;
 }
 
 int simulate_with_ds(sim_workspace *ws) {
     if(!ws) {
-        jabs_message(MSG_ERROR, stderr, "Congratulations, you've found a bug in %s.", __LINE__);
-        abort();
+        jabs_message(MSG_ERROR, stderr, "Congratulations, you've found a bug in %s:%i.\n", __FILE__, __LINE__);
         return EXIT_FAILURE;
     }
     double fluence = ws->fluence;

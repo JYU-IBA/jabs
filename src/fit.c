@@ -81,8 +81,8 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     assert(fit->fdf->n == fit->f->size);
 
     gsl_matrix_set_zero(J); /* We might only set parts of the Jacobian, the rest of the elements of the matrix should be zero. */
-    size_t p = fit->fdf->p;
-    size_t n = fit->fdf->n;
+    const size_t p = fit->fdf->p;
+    const size_t n = fit->fdf->n;
 
     struct jacobian_space *space = calloc(p, sizeof(struct jacobian_space));
     for(size_t j = 0; j < p; j++) { /* Set all fit parameters based on vector x */
@@ -113,7 +113,7 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
         *(var->value) = (xj + spc->delta) * var->value_orig; /* Perturb */
         spc->sim = *fit->sim; /* Shallow copy! */
         spc->sim.det = calloc(fit->sim->n_det, sizeof(detector *)); /* Allocate space for clones of detectors. Uncloned detectors remain NULL. */
-        spc->sim.sample = sample_from_sample_model(fit->sm); /* Allocates new thing! TODO: not always necessary */
+        spc->sim.sample = sample_from_sample_model(fit->sm); /* Allocates new thing! TODO: not necessary when var has nothing to do with sample */
         for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
             if(var->i_det >= fit->sim->n_det || var->i_det == i_det) { /* All detectors or just this one specific, depending on the variable */
                 spc->sim.det[i_det] = detector_clone(fit->sim->det[i_det]);
@@ -122,6 +122,9 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
         *(var->value) = (xj) * var->value_orig; /* Unperturb */
     }
     double start = jabs_clock();
+    volatile int error = FALSE;
+#pragma omp parallel default(none) shared(fit, space, n, J, error)
+#pragma omp for
     for(size_t j = 0; j < fit->fdf->p; j++) {
         struct jacobian_space *spc = &space[j];
         fit_variable *var = spc->var;
@@ -134,12 +137,26 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
             i_stop = fit->sim->n_det - 1;
         }
         DEBUGMSG("Variable %s (i_v = %zu, j = %zu) perturbation. i_det = [%zu, %zu]", var->name, var->i_v, j, i_start, i_stop);
-        for(size_t i_det = 0; i_det <= i_stop; i_det++) {
+        for(size_t i_det = i_start; i_det <= i_stop; i_det++) {
             fit_data_det *fdd = &fit->fdd[i_det];
-            gsl_vector_view v = gsl_vector_subvector(spc->f_param, fit->fdd->f_offset, fit->fdd->n_ch); /* The ROIs of this detector are a subvector of f_param (all channels in fit) */
-            DEBUGVERBOSEMSG("Detector %zu: offset: %zu, len: %zu", i_det, fit->fdd->f_offset, fit->fdd->n_ch);
-            fit_detector(fit->jibal, fdd, &spc->sim, NULL, &v.vector);
+            gsl_vector_view v = gsl_vector_subvector(spc->f_param, fdd->f_offset, fdd->n_ch); /* The ROIs of this detector are a subvector of f_param (all channels in fit) */
+            DEBUGMSG("Detector %zu (FDD %p), %zu ranges, offset: %zu, len: %zu", i_det, (void *) fdd, fdd->n_ranges, fdd->f_offset, fdd->n_ch);
+            if(fit_detector(fit->jibal, fdd, &spc->sim, NULL, &v.vector)) {
+                error = TRUE;
+                break;
+            }
+            for(size_t i = 0; i < fdd->n_ch; i++) {
+                double fnext = gsl_vector_get(&v.vector, i);
+                double fi = gsl_vector_get(fit->f_iter, fdd->f_offset + i);
+                double out = (fnext - fi) * spc->delta_inv;
+                J->data[(i + fdd->f_offset) * J->tda + j] = out;
+            }
+
         }
+        if(error) {
+            continue;
+        }
+#if 0
         for (size_t i = 0; i < n; i++) {
             double fnext = gsl_vector_get(spc->f_param, i);
             double fi = gsl_vector_get(fit->f_iter, i); /* Reference (unperturbed parameter) from first call of iteration */
@@ -148,6 +165,7 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
             J->data[i * J->tda + j] = out; /* Should be calling gsl_matrix_set, but want to avoid function call... */
             //fprintf(stderr, "J(%zu, %zu) = %g because %g and %g and %g.\n", i, j, out, fi, fnext, spc->delta_inv, i);
         }
+#endif
     }
     double end = jabs_clock();
     fit->stats.cputime_iter += (end - start);
@@ -162,13 +180,13 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
         gsl_vector_free(spc->f_param);
     }
     free(space);
-    return GSL_SUCCESS;
+    return error ? GSL_FAILURE : GSL_SUCCESS;
 }
 
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     struct fit_data *fit = (struct fit_data *) params;
     fit->stats.iter_call++;
-    if(fit->stats.iter_call == 1) {
+    if(fit->stats.iter_call == 1) { /* Clear stored spectra from previous iteration */
         for(size_t i = 0; i < fit->n_det_spectra; i++) {
             result_spectra_free(&fit->spectra[i]);
         }
@@ -221,12 +239,12 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
         return GSL_FAILURE;
     }
 
-    if(fit_determine_active_detectors(fit)) {
+    if(fit_determine_active_detectors(fit)) { /* TODO: since/when Jacobian is calculated elsewhere, aren't all the detectors always active? */
         fit->stats.error = FIT_ERROR_WORKSPACE_INITIALIZATION;
         return GSL_FAILURE;
     }
 
-    DEBUGMSG("There are %zu/%zu active detectors in this fit function call.", fit->n_fdd_active_iter_call, fit->n_fdd);
+    DEBUGMSG("There are %zu/%zu active detectors in this fit function call.\n", fit->n_fdd_active_iter_call, fit->n_fdd);
 #if 0 /* If and when this is enabled, make sure to calculate one complete spectrum with original emin at the end of fit */
     for(size_t i_det = 0; i_det < fit->n_ws; i_det++) { /* Sets the lowest energy in each simulation according to fit ranges */
         double emin = fit_emin(fit, i_det);
@@ -665,18 +683,22 @@ int fit_data_fdd_init(fit_data *fit) {
         fdd->det = sim_det(fit->sim, i_fdd);
         fdd->f_iter = gsl_vector_alloc(fdd->n_ch);
         fdd->ranges = calloc(fdd->n_ranges, sizeof(roi));
+        if(fdd->n_ranges == 0) {
+            fprintf(stderr, "FDD %zu no ranges, length: %zu\n", i_fdd, fdd->n_ch);
+        }
         size_t i = 0; /* Index of fdd roi */
         size_t i_vec = 0; /* fit residual vector index at beginning of roi */
         for(size_t i_roi = 0; i_roi < fit->n_fit_ranges; i_roi++) {
             const roi *roi = &fit->fit_ranges[i_roi];
             size_t l = (roi->high - roi->low + 1);
             if(i_fdd != roi->i_det) {
+                i_vec += l;
                 continue;
             }
             if(i == 0) {
                 fdd->f_offset = i_vec;
                 fdd->f = gsl_vector_subvector(fit->f, fdd->f_offset, fdd->n_ch);
-                DEBUGMSG("FDD %zu First ROI is %zu/%zu of all, subvector offset %zu, length %zu)", i_fdd, i_roi, fit->n_fit_ranges, fdd->f_offset, fdd->n_ch);
+                DEBUGMSG("FDD %zu, %zu ROIs, First ROI is %zu/%zu of all, subvector offset %zu, length %zu)", i_fdd, fdd->n_ranges, i_roi, fit->n_fit_ranges, fdd->f_offset, fdd->n_ch);
             }
             fdd->ranges[i] = *roi;
             i++;

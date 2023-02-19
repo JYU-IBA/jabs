@@ -88,7 +88,7 @@ typedef struct fit_data {
     size_t n_fdd; /* TODO: rename */
     fit_data_det **fdd_active;
     size_t n_fdd_active_iter_call;
-    result_spectra *spectra; /* all spectra, updates every iter at the start of iter. */
+    result_spectra *spectra; /* all spectra (array of n_det_spectra), updates every iter at the start of iter. */
     size_t n_det_spectra; /* n_det (= n_fdd) when histograms were copied */
     gsl_histogram **exp; /* experimental data to be fitted, array of n_exp elements */
     size_t n_exp; /* same as sim->n_det, but this keeps track on how many spectra we have allocated in exp and ref */ /* TODO: remove */

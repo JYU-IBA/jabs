@@ -440,7 +440,7 @@ void MainWindow::on_action_Run_triggered()
 void MainWindow::plotSpectrum(size_t i_det)
 {
     ui->widget->clearAll();
-    if(!session || !session->fit || !session->fit->sim || i_det >= session->fit->sim->n_det) {
+    if(!session || !session->fit || !session->fit->spectra || i_det >= session->fit->spectra->n_spectra) {
         ui->widget->setVisible(false);
         return;
     }
@@ -448,7 +448,7 @@ void MainWindow::plotSpectrum(size_t i_det)
     if(ref_histo) {
         ui->widget->drawDataToChart("Reference", ref_histo->range, ref_histo->bin, ref_histo->n, QColor("Gray"));
     }
-    result_spectra *spectra = session->fit->spectra;
+    result_spectra *spectra = &session->fit->spectra[i_det];
     if(spectra) {
         size_t n_spectra = spectra->n_spectra;
         gsl_histogram *histo = NULL;
