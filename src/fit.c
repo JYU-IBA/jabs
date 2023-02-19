@@ -69,7 +69,7 @@ struct jacobian_space {
     gsl_vector *f_param; /* Residuals vector */
     double delta; /* Perturbation */
     double delta_inv; /* Inverse of perturbation 1/delta */
-    size_t n_det; /* How many spectra (detectors) should be computed for this var */
+    size_t n_spectra_calculated; /* How many spectra (detectors) were actually computed for this var */
 };
 
 int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
@@ -100,12 +100,6 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
         if(spc->delta == 0.0) {
             spc->delta = fit->h_df; /* TODO: this is what GSL does, but it doesn't always work */
         }
-        if(spc->var->i_det >= fit->sim->n_det) {
-            spc->n_det += fit->sim->n_det;
-        } else {
-            spc->n_det = 1;
-        }
-
         spc->delta_inv = 1.0/spc->delta;
         spc->f_param = gsl_vector_alloc(n); /* Residuals for this parameter */
         gsl_vector_set_zero(spc->f_param);
@@ -141,10 +135,14 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
             fit_data_det *fdd = &fit->fdd[i_det];
             gsl_vector_view v = gsl_vector_subvector(spc->f_param, fdd->f_offset, fdd->n_ch); /* The ROIs of this detector are a subvector of f_param (all channels in fit) */
             DEBUGMSG("Detector %zu (FDD %p), %zu ranges, offset: %zu, len: %zu", i_det, (void *) fdd, fdd->n_ranges, fdd->f_offset, fdd->n_ch);
+            if(fdd->n_ranges == 0) {
+                continue;
+            }
             if(fit_detector(fit->jibal, fdd, &spc->sim, NULL, &v.vector)) {
                 error = TRUE;
                 break;
             }
+            spc->n_spectra_calculated++;
             for(size_t i = 0; i < fdd->n_ch; i++) {
                 double fnext = gsl_vector_get(&v.vector, i);
                 double fi = gsl_vector_get(fit->f_iter, fdd->f_offset + i);
@@ -171,7 +169,7 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     fit->stats.cputime_iter += (end - start);
     for(size_t j = 0; j < p; j++) {
         struct jacobian_space *spc = &space[j];
-        fit->stats.n_detectors_active += spc->n_det;
+        fit->stats.n_spectra_iter += spc->n_spectra_calculated;
         for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
             detector_free(spc->sim.det[i_det]);
         }
@@ -284,7 +282,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     }
     fit->stats.cputime_iter += (end - start);
     fit->stats.n_evals_iter++;
-    fit->stats.n_detectors_active += fit->n_fdd_active_iter_call;
+    fit->stats.n_spectra_iter += fit->n_fdd_active_iter_call;
     if(fit->stats.iter_call == 1) {
         gsl_vector_memcpy(fit->f_iter, fit->f); /* Store residual vector on first call, this acts as baseline for everything we do later */
     }
@@ -396,15 +394,15 @@ void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear
     fit_data->stats.norm = gsl_blas_dnrm2(f);
     fit_data->stats.chisq_dof = fit_data->stats.chisq / fit_data->dof;
     fit_data->stats.n_evals += fit_data->stats.n_evals_iter;
-    fit_data->stats.n_detectors += fit_data->stats.n_detectors_active;
+    fit_data->stats.n_spectra += fit_data->stats.n_spectra_iter;
     fit_data->stats.cputime_cumul += fit_data->stats.cputime_iter;
 }
 
 void fit_iter_stats_print(const struct fit_stats *stats) {
     jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %11zu | %9zu | %10.3lf | %13.1lf |\n",
                  stats->iter, 1.0 / stats->rcond, stats->norm,
-                 stats->chisq_dof, stats->n_evals, stats->n_detectors,
-                 stats->cputime_cumul, 1000.0 * stats->cputime_iter / stats->n_detectors_active);
+                 stats->chisq_dof, stats->n_evals, stats->n_spectra,
+                 stats->cputime_cumul, 1000.0 * stats->cputime_iter / stats->n_spectra_iter);
 }
 
 void fit_stats_print(FILE *f, const struct fit_stats *stats, jabs_msg_level msg_level) {
@@ -684,7 +682,7 @@ int fit_data_fdd_init(fit_data *fit) {
         fdd->f_iter = gsl_vector_alloc(fdd->n_ch);
         fdd->ranges = calloc(fdd->n_ranges, sizeof(roi));
         if(fdd->n_ranges == 0) {
-            fprintf(stderr, "FDD %zu no ranges, length: %zu\n", i_fdd, fdd->n_ch);
+            DEBUGMSG("FDD %zu no ranges, length: %zu", i_fdd, fdd->n_ch);
         }
         size_t i = 0; /* Index of fdd roi */
         size_t i_vec = 0; /* fit residual vector index at beginning of roi */
@@ -850,8 +848,8 @@ struct fit_stats fit_stats_init() {
     struct fit_stats s;
     s.n_evals = 0;
     s.n_evals_iter = 0;
-    s.n_detectors = 0;
-    s.n_detectors_active = 0;
+    s.n_spectra = 0;
+    s.n_spectra_iter = 0;
     s.cputime_cumul = 0.0;
     s.cputime_iter = 0.0;
     s.chisq0 = 0.0;
@@ -919,7 +917,7 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
             chisq_dof_old = fit_data->stats.chisq_dof;
             fit_data->stats.cputime_iter = 0.0;
             fit_data->stats.n_evals_iter = 0;
-            fit_data->stats.n_detectors_active = 0;
+            fit_data->stats.n_spectra_iter = 0;
             status = gsl_multifit_nlinear_iterate(w);
             DEBUGMSG("Iteration status %i (%s)", status, gsl_strerror(status));
         }
@@ -962,7 +960,7 @@ void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspac
     jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf->nevalf);
 #endif
     jabs_message(MSG_INFO, stderr, "Jacobian evaluations: %zu\n", fdf->nevaldf);
-    jabs_message(MSG_INFO, stderr, "number of spectra simulated: %zu\n", fit->stats.n_detectors);
+    jabs_message(MSG_INFO, stderr, "number of spectra simulated: %zu\n", fit->stats.n_spectra);
     jabs_message(MSG_INFO, stderr, "reason for stopping: %s\n", fit_error_str(fit->stats.error));
     jabs_message(MSG_INFO, stderr, "initial |f(x)| = %f\n", sqrt(fit->stats.chisq0));
     jabs_message(MSG_INFO, stderr, "final   |f(x)| = %f\n", sqrt(fit->stats.chisq));

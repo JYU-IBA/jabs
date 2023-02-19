@@ -50,8 +50,8 @@ struct fit_stats {
     int phase;
     size_t n_evals;
     size_t n_evals_iter; /* Number of function evaluations per iteration */
-    size_t n_detectors;
-    size_t n_detectors_active; /* Number of detectors (full spectra with roughness etc) actually simulated per iteration call */
+    size_t n_spectra;
+    size_t n_spectra_iter; /* Number of spectra (full spectra with roughness etc) actually simulated per iteration call */
     double cputime_cumul;
     double cputime_iter;
     double chisq0;
