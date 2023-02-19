@@ -33,7 +33,6 @@ typedef struct {
 typedef struct result_spectra {
     result_spectrum *s;
     size_t n_spectra;
-    size_t iter; /* If fitted, which iteration this corresponds to */
 } result_spectra;
 
 result_spectra *result_spectra_alloc(size_t n);

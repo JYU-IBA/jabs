@@ -41,22 +41,36 @@
 #endif
 
 
-int fit_detector(const jibal *jibal, fit_data_det *fdd, const simulation *sim, size_t iter_call, gsl_vector *f) { /* TODO: this updates detector, preventing parallel simulation */
-    detector_update(fdd->det); /* TODO: remove! */
-    sim_workspace *ws = sim_workspace_init(jibal, sim, fdd->det);
+int fit_detector(const jibal *jibal, const fit_data_det *fdd, const simulation *sim, result_spectra *spectra, gsl_vector *f) {
+    detector *det = sim_det(sim, fdd->i_det);
+    detector_update(det); /* non-const pointer inside const... not great */
+    sim_workspace *ws = sim_workspace_init(jibal, sim, det);
     if(simulate_with_ds(ws)) {
-        jabs_message(MSG_ERROR, stderr, "Simulation of detector %s spectrum failed!\n", fdd->det->name);
+        jabs_message(MSG_ERROR, stderr, "Simulation of detector %s spectrum failed!\n", det->name);
         return EXIT_FAILURE;
     }
     fit_data_det_residual_vector_set(fdd, ws->histo_sum, f);
+#if 0
     if(iter_call == 1) { /* TODO: give spectra (and f_iter) as pointers, set these if pointer given */
         gsl_vector_memcpy(fdd->f_iter, f); /* Copy residual vector, this can be used on later calls if fdd is not active */
-        result_spectra_free(&fdd->spectra);
-        fit_data_spectra_copy_to_spectra_from_ws(&fdd->spectra, fdd->det, fdd->exp, ws);
+    }
+#endif
+    if(spectra) {
+        result_spectra_free(spectra);
+        fit_data_spectra_copy_to_spectra_from_ws(spectra, det, fdd->exp, ws);
     }
     sim_workspace_free(ws);
     return EXIT_SUCCESS;
 }
+
+struct jacobian_space {
+    simulation sim; /* Copy of simulation, partially shallow */
+    fit_variable *var; /* Active fit variable to be perturbed */
+    gsl_vector *f_param; /* Residuals vector */
+    double delta; /* Perturbation */
+    double delta_inv; /* Inverse of perturbation 1/delta */
+    size_t n_det; /* How many spectra (detectors) should be computed for this var */
+};
 
 int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     struct fit_data *fit = (struct fit_data *) params;
@@ -66,115 +80,99 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     assert(fit->fdf->p == fit->fit_params->n_active);
     assert(fit->fdf->n == fit->f->size);
 
-    sample_free(fit->sim->sample);
-    fit->sim->sample = sample_from_sample_model(fit->sm);
-    if(!fit->sim->sample) {
-        return GSL_FAILURE;
-    }
+    gsl_matrix_set_zero(J); /* We might only set parts of the Jacobian, the rest of the elements of the matrix should be zero. */
+    size_t p = fit->fdf->p;
+    size_t n = fit->fdf->n;
 
-    for(size_t j = 0; j < fit->fdf->p; j++) { /* Set all fit parameters based on vector x */
+    struct jacobian_space *space = calloc(p, sizeof(struct jacobian_space));
+    for(size_t j = 0; j < p; j++) { /* Set all fit parameters based on vector x */
         fit_variable *var = fit_params_find_active(fit->fit_params, j);
         assert(var);
         *(var->value) = gsl_vector_get(x, j) * var->value_orig;
+        space[j].var = var;
     }
 
-    for(size_t j = 0; j < fit->fdf->p; j++) { /* First we handle all parameters that require simulation of all detectors */
-        fit_variable *var = fit_params_find_active(fit->fit_params, j);
-        if(var->i_det < fit->sim->n_det) { /* Detector specific variable, handle later */
-            continue;
-        }
-        DEBUGMSG("Variable %s (i_v = %zu, j = %zu) perturbation affects all detectors. Simulate all %zu.", var->name, var->i_v, j, fit->n_fdd);
+    for(size_t j = 0; j < p; j++) { /* Make copies of sim (shallow) with deep copies of detector and sample. This way we can parallelize. */
+        struct jacobian_space *spc = &space[j];
+        fit_variable *var = spc->var;
         double xj = gsl_vector_get(x, j);
-        double delta = fit->h_df * fabs(xj);
-        if(delta == 0.0) {
-            delta = fit->h_df;
+        spc->delta = fit->h_df * fabs(xj);
+        if(spc->delta == 0.0) {
+            spc->delta = fit->h_df; /* TODO: this is what GSL does, but it doesn't always work */
         }
-        *(var->value) = (xj + delta) * var->value_orig;
+        if(spc->var->i_det >= fit->sim->n_det) {
+            spc->n_det += fit->sim->n_det;
+        } else {
+            spc->n_det = 1;
+        }
 
-        sample_free(fit->sim->sample); /* TODO: resetting the sample is only necessary if var is some sample related variable */
-        fit->sim->sample = sample_from_sample_model(fit->sm);
-        if(!fit->sim->sample) {
-            return GSL_FAILURE;
-        }
-        double start = jabs_clock();
-        for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) { /* TODO: compute this in parallel */
-            fit_data_det *fdd = &fit->fdd[i_fdd];
-            fit_detector(fit->jibal, fdd, fit->sim, 666, &fdd->f.vector);
-        }
-        double end = jabs_clock();
-        *(var->value) = (xj) * var->value_orig; /* Remove perturbation */
-        fit->stats.n_detectors_active += fit->n_fdd;
-        fit->stats.cputime_iter += (end - start);
-        delta = 1.0 / delta;
-        for (size_t i = 0; i < fit->fdf->n; i++) {
-            double fnext = gsl_vector_get(fit->f, i);
-            double fi = gsl_vector_get(fit->f_iter, i);
-            double out = (fnext - fi) * delta;
-            //gsl_matrix_set(J, i, j, out); /* i'th channel, j'th active fit parameter */
-            J->data[i * J->tda + j] = out;
-        }
-    }
+        spc->delta_inv = 1.0/spc->delta;
+        spc->f_param = gsl_vector_alloc(n); /* Residuals for this parameter */
+        gsl_vector_set_zero(spc->f_param);
 
-    for(size_t j = 0; j < fit->fdf->p; j++) { /* Set all fit parameters based on vector x */
-        fit_variable *var = fit_params_find_active(fit->fit_params, j);
-        assert(var);
-        *(var->value) = gsl_vector_get(x, j) * var->value_orig;
-    }
-
-    sample_free(fit->sim->sample);
-    fit->sim->sample = sample_from_sample_model(fit->sm);
-    if(!fit->sim->sample) {
-        return GSL_FAILURE;
-    }
-
-    fit_variable **vars_detector_specific = calloc(fit->fit_params->n_active, sizeof(fit_variable *));
-    size_t n_det_spec = 0;
-    for(size_t j = 0; j < fit->fdf->p; j++) { /* Then just detector specific stuff. We'll make a table. */
-        fit_variable *var = fit_params_find_active(fit->fit_params, j);
-        if(var->i_det >= fit->sim->n_det) { /* Already handled */
-            continue;
+        *(var->value) = (xj + spc->delta) * var->value_orig; /* Perturb */
+        spc->sim = *fit->sim; /* Shallow copy! */
+        spc->sim.det = calloc(fit->sim->n_det, sizeof(detector *)); /* Allocate space for clones of detectors. Uncloned detectors remain NULL. */
+        spc->sim.sample = sample_from_sample_model(fit->sm); /* Allocates new thing! TODO: not always necessary */
+        for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
+            if(var->i_det >= fit->sim->n_det || var->i_det == i_det) { /* All detectors or just this one specific, depending on the variable */
+                spc->sim.det[i_det] = detector_clone(fit->sim->det[i_det]);
+            }
         }
-        vars_detector_specific[n_det_spec] = var;
-        n_det_spec++;
+        *(var->value) = (xj) * var->value_orig; /* Unperturb */
     }
-    DEBUGMSG("There are %zu detector specific variables we need to handle.", n_det_spec);
     double start = jabs_clock();
-
-//#pragma omp parallel default(none) shared(fit, vars_detector_specific, x, n_det_spec, J)
-//#pragma omp for
-    for(size_t i_param = 0; i_param < n_det_spec; i_param++) { /* TODO: parallelize! Note that fit_detector doesn't work at the moment in parallel for the same detector (shared things). */
-        fit_variable *var = vars_detector_specific[i_param];
-        fit_data_det *fdd = &fit->fdd[var->i_det];
-        DEBUGMSG("Variable %s (i_v = %zu) perturbation affects detector %zu. Simulate it. Residuals offset %zu length %zu.", var->name, var->i_v, var->i_det + 1, fdd->f_offset, fdd->n_ch);
-        assert(j < fit->fdf->p);
-
-        double xj = gsl_vector_get(x, var->i_v);
-        double delta = fit->h_df * fabs(xj);
-        if(delta == 0.0) {
-            delta = fit->h_df;
+    for(size_t j = 0; j < fit->fdf->p; j++) {
+        struct jacobian_space *spc = &space[j];
+        fit_variable *var = spc->var;
+        size_t i_start, i_stop;
+        if(spc->var->i_det < fit->sim->n_det) { /* Detector specific */
+            i_start = spc->var->i_det;
+            i_stop = spc->var->i_det;
+        } else { /* All detectors */
+            i_start = 0;
+            i_stop = fit->sim->n_det - 1;
         }
-        *(var->value) = (xj + delta) * var->value_orig;
-        fit_detector(fit->jibal, fdd, fit->sim, 666, &fdd->f.vector); /* TODO: If we want to process these in parallel, substitute for fdd->f.vector (output residuals) needs to be given */
-        *(var->value) = (xj) * var->value_orig;
-        delta = 1.0 / delta;
-        for (size_t i = 0; i < fdd->n_ch; i++) {
-            double fnext = gsl_vector_get(&fdd->f.vector, i);
-            double fi = gsl_vector_get(fdd->f_iter, i);
-            //gsl_matrix_set(J, i + fdd->f_offset, j, (fnext - fi) * delta); /* i'th channel (in fit_ranges), j'th active fit parameter */
-            J->data[(i + fdd->f_offset) * J->tda + var->i_v] = (fnext - fi) * delta;
+        DEBUGMSG("Variable %s (i_v = %zu, j = %zu) perturbation. i_det = [%zu, %zu]", var->name, var->i_v, j, i_start, i_stop);
+        for(size_t i_det = 0; i_det <= i_stop; i_det++) {
+            fit_data_det *fdd = &fit->fdd[i_det];
+            gsl_vector_view v = gsl_vector_subvector(spc->f_param, fit->fdd->f_offset, fit->fdd->n_ch); /* The ROIs of this detector are a subvector of f_param (all channels in fit) */
+            DEBUGVERBOSEMSG("Detector %zu: offset: %zu, len: %zu", i_det, fit->fdd->f_offset, fit->fdd->n_ch);
+            fit_detector(fit->jibal, fdd, &spc->sim, NULL, &v.vector);
+        }
+        for (size_t i = 0; i < n; i++) {
+            double fnext = gsl_vector_get(spc->f_param, i);
+            double fi = gsl_vector_get(fit->f_iter, i); /* Reference (unperturbed parameter) from first call of iteration */
+            double out = (fnext - fi) * spc->delta_inv;
+            //gsl_matrix_set(J, i, j, out); /* i'th channel, j'th active fit parameter */
+            J->data[i * J->tda + j] = out; /* Should be calling gsl_matrix_set, but want to avoid function call... */
+            //fprintf(stderr, "J(%zu, %zu) = %g because %g and %g and %g.\n", i, j, out, fi, fnext, spc->delta_inv, i);
         }
     }
     double end = jabs_clock();
     fit->stats.cputime_iter += (end - start);
-    fit->stats.n_detectors_active += n_det_spec;
-    free(vars_detector_specific);
+    for(size_t j = 0; j < p; j++) {
+        struct jacobian_space *spc = &space[j];
+        fit->stats.n_detectors_active += spc->n_det;
+        for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
+            detector_free(spc->sim.det[i_det]);
+        }
+        free(spc->sim.det);
+        sample_free(spc->sim.sample);
+        gsl_vector_free(spc->f_param);
+    }
+    free(space);
     return GSL_SUCCESS;
 }
 
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     struct fit_data *fit = (struct fit_data *) params;
     fit->stats.iter_call++;
-
+    if(fit->stats.iter_call == 1) {
+        for(size_t i = 0; i < fit->n_det_spectra; i++) {
+            result_spectra_free(&fit->spectra[i]);
+        }
+    }
 
 #ifdef FIT_FUNCTION_RESTORES_RESIDUAL_VECTOR
 
@@ -243,7 +241,9 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     assert(fit->n_fdd_active_iter_call > 0 && fit->n_fdd_active_iter_call <= fit->n_fdd);
     volatile int error = FALSE;
     if(fit->n_fdd_active_iter_call == 1) { /* Skip OpenMP if only one workspace */
-        error = fit_detector(fit->jibal, fit->fdd_active[0], fit->sim, fit->stats.iter_call, &fit->fdd_active[0]->f.vector);
+        fit_data_det *fdd = fit->fdd_active[0];
+        result_spectra *spectra = (fit->stats.iter_call == 1 ? &fit->spectra[fdd->i_det] : NULL);
+        error = fit_detector(fit->jibal, fdd, fit->sim, spectra, &fdd->f.vector);
     } else {
 #pragma omp parallel default(none) shared(fit, error)
 #pragma omp for
@@ -252,7 +252,8 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
             DEBUGMSG("Thread id %i got %zu.", omp_get_thread_num(), i);
 #endif
             fit_data_det *fdd = fit->fdd_active[i];
-            if(fit_detector(fit->jibal, fdd, fit->sim, fit->stats.iter_call, &fdd->f.vector)) {
+            result_spectra *spectra = (fit->stats.iter_call == 1 ? &fit->spectra[fdd->i_det] : NULL); /* Pass spectra pointer on first call */
+            if(fit_detector(fit->jibal, fdd, fit->sim, spectra, &fdd->f.vector)) {
                 error = TRUE;
             }
         }
@@ -268,12 +269,6 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     fit->stats.n_detectors_active += fit->n_fdd_active_iter_call;
     if(fit->stats.iter_call == 1) {
         gsl_vector_memcpy(fit->f_iter, fit->f); /* Store residual vector on first call, this acts as baseline for everything we do later */
-        assert(fit->n_det_spectra == fit->n_fdd_active_iter_call == fit->sim->n_det);
-        for(size_t i = 0; i < fit->n_fdd_active_iter_call; i++) {
-            result_spectra_free(&fit->spectra[i]);
-            result_spectra_copy(&fit->spectra[i], &fit->fdd[i].spectra);
-            fit->spectra[i].iter = fit->stats.iter;
-        }
     }
     gsl_vector_memcpy(f, fit->f);
     DEBUGSTR("Successful fit function call.");
@@ -388,10 +383,10 @@ void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear
 }
 
 void fit_iter_stats_print(const struct fit_stats *stats) {
-    jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %11zu | %9zu | %10.3lf | %9.1lf |\n",
+    jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %11zu | %9zu | %10.3lf | %13.1lf |\n",
                  stats->iter, 1.0 / stats->rcond, stats->norm,
                  stats->chisq_dof, stats->n_evals, stats->n_detectors,
-                 stats->cputime_cumul, 1000.0 * stats->cputime_iter / stats->n_evals_iter);
+                 stats->cputime_cumul, 1000.0 * stats->cputime_iter / stats->n_detectors_active);
 }
 
 void fit_stats_print(FILE *f, const struct fit_stats *stats, jabs_msg_level msg_level) {
@@ -666,6 +661,7 @@ int fit_data_fdd_init(fit_data *fit) {
     for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) {
         fit_data_det *fdd = &fit->fdd[i_fdd];
         fdd->exp = fit_data_exp(fit, i_fdd);
+        fdd->i_det = i_fdd;
         fdd->det = sim_det(fit->sim, i_fdd);
         fdd->f_iter = gsl_vector_alloc(fdd->n_ch);
         fdd->ranges = calloc(fdd->n_ranges, sizeof(roi));
@@ -694,7 +690,6 @@ void fit_data_fdd_free(fit_data *fit) {
     for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) {
         fit_data_det *fdd = &fit->fdd[i_fdd];
         gsl_vector_free(fdd->f_iter);
-        result_spectra_free(&fdd->spectra);
         free(fdd->ranges);
     }
     free(fit->fdd_active);
@@ -893,8 +888,8 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
     int status = 0;
     size_t iter;
     double chisq_dof_old;
-    jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | evaluations |   spectra | time cumul | time eval |\n");
-    jabs_message(MSG_INFO, stderr, "     |              |                |              |  cumulative | cumulative|          s |        ms |\n");
+    jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | evaluations |   spectra | time cumul | time/spectrum |\n");
+    jabs_message(MSG_INFO, stderr, "     |              |                |              |  cumulative | cumulative|          s |            ms |\n");
     for(iter = 0; iter <= maxiter; iter++) {
         fit_data->stats.iter_call = 0;
         fit_data->stats.iter = iter;

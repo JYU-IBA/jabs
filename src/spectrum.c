@@ -24,22 +24,29 @@ result_spectra *result_spectra_alloc(size_t n) {
     result_spectra *spectra = malloc(sizeof(result_spectra));
     spectra->n_spectra = n;
     spectra->s = calloc(n, sizeof(result_spectrum));
-    spectra->iter = 0;
     return spectra;
 }
 
 void result_spectra_free(result_spectra *spectra) {
+    if(!spectra) {
+        return;
+    }
     for(size_t i = 0; i < spectra->n_spectra; i++) {
-        gsl_histogram_free(spectra->s[i].histo);
-        free(spectra->s[i].name);
+        result_spectrum *s = &spectra->s[i];
+        if(!s) {
+            continue;
+        }
+        gsl_histogram_free(s->histo);
+        free(s->name);
     }
     free(spectra->s);
+    spectra->s = NULL;
+    spectra->n_spectra = 0;
 }
 
 int result_spectra_copy(result_spectra *dest, const result_spectra *src) {
     dest->n_spectra = src->n_spectra;
     dest->s = calloc(dest->n_spectra, sizeof(result_spectrum));
-    dest->iter = src->iter;
     for(size_t i = 0; i < src->n_spectra; i++) {
         result_spectrum_copy(&dest->s[i], &src->s[i]);
     }

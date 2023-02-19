@@ -71,8 +71,8 @@ typedef struct roi {
 } roi;
 
 typedef struct fit_data_det {
+    size_t i_det;
     detector *det; /* Not stored here, same as sim->det[i_det], but we need a non-const pointer. TODO: make a copy */
-    result_spectra spectra;
     const gsl_histogram *exp; /* Not a copy! */
     roi *ranges; /* Same ranges as in fit_data, but only those relevant for "det". Full copies are made. */
     size_t n_ranges;

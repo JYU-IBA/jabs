@@ -34,6 +34,7 @@ calibration *calibration_clone(const calibration *c_orig) {
         case CALIBRATION_LINEAR:
             c = calibration_init_linear();
             calibration_copy_params(c, c_orig);
+            break;
         default:
             c = NULL;
             break;
