@@ -440,7 +440,7 @@ void MainWindow::on_action_Run_triggered()
 void MainWindow::plotSpectrum(size_t i_det)
 {
     ui->widget->clearAll();
-    if(!session || !session->fit || !session->fit->spectra || i_det >= session->fit->spectra->n_spectra) {
+    if(!session || !session->fit || !session->fit->spectra || i_det >= session->fit->n_det_spectra) {
         ui->widget->setVisible(false);
         return;
     }

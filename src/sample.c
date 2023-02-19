@@ -632,8 +632,9 @@ sample_model *sample_model_clone(const sample_model *sm_orig) {
         return NULL;
     }
     sample_model *sm = sample_model_alloc(sm_orig->n_materials, sm_orig->n_ranges);
+    sm->type = sm_orig->type;
     for(size_t i = 0; i < sm->n_materials; i++) {
-        sm_orig->materials[i] = jibal_material_copy(sm_orig->materials[i]);
+        sm->materials[i] = jibal_material_copy(sm_orig->materials[i]);
     }
     for(size_t i = 0; i < sm->n_ranges; i++) {
         sample_range_copy(&sm->ranges[i], &sm_orig->ranges[i]);
