@@ -225,6 +225,9 @@ int detector_foil_set_from_argv(const jibal *jibal, detector *det, int *argc, ch
 }
 
 int detector_update_foil(detector *det) {
+    if(!det) {
+        return 0;
+    }
     det->foil = sample_from_sample_model(det->foil_sm);
     return 0;
 }
@@ -367,8 +370,9 @@ detector *detector_clone(const detector *det_orig) {
             det->calibration_Z[Z] = calibration_clone(det_orig->calibration_Z[Z]);
         }
     }
-    /* TODO: clone aperture */
-    /* TODO: clone foil */
+    det->aperture = aperture_clone(det_orig->aperture);
+    det->foil_sm = sample_model_clone(det->foil_sm);
+    detector_update_foil(det);
     detector_update(det);
     return det;
 }

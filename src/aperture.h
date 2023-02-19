@@ -40,6 +40,7 @@ typedef struct aperture {
 
 const char *aperture_name(const aperture *a);
 aperture *aperture_default();
+aperture *aperture_clone(const aperture *a_orig);
 void aperture_free(aperture *a);
 double aperture_width_shape_product(const aperture *a, char direction);
 aperture *aperture_set_from_argv(const jibal *jibal, aperture *a, int * const argc, char * const ** const argv);

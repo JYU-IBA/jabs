@@ -24,6 +24,15 @@ aperture *aperture_default() {
     return a;
 }
 
+aperture *aperture_clone(const aperture *a_orig) {
+    if(!a_orig) {
+        return NULL;
+    }
+    aperture *a = malloc(sizeof(aperture));
+    *a = *a_orig;
+    return a;
+}
+
 double aperture_shape_parameter(const aperture *a) {
     static const double shape_circle = 0.5 * C_FWHM/2.0;
     static const double shape_rect = 0.5 * C_FWHM/1.7320508075688772;

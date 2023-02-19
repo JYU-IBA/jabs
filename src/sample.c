@@ -79,7 +79,7 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
     sm->n_ranges = n_ranges;
     sm->n_materials = n_materials;
     sm->materials = calloc(n_materials, sizeof(jibal_material *));
-    sm->cbins = calloc( n_ranges * n_materials, sizeof(double));
+    sm->cbins = calloc(n_ranges * n_materials, sizeof(double));
     sm->ranges = calloc(n_ranges, sizeof(struct sample_range));
     return sm;
 }
@@ -619,13 +619,27 @@ void sample_model_free(sample_model *sm) {
     }
     for(size_t i = 0; i < sm->n_ranges; i++) {
         sample_range *range = &sm->ranges[i];
-
         roughness_file_free(range->rough.file);
     }
     free(sm->ranges);
     free(sm->materials);
     free(sm->cbins);
     free(sm);
+}
+
+sample_model *sample_model_clone(const sample_model *sm_orig) {
+    if(!sm_orig) {
+        return NULL;
+    }
+    sample_model *sm = sample_model_alloc(sm_orig->n_materials, sm_orig->n_ranges);
+    for(size_t i = 0; i < sm->n_materials; i++) {
+        sm_orig->materials[i] = jibal_material_copy(sm_orig->materials[i]);
+    }
+    for(size_t i = 0; i < sm->n_ranges; i++) {
+        sample_range_copy(&sm->ranges[i], &sm_orig->ranges[i]);
+    }
+    memcpy(sm->cbins, sm_orig->cbins, sizeof (double) * sm->n_materials * sm->n_ranges);
+    return sm;
 }
 
 sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char * const ** const argv) {

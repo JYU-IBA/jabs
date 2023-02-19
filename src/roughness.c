@@ -247,8 +247,9 @@ roughness_file *roughness_file_read(const char *filename) {
 }
 
 roughness_file *roughness_file_copy(const roughness_file *rf) {
-    if(!rf)
+    if(!rf) {
         return NULL;
+    }
     roughness_file *rf_out = malloc(sizeof(roughness_file));
     rf_out->tpd = thickness_probability_table_copy(rf->tpd);
     rf_out->filename = strdup_non_null(rf->filename);

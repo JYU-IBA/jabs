@@ -80,6 +80,7 @@ char *sample_model_to_string(const sample_model *sm);
 sample_model *sample_model_to_point_by_point(const sample_model *sm);
 size_t sample_model_element_count(const sample_model *sm);
 void sample_model_free(sample_model *sm);
+sample_model *sample_model_clone(const sample_model *sm_orig);
 sample *sample_from_sample_model(const sample_model *sm);
 int sample_model_print(const char *filename, const sample_model *sm, jabs_msg_level msg_level);
 size_t sample_model_number_of_rough_ranges(const sample_model *sm); /* May change to real sample, since minor roughness can be neglected. */

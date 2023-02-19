@@ -60,7 +60,7 @@ typedef struct calibration_params_poly {
 
 calibration *calibration_init();
 void calibration_free(calibration *c);
-calibration *calibration_clone(const calibration *c_orig); /* TODO: unfinished! */
+calibration *calibration_clone(const calibration *c_orig);
 calibration *calibration_init_linear();
 calibration *calibration_init_poly(size_t n); /* n is the degree of the polynomial */
 double calibration_linear(const void *params, size_t x);
@@ -72,7 +72,7 @@ int calibration_set_param(calibration *c, int i, double value);
 size_t calibration_get_number_of_params(const calibration *c);
 double calibration_get_param(const calibration *c, int i); /* get i'th param in range [0..n-1], get n by  calibration_get_number_of_params()*/
 double *calibration_get_param_ref(calibration *c, int i);
-int calibration_copy_params(calibration *dst, calibration *src); /* Copies parameters from src to dst. Calibration types may be different (e.g. linear or poly), we'll do our best. */
+int calibration_copy_params(calibration *dst, const calibration *src); /* Copies parameters from src to dst. Calibration types may be different (e.g. linear or poly), we'll do our best. */
 const char *calibration_name(const calibration *c);
 char *calibration_to_string(const calibration *c);
 char *calibration_param_name(calibration_type type, calibration_param_type i); /* Name of i'th param (e.g. "slope"). Returns a string that can be free'd */
