@@ -280,7 +280,9 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
             d_after = des_min->d;
             last = TRUE;
         }
-        d_after = des_table_find_depth(dt, &i_des, d_before, &ion1); /* Does this handle E below min? */
+        if(i_brick != 0) {
+            d_after = des_table_find_depth(dt, &i_des, d_before, &ion1); /* Does this handle E below min? */
+        }
         if(i_brick == 0 || d_after.i != d_before.i) { /* There was a layer (depth range) crossing. If step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
             if(ws->params->bricks_skip_zero_conc_ranges) {
                 double conc_start = *sample_conc_bin(sample, d_after.i, sim_r->i_isotope);
@@ -380,7 +382,7 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
         }
         if(ion1.inverse_cosine_theta > 0.0 && d_after.x >= sim_r->max_depth) {
             sim_r->last_brick = i_brick;
-            DEBUGMSG("Max depth of %g tfu reached.", sim_r->max_depth / C_TFU);
+            DEBUGMSG("Max depth of %g tfu reached (d_after.x is %g).", sim_r->max_depth / C_TFU,  d_after.x / C_TFU);
             break;
         } else if(ion1.inverse_cosine_theta < 0.0 && d_after.x < DEPTH_TOLERANCE) {
             sim_r->last_brick = i_brick;
@@ -422,6 +424,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
 #ifdef DEBUG_VERBOSE
     des_table_print(stderr, dt);
 #endif
+
 #if 0
 #pragma omp parallel default(none) shared(ws, incident, depth_start, sample, dt, g)
 #pragma omp for nowait
