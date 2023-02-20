@@ -189,87 +189,42 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
             result_spectra_free(&fit->spectra[i]);
         }
     }
-
-#ifdef FIT_FUNCTION_RESTORES_RESIDUAL_VECTOR
-
-    /* This function stores in fit->f the full residual vector computed on first call (through vector views on each workspace). These contents are always set to f.
-     * On subsequent calls (like those involving Jacobian calculation) the fit->f is updated. This means fit->f contents no longer match those of the first call "x".
-     * This in practice is not a problem for the Jacobian evaluation, as the differences in fit->f cancel out for all other parameters except the one being perturbed.
-     * Enabling this bit of code might help if bugs appear, as it restores the saved residual vector. */
-    if(fit->stats.iter_call > 1) {
-        gsl_vector_memcpy(fit->f, fit->f_iter);
-    }
-#endif
-
     if(fit_parameters_set_from_vector(fit, x)) { /* This also sets some helper numbers and arrays */
         return GSL_FAILURE;
     }
-
-    //fprintf(stderr, "Fit iteration %zu call %zu\n", fit->stats.iter, fit->stats.iter_call);
-    DEBUGMSG("Fit iteration %zu call %zu. Size of vector x: %zu, f: %zu. Of %zu active fit parameters, %zu are being varied this function call.",
-            fit->stats.iter, fit->stats.iter_call, x->size, f->size, fit->fit_params->n_active, fit->fit_params->n_active_iter_call);
-#if 0 /* Effect of varying some parameters (if only one at a time) can be easily "simulated", e.g. varying fluence. This code is for that. Workspace initialization has changed, so this no longer works without modifications. */
-    int ret = fit_speedup(fit);
-    if(ret == GSL_FAILURE) {
-        fit->stats.error = FIT_ERROR_IMPOSSIBLE;
-        return GSL_FAILURE;
-    } else if(ret != FALSE) { /* Success */
-        fit->stats.n_speedup_evals++;
-        fit->stats.error = fit_set_residuals(fit, f);
-        if(fit->stats.error) {
-            return GSL_FAILURE;
-        } else {
-            return GSL_SUCCESS;
-        }
-    } /* ret == 0, continue with full simulation,no speedup available for this fit variable */
-#endif
-
+    DEBUGMSG("Fit iteration %zu call %zu. Size of vector x: %zu, f: %zu. %zu active fit parameters.",
+             fit->stats.iter, fit->stats.iter_call, x->size, f->size, fit->fit_params->n_active);
 
     if(sim_sanity_check(fit->sim) == GSL_FAILURE) {
         fit->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
     }
-
     sample_free(fit->sim->sample); /* TODO: this is only necessary on first call of iter and when sample specific parameters are active */
     fit->sim->sample = sample_from_sample_model(fit->sm);
     if(!fit->sim->sample) {
         fit->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
     }
-
-    if(fit_determine_active_detectors(fit)) { /* TODO: since/when Jacobian is calculated elsewhere, aren't all the detectors always active? */
-        fit->stats.error = FIT_ERROR_WORKSPACE_INITIALIZATION;
-        return GSL_FAILURE;
-    }
-
-    DEBUGMSG("There are %zu/%zu active detectors in this fit function call.\n", fit->n_fdd_active_iter_call, fit->n_fdd);
-#if 0 /* If and when this is enabled, make sure to calculate one complete spectrum with original emin at the end of fit */
-    for(size_t i_det = 0; i_det < fit->n_ws; i_det++) { /* Sets the lowest energy in each simulation according to fit ranges */
-        double emin = fit_emin(fit, i_det);
-        sim_workspace *ws = fit_data_ws(fit, i_det);
-        if(emin > ws->emin) { /* Only increase the emin, never reduce it. */
-            ws->emin = emin;
-        }
-    }
-#endif
-
     double start = jabs_clock();
-    assert(fit->n_fdd_active_iter_call > 0 && fit->n_fdd_active_iter_call <= fit->n_fdd);
     volatile int error = FALSE;
-    if(fit->n_fdd_active_iter_call == 1) { /* Skip OpenMP if only one workspace */
-        fit_data_det *fdd = fit->fdd_active[0];
+    if(fit->n_fdd == 1) { /* Skip OpenMP if only one workspace */
+        fit_data_det *fdd = &fit->fdd[0];
         result_spectra *spectra = (fit->stats.iter_call == 1 ? &fit->spectra[fdd->i_det] : NULL);
-        error = fit_detector(fit->jibal, fdd, fit->sim, spectra, &fdd->f.vector);
+        error = fit_detector(fit->jibal, fdd, fit->sim, spectra, f);
     } else {
-#pragma omp parallel default(none) shared(fit, error)
+#pragma omp parallel default(none) shared(fit, error, f)
 #pragma omp for
-        for(size_t i = 0; i < fit->n_fdd_active_iter_call; i++) {
+        for(size_t i = 0; i < fit->n_fdd; i++) {
 #ifdef _OPENMP
             DEBUGMSG("Thread id %i got %zu.", omp_get_thread_num(), i);
 #endif
-            fit_data_det *fdd = fit->fdd_active[i];
+            fit_data_det *fdd = &fit->fdd[i];
+            if(fdd->n_ranges == 0) { /* This will NOT simulate those detectors that don't participate in fit! */
+                continue;
+            }
             result_spectra *spectra = (fit->stats.iter_call == 1 ? &fit->spectra[fdd->i_det] : NULL); /* Pass spectra pointer on first call */
-            if(fit_detector(fit->jibal, fdd, fit->sim, spectra, &fdd->f.vector)) {
+            gsl_vector_view f_det = gsl_vector_subvector(f, fdd->f_offset, fdd->n_ch);
+            if(fit_detector(fit->jibal, fdd, fit->sim, spectra, &f_det.vector)) {
                 error = TRUE;
             }
         }
@@ -282,56 +237,13 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     }
     fit->stats.cputime_iter += (end - start);
     fit->stats.n_evals_iter++;
-    fit->stats.n_spectra_iter += fit->n_fdd_active_iter_call;
+    fit->stats.n_spectra_iter += fit->n_fdd;
     if(fit->stats.iter_call == 1) {
-        gsl_vector_memcpy(fit->f_iter, fit->f); /* Store residual vector on first call, this acts as baseline for everything we do later */
+        gsl_vector_memcpy(fit->f_iter, f); /* Store residual vector on first call, this acts as baseline for everything we do later */
     }
-    gsl_vector_memcpy(f, fit->f);
+    //gsl_vector_memcpy(f, fit->f);
     DEBUGSTR("Successful fit function call.");
     return GSL_SUCCESS;
-}
-
-int fit_determine_active_detectors(fit_data *fit) {
-    for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) { /* Default for detector simulatin */
-        fit_data_det *fdd = &fit->fdd[i_fdd];
-        if(fit->stats.iter_call == 1) {
-            fdd->active_iter_call = TRUE; /* On first call, simulate all detectors */
-        } else {
-            fdd->active_iter_call = FALSE; /* On subsequent alls, don't simulate by default */
-        }
-    }
-    for(size_t i = 0; i < fit->fit_params->n; i++) { /* Check which workspaces need to be simulated based on fit parameters */
-        fit_variable *var = &fit->fit_params->vars[i];
-        if(!var->active_iter_call) {
-            continue;
-        }
-        if(var->i_det < fit->n_fdd) {
-            fit->fdd[var->i_det].active_iter_call = TRUE; /* Mark this workspace as needing some simulation */
-        } else if(var->i_det >= fit->n_fdd) {
-            for(size_t i_ws = 0; i_ws < fit->n_fdd; i_ws++) { /* Mark all workspaces */
-                fit->fdd[i_ws].active_iter_call = TRUE;
-            }
-            break; /* All marked, nothing more to mark. */
-        }
-    }
-    for(size_t i = 0; i < fit->fit_params->n_active_iter_call; i++) { /* Print active variables */
-        fit_variable *var = fit->fit_params->vars_active_iter_call[i];
-        DEBUGMSG("    %zu/%zu: %26s (%18.12g, first call %18.12g, rel %18.12e)",
-                i + 1, fit->fit_params->n_active_iter_call, var->name, *(var->value), var->value_iter, *(var->value) / var->value_iter - 1.0);
-    }
-
-    fit->n_fdd_active_iter_call = 0;
-    for(size_t i = 0; i < fit->n_fdd; i++) {
-        if(fit->fdd[i].active_iter_call) {
-            fit->fdd_active[fit->n_fdd_active_iter_call] = &fit->fdd[i];
-            fit->n_fdd_active_iter_call++;
-        }
-    }
-    if(fit->n_fdd_active_iter_call == 0) {
-        DEBUGSTR("Zero active detectors. Shouldn't happen. Has everything initialized properly?");
-        return EXIT_FAILURE;
-    }
-    return 0;
 }
 
 int fit_sanity_check(const fit_data *fit) {
@@ -345,12 +257,10 @@ int fit_sanity_check(const fit_data *fit) {
 }
 
 int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x) {
-    fit->fit_params->n_active_iter_call = 0;
     DEBUGMSG("Fit iteration has %zu active parameters from a total of %zu possible.", fit->fit_params->n_active, fit->fit_params->n)
     for(size_t i = 0; i < fit->fit_params->n; i++) {
         fit_variable *var = &fit->fit_params->vars[i];
         if(!var->active) {
-            var->active_iter_call = FALSE; /* Not active variables can never be active. */
             continue;
         }
         if(!isfinite(*(var->value))) {
@@ -359,30 +269,7 @@ int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x) {
             return GSL_FAILURE;
         }
         *(var->value) = gsl_vector_get(x, var->i_v) * var->value_orig;
-        if(fit->stats.iter_call == 1) { /* Store the value of fit parameters at the first function evaluation and mark them all as active */
-            var->value_iter = *(var->value);
-            var->active_iter_call = TRUE;
-            fit->fit_params->n_active_iter_call++;
-        } else if(var->value_iter != *(var->value)) { /* On subsequent calls, value can be changed from stored value by the fitting algorithm */
-            var->active_iter_call = TRUE;
-            fit->fit_params->n_active_iter_call++;
-            DEBUGMSG(" %s  i_v=%zu (%p) orig=%12.10lf iter=%12.10lf", var->name, var->i_v, (void *)var->value, *(var->value) / var->value_orig, *(var->value) / var->value_iter);
-        } else { /* Not active, since it's not the first call and value is the same as in the first call */
-            var->active_iter_call = FALSE;
-        }
-
     }
-    DEBUGMSG("Fit iteration has %zu parameters that are being varied this function call.", fit->fit_params->n_active_iter_call)
-    assert(fit->fit_params->n_active_iter_call <= fit->fit_params->n_active);
-    size_t i_active_iter = 0;
-    for(size_t i = 0; i < fit->fit_params->n; i++) { /* Fill the array of actively varied fit parameters */
-        fit_variable *var = &fit->fit_params->vars[i];
-        if(var->active_iter_call) {
-            fit->fit_params->vars_active_iter_call[i_active_iter] = var;
-            i_active_iter++;
-        }
-    }
-    assert(fit->fit_params->n_active_iter_call == i_active_iter);
     return GSL_SUCCESS;
 }
 
@@ -439,6 +326,9 @@ void fit_data_fit_ranges_free(struct fit_data *fit_data) {
 
 void fit_data_det_residual_vector_set(const fit_data_det *fdd, const gsl_histogram *histo_sum, gsl_vector *f) { /* Sets residual vector (f) based on histo_sum */
     size_t i_vec = 0;
+    if(fdd->n_ranges == 0) {
+        fprintf(stderr, "No ranges!\n");
+    }
     for(size_t i_range = 0; i_range < fdd->n_ranges; i_range++) {
         const roi *range = &fdd->ranges[i_range];
         for(size_t i = range->low; i <= range->high; i++) {
@@ -659,8 +549,6 @@ int fit_data_fdd_init(fit_data *fit) {
     size_t n_alloc = fit->sim->n_det;
     fit->fdd = calloc(n_alloc, sizeof(fit_data_det));
     fit->n_fdd = n_alloc;
-    fit->fdd_active = calloc(n_alloc, sizeof(fit_data_det));
-    fit->n_fdd_active_iter_call = 0;
 
     for(size_t i_roi = 0; i_roi < fit->n_fit_ranges; i_roi++) { /* Loop over rois, fdds, count rois and n of channels */
         const roi *roi = &fit->fit_ranges[i_roi];
@@ -695,7 +583,6 @@ int fit_data_fdd_init(fit_data *fit) {
             }
             if(i == 0) {
                 fdd->f_offset = i_vec;
-                fdd->f = gsl_vector_subvector(fit->f, fdd->f_offset, fdd->n_ch);
                 DEBUGMSG("FDD %zu, %zu ROIs, First ROI is %zu/%zu of all, subvector offset %zu, length %zu)", i_fdd, fdd->n_ranges, i_roi, fit->n_fit_ranges, fdd->f_offset, fdd->n_ch);
             }
             fdd->ranges[i] = *roi;
@@ -712,12 +599,9 @@ void fit_data_fdd_free(fit_data *fit) {
         gsl_vector_free(fdd->f_iter);
         free(fdd->ranges);
     }
-    free(fit->fdd_active);
-    fit->fdd_active = NULL;
     free(fit->fdd);
     fit->fdd = NULL;
     fit->n_fdd = 0;
-    fit->n_fdd_active_iter_call = 0;
 }
 
 void fit_data_exp_alloc(fit_data *fit) {
@@ -1058,7 +942,6 @@ int fit(fit_data *fit) {
 #ifdef DEBUG
     fprintf(stderr, "Set %zu weights.\n", i_w);
 #endif
-    fit->f = gsl_vector_alloc(fdf->n);
     fit->f_iter = gsl_vector_alloc(fdf->n);
     if(fit_data_fdd_init(fit)) {
         return EXIT_FAILURE;
@@ -1110,11 +993,10 @@ int fit(fit_data *fit) {
         sim_calc_params_print(fit->sim->params, MSG_VERBOSE);
         jabs_message(MSG_IMPORTANT, stderr, "Initializing fit...\n");
         gsl_multifit_nlinear_winit(x, &wts.vector, fdf, w);
-        jabs_message(MSG_IMPORTANT, stderr, "Done. Starting iteration...\n");
         /* compute initial cost function */
         f = gsl_multifit_nlinear_residual(w);
         gsl_blas_ddot(f, f, &fit->stats.chisq0);
-
+        jabs_message(MSG_IMPORTANT, stderr, "Done. Starting iteration...\n");
         status = jabs_gsl_multifit_nlinear_driver(fit->n_iters_max, xtol, chisq_tol, fit, w); /* Fit */fit->stats.error = status;
         if(status < 0) {
             jabs_message(MSG_ERROR, stderr, "Fit aborted in phase %i, reason: %s.\n", phase, fit_error_str(fit->stats.error));
@@ -1143,14 +1025,11 @@ int fit(fit_data *fit) {
         fit_parameters_update_changed(fit_params); /* sample_model_renormalize() can and will change concentration values, this will recompute error (assuming relative error stays the same) */
         fit_params_print_final(fit_params);
         fit_covar_print(covar, MSG_VERBOSE);
-
         fit_data_print(fit, MSG_VERBOSE);
     }
     gsl_multifit_nlinear_free(w);
     gsl_matrix_free(covar);
     gsl_vector_free(x);
-    gsl_vector_free(fit->f);
-    fit->f = NULL;
     free(weights);
     free(fdf);
     return fit->stats.error;

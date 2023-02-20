@@ -24,7 +24,6 @@ void fit_params_free(fit_params *p) {
         free(p->vars[i].name); /* This should be fit_variable_free(), but then p->vars should probably be an array of pointers, too). */
     }
     free(p->vars);
-    free(p->vars_active_iter_call);
     free(p);
 }
 
@@ -32,10 +31,8 @@ int fit_params_update(fit_params *p) {
     if(!p)
         return EXIT_FAILURE;
     p->n_active = 0;
-    p->n_active_iter_call = 0;
     for(size_t i = 0; i < p->n; i++) { /* Count number of active variables and assign index numbers */
         fit_variable *var = &p->vars[i];
-        var->active_iter_call = FALSE;
         if(var->active) {
             for(size_t j = 0; j < i; j++) { /* Check if this *active* variable is a duplicate (earlier active variable has the same value) */
                 if(!p->vars[j].active)
@@ -54,12 +51,6 @@ int fit_params_update(fit_params *p) {
         } else {
             var->i_v = p->n; /* Intentionally invalid index */
         }
-    }
-    free(p->vars_active_iter_call);
-    if(p->n_active) {
-        p->vars_active_iter_call = calloc(p->n_active, sizeof(fit_variable *));
-    } else {
-        p->vars_active_iter_call = NULL;
     }
     return EXIT_SUCCESS;
 }
@@ -80,7 +71,6 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
     var->value = value;
     var->value_orig = 0.0;
     var->value_final = 0.0;
-    var->value_iter = 0.0;
     var->err = 0.0;
     var->err_rel = 0.0;
     var->sigmas = 0.0;
@@ -88,7 +78,6 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
     var->unit = unit;
     var->unit_factor = unit_factor;
     var->active = FALSE;
-    var->active_iter_call = FALSE;
     var->i_v = SIZE_MAX;
     var->i_det = i_det;
     DEBUGMSG("Fit parameter %s added successfully (total %zu).", var->name, p->n);

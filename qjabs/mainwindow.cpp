@@ -359,6 +359,7 @@ int MainWindow::fitCallback(fit_stats stats)
     } else {
         ui->widget->setVisible(false);
     }
+    repaint();
     QCoreApplication::processEvents();
     return fitDialog->isAborted();
 }

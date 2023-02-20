@@ -78,16 +78,12 @@ typedef struct fit_data_det {
     size_t n_ranges;
     size_t n_ch; /* in fit ranges */
     size_t f_offset;
-    gsl_vector_view f; /* subset of fit_data->f */
-    gsl_vector *f_iter; /* Stored values of f on first call of iter */
-    int active_iter_call;
+    gsl_vector *f_iter; /* Stored residual vector values of f on first call of iter */
 } fit_data_det;
 
 typedef struct fit_data {
     fit_data_det *fdd; /* Detector specific stuff */
     size_t n_fdd; /* TODO: rename */
-    fit_data_det **fdd_active;
-    size_t n_fdd_active_iter_call;
     result_spectra *spectra; /* all spectra (array of n_det_spectra), updates every iter at the start of iter. */
     size_t n_det_spectra; /* n_det (= n_fdd) when histograms were copied */
     gsl_histogram **exp; /* experimental data to be fitted, array of n_exp elements */
@@ -109,7 +105,6 @@ typedef struct fit_data {
     int phase_start; /* Fit phase to start from (see FIT_PHASE -defines) */
     int phase_stop; /* Inclusive */
     int (*fit_iter_callback)(struct fit_stats stats);
-    gsl_vector *f;
     gsl_vector *f_iter;
     double h_df;
 } fit_data;
