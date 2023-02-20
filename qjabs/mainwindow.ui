@@ -46,7 +46,7 @@
          </size>
         </property>
        </widget>
-       <widget class="QWidget" name="">
+       <widget class="QWidget" name="layoutWidget">
         <layout class="QVBoxLayout" name="verticalLayout">
          <item>
           <widget class="QFrame" name="detectorFrame">
@@ -200,9 +200,17 @@
     <addaction name="action_Plot"/>
     <addaction name="actionPreferences"/>
    </widget>
+   <widget class="QMenu" name="menuDetector">
+    <property name="title">
+     <string>Detector</string>
+    </property>
+    <addaction name="actionNext_detector"/>
+    <addaction name="actionPrevious_detector"/>
+   </widget>
    <addaction name="menu_File"/>
    <addaction name="menu_Edit"/>
    <addaction name="menu_Help"/>
+   <addaction name="menuDetector"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QToolBar" name="toolBar">
@@ -219,6 +227,8 @@
    <addaction name="action_Open_File"/>
    <addaction name="action_Save_File"/>
    <addaction name="action_Run"/>
+   <addaction name="actionPrevious_detector"/>
+   <addaction name="actionNext_detector"/>
   </widget>
   <action name="action_Run">
    <property name="icon">
@@ -290,6 +300,24 @@
   <action name="actionIDF">
    <property name="text">
     <string>IDF...</string>
+   </property>
+  </action>
+  <action name="actionNext_detector">
+   <property name="icon">
+    <iconset resource="icons.qrc">
+     <normaloff>:/icons/chevron-right.svg</normaloff>:/icons/chevron-right.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Next detector</string>
+   </property>
+  </action>
+  <action name="actionPrevious_detector">
+   <property name="icon">
+    <iconset resource="icons.qrc">
+     <normaloff>:/icons/chevron-left.svg</normaloff>:/icons/chevron-left.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Previous detector</string>
    </property>
   </action>
  </widget>

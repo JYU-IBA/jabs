@@ -45,6 +45,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->action_Run->setShortcut(QKeySequence::Refresh);
     ui->action_Run->setShortcutVisibleInContextMenu(true);
     ui->action_Quit->setShortcut(QKeySequence::Quit);
+    ui->actionPrevious_detector->setShortcut(QKeySequence::Back);
+    ui->actionNext_detector->setShortcut(QKeySequence::Forward);
     setNeedsSaving(false);
     firstRun = true;
     statusBar()->showMessage(QString("JaBS ") + jabs_version() + ", cwd: " +  QDir::currentPath(), 2000);
@@ -69,6 +71,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->widget, &SpectrumPlot::energyAxisSet, this, &MainWindow::onEnergyAxisSet);
     connect(ui->widget, &SpectrumPlot::legendMoved, this, &MainWindow::onSpectrumLegendMoved);
     connect(ui->widget, &SpectrumPlot::graphVisibilityChanged, this, &MainWindow::updateListOfVisibleGraphs);
+
+    updateDetectorList();
 
     ui->msgTextBrowser->append("\n");
     ui->msgTextBrowser->ensureCursorVisible();
@@ -799,20 +803,39 @@ void MainWindow::updateDetectorList()
 {
     if(!session || !session->fit || !session->fit->sim) {
         ui->detectorFrame->setVisible(false);
+        ui->actionNext_detector->setVisible(false);
+        ui->actionPrevious_detector->setVisible(false);
         return;
     }
     ui->detectorFrame->setVisible(session->fit->sim->n_det > 1);
+    ui->actionPrevious_detector->setVisible(session->fit->sim->n_det > 1);
+    ui->actionNext_detector->setVisible(session->fit->sim->n_det > 1);
     int old_i_det = ui->comboBox->currentIndex();
     ui->comboBox->clear();
     for(size_t i_det = 0; i_det < session->fit->sim->n_det; i_det++) {
         ui->comboBox->addItem(QString(session->fit->sim->det[i_det]->name));
     }
     ui->comboBox->setCurrentIndex(old_i_det < session->fit->sim->n_det ? old_i_det : 0);
+
 }
 
 
 void MainWindow::on_comboBox_currentIndexChanged(int index)
 {
+    ui->actionPrevious_detector->setEnabled(index > 0);
+    ui->actionNext_detector->setEnabled(index < session->fit->sim->n_det - 1);
     plotSpectrum(index);
+}
+
+
+void MainWindow::on_actionNext_detector_triggered()
+{
+    ui->comboBox->setCurrentIndex(ui->comboBox->currentIndex() + 1);
+}
+
+
+void MainWindow::on_actionPrevious_detector_triggered()
+{
+    ui->comboBox->setCurrentIndex(ui->comboBox->currentIndex() - 1);
 }
 
