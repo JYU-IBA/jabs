@@ -249,27 +249,6 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
     return 1;
 }
 
-script_command_status script_save_bricks(script_session *s, int argc, char *const *argv) {
-    size_t i_det = 0;
-    const int argc_orig = argc;
-    struct fit_data *fit = s->fit;
-    if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det) || argc != 1) {
-        jabs_message(MSG_ERROR, stderr, "Usage: save bricks [detector] file\n");
-        return SCRIPT_COMMAND_FAILURE;
-    }
-#if 0 /* TODO: how to save bricks if ws is not set? */
-    if(sim_workspace_print_bricks(fit_data_ws(fit, i_det), argv[0])) {
-        jabs_message(MSG_ERROR, stderr,
-                     "Could not save bricks of detector %zu to file \"%s\"! There should be %zu detector(s).\n",
-                     i_det + 1, argv[0], fit->sim->n_det);
-        return SCRIPT_COMMAND_FAILURE;
-    }
-#endif
-    argc--;
-    argv++;
-    return argc_orig - argc;
-}
-
 script_command_status script_save_spectra(script_session *s, int argc, char *const *argv) {
     size_t i_det = 0;
     struct fit_data *fit = s->fit;
@@ -1317,7 +1296,6 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&head, script_command_new("exit", "Exit.", 0, 0, &script_exit));
 
     c = script_command_new("save", "Save something.", 0, 0, NULL);
-    script_command_list_add_command(&c->subcommands, script_command_new("bricks", "Save bricks.", 0, 0, &script_save_bricks));
     script_command_list_add_command(&c->subcommands, script_command_new("calibrations", "Save detector calibrations.", 0, 0, &script_save_calibrations));
     script_command_list_add_command(&c->subcommands, script_command_new("sample", "Save sample.", 0, 0, &script_save_sample));
     script_command_list_add_command(&c->subcommands, script_command_new("spectra", "Save spectra.", 0, 0, &script_save_spectra));
