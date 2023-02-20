@@ -81,6 +81,16 @@ typedef struct fit_data_det {
     gsl_vector *f_iter; /* Stored residual vector values of f on first call of iter */
 } fit_data_det;
 
+typedef struct jacobian_space {
+    simulation sim; /* Copy of simulation, partially shallow, overwritten on every Jacobian calculation, so don't store anything here! */
+    detector **det; /* Array of detector pointers, detectors will be cloned here */
+    fit_variable *var; /* Active fit variable to be perturbed */
+    gsl_vector *f_param; /* Residuals vector */
+    double delta; /* Perturbation */
+    double delta_inv; /* Inverse of perturbation 1/delta */
+    size_t n_spectra_calculated; /* How many spectra (detectors) were actually computed for this var */
+} jacobian_space; /* All the stuff needed to compute Jacobian */
+
 typedef struct fit_data {
     fit_data_det *fdd; /* Detector specific stuff */
     size_t n_fdd; /* TODO: rename */
@@ -107,10 +117,13 @@ typedef struct fit_data {
     int (*fit_iter_callback)(struct fit_stats stats);
     gsl_vector *f_iter;
     double h_df;
+    jacobian_space *jspace;
 } fit_data;
 
 void fit_data_det_residual_vector_set(const fit_data_det *fdd, const gsl_histogram *histo_sum, gsl_vector *f);
 fit_data *fit_data_new(const jibal *jibal, simulation *sim);
+int fit_data_jspace_init(fit_data *fit, size_t n_channels_in_fit);
+void fit_data_jspace_free(fit_data *fit);
 void fit_data_defaults(fit_data *f);
 void fit_data_free(fit_data *fit); /* Doesn't free everything in fit, like sm, jibal, ... */
 void fit_data_reset(fit_data *fit);
@@ -135,7 +148,6 @@ size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_d
 struct fit_stats fit_stats_init();
 int fit(fit_data *fit);
 void fit_covar_print(const gsl_matrix *covar, jabs_msg_level msg_level);
-
 int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x); /* Updates values in fit params as they are varied by the fit algorithm. */
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 int fit_determine_active_detectors(fit_data *fit);

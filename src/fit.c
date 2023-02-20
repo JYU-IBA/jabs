@@ -43,6 +43,10 @@
 
 int fit_detector(const jibal *jibal, const fit_data_det *fdd, const simulation *sim, result_spectra *spectra, gsl_vector *f) {
     detector *det = sim_det(sim, fdd->i_det);
+    if(!det) {
+        jabs_message(MSG_ERROR, stderr, "No detector set.\n");
+        return EXIT_FAILURE;
+    }
     detector_update(det); /* non-const pointer inside const... not great */
     sim_workspace *ws = sim_workspace_init(jibal, sim, det);
     if(simulate_with_ds(ws)) {
@@ -63,14 +67,7 @@ int fit_detector(const jibal *jibal, const fit_data_det *fdd, const simulation *
     return EXIT_SUCCESS;
 }
 
-struct jacobian_space {
-    simulation sim; /* Copy of simulation, partially shallow */
-    fit_variable *var; /* Active fit variable to be perturbed */
-    gsl_vector *f_param; /* Residuals vector */
-    double delta; /* Perturbation */
-    double delta_inv; /* Inverse of perturbation 1/delta */
-    size_t n_spectra_calculated; /* How many spectra (detectors) were actually computed for this var */
-};
+
 
 int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     struct fit_data *fit = (struct fit_data *) params;
@@ -78,18 +75,17 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     DEBUGMSG("Computing Jacobian iter_call = %zu.", fit->stats.iter_call);
     assert(fit->stats.iter_call >= 1); /* This function relies on data that was computed when iter_call == 1 */
     assert(fit->fdf->p == fit->fit_params->n_active);
-    assert(fit->fdf->n == fit->f->size);
 
     gsl_matrix_set_zero(J); /* We might only set parts of the Jacobian, the rest of the elements of the matrix should be zero. */
     const size_t p = fit->fdf->p;
     const size_t n = fit->fdf->n;
 
-    struct jacobian_space *space = calloc(p, sizeof(struct jacobian_space));
+    jacobian_space *space = fit->jspace;
+
     for(size_t j = 0; j < p; j++) { /* Set all fit parameters based on vector x */
-        fit_variable *var = fit_params_find_active(fit->fit_params, j);
+        fit_variable *var = space[j].var;
         assert(var);
         *(var->value) = gsl_vector_get(x, j) * var->value_orig;
-        space[j].var = var;
     }
 
     for(size_t j = 0; j < p; j++) { /* Make copies of sim (shallow) with deep copies of detector and sample. This way we can parallelize. */
@@ -101,16 +97,17 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
             spc->delta = fit->h_df; /* TODO: this is what GSL does, but it doesn't always work */
         }
         spc->delta_inv = 1.0/spc->delta;
-        spc->f_param = gsl_vector_alloc(n); /* Residuals for this parameter */
         gsl_vector_set_zero(spc->f_param);
 
         *(var->value) = (xj + spc->delta) * var->value_orig; /* Perturb */
         spc->sim = *fit->sim; /* Shallow copy! */
-        spc->sim.det = calloc(fit->sim->n_det, sizeof(detector *)); /* Allocate space for clones of detectors. Uncloned detectors remain NULL. */
+        spc->sim.det = spc->det;
         spc->sim.sample = sample_from_sample_model(fit->sm); /* Allocates new thing! TODO: not necessary when var has nothing to do with sample */
         for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
             if(var->i_det >= fit->sim->n_det || var->i_det == i_det) { /* All detectors or just this one specific, depending on the variable */
                 spc->sim.det[i_det] = detector_clone(fit->sim->det[i_det]);
+            } else {
+                spc->sim.det[i_det] = NULL; /* Set the unused detectors to NULL, so we don't mix them up by accident */
             }
         }
         *(var->value) = (xj) * var->value_orig; /* Unperturb */
@@ -172,12 +169,10 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
         fit->stats.n_spectra_iter += spc->n_spectra_calculated;
         for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
             detector_free(spc->sim.det[i_det]);
+            spc->sim.det[i_det] = NULL;
         }
-        free(spc->sim.det);
         sample_free(spc->sim.sample);
-        gsl_vector_free(spc->f_param);
     }
-    free(space);
     return error ? GSL_FAILURE : GSL_SUCCESS;
 }
 
@@ -358,6 +353,33 @@ void fit_data_defaults(fit_data *f) {
     f->chisq_fast_tol = FIT_FAST_CHISQ_TOL;
     f->phase_start = FIT_PHASE_FAST;
     f->phase_stop = FIT_PHASE_SLOW;
+}
+
+int fit_data_jspace_init(fit_data *fit, size_t n_channels_in_fit) {
+    if(!fit || !fit->fit_params || !fit->fit_params->n_active) {
+        return EXIT_FAILURE;
+    }
+    fit->jspace =  calloc(fit->fit_params->n_active, sizeof(jacobian_space)); /* Space for each parameter for Jacobian calculation */
+    for(size_t j = 0; j < fit->fit_params->n_active; j++) {
+        jacobian_space *spc = &fit->jspace[j];
+        spc->var = fit_params_find_active(fit->fit_params, j);
+        spc->det = calloc(fit->sim->n_det, sizeof(detector *)); /* Array for detector pointers. Detectors themselves should be allocated/freed elsewhere. */
+        spc->f_param = gsl_vector_alloc(n_channels_in_fit); /* Residuals for this parameter */
+    }
+    return EXIT_SUCCESS;
+}
+
+void fit_data_jspace_free(fit_data *fit) {
+    if(!fit) {
+        return;
+    }
+    for(size_t j = 0; j < fit->fit_params->n_active; j++) {
+        jacobian_space *spc = &fit->jspace[j];
+        free(spc->det);
+        gsl_vector_free(spc->f_param);
+    }
+    free(fit->jspace);
+    fit->jspace = NULL;
 }
 
 void fit_data_free(fit_data *fit) {
@@ -919,6 +941,9 @@ int fit(fit_data *fit) {
     fit->dof = fdf->n - fdf->p;
     fit->h_df = fdf_params.h_df;
     jabs_message(MSG_INFO, stderr, "%zu channels and %zu parameters in fit, %zu degrees of %s\n", fdf->n, fdf->p, fit->dof, fit->dof < 10000 ? "freedom.":"FREEDOOOOM!!!");
+    if(fit_data_jspace_init(fit, fdf->n)) {
+        jabs_message(MSG_ERROR, stderr, "Could not initialize Jacobian evaluation workspace for %zu parameters.\n", fit->fit_params->n_active);
+    }
     gsl_vector *f;
     gsl_matrix *J;
     int status;
@@ -950,7 +975,8 @@ int fit(fit_data *fit) {
 
     gsl_matrix *covar = gsl_matrix_alloc(fit_params->n_active, fit_params->n_active);
     gsl_vector *x = gsl_vector_alloc(fit_params->n_active);
-    for(size_t i = 0; i < fit_params->n; i++) { /* Update all (including inactives) */
+
+    for(size_t i = 0; i < fit_params->n; i++) { /* Update all (including inactives) and set the (active) variable for each Jacobian parameter workspace */
         fit_variable *var = &(fit_params->vars[i]);
         var->err = 0.0;
         var->value_orig = *(var->value);
@@ -959,7 +985,6 @@ int fit(fit_data *fit) {
     gsl_vector_view wts = gsl_vector_view_array(weights, i_w);
 
     w = gsl_multifit_nlinear_alloc(T, &fdf_params, fdf->n, fdf->p);
-
     sim_calc_params p_orig = *fit->sim->params; /* Store original values (will be used in final stage of fitting) */
     for(int phase = fit->phase_start; phase <= fit->phase_stop; phase++) { /* Phase 1 is "fast", phase 2 normal. */
         assert(phase >= FIT_PHASE_FAST && phase <= FIT_PHASE_SLOW);
@@ -1032,6 +1057,7 @@ int fit(fit_data *fit) {
     gsl_vector_free(x);
     free(weights);
     free(fdf);
+    fit_data_jspace_free(fit);
     return fit->stats.error;
 }
 
