@@ -96,11 +96,13 @@ void Highlighter::highlightBlock(const QString &text)
     } else {
         highlightArgv(argc, argv); /* Highlights individual arguments */
         size_t last_pos = argv[argc - 1] - argv[0] + strlen(argv[argc - 1]); /* Last character, after parsing to argument vector, is this far in one the line */
-        if(text.at(last_pos) == '"') { /* Argument vector parser changes last quote to '\0', but we don't want to mark it as a comment */
-            last_pos++;
-        }
-        if(last_pos != len) {/* Where the argument vector parser stopped, comments begin */
-            setFormat(last_pos, len - last_pos, singleLineCommentFormat);
+        if(last_pos < text.length()) {
+            if(text.at(last_pos) == '"') { /* Argument vector parser changes last quote to '\0', but we don't want to mark it as a comment */
+                last_pos++;
+            }
+            if(last_pos != len) {/* Where the argument vector parser stopped, comments begin */
+                setFormat(last_pos, len - last_pos, singleLineCommentFormat);
+            }
         }
     }
     argv_free(argv, s_out);
