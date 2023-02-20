@@ -55,7 +55,7 @@ int fit_params_update(fit_params *p) {
     return EXIT_SUCCESS;
 }
 
-int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor, size_t i_det) {
+int fit_params_add_parameter(fit_params *p, fit_variable_type type, double *value, const char *name, const char *unit, double unit_factor, size_t i_det) {
     if(!value || !name) {
         DEBUGMSG("Didn't add a fit parameter since a NULL pointer was passed. Value = %p, name = %p (%s).", (void *)value, (void *)name, name);
         return EXIT_FAILURE;
@@ -68,6 +68,7 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
     p->n++;
     p->vars = realloc(p->vars, sizeof(fit_variable) * p->n);
     fit_variable *var = &(p->vars[p->n - 1]);
+    var->type = type;
     var->value = value;
     var->value_orig = 0.0;
     var->value_final = 0.0;
@@ -79,7 +80,11 @@ int fit_params_add_parameter(fit_params *p, double *value, const char *name, con
     var->unit_factor = unit_factor;
     var->active = FALSE;
     var->i_v = SIZE_MAX;
-    var->i_det = i_det;
+    if(type == FIT_VARIABLE_DETECTOR) {
+        var->i_det = i_det;
+    } else {
+        var->i_det = SIZE_MAX;
+    }
     DEBUGMSG("Fit parameter %s added successfully (total %zu).", var->name, p->n);
     return EXIT_SUCCESS;
 }
@@ -103,7 +108,7 @@ void fit_params_print(const fit_params *params, int active, const char *pattern,
             continue;
         if(pattern && !is_match(var->name, pattern))
             continue;
-        jabs_message(msg_level, stderr, "%s %24s = %g %s %s\n", var->active && !active ? "X" : "  ", var->name, *(var->value) / var->unit_factor, var->unit, var->i_det < n_det ? "(detector specific variable)":"");
+        jabs_message(msg_level, stderr, "%s %24s = %g %s\n", var->active && !active ? "X" : "  ", var->name, *(var->value) / var->unit_factor, var->unit);
         DEBUGMSG("This one is %p, raw value %.12g, i_v = %zu", (void *)var->value, *var->value, var->i_v);
     }
 }
@@ -214,4 +219,26 @@ fit_variable *fit_params_find_active(const fit_params *params, size_t i_v) {
     }
     DEBUGMSG("Could not find active fit parameter number i_v = %zu. This is a bug.", i_v);
     return NULL;
+}
+
+const char *fit_variable_type_str(const fit_variable *var) {
+    if(!var) {
+        return "null";
+    }
+    switch(var->type) {
+        case FIT_VARIABLE_NONE:
+            return "none";
+        case FIT_VARIABLE_GENERIC:
+            return "generic";
+        case FIT_VARIABLE_BEAM:
+            return "beam";
+        case FIT_VARIABLE_GEOMETRY:
+            return "geometry";
+        case FIT_VARIABLE_DETECTOR:
+            return "detector";
+        case FIT_VARIABLE_SAMPLE:
+            return "sample";
+        default:
+            return "unknown";
+    }
 }

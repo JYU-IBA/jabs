@@ -16,7 +16,17 @@
 #define JABS_FIT_VARIABLE_H
 #include <stdlib.h>
 
+typedef enum fit_variable_type {
+    FIT_VARIABLE_NONE = 0,
+    FIT_VARIABLE_GENERIC = 1,
+    FIT_VARIABLE_BEAM = 2,
+    FIT_VARIABLE_GEOMETRY = 3,
+    FIT_VARIABLE_DETECTOR = 4,
+    FIT_VARIABLE_SAMPLE = 5
+} fit_variable_type;
+
 typedef struct fit_variable {
+    fit_variable_type type;
     double *value; /* Pointer to a value. This is not allocated or free'd by fitting related methods. */
     double value_orig;
     double value_final;

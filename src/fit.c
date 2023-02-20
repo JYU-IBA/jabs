@@ -103,11 +103,11 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
         spc->sim = *fit->sim; /* Shallow copy! */
         spc->sim.det = spc->det;
         spc->sim.sample = sample_from_sample_model(fit->sm); /* Allocates new thing! TODO: not necessary when var has nothing to do with sample */
-        for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
-            if(var->i_det >= fit->sim->n_det || var->i_det == i_det) { /* All detectors or just this one specific, depending on the variable */
+        if(var->type == FIT_VARIABLE_DETECTOR) {
+            spc->sim.det[var->i_det] = detector_clone(fit->sim->det[var->i_det]);
+        } else {
+            for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
                 spc->sim.det[i_det] = detector_clone(fit->sim->det[i_det]);
-            } else {
-                spc->sim.det[i_det] = NULL; /* Set the unused detectors to NULL, so we don't mix them up by accident */
             }
         }
         *(var->value) = (xj) * var->value_orig; /* Unperturb */
@@ -480,9 +480,9 @@ fit_params *fit_params_all(fit_data *fit) {
     size_t param_name_max_len = 256; /* Laziness. We use a fixed size temporary string. snprintf is used, so no overflows should occur, but very long names may be truncated. */
     char *param_name = malloc(sizeof(char) * param_name_max_len);
     fit_params *params = fit_params_new();
-    fit_params_add_parameter(params, &sim->fluence, "fluence", "", 1.0, sim->n_det); /* This must be the first parameter always, as there is a speedup in the fit routine */
-    fit_params_add_parameter(params, &sim->sample_theta, "alpha", "deg", C_DEG, sim->n_det);
-    fit_params_add_parameter(params, &sim->beam_E, "energy", "keV", C_KEV, sim->n_det);
+    fit_params_add_parameter(params, FIT_VARIABLE_BEAM, &sim->fluence, "fluence", "", 1.0, 0); /* This must be the first parameter always, as there is a speedup in the fit routine */
+    fit_params_add_parameter(params, FIT_VARIABLE_GEOMETRY, &sim->sample_theta, "alpha", "deg", C_DEG, 0);
+    fit_params_add_parameter(params, FIT_VARIABLE_BEAM, &sim->beam_E, "energy", "keV", C_KEV, 0);
 
     if(sm) {
         for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) {
@@ -493,38 +493,38 @@ fit_params *fit_params_all(fit_data *fit) {
             }
             if(r->rough.model != ROUGHNESS_FILE) { /* Layer thickness is not a parameter with arbitrary roughness from a file */
                 snprintf(param_name, param_name_max_len, "thick%zu", range_index);
-                fit_params_add_parameter(params, &(r->x), param_name, "tfu", C_TFU, sim->n_det);
+                fit_params_add_parameter(params, FIT_VARIABLE_SAMPLE, &(r->x), param_name, "tfu", C_TFU, 0);
             }
 
             snprintf(param_name, param_name_max_len, "yield%zu", range_index);
-            fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0, sim->n_det);
+            fit_params_add_parameter(params, FIT_VARIABLE_SAMPLE, &(r->yield), param_name, "", 1.0, 0);
 
             snprintf(param_name, param_name_max_len, "yield_slope%zu", range_index);
-            fit_params_add_parameter(params, &(r->yield_slope), param_name, "", 1.0, sim->n_det);
+            fit_params_add_parameter(params, FIT_VARIABLE_SAMPLE, &(r->yield_slope), param_name, "", 1.0, 0);
 
             if(i_range == sm->n_ranges - 1) { /* Last range, add channeling "aliases" (=yield corrections) */
                 snprintf(param_name, param_name_max_len, "channeling");
-                fit_params_add_parameter(params, &(r->yield), param_name, "", 1.0, sim->n_det);
+                fit_params_add_parameter(params, FIT_VARIABLE_SAMPLE, &(r->yield), param_name, "", 1.0, 0);
 
                 snprintf(param_name, param_name_max_len, "channeling_slope");
-                fit_params_add_parameter(params, &(r->yield_slope), param_name, "", 1.0, sim->n_det);
+                fit_params_add_parameter(params, FIT_VARIABLE_SAMPLE, &(r->yield_slope), param_name, "", 1.0, 0);
             }
 
             snprintf(param_name, param_name_max_len, "bragg%zu", range_index);
-            fit_params_add_parameter(params, &(r->bragg), param_name, "", 1.0, sim->n_det);
+            fit_params_add_parameter(params, FIT_VARIABLE_SAMPLE, &(r->bragg), param_name, "", 1.0, 0);
 
             snprintf(param_name, param_name_max_len, "stragg%zu", range_index);
-            fit_params_add_parameter(params, &(r->stragg), param_name, "", 1.0, sim->n_det);
+            fit_params_add_parameter(params, FIT_VARIABLE_SAMPLE, &(r->stragg), param_name, "", 1.0, 0);
 
             if(r->rough.model == ROUGHNESS_GAMMA && r->rough.x > 0.0) {
                 snprintf(param_name, param_name_max_len, "rough%zu", range_index);
-                fit_params_add_parameter(params, &(r->rough.x), param_name, "tfu", C_TFU, sim->n_det);
+                fit_params_add_parameter(params, FIT_VARIABLE_SAMPLE, &(r->rough.x), param_name, "tfu", C_TFU, 0);
             }
             for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
                 if(*sample_model_conc_bin(sm, i_range, i_mat) < CONC_TOLERANCE) /* Don't add fit variables for negative, zero or very low concentrations. */
                     continue;
                 snprintf(param_name, param_name_max_len, "conc%zu_%s", range_index, sm->materials[i_mat]->name);
-                fit_params_add_parameter(params, sample_model_conc_bin(sm, i_range, i_mat), param_name, "%", C_PERCENT, sim->n_det);
+                fit_params_add_parameter(params, FIT_VARIABLE_SAMPLE, sample_model_conc_bin(sm, i_range, i_mat), param_name, "%", C_PERCENT, 0);
             }
         }
     }
@@ -536,7 +536,7 @@ fit_params *fit_params_all(fit_data *fit) {
             return NULL;
         }
         snprintf(param_name, param_name_max_len, "%ssolid", det_name);
-        fit_params_add_parameter(params, &det->solid, param_name, "msr", C_MSR, i_det);
+        fit_params_add_parameter(params, FIT_VARIABLE_DETECTOR, &det->solid, param_name, "msr", C_MSR, i_det);
 
         for(int Z = JIBAL_ANY_Z; Z <= det->cal_Z_max; Z++) {
             calibration *c = detector_get_calibration(det, Z);
@@ -552,7 +552,7 @@ fit_params *fit_params_all(fit_data *fit) {
                          (Z == JIBAL_ANY_Z) ? "" : jibal_element_name(fit->jibal->elements, Z),
                          calib_param_name);
                 free(calib_param_name);
-                fit_params_add_parameter(params, calibration_get_param_ref(c, i), param_name, "keV", C_KEV, i_det);
+                fit_params_add_parameter(params, FIT_VARIABLE_DETECTOR, calibration_get_param_ref(c, i), param_name, "keV", C_KEV, i_det);
             }
         }
         free(det_name);

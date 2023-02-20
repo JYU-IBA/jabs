@@ -24,7 +24,7 @@ typedef struct fit_params {
 
 fit_params *fit_params_new();
 void fit_params_free(fit_params *p);
-int fit_params_add_parameter(fit_params *p, double *value, const char *name, const char *unit, double unit_factor, size_t i_det); /* Pointer to parameter to be fitted (value) is accessed during fitting (read, write). No guarantees that it stays accessible after the fit is over and user decides to change something! */
+int fit_params_add_parameter(fit_params *p, fit_variable_type type, double *value, const char *name, const char *unit, double unit_factor, size_t i_det);  /* Pointer to parameter to be fitted (value) is accessed during fitting (read, write). No guarantees that it stays accessible after the fit is over and user decides to change something! */
 int fit_params_update(fit_params *p);
 void fit_params_print(const fit_params *params, int active, const char *pattern, size_t n_det, jabs_msg_level msg_level); /* if active is TRUE print only active variables. pattern can be NULL to bypass matching. */
 void fit_params_print_final(const fit_params *params);
@@ -33,4 +33,5 @@ void fit_parameters_update(const fit_params *fit_params, const gsl_multifit_nlin
 void fit_parameters_update_changed(const fit_params *fit_params); /* Checks if values have changed since fit_parameters_update(), computes new error */
 int fit_params_enable_using_string(fit_params *params, const char *fit_vars);
 fit_variable *fit_params_find_active(const fit_params *params, size_t i_v); /* Find active fit parameter with matching index number i_v as set by fit_params_update() */
+const char *fit_variable_type_str(const fit_variable *var);
 #endif // JABS_PARAMS_H
