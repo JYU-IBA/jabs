@@ -83,17 +83,15 @@ typedef struct fit_data_det {
 
 typedef struct jacobian_space {
     simulation sim; /* Copy of simulation, partially shallow, overwritten on every Jacobian calculation, so don't store anything here! */
-    detector **det; /* Array of detector pointers, detectors will be cloned here */
+    detector **det; /* Array of detector pointers, detectors will be cloned here (if needed) */
     fit_variable *var; /* Active fit variable to be perturbed */
     gsl_vector *f_param; /* Residuals vector */
-    double delta; /* Perturbation */
     double delta_inv; /* Inverse of perturbation 1/delta */
     size_t n_spectra_calculated; /* How many spectra (detectors) were actually computed for this var */
 } jacobian_space; /* All the stuff needed to compute Jacobian */
 
 typedef struct fit_data {
     fit_data_det *fdd; /* Detector specific stuff */
-    size_t n_fdd; /* TODO: rename */
     result_spectra *spectra; /* all spectra (array of n_det_spectra), updates every iter at the start of iter. */
     size_t n_det_spectra; /* n_det (= n_fdd) when histograms were copied */
     gsl_histogram **exp; /* experimental data to be fitted, array of n_exp elements */

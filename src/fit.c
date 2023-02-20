@@ -67,7 +67,52 @@ int fit_detector(const jibal *jibal, const fit_data_det *fdd, const simulation *
     return EXIT_SUCCESS;
 }
 
+void fit_deriv_prepare_jspaces(const gsl_vector *x, fit_data *fit) {
+    jacobian_space *space = fit->jspace;
+    for(size_t j = 0; j < fit->fit_params->n_active; j++) { /* Make copies of sim (shallow) with deep copies of detector and sample. This way we can parallelize. */
+        struct jacobian_space *spc = &space[j];
+        fit_variable *var = spc->var;
+        double xj = gsl_vector_get(x, j);
+        double delta = fit->h_df * fabs(xj);
+        if(delta == 0.0) {
+            delta = fit->h_df; /* TODO: this is what GSL does, but it doesn't always work */
+        }
+        spc->delta_inv = 1.0/delta;
+        *(var->value) = (xj + delta) * var->value_orig; /* Perturb */
+        spc->sim = *fit->sim; /* Shallow copy! */
+        switch(var->type) { /* Deepen the copy based on the variable */
+            case FIT_VARIABLE_SAMPLE:
+                spc->sim.sample = sample_from_sample_model(fit->sm);
+                break;
+            case FIT_VARIABLE_DETECTOR:
+                spc->sim.det = spc->det;
+                spc->sim.det[var->i_det] = detector_clone(fit->sim->det[var->i_det]);
+                break;
+            default:
+                break;
+        }
+        *(var->value) = (xj) * var->value_orig; /* Unperturb */
+    }
+}
 
+void fit_deriv_cleanup_jspaces(fit_data *fit) {
+    jacobian_space *space = fit->jspace;
+    for(size_t j = 0; j <  fit->fit_params->n_active; j++) {
+        struct jacobian_space *spc = &space[j];
+        fit_variable *var = spc->var;
+        fit->stats.n_spectra_iter += spc->n_spectra_calculated;
+        switch(var->type) {
+            case FIT_VARIABLE_SAMPLE:
+                sample_free(spc->sim.sample);
+                break;
+            case FIT_VARIABLE_DETECTOR:
+                detector_free(spc->sim.det[var->i_det]);
+                break;
+            default:
+                break;
+        }
+    }
+}
 
 int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     struct fit_data *fit = (struct fit_data *) params;
@@ -77,57 +122,25 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     assert(fit->fdf->p == fit->fit_params->n_active);
 
     gsl_matrix_set_zero(J); /* We might only set parts of the Jacobian, the rest of the elements of the matrix should be zero. */
-    const size_t p = fit->fdf->p;
-    const size_t n = fit->fdf->n;
 
-    jacobian_space *space = fit->jspace;
+    fit_deriv_prepare_jspaces(x, fit);
 
-    for(size_t j = 0; j < p; j++) { /* Set all fit parameters based on vector x */
-        fit_variable *var = space[j].var;
-        assert(var);
-        *(var->value) = gsl_vector_get(x, j) * var->value_orig;
-    }
-
-    for(size_t j = 0; j < p; j++) { /* Make copies of sim (shallow) with deep copies of detector and sample. This way we can parallelize. */
-        struct jacobian_space *spc = &space[j];
-        fit_variable *var = spc->var;
-        double xj = gsl_vector_get(x, j);
-        spc->delta = fit->h_df * fabs(xj);
-        if(spc->delta == 0.0) {
-            spc->delta = fit->h_df; /* TODO: this is what GSL does, but it doesn't always work */
-        }
-        spc->delta_inv = 1.0/spc->delta;
-        gsl_vector_set_zero(spc->f_param);
-
-        *(var->value) = (xj + spc->delta) * var->value_orig; /* Perturb */
-        spc->sim = *fit->sim; /* Shallow copy! */
-        spc->sim.det = spc->det;
-        spc->sim.sample = sample_from_sample_model(fit->sm); /* Allocates new thing! TODO: not necessary when var has nothing to do with sample */
-        if(var->type == FIT_VARIABLE_DETECTOR) {
-            spc->sim.det[var->i_det] = detector_clone(fit->sim->det[var->i_det]);
-        } else {
-            for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
-                spc->sim.det[i_det] = detector_clone(fit->sim->det[i_det]);
-            }
-        }
-        *(var->value) = (xj) * var->value_orig; /* Unperturb */
-    }
     double start = jabs_clock();
     volatile int error = FALSE;
-#pragma omp parallel default(none) shared(fit, space, n, J, error)
+#pragma omp parallel default(none) shared(fit, J, error)
 #pragma omp for
-    for(size_t j = 0; j < fit->fdf->p; j++) {
-        struct jacobian_space *spc = &space[j];
+    for(size_t j = 0; j < fit->fit_params->n_active; j++) {
+        struct jacobian_space *spc = &fit->jspace[j];
         fit_variable *var = spc->var;
         size_t i_start, i_stop;
-        if(spc->var->i_det < fit->sim->n_det) { /* Detector specific */
-            i_start = spc->var->i_det;
-            i_stop = spc->var->i_det;
+        if(var->type == FIT_VARIABLE_DETECTOR) {
+            i_start = var->i_det;
+            i_stop = var->i_det;
         } else { /* All detectors */
             i_start = 0;
             i_stop = fit->sim->n_det - 1;
         }
-        DEBUGMSG("Variable %s (i_v = %zu, j = %zu) perturbation. i_det = [%zu, %zu]", var->name, var->i_v, j, i_start, i_stop);
+        DEBUGMSG("Variable %s (i_v = %zu, j = %zu) Jacobian. i_det = [%zu, %zu]", var->name, var->i_v, j, i_start, i_stop);
         for(size_t i_det = i_start; i_det <= i_stop; i_det++) {
             fit_data_det *fdd = &fit->fdd[i_det];
             gsl_vector_view v = gsl_vector_subvector(spc->f_param, fdd->f_offset, fdd->n_ch); /* The ROIs of this detector are a subvector of f_param (all channels in fit) */
@@ -143,36 +156,15 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
             for(size_t i = 0; i < fdd->n_ch; i++) {
                 double fnext = gsl_vector_get(&v.vector, i);
                 double fi = gsl_vector_get(fit->f_iter, fdd->f_offset + i);
-                double out = (fnext - fi) * spc->delta_inv;
-                J->data[(i + fdd->f_offset) * J->tda + j] = out;
+                gsl_matrix_set(J, i + fdd->f_offset, j, (fnext - fi) * spc->delta_inv);
             }
-
         }
         if(error) {
             continue;
         }
-#if 0
-        for (size_t i = 0; i < n; i++) {
-            double fnext = gsl_vector_get(spc->f_param, i);
-            double fi = gsl_vector_get(fit->f_iter, i); /* Reference (unperturbed parameter) from first call of iteration */
-            double out = (fnext - fi) * spc->delta_inv;
-            //gsl_matrix_set(J, i, j, out); /* i'th channel, j'th active fit parameter */
-            J->data[i * J->tda + j] = out; /* Should be calling gsl_matrix_set, but want to avoid function call... */
-            //fprintf(stderr, "J(%zu, %zu) = %g because %g and %g and %g.\n", i, j, out, fi, fnext, spc->delta_inv, i);
-        }
-#endif
     }
     double end = jabs_clock();
     fit->stats.cputime_iter += (end - start);
-    for(size_t j = 0; j < p; j++) {
-        struct jacobian_space *spc = &space[j];
-        fit->stats.n_spectra_iter += spc->n_spectra_calculated;
-        for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
-            detector_free(spc->sim.det[i_det]);
-            spc->sim.det[i_det] = NULL;
-        }
-        sample_free(spc->sim.sample);
-    }
     return error ? GSL_FAILURE : GSL_SUCCESS;
 }
 
@@ -202,14 +194,14 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     }
     double start = jabs_clock();
     volatile int error = FALSE;
-    if(fit->n_fdd == 1) { /* Skip OpenMP if only one workspace */
+    if(fit->sim->n_det == 1) { /* Skip OpenMP if only one workspace */
         fit_data_det *fdd = &fit->fdd[0];
         result_spectra *spectra = (fit->stats.iter_call == 1 ? &fit->spectra[fdd->i_det] : NULL);
         error = fit_detector(fit->jibal, fdd, fit->sim, spectra, f);
     } else {
 #pragma omp parallel default(none) shared(fit, error, f)
 #pragma omp for
-        for(size_t i = 0; i < fit->n_fdd; i++) {
+        for(size_t i = 0; i < fit->sim->n_det; i++) {
 #ifdef _OPENMP
             DEBUGMSG("Thread id %i got %zu.", omp_get_thread_num(), i);
 #endif
@@ -232,7 +224,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     }
     fit->stats.cputime_iter += (end - start);
     fit->stats.n_evals_iter++;
-    fit->stats.n_spectra_iter += fit->n_fdd;
+    fit->stats.n_spectra_iter += fit->sim->n_det;
     if(fit->stats.iter_call == 1) {
         gsl_vector_memcpy(fit->f_iter, f); /* Store residual vector on first call, this acts as baseline for everything we do later */
     }
@@ -363,7 +355,12 @@ int fit_data_jspace_init(fit_data *fit, size_t n_channels_in_fit) {
     for(size_t j = 0; j < fit->fit_params->n_active; j++) {
         jacobian_space *spc = &fit->jspace[j];
         spc->var = fit_params_find_active(fit->fit_params, j);
-        spc->det = calloc(fit->sim->n_det, sizeof(detector *)); /* Array for detector pointers. Detectors themselves should be allocated/freed elsewhere. */
+        assert(spc->var);
+        if(spc->var->type == FIT_VARIABLE_DETECTOR) {
+            spc->det = calloc(fit->sim->n_det, sizeof(detector *)); /* Array for detector pointers. This overrides array in sim, so it needs to be an array, although we only use one element of it. */
+        } else {
+            spc->det = NULL;
+        }
         spc->f_param = gsl_vector_alloc(n_channels_in_fit); /* Residuals for this parameter */
     }
     return EXIT_SUCCESS;
@@ -568,15 +565,13 @@ int fit_data_fdd_init(fit_data *fit) {
     if(fit->fdd) {
         free(fit->fdd);
     }
-    size_t n_alloc = fit->sim->n_det;
-    fit->fdd = calloc(n_alloc, sizeof(fit_data_det));
-    fit->n_fdd = n_alloc;
+    fit->fdd = calloc(fit->sim->n_det, sizeof(fit_data_det));
 
     for(size_t i_roi = 0; i_roi < fit->n_fit_ranges; i_roi++) { /* Loop over rois, fdds, count rois and n of channels */
         const roi *roi = &fit->fit_ranges[i_roi];
-        for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) {
-            fit_data_det *fdd = &fit->fdd[i_fdd];
-            if(i_fdd != roi->i_det) { /* This ROI is not for this fdd */
+        for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
+            fit_data_det *fdd = &fit->fdd[i_det];
+            if(i_det != roi->i_det) { /* This ROI is not for this fdd */
                 continue;
             }
             fdd->n_ranges++;
@@ -584,22 +579,22 @@ int fit_data_fdd_init(fit_data *fit) {
         }
     }
 
-    for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) {
-        fit_data_det *fdd = &fit->fdd[i_fdd];
-        fdd->exp = fit_data_exp(fit, i_fdd);
-        fdd->i_det = i_fdd;
-        fdd->det = sim_det(fit->sim, i_fdd);
+    for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
+        fit_data_det *fdd = &fit->fdd[i_det];
+        fdd->exp = fit_data_exp(fit, i_det);
+        fdd->i_det = i_det;
+        fdd->det = sim_det(fit->sim, i_det);
         fdd->f_iter = gsl_vector_alloc(fdd->n_ch);
         fdd->ranges = calloc(fdd->n_ranges, sizeof(roi));
         if(fdd->n_ranges == 0) {
-            DEBUGMSG("FDD %zu no ranges, length: %zu", i_fdd, fdd->n_ch);
+            DEBUGMSG("Detector %zu no ranges, length: %zu", i_det + 1, fdd->n_ch);
         }
         size_t i = 0; /* Index of fdd roi */
         size_t i_vec = 0; /* fit residual vector index at beginning of roi */
         for(size_t i_roi = 0; i_roi < fit->n_fit_ranges; i_roi++) {
             const roi *roi = &fit->fit_ranges[i_roi];
             size_t l = (roi->high - roi->low + 1);
-            if(i_fdd != roi->i_det) {
+            if(i_det != roi->i_det) {
                 i_vec += l;
                 continue;
             }
@@ -616,14 +611,19 @@ int fit_data_fdd_init(fit_data *fit) {
 }
 
 void fit_data_fdd_free(fit_data *fit) {
-    for(size_t i_fdd = 0; i_fdd < fit->n_fdd; i_fdd++) {
+    if(!fit || !fit->fdd) {
+        return;
+    }
+    for(size_t i_fdd = 0; i_fdd < fit->sim->n_det; i_fdd++) {
         fit_data_det *fdd = &fit->fdd[i_fdd];
+        if(!fdd) {
+            continue;
+        }
         gsl_vector_free(fdd->f_iter);
         free(fdd->ranges);
     }
     free(fit->fdd);
     fit->fdd = NULL;
-    fit->n_fdd = 0;
 }
 
 void fit_data_exp_alloc(fit_data *fit) {
@@ -727,7 +727,7 @@ int fit_data_add_det(struct fit_data *fit, detector *det) {
 fit_data_det *fit_data_fdd(const fit_data *fit, size_t i_det) {
     if(!fit|| !fit->fdd)
         return NULL;
-    if(i_det >= fit->n_fdd)
+    if(i_det >= fit->sim->n_det)
         return NULL;
     return &fit->fdd[i_det];
 }

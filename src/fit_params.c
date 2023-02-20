@@ -89,7 +89,7 @@ int fit_params_add_parameter(fit_params *p, fit_variable_type type, double *valu
     return EXIT_SUCCESS;
 }
 
-void fit_params_print(const fit_params *params, int active, const char *pattern, size_t n_det, jabs_msg_level msg_level) { /* Prints current values of all possible fit variables matching pattern. Pattern can be NULL too. */
+void fit_params_print(const fit_params *params, int active, const char *pattern, jabs_msg_level msg_level) { /* Prints current values of all possible fit variables matching pattern. Pattern can be NULL too. */
     if(!params)
         return;
     const char *whatkind = active ? "active" : "possible";
