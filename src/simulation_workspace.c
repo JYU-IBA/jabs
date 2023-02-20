@@ -91,7 +91,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->ion.E = sim->beam_E;
     ws->ion.S = pow2(sim->beam_E_broad / C_FWHM);
 
-    sim_workspace_recalculate_n_channels(ws, sim);
+    sim_workspace_recalculate_n_channels(ws, ws->sim);
 
     if(ws->n_channels == 0) {
         jabs_message(MSG_ERROR, stderr,  "Number of channels in workspace is zero. Aborting initialization.\n");
@@ -160,7 +160,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
                     reaction_type_to_string(r->type), ws->det->theta / C_DEG);
             continue;
         }
-        double E = reaction_product_energy(r, ws->det->theta, sim->beam_E + ws->params->sigmas_cutoff * sqrt(sim->beam_E_broad / C_FWHM)); /* Highest energy we could possibly reach, maybe */
+        double E = reaction_product_energy(r, ws->det->theta, sim->beam_E + ws->params->sigmas_cutoff * sim->beam_E_broad / C_FWHM); /* Highest energy we could possibly reach, maybe */
         double E_safer = E + ws->params->sigmas_cutoff * sqrt(detector_resolution(ws->det, r->product, E)); /* Add resolution sigma to max energy */
         E_safer *= 1.1; /* and 10% for good measure! */
         const calibration *cal = detector_get_calibration(ws->det, r->product->Z);
