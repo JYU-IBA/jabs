@@ -179,6 +179,14 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
             sim_workspace_free(ws);
             return SCRIPT_COMMAND_FAILURE;
         }
+#ifdef DEBUG
+        char *bricks_filename;
+        asprintf(&bricks_filename, "bricks_%zu.dat", i_det + 1);
+        if(bricks_filename) {
+            sim_workspace_print_bricks(ws, bricks_filename);
+            free(bricks_filename);
+        }
+#endif
         fit_data_spectra_copy_to_spectra_from_ws(&fit->spectra[i_det], det, s->fit->exp[i_det], ws);
         sim_workspace_free(ws);
     }
