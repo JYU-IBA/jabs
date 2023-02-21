@@ -71,6 +71,7 @@ void fit_deriv_prepare_jspaces(const gsl_vector *x, fit_data *fit) {
     jacobian_space *space = fit->jspace;
     for(size_t j = 0; j < fit->fit_params->n_active; j++) { /* Make copies of sim (shallow) with deep copies of detector and sample. This way we can parallelize. */
         struct jacobian_space *spc = &space[j];
+        spc->n_spectra_calculated = 0;
         fit_variable *var = spc->var;
         double xj = gsl_vector_get(x, j);
         double delta = fit->h_df * fabs(xj);
@@ -163,6 +164,7 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
             continue;
         }
     }
+    fit_deriv_cleanup_jspaces(fit);
     double end = jabs_clock();
     fit->stats.cputime_iter += (end - start);
     return error ? GSL_FAILURE : GSL_SUCCESS;
