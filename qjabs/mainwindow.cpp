@@ -133,7 +133,7 @@ void MainWindow::openFile(const QString &filename)
 }
 
 void MainWindow::runRoi(const QString &roi) {
-    runLine(QString("roi %1 %2").arg(ui->comboBox->currentIndex()).arg(roi));
+    runLine(QString("roi %1 %2").arg(ui->comboBox->currentIndex() + 1).arg(roi));
 }
 
 void MainWindow::plotDialogClosed()
