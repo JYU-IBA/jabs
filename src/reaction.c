@@ -108,19 +108,12 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     if(!target || !incident) {
         return NULL;
     }
-    reaction *r = malloc(sizeof(reaction));
+    reaction *r = calloc(1, sizeof(reaction));
     r->type = type;
     r->cs = cs;
     r->incident = incident;
     r->target = target;
-    r->filename = NULL;
-    r->cs_table = NULL;
     r->n_cs_table = 0;
-#ifdef JABS_PLUGINS
-    r->plugin = NULL;
-    r->plugin_r = NULL;
-#endif
-    r->nucl_stop = NULL; /* Will be handled when reaction is prepared */
     r->E_min = E_MIN;
     r->E_max = E_MAX;
     r->Q = 0.0;
@@ -134,11 +127,7 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
             r->product = incident;
             r->residual = target;
             break;
-        case REACTION_FILE:
-        case REACTION_PLUGIN:
-        default:
-            r->product = NULL;
-            r->residual = NULL;
+        default: /* Other reaction types leave product and residual as NULL. They should be defined! */
             break;
     }
     reaction_generate_name(r);
