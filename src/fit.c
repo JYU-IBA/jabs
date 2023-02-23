@@ -978,12 +978,11 @@ int fit(fit_data *fit) {
 #ifdef DEBUG
     fprintf(stderr, "Set %zu weights.\n", i_w);
 #endif
-    fit->f_iter = gsl_vector_alloc(fdf->n);
     if(fit_data_fdd_init(fit)) {
         return EXIT_FAILURE;
     }
     assert(i_w == fdf->n);
-
+    fit->f_iter = gsl_vector_alloc(fdf->n);
     gsl_matrix *covar = gsl_matrix_alloc(fit_params->n_active, fit_params->n_active);
     gsl_vector *x = gsl_vector_alloc(fit_params->n_active);
 
@@ -1064,6 +1063,7 @@ int fit(fit_data *fit) {
         fit_data_print(fit, MSG_VERBOSE);
     }
     gsl_multifit_nlinear_free(w);
+    gsl_vector_free(fit->f_iter);
     gsl_matrix_free(covar);
     gsl_vector_free(x);
     free(weights);
