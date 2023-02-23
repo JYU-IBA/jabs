@@ -2146,7 +2146,7 @@ script_command_status script_set_verbosity(struct script_session *s, int argc, c
         return EXIT_FAILURE;
     }
     jabs_message_verbosity = tmp;
-    jabs_message(MSG_INFO, stderr, "Verbosity level set to \"%s\".\n", jabs_msg_levels[jabs_message_verbosity]);
+    jabs_message(MSG_INFO, stderr, "Verbosity level set to \"%s\".\n", jabs_message_level_str(jabs_message_verbosity));
     return 1;
 }
 

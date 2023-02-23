@@ -59,6 +59,15 @@ int main(int argc, char *argv[])
     return a.exec();
 }
 
+static const char *jabs_msg_levels[MSG_ERROR+1] = {"Debug", "Verbose", "Default", "Important", "Warning", "Error"};
+
+const char *jabs_message_level_str(jabs_msg_level level) {
+    if(level <= MSG_ERROR) {
+        return jabs_msg_levels[level];
+    }
+    return NULL;
+}
+
 void jabs_message(jabs_msg_level level, FILE *f, const char * format, ...) {
     if(level < jabs_message_verbosity) {
         return;
