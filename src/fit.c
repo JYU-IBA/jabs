@@ -202,7 +202,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
         result_spectra *spectra = (fit->stats.iter_call == 1 ? &fit->spectra[fdd->i_det] : NULL);
         error = fit_detector(fit->jibal, fdd, fit->sim, spectra, f);
     } else {
-#pragma omp parallel default(none) shared(fit, error, f)
+#pragma omp parallel default(none) shared(fit, error, f, stderr)
 #pragma omp for
         for(size_t i = 0; i < fit->sim->n_det; i++) {
 #ifdef _OPENMP
