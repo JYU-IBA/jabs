@@ -694,7 +694,9 @@ void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *spectra, const det
         const reaction *r = ws->reactions[i]->r;
         result_spectrum *s = &spectra->s[RESULT_SPECTRA_REACTION_SPECTRUM(i)];
         s->histo = gsl_histogram_clone(ws->reactions[i]->histo);
-        asprintf(&s->name, ",\"%s (%s)\"", r->target->name, reaction_type_to_string(r->type));
+        if(asprintf(&s->name, ",\"%s (%s)\"", r->target->name, reaction_type_to_string(r->type)) < 0) {
+            s->name = NULL;
+        }
         s->target_isotope = r->target;
         s->type = r->type;
     }

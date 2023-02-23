@@ -11,6 +11,9 @@
     See LICENSE.txt for the full license.
 
  */
+
+#define _GNU_SOURCE
+#include <stdio.h>
 #include <assert.h>
 #include <string.h>
 #include "simulation.h"

@@ -1,6 +1,7 @@
 #include <gsl/gsl_multifit_nlinear.h>
 #include <assert.h>
 #include <string.h>
+#include <stdint.h>
 #include "jabs_debug.h"
 #include "defaults.h"
 #include "message.h"
