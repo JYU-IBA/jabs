@@ -35,6 +35,7 @@
 #include "jabs.h"
 #include "spectrum.h"
 #include "message.h"
+#include "gsl_inline.h"
 #include "fit.h"
 #ifdef _OPENMP
 #include <omp.h>
@@ -155,9 +156,9 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
             }
             spc->n_spectra_calculated++;
             for(size_t i = 0; i < fdd->n_ch; i++) {
-                double fnext = gsl_vector_get(&v.vector, i);
-                double fi = gsl_vector_get(fit->f_iter, fdd->f_offset + i);
-                gsl_matrix_set(J, i + fdd->f_offset, j, (fnext - fi) * spc->delta_inv);
+                double fnext = jabs_gsl_vector_get(&v.vector, i);
+                double fi = jabs_gsl_vector_get(fit->f_iter, fdd->f_offset + i);
+                jabs_gsl_matrix_set(J, i + fdd->f_offset, j, (fnext - fi) * spc->delta_inv);
             }
         }
         if(error) {
@@ -322,9 +323,9 @@ void fit_data_det_residual_vector_set(const fit_data_det *fdd, const gsl_histogr
         const roi *range = &fdd->ranges[i_range];
         for(size_t i = range->low; i <= range->high; i++) {
             if(i >= histo_sum->n) { /* Outside range of simulated spectrum (simulated is zero) */
-                gsl_vector_set(f, i_vec, fdd->exp->bin[i]);
+                jabs_gsl_vector_set(f, i_vec, fdd->exp->bin[i]);
             } else {
-                gsl_vector_set(f, i_vec, fdd->exp->bin[i] - histo_sum->bin[i]);
+                jabs_gsl_vector_set(f, i_vec, fdd->exp->bin[i] - histo_sum->bin[i]);
             }
             i_vec++;
         }
