@@ -118,8 +118,6 @@ void fit_deriv_cleanup_jspaces(fit_data *fit) {
 
 int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     struct fit_data *fit = (struct fit_data *) params;
-
-    DEBUGMSG("Computing Jacobian iter_call = %zu.", fit->stats.iter_call);
     assert(fit->stats.iter_call >= 1); /* This function relies on data that was computed when iter_call == 1 */
     assert(fit->fdf->p == fit->fit_params->n_active);
 
@@ -129,9 +127,11 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
 
     double start = jabs_clock();
     volatile int error = FALSE;
-#pragma omp parallel default(none) shared(fit, J, error)
-#pragma omp for
-    for(size_t j = 0; j < fit->fit_params->n_active; j++) {
+    const size_t n = fit->fit_params->n_active;
+#pragma omp parallel default(none) shared(fit, J, error, stderr, n)
+#pragma omp for nowait schedule(dynamic)
+    for(size_t j = 0; j < n; j++) {
+        //fprintf(stderr, "Thread id %i got %zu.\n", omp_get_thread_num(), j);
         struct jacobian_space *spc = &fit->jspace[j];
         fit_variable *var = spc->var;
         size_t i_start, i_stop;
