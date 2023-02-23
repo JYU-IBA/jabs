@@ -537,6 +537,12 @@ fit_params *fit_params_all(fit_data *fit) {
         snprintf(param_name, param_name_max_len, "%ssolid", det_name);
         fit_params_add_parameter(params, FIT_VARIABLE_DETECTOR, &det->solid, param_name, "msr", C_MSR, i_det);
 
+        snprintf(param_name, param_name_max_len, "%stheta", det_name);
+        fit_params_add_parameter(params, FIT_VARIABLE_DETECTOR, &det->theta, param_name, "deg", C_DEG, i_det);
+
+        snprintf(param_name, param_name_max_len, "%sphi", det_name);
+        fit_params_add_parameter(params, FIT_VARIABLE_DETECTOR, &det->phi, param_name, "deg", C_DEG, i_det);
+
         for(int Z = JIBAL_ANY_Z; Z <= det->cal_Z_max; Z++) {
             calibration *c = detector_get_calibration(det, Z);
             if(Z != JIBAL_ANY_Z && c == det->calibration) /* No Z-specific calibration */
