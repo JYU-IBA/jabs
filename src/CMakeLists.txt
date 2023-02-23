@@ -32,6 +32,7 @@ add_executable(jabs
         calibration.c prob_dist.c idf2jbs.c idfelementparsers.c
         idfparse.c nuclear_stopping.c stop.c des.c
         simulation_workspace.c sim_reaction.c sim_calc_params.c
+        histogram.c
         "$<$<BOOL:${JABS_PLUGINS}>:plugin.c>"
         "$<$<BOOL:${WIN32}>:win_compat.c>"
         )

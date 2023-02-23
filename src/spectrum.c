@@ -18,6 +18,7 @@
 #include "generic.h"
 #include "spectrum.h"
 #include "message.h"
+#include "histogram.h"
 #include "win_compat.h"
 
 result_spectra *result_spectra_alloc(size_t n) {
@@ -59,7 +60,7 @@ int result_spectrum_copy(result_spectrum *dest, const result_spectrum *src) {
 }
 
 int result_spectrum_set(result_spectrum *dest, const gsl_histogram *h, const char *name, const jibal_isotope *target_isotope, reaction_type type) {
-    dest->histo = h ? gsl_histogram_clone(h) : NULL;
+    dest->histo = h ? jabs_histogram_clone(h) : NULL;
     dest->name = name ? strdup(name) : NULL;
     dest->target_isotope = target_isotope;
     dest->type = type;

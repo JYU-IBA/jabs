@@ -608,7 +608,7 @@ int fit_data_fdd_init(fit_data *fit) {
             }
             if(i == 0) {
                 fdd->f_offset = i_vec;
-                DEBUGMSG("FDD %zu, %zu ROIs, First ROI is %zu/%zu of all, subvector offset %zu, length %zu)", i_fdd, fdd->n_ranges, i_roi, fit->n_fit_ranges, fdd->f_offset, fdd->n_ch);
+                DEBUGMSG("FDD %zu, %zu ROIs, First ROI is %zu/%zu of all, subvector offset %zu, length %zu)", i_det, fdd->n_ranges, i_roi, fit->n_fit_ranges, fdd->f_offset, fdd->n_ch);
             }
             fdd->ranges[i] = *roi;
             i++;
