@@ -79,6 +79,9 @@ public:
     Highlighter(QTextDocument *parent = nullptr);
     void setSession(const script_session *session);
     void highlightArgv(int argc, char **argv);
+    void setCommandFormat(QTextCharFormat format);
+    void setVariableFormat(QTextCharFormat format);
+    void setCommentFormat(QTextCharFormat format);
 
 protected:
     void highlightBlock(const QString &text) override;
@@ -90,7 +93,7 @@ private:
         QTextCharFormat format;
     };
     QList<HighlightingRule> highlightingRules;
-    QTextCharFormat singleLineCommentFormat;
+    QTextCharFormat commentFormat;
     QTextCharFormat commandFormat;
     QTextCharFormat variableFormat;
     const script_session *session;

@@ -140,5 +140,6 @@ private:
     QStringList visibleGraphs;
     int warningCounter;
     int defaultVerbosity;
+    QColor messageColor;
 };
 #endif // MAINWINDOW_H

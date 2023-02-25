@@ -27,6 +27,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     QIcon icon(":/icons/jabs.svg");
     QApplication::setWindowIcon(icon);
+    highlighter = new Highlighter(ui->editor->document());
     ui->widget->setVisible(false);
     ui->detectorFrame->setVisible(false); /* Will be made visible if necessary */
     setWindowIcon(icon);
@@ -99,7 +100,7 @@ void MainWindow::addMessage(jabs_msg_level level, const char *msg)
         ui->msgTextBrowser->setTextColor(Qt::gray);
         break;
     default:
-        ui->msgTextBrowser->setTextColor(Qt::black); /* TODO: defaults from theme? */
+        ui->msgTextBrowser->setTextColor(messageColor);
         break;
     }
     ui->msgTextBrowser->insertPlainText(msg);
@@ -281,7 +282,6 @@ int MainWindow::initSession()
         return -1;
     }
     session->fit_iter_callback = &fit_iter_callback;
-    highlighter = new Highlighter(ui->editor->document());
     highlighter->setSession(session);
     return 0;
 }
@@ -322,6 +322,23 @@ void MainWindow::readSettings()
     messageFont.setPointSize(settings.value("messageFontSize", 10).toInt());
     ui->msgTextBrowser->setFont(messageFont);
     defaultVerbosity = settings.value("defaultVerbosity", JABS_DEFAULT_VERBOSITY).toInt();
+
+    QString messageColorStr = settings.value("messageColor").toString();
+    if(messageColorStr.isEmpty()) {
+        messageColor = this->palette().color(QPalette::Text);
+    } else {
+        messageColor = QColor::fromString(messageColorStr);
+    }
+
+    QTextCharFormat format;
+    format.setForeground(QColor::fromString(settings.value("commentColor", "lightslategray").toString()));
+    highlighter->setCommentFormat(format);
+    format.setForeground(QColor::fromString(settings.value("commandColor", "cornflowerblue").toString()));
+    format.setFontWeight(QFont::Bold);
+    highlighter->setCommandFormat(format);
+    format.setForeground(QColor::fromString(settings.value("variableColor", "lightcoral").toString()));
+    format.setFontWeight(QFont::StyleItalic);
+    highlighter->setVariableFormat(format);
 }
 
 void MainWindow::setNeedsSaving(bool value)
