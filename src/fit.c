@@ -129,7 +129,7 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     volatile int error = FALSE;
     const size_t n = fit->fit_params->n_active;
 #pragma omp parallel default(none) shared(fit, J, error, stderr, n)
-#pragma omp for nowait schedule(dynamic)
+#pragma omp for schedule(dynamic)
     for(size_t j = 0; j < n; j++) {
         //fprintf(stderr, "Thread id %i got %zu.\n", omp_get_thread_num(), j);
         struct jacobian_space *spc = &fit->jspace[j];

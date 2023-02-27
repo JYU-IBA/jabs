@@ -2409,7 +2409,7 @@ script_command_status script_help_version(script_session *s, int argc, char *con
     jabs_message(MSG_INFO, stderr,  "Compiled with compiler version: %s\n", __VERSION__);
 #endif
 #ifdef _MSC_VER
-    jabs_message(MSG_INFO, stderr, "Compiled with MSVC version %s\n", _MSC_VER)
+    jabs_message(MSG_INFO, stderr, "Compiled with MSVC version %s\n", _MSC_VER);
 #endif
 #ifdef JABS_PLUGINS
     jabs_message(MSG_INFO, stderr,  "Plugin support enabled.\n");
