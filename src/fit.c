@@ -129,7 +129,7 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     volatile int error = FALSE;
     const int n = (int) fit->fit_params->n_active;
     int j;
-#pragma omp parallel default(none) shared(fit, J, error, stderr, n)
+#pragma omp parallel default(none) shared(fit, J, error, n)
 #pragma omp for schedule(dynamic)
     for(j = 0; j < n; j++) {
         //fprintf(stderr, "Thread id %i got %zu.\n", omp_get_thread_num(), j);
@@ -205,7 +205,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     } else {
         int i;
         const int n = (int) fit->sim->n_det;
-#pragma omp parallel default(none) shared(fit, error, f, n, stderr)
+#pragma omp parallel default(none) shared(fit, error, f, n)
 #pragma omp for
         for(i = 0; i < n; i++) {
 #ifdef _OPENMP
