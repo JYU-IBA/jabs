@@ -56,6 +56,7 @@
 **
 ****************************************************************************/
 
+#include <QPalette>
 #include "highlighter.h"
 extern "C" {
 #include "generic.h"
@@ -65,11 +66,7 @@ extern "C" {
 Highlighter::Highlighter(QTextDocument *parent)
     : QSyntaxHighlighter(parent)
 {
-    singleLineCommentFormat.setForeground(Qt::gray);
-    commandFormat.setForeground(Qt::darkBlue);
-    commandFormat.setFontWeight(QFont::Bold);
-    variableFormat.setForeground(Qt::darkMagenta);
-    variableFormat.setFontWeight(QFont::StyleItalic);
+    session = nullptr;
 }
 
 void Highlighter::setSession(const script_session *session)
@@ -92,15 +89,17 @@ void Highlighter::highlightBlock(const QString &text)
 
     }
     if(argc == 0) { /* Begins with a comment, the whole line is a comment. */
-        setFormat(0, len, singleLineCommentFormat);
+        setFormat(0, len, commentFormat);
     } else {
         highlightArgv(argc, argv); /* Highlights individual arguments */
         size_t last_pos = argv[argc - 1] - argv[0] + strlen(argv[argc - 1]); /* Last character, after parsing to argument vector, is this far in one the line */
-        if(text.at(last_pos) == '"') { /* Argument vector parser changes last quote to '\0', but we don't want to mark it as a comment */
-            last_pos++;
-        }
-        if(last_pos != len) {/* Where the argument vector parser stopped, comments begin */
-            setFormat(last_pos, len - last_pos, singleLineCommentFormat);
+        if(last_pos < text.length()) {
+            if(text.at(last_pos) == '"') { /* Argument vector parser changes last quote to '\0', but we don't want to mark it as a comment */
+                last_pos++;
+            }
+            if(last_pos != len) {/* Where the argument vector parser stopped, comments begin */
+                setFormat(last_pos, len - last_pos, commentFormat);
+            }
         }
     }
     argv_free(argv, s_out);
@@ -110,6 +109,9 @@ void Highlighter::highlightBlock(const QString &text)
 
 void Highlighter::highlightArgv(int argc, char **argv) {
     if(!argc) {
+        return;
+    }
+    if(!session) {
         return;
     }
     const script_command *cmds = session->commands;
@@ -146,4 +148,19 @@ void Highlighter::highlightArgv(int argc, char **argv) {
             }
         }
     }
+}
+
+void Highlighter::setCommandFormat(QTextCharFormat format)
+{
+    commandFormat = format;
+}
+
+void Highlighter::setVariableFormat(QTextCharFormat format)
+{
+    variableFormat = format;
+}
+
+void Highlighter::setCommentFormat(QTextCharFormat format)
+{
+    commentFormat = format;
 }

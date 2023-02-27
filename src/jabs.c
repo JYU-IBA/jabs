@@ -280,7 +280,9 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
             d_after = des_min->d;
             last = TRUE;
         }
-        d_after = des_table_find_depth(dt, &i_des, d_before, &ion1); /* Does this handle E below min? */
+        if(i_brick != 0) {
+            d_after = des_table_find_depth(dt, &i_des, d_before, &ion1); /* Does this handle E below min? */
+        }
         if(i_brick == 0 || d_after.i != d_before.i) { /* There was a layer (depth range) crossing. If step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
             if(ws->params->bricks_skip_zero_conc_ranges) {
                 double conc_start = *sample_conc_bin(sample, d_after.i, sim_r->i_isotope);
@@ -380,7 +382,7 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
         }
         if(ion1.inverse_cosine_theta > 0.0 && d_after.x >= sim_r->max_depth) {
             sim_r->last_brick = i_brick;
-            DEBUGMSG("Max depth of %g tfu reached.", sim_r->max_depth / C_TFU);
+            DEBUGMSG("Max depth of %g tfu reached (d_after.x is %g).", sim_r->max_depth / C_TFU,  d_after.x / C_TFU);
             break;
         } else if(ion1.inverse_cosine_theta < 0.0 && d_after.x < DEPTH_TOLERANCE) {
             sim_r->last_brick = i_brick;
@@ -422,6 +424,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
 #ifdef DEBUG_VERBOSE
     des_table_print(stderr, dt);
 #endif
+
 #if 0
 #pragma omp parallel default(none) shared(ws, incident, depth_start, sample, dt, g)
 #pragma omp for nowait
@@ -546,7 +549,7 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
 
 int simulate_with_roughness(sim_workspace *ws) {
     int status = 0;
-    double p_sr = ws->sim->fluence;
+    const double fluence_original = ws->fluence;
     size_t n_rl = 0; /* Number of rough layers */
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
         sample_range *r = &(ws->sample->ranges[i]);
@@ -628,11 +631,11 @@ int simulate_with_roughness(sim_workspace *ws) {
                 sample_rough->ranges[i_range].x += x_diff;
             }
         }
-        DEBUGMSG("Weight %.6lf.", p);
 #ifdef DEBUG
-        sample_print(sample_rough, FALSE);
+        jabs_message(MSG_DEBUG, stderr, "Roughness subspectrum %zu / %zu", i_iter, iter_total);
+        sample_print(sample_rough, FALSE, MSG_DEBUG);
 #endif
-        ws->fluence = p * p_sr;
+        ws->fluence = p * fluence_original;
         ion_set_angle(&ws->ion, 0.0, 0.0);
         ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
         sample_thickness_recalculate(sample_rough);
@@ -646,13 +649,13 @@ int simulate_with_roughness(sim_workspace *ws) {
     }
     sample_free(sample_rough);
     free(tpds);
+    ws->fluence = fluence_original;
     return status;
 }
 
 int simulate_with_ds(sim_workspace *ws) {
     if(!ws) {
-        jabs_message(MSG_ERROR, stderr, "Congratulations, you've found a bug in %s.", __LINE__);
-        abort();
+        jabs_message(MSG_ERROR, stderr, "Congratulations, you've found a bug in %s:%i.\n", __FILE__, __LINE__);
         return EXIT_FAILURE;
     }
     double fluence = ws->fluence;

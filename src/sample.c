@@ -79,12 +79,16 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
     sm->n_ranges = n_ranges;
     sm->n_materials = n_materials;
     sm->materials = calloc(n_materials, sizeof(jibal_material *));
-    sm->cbins = calloc( n_ranges * n_materials, sizeof(double));
+    sm->cbins = calloc(n_ranges * n_materials, sizeof(double));
     sm->ranges = calloc(n_ranges, sizeof(struct sample_range));
     return sm;
 }
 
 int sample_model_sanity_check(const sample_model *sm) {
+    if(!sm) {
+        jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (null pointer).\n");
+        return EXIT_FAILURE;
+    }
     for(size_t i = 0; i < sm->n_ranges; i++) {
         const sample_range *r = &sm->ranges[i];
         if(sm->type == SAMPLE_MODEL_LAYERED) {
@@ -112,7 +116,7 @@ int sample_model_sanity_check(const sample_model *sm) {
             jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative ad-hoc correction parameter (bragg (%g), stragg (%g) or yield (%g)) at layer/range %zu).\n",
                          r->bragg, r->stragg, r->yield, i + 1);
 #ifdef DEBUG
-            sample_model_print("debug_sample.txt", sm);
+            sample_model_print("debug_sample.txt", sm, MSG_INFO);
 #endif
             return EXIT_FAILURE;
         }
@@ -152,6 +156,9 @@ void sample_model_renormalize(sample_model *sm) {
 }
 
 void sample_renormalize(sample *sample) {
+    if(!sample) {
+        return;
+    }
     for(size_t i = 0; i < sample->n_ranges; i++) {
         double sum = 0.0;
         for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
@@ -242,21 +249,9 @@ sample_model *sample_model_to_point_by_point(const sample_model *sm) { /* Conver
 }
 
 sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize concentrations! */
-    if(!sm)
+    if(sample_model_sanity_check(sm)) {
         return NULL;
-#ifdef DEBUG
-    fprintf(stderr, "Sample model is type %i, it has %zu materials and %zu ranges.\n", sm->type, sm->n_materials, sm->n_ranges);
-    for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
-        fprintf(stderr, "Material %zu is %s. There are %zu elements.\n", i_mat, sm->materials[i_mat]->name, sm->materials[i_mat]->n_elements);
-        for(size_t i_elem = 0; i_elem < sm->materials[i_mat]->n_elements; i_elem++) {
-            fprintf(stderr, "  element %zu (%s: Z = %i): %zu isotopes.\n",  i_mat, sm->materials[i_mat]->elements[i_elem].name, sm->materials[i_mat]->elements[i_elem].Z, sm->materials[i_mat]->elements[i_elem].n_isotopes);
-            for(size_t i_isotope = 0; i_isotope < sm->materials[i_mat]->elements[i_elem].n_isotopes; i_isotope++) {
-                const jibal_isotope *isotope = sm->materials[i_mat]->elements[i_elem].isotopes[i_isotope];
-                fprintf(stderr, "    isotope %zu: %s, A=%i, abundance %g, conc %g\n", i_isotope, isotope->name, isotope->A, isotope->abundance, sm->materials[i_mat]->elements[i_elem].concs[i_isotope]);
-            }
-        }
     }
-#endif
     sample *s = malloc(sizeof(sample));
     sample_model *sm_copy = NULL;
     if(sm->type == SAMPLE_MODEL_LAYERED) {
@@ -272,7 +267,7 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
     }
 #ifdef DEBUG
     fprintf(stderr, "Point-by-point sample model for simulation:\n");
-    sample_model_print(NULL, sm);
+    sample_model_print(NULL, sm, MSG_INFO);
 #endif
     size_t n_isotopes = 0;
     for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
@@ -343,12 +338,9 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
         }
         roughness_reset_if_below_tolerance(&r->rough);
     }
-
-#ifdef DEBUG
-    sample_print(s, 0);
-#endif
     sample_model_free(sm_copy);
     sample_thickness_recalculate(s);
+    sample_renormalize(s);
     return s;
 }
 
@@ -627,13 +619,28 @@ void sample_model_free(sample_model *sm) {
     }
     for(size_t i = 0; i < sm->n_ranges; i++) {
         sample_range *range = &sm->ranges[i];
-
         roughness_file_free(range->rough.file);
     }
     free(sm->ranges);
     free(sm->materials);
     free(sm->cbins);
     free(sm);
+}
+
+sample_model *sample_model_clone(const sample_model *sm_orig) {
+    if(!sm_orig) {
+        return NULL;
+    }
+    sample_model *sm = sample_model_alloc(sm_orig->n_materials, sm_orig->n_ranges);
+    sm->type = sm_orig->type;
+    for(size_t i = 0; i < sm->n_materials; i++) {
+        sm->materials[i] = jibal_material_copy(sm_orig->materials[i]);
+    }
+    for(size_t i = 0; i < sm->n_ranges; i++) {
+        sample_range_copy(&sm->ranges[i], &sm_orig->ranges[i]);
+    }
+    memcpy(sm->cbins, sm_orig->cbins, sizeof (double) * sm->n_materials * sm->n_ranges);
+    return sm;
 }
 
 sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char * const ** const argv) {

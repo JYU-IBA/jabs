@@ -29,6 +29,7 @@
 #include "simulation.h"
 #include "reaction.h"
 #include "sample.h"
+#include "spectrum.h"
 
 #define FIT_SUCCESS_CHISQ (2)
 #define FIT_SUCCESS_DELTA (1)
@@ -49,10 +50,8 @@ struct fit_stats {
     int phase;
     size_t n_evals;
     size_t n_evals_iter; /* Number of function evaluations per iteration */
-    size_t n_workspaces;
-    size_t n_workspaces_iter; /* Number of workspaces (detectors) actually simulated per iteration */
-    size_t n_speedup_evals;
-    size_t n_speedup_evals_iter;
+    size_t n_spectra;
+    size_t n_spectra_iter; /* Number of spectra (full spectra with roughness etc) actually simulated per iteration call */
     double cputime_cumul;
     double cputime_iter;
     double chisq0;
@@ -71,82 +70,86 @@ typedef struct roi {
     size_t high;
 } roi;
 
-typedef struct fit_data_workspace_val {
-    int active_iter_call; /* Workspace should be (re)simulated */
-} fit_data_workspace_val;
-
 typedef struct fit_data_det {
-    detector *det;
-    gsl_histogram *exp;
-    gsl_histogram *histo_sim_sum;
-    gsl_histogram **histo_sim;
+    size_t i_det;
+    detector *det; /* Not stored here, same as sim->det[i_det], but we need a non-const pointer. TODO: make a copy */
+    const gsl_histogram *exp; /* Not a copy! */
+    roi *ranges; /* Same ranges as in fit_data, but only those relevant for "det". Full copies are made. */
+    size_t n_ranges;
+    size_t n_ch; /* in fit ranges */
+    size_t f_offset;
+    gsl_vector *f_iter; /* Stored residual vector values of f on first call of iter */
 } fit_data_det;
+
+typedef struct jacobian_space {
+    simulation sim; /* Copy of simulation, partially shallow, overwritten on every Jacobian calculation, so don't store anything here! */
+    detector **det; /* Array of detector pointers, detectors will be cloned here (if needed) */
+    fit_variable *var; /* Active fit variable to be perturbed */
+    gsl_vector *f_param; /* Residuals vector */
+    double delta_inv; /* Inverse of perturbation 1/delta */
+    size_t n_spectra_calculated; /* How many spectra (detectors) were actually computed for this var */
+} jacobian_space; /* All the stuff needed to compute Jacobian */
 
 typedef struct fit_data {
     fit_data_det *fdd; /* Detector specific stuff */
+    result_spectra *spectra; /* all spectra (array of n_det_spectra), updates every iter at the start of iter. */
+    size_t n_det_spectra; /* n_det (= n_fdd) when histograms were copied */
     gsl_histogram **exp; /* experimental data to be fitted, array of n_exp elements */
-    size_t n_exp; /* same as sim->n_det, but this keeps track on how many spectra we have allocated in exp and ref */
+    size_t n_exp; /* same as sim->n_det, but this keeps track on how many spectra we have allocated in exp and ref */ /* TODO: remove */
     gsl_histogram *ref; /* reference spectra, exactly one */
     simulation *sim;
     const jibal *jibal; /* This shouldn't be here, but it is the only place I can think of */
     sample_model *sm;
-    fit_params *fit_params; /* Allocated with fit_data_new() and freed by fit_data_free() */
-    sim_workspace **ws; /* Allocated and leaked by fitting function! An array of n_ws. */
-    fit_data_workspace_val *ws_val; /* Fitting and workspace (ws above) related (temporary) values, that are not fit parameters */
-    size_t n_ws;
-    sim_workspace **ws_active; /* Same pointers as in ws, but n_ws_active ( < n_ws). Note that ws[i] != ws_active[i] unless all workspaces are active! */
-    size_t n_ws_active;
     struct roi *fit_ranges; /* Array of fit_range, size n_fit_ranges, freed by fit_data_free() */
+    fit_params *fit_params; /* Allocated with fit_data_new() and freed by fit_data_free() */
     size_t n_fit_ranges;
     size_t n_iters_max; /* Maximum number of iterations, in each fit phase */
     double xtol; /* Tolerance of step size */
     double chisq_tol; /* Chi squared relative change tolerance */
     double chisq_fast_tol; /* Chi squared relative change tolerance (fast phase) */
+    gsl_multifit_nlinear_fdf *fdf;
     size_t dof; /* Degrees of freedom (calculated) */
     struct fit_stats stats; /* Fit statistics, updated as we iterate */
     int phase_start; /* Fit phase to start from (see FIT_PHASE -defines) */
     int phase_stop; /* Inclusive */
-    gsl_histogram **histo_sum_iter; /* Array of histograms (n_ws, one for each workspace), updates every iter. */
-    size_t n_histo_sum; /* n_ws when histograms were copied */
-    gsl_vector *f_iter; /* Residuals on first iter */
     int (*fit_iter_callback)(struct fit_stats stats);
+    gsl_vector *f_iter;
+    double h_df;
+    jacobian_space *jspace;
 } fit_data;
 
+void fit_data_det_residual_vector_set(const fit_data_det *fdd, const gsl_histogram *histo_sum, gsl_vector *f);
 fit_data *fit_data_new(const jibal *jibal, simulation *sim);
+int fit_data_jspace_init(fit_data *fit, size_t n_channels_in_fit);
+void fit_data_jspace_free(fit_data *fit);
 void fit_data_defaults(fit_data *f);
 void fit_data_free(fit_data *fit); /* Doesn't free everything in fit, like sm, jibal, ... */
 void fit_data_reset(fit_data *fit);
-void fit_data_print(FILE *f, const struct fit_data *fit_data);
+void fit_data_exp_reset(fit_data *fit);
+void fit_data_print(const fit_data *fit, jabs_msg_level msg_level);
 void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct roi *roi);
-gsl_histogram *fit_data_exp(const struct fit_data *fit_data, size_t i_det);
-gsl_histogram *fit_data_sim(const struct fit_data *fit_data, size_t i_det); /* You should probably use fit_data_histo_sum() to get the simulated sum spectra */
-gsl_histogram *fit_data_ref(const struct fit_data *fit_data);
+gsl_histogram *fit_data_exp(const fit_data *fit, size_t i_det);
+gsl_histogram *fit_data_ref(const fit_data *fit_data);
 fit_params *fit_params_all(fit_data *fit);
+int fit_data_fdd_init(fit_data *fit);
+void fit_data_fdd_free(fit_data *fit);
 void fit_data_exp_alloc(fit_data *fit);
 void fit_data_exp_free(fit_data *fit);
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename);
-void fit_data_histo_sum_free(struct fit_data *fit_data);
-void fit_data_histo_sum_store(struct fit_data *fit_data);
-gsl_histogram *fit_data_histo_sum(const struct fit_data *fit_data, size_t i_det);
+gsl_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det);
+void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *s, const detector *det, const gsl_histogram *exp, const sim_workspace *ws); /* Makes deep copies of histograms */
+int fit_data_spectra_alloc(fit_data *fit);
+void fit_data_spectra_free(fit_data *fit);
 int fit_data_add_det(struct fit_data *fit, detector *det);
-sim_workspace *fit_data_ws(const struct fit_data *fit_data, size_t i_det);
+fit_data_det *fit_data_fdd(const fit_data *fit, size_t i_det);
 size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);
-sim_workspace *fit_data_workspace_init(fit_data *fit, size_t i_ws);
-int fit_data_workspaces_init(fit_data *fit);
-void fit_data_workspaces_free(fit_data *fit); /* Also sets workspace pointers to NULL */
-void fit_data_workspaces_reset(fit_data *fit);
 struct fit_stats fit_stats_init();
 int fit(fit_data *fit);
 void fit_covar_print(const gsl_matrix *covar, jabs_msg_level msg_level);
-
 int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x); /* Updates values in fit params as they are varied by the fit algorithm. */
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
-int fit_init_active_workspaces(fit_data *fit);
+int fit_determine_active_detectors(fit_data *fit);
 int fit_sanity_check(const fit_data *fit);
-int fit_speedup(fit_data *fit);
-int fit_speedup_fluence(struct fit_data *fit, const fit_variable *var);
-int fit_set_residuals_detector(const fit_data *fit, gsl_vector *f, size_t i_det);
-int fit_set_residuals(const fit_data *fit, gsl_vector *f);
 void fit_iter_stats_update(struct fit_data *params, const gsl_multifit_nlinear_workspace *w);
 void fit_iter_stats_print(const struct fit_stats *stats);
 void fit_stats_print(FILE *f, const struct fit_stats *stats, jabs_msg_level msg_level);
@@ -155,4 +158,5 @@ void fit_data_fit_ranges_free(struct fit_data *fit_data);
 int fit_set_roi_from_string(roi *r, const char *str); /* Parses only low and high from "[low:high]". */
 double fit_emin(struct fit_data *fit, size_t i_det); /* Returns lowest energy of fit ranges for detector i_det. Detectors, calibrations and fit ranges must be set before calling. */
 const char *fit_error_str(int error);
+int fit_range_compare(const void *a, const void *b);
 #endif // JABS_FIT_H

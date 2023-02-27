@@ -18,7 +18,83 @@
 #include "generic.h"
 #include "spectrum.h"
 #include "message.h"
+#include "histogram.h"
 #include "win_compat.h"
+
+result_spectra *result_spectra_alloc(size_t n) {
+    result_spectra *spectra = malloc(sizeof(result_spectra));
+    spectra->n_spectra = n;
+    spectra->s = calloc(n, sizeof(result_spectrum));
+    return spectra;
+}
+
+void result_spectra_free(result_spectra *spectra) {
+    if(!spectra) {
+        return;
+    }
+    for(size_t i = 0; i < spectra->n_spectra; i++) {
+        result_spectrum *s = &spectra->s[i];
+        if(!s) {
+            continue;
+        }
+        gsl_histogram_free(s->histo);
+        free(s->name);
+    }
+    free(spectra->s);
+    spectra->s = NULL;
+    spectra->n_spectra = 0;
+}
+
+int result_spectra_copy(result_spectra *dest, const result_spectra *src) {
+    dest->n_spectra = src->n_spectra;
+    dest->s = calloc(dest->n_spectra, sizeof(result_spectrum));
+    for(size_t i = 0; i < src->n_spectra; i++) {
+        result_spectrum_copy(&dest->s[i], &src->s[i]);
+    }
+    return EXIT_SUCCESS;
+}
+
+int result_spectrum_copy(result_spectrum *dest, const result_spectrum *src) {
+    result_spectrum_set(dest, src->histo, src->name, src->target_isotope, src->type);
+    return EXIT_SUCCESS;
+}
+
+int result_spectrum_set(result_spectrum *dest, const gsl_histogram *h, const char *name, const jibal_isotope *target_isotope, reaction_type type) {
+    dest->histo = h ? jabs_histogram_clone(h) : NULL;
+    dest->name = name ? strdup(name) : NULL;
+    dest->target_isotope = target_isotope;
+    dest->type = type;
+    return EXIT_SUCCESS;
+}
+
+size_t result_spectra_n_ch(const result_spectra *spectra) {
+    size_t n_ch = 0;
+    for(size_t i = 0; i < spectra->n_spectra; i++) {
+        if(!spectra->s[i].histo) {
+            continue;
+        }
+        n_ch = GSL_MAX(n_ch, spectra->s[i].histo->n);
+    }
+    return n_ch;
+}
+
+gsl_histogram *result_spectrum_histo(const result_spectra *spectra, size_t i_spectrum) {
+    if(i_spectrum < spectra->n_spectra) {
+        return spectra->s[i_spectrum].histo;
+    }
+    return NULL;
+}
+gsl_histogram *result_spectra_reaction_histo(const result_spectra *spectra, size_t i_reaction) {
+    return result_spectrum_histo(spectra, RESULT_SPECTRA_N_FIXED + i_reaction);
+}
+
+gsl_histogram *result_spectra_simulated_histo(const result_spectra *spectra) {
+    return result_spectrum_histo(spectra, RESULT_SPECTRA_SIMULATED);
+}
+
+gsl_histogram *result_spectra_experimental_histo(const result_spectra *spectra) {
+    return result_spectrum_histo(spectra, RESULT_SPECTRA_EXPERIMENTAL);
+}
 
 gsl_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_max, size_t column, size_t compress) {
     char *line=NULL;

@@ -15,7 +15,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent) :
     ui->editorFontComboBox->setMinimumWidth(200);
     ui->messageFontComboBox->setMinimumWidth(200);
     for(int i = 0; i <= MSG_ERROR; i++) {
-        ui->verbosityComboBox->addItem(QString(jabs_msg_levels[i]));
+        ui->verbosityComboBox->addItem(QString(jabs_message_level_str((jabs_msg_level) i)));
     }
     readSettings();
     connect(this, &QDialog::accepted, this, &PreferencesDialog::saveSettings);

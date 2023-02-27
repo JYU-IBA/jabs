@@ -11,6 +11,9 @@
     See LICENSE.txt for the full license.
 
  */
+
+#define _GNU_SOURCE
+#include <stdio.h>
 #include <assert.h>
 #include <string.h>
 #include "simulation.h"
@@ -230,7 +233,9 @@ int sim_det_add(simulation *sim, detector *det) {
     if(!sim->det)
         return EXIT_FAILURE;
     if(det->name == NULL) {
-        asprintf(&(det->name), "Detector %zu", sim->n_det);
+        if(asprintf(&(det->name), "Detector %zu", sim->n_det) < 0) {
+            det->name = NULL;
+        }
     }
     sim->det[sim->n_det - 1] = det;
     return EXIT_SUCCESS;

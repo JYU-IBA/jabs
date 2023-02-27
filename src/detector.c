@@ -225,6 +225,9 @@ int detector_foil_set_from_argv(const jibal *jibal, detector *det, int *argc, ch
 }
 
 int detector_update_foil(detector *det) {
+    if(!det || !det->foil_sm) {
+        return 0;
+    }
     det->foil = sample_from_sample_model(det->foil_sm);
     return 0;
 }
@@ -356,4 +359,21 @@ const char *detector_name(detector *det) {
         }
     }
     return "none";
+}
+
+detector *detector_clone(const detector *det_orig) {
+    detector *det = malloc(sizeof(detector));
+    *det = *det_orig;
+    det->name = strdup_non_null(det_orig->name);
+    det->calibration = calibration_clone(det_orig->calibration);
+    if(det->calibration_Z) {
+        for(int Z = 0;  Z <= det->cal_Z_max; Z++) {
+            det->calibration_Z[Z] = calibration_clone(det_orig->calibration_Z[Z]);
+        }
+    }
+    det->aperture = aperture_clone(det_orig->aperture);
+    det->foil_sm = sample_model_clone(det->foil_sm);
+    detector_update_foil(det);
+    //detector_update(det);
+    return det;
 }

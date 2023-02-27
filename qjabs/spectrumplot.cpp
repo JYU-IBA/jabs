@@ -476,12 +476,15 @@ void SpectrumPlot::hideSelectedGraph()
 
 void SpectrumPlot::onMouseMove(QMouseEvent *event)
 {
-    int x = qFloor(xAxis->pixelToCoord(event->pos().x()));
+    double x = xAxis->pixelToCoord(event->pos().x());
+    if(!energyAxis) {
+        x = floor(x); /* Channels, this will cause label to "snap" to bin edge */
+    }
     double y = yAxis->pixelToCoord(event->pos().y());
     if(zoom) {
-        coordinatesText->setText(QString("Zoom (%1, %2)").arg(x).arg(y, 6, 'f', 1));
+        coordinatesText->setText(QString("Zoom (%1, %2)").arg(x, 6, 'f', 0).arg(y, 6, 'f', 1));
     } else {
-        coordinatesText->setText(QString("(%1, %2)").arg(x).arg(y, 6, 'f', 1));
+        coordinatesText->setText(QString("(%1, %2)").arg(x, 6, 'f', 0).arg(y, 6, 'f', 1));
     }
     coordinatesText->position->setCoords(QPointF(x, y));
     replot(QCustomPlot::rpQueuedReplot);

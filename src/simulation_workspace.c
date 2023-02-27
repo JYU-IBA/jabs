@@ -91,13 +91,20 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->ion.E = sim->beam_E;
     ws->ion.S = pow2(sim->beam_E_broad / C_FWHM);
 
-    sim_workspace_recalculate_n_channels(ws, sim);
+    sim_workspace_recalculate_n_channels(ws, ws->sim);
 
     if(ws->n_channels == 0) {
-        free(ws);
         jabs_message(MSG_ERROR, stderr,  "Number of channels in workspace is zero. Aborting initialization.\n");
+        free(ws);
         return NULL;
     }
+
+    if(detector_sanity_check(det, ws->n_channels)) {
+        jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!", det->name);
+        free(ws);
+        return NULL;
+    }
+
     ws->histo_sum = gsl_histogram_alloc(ws->n_channels);
     if(!ws->histo_sum) {
         return NULL;
@@ -153,7 +160,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
                     reaction_type_to_string(r->type), ws->det->theta / C_DEG);
             continue;
         }
-        double E = reaction_product_energy(r, ws->det->theta, sim->beam_E + ws->params->sigmas_cutoff * sqrt(sim->beam_E_broad / C_FWHM)); /* Highest energy we could possibly reach, maybe */
+        double E = reaction_product_energy(r, ws->det->theta, sim->beam_E + ws->params->sigmas_cutoff * sim->beam_E_broad / C_FWHM); /* Highest energy we could possibly reach, maybe */
         double E_safer = E + ws->params->sigmas_cutoff * sqrt(detector_resolution(ws->det, r->product, E)); /* Add resolution sigma to max energy */
         E_safer *= 1.1; /* and 10% for good measure! */
         const calibration *cal = detector_get_calibration(ws->det, r->product->Z);
@@ -251,19 +258,16 @@ void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
 }
 
 
-int sim_workspace_print_spectra(const sim_workspace *ws, const char *filename, const gsl_histogram *histo_iter, const gsl_histogram *exp) {
+int sim_workspace_print_spectra(const result_spectra *spectra, const char *filename) {
     char sep = ' ';
-    if(!ws) {
+    if(!spectra || spectra->n_spectra == 0) {
+        jabs_message(MSG_ERROR, stderr, "No spectra!\n");
         return EXIT_FAILURE;
     }
-    const gsl_histogram *h;
-    if(histo_iter) {
-        h = histo_iter;
-    } else {
-        DEBUGSTR("No stored sum spectrum in fit_data, falling back to sum spectrum in workspace.\n");
-        h = ws->histo_sum;
-    }
-    if(!h) {
+    gsl_histogram *h_sum = result_spectra_simulated_histo(spectra);
+    gsl_histogram *h_exp = result_spectra_experimental_histo(spectra);
+    if(!h_sum) {
+        jabs_message(MSG_ERROR, stderr, "No simulated spectrum!\n");
         return EXIT_FAILURE;
     }
     FILE *f = fopen_file_or_stream(filename, "w");
@@ -273,38 +277,30 @@ int sim_workspace_print_spectra(const sim_workspace *ws, const char *filename, c
     if(filename) {
         if(strncmp(jabs_file_extension_const(filename), ".csv", 4) == 0) { /* For CSV: print header line */
             sep = ','; /* and set the separator! */
-            fprintf(f, "\"Channel\",\"Energy (keV)\",\"Simulated\"");
-            if(exp) {
-                fprintf(f, ",\"Experimental\"");
-            }
-            for(size_t j = 0; j < ws->n_reactions; j++) {
-                const reaction *r = ws->reactions[j]->r;
-                fprintf(f, ",\"%s (%s)\"", r->target->name, reaction_type_to_string(r->type));
+            fprintf(f, "\"Channel\",\"Energy (keV)\"");
+            for(size_t i_spectrum = 0; i_spectrum < spectra->n_spectra; i_spectrum++) {
+                fprintf(f, ",\"%s\"", spectra->s[i_spectrum].name);
             }
             fprintf(f, "\n");
         }
     }
-    for(size_t i = 0; i < ws->n_channels; i++) {
-        fprintf(f, "%zu%c%.3lf%c", i, sep, detector_calibrated(ws->det, JIBAL_ANY_Z, i) / C_KEV,
-                sep); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
-        if(i >= h->n || h->bin[i] == 0.0) {
-            fprintf(f, "0"); /* Tidier output with a clean zero sum */
-        } else {
-            fprintf(f, "%e", h->bin[i]);
-        }
-        if(exp) {
-            if(i < exp->n) {
-                fprintf(f, "%c%g", sep, exp->bin[i]);
-            } else {
-                fprintf(f, "%c0", sep);
-            }
-        }
-        for(size_t j = 0; j < ws->n_reactions; j++) {
-            gsl_histogram *rh = ws->reactions[j]->histo; /* TODO: these don't correspond to stored sum spectrum in fit (but they should be very close!). */
-            if(i >= rh->n || rh->bin[i] == 0.0) {
+    size_t n_ch;
+    double *range;
+    if(h_exp && h_exp->n > h_sum->n) { /* Energy for output is taken from experimental spectrum if it exists and extends to higher energy than simulated spectrum */
+        range = h_exp->range;
+        n_ch = h_exp->n;
+    } else {
+        range = h_sum->range;
+        n_ch = h_sum->n;
+    }
+    for(size_t ch = 0; ch < n_ch; ch++) {
+        fprintf(f, "%zu%c%.3lf", ch, sep, range[ch] / C_KEV); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
+        for(size_t j = 0; j < spectra->n_spectra; j++) {
+            gsl_histogram *h = spectra->s[j].histo;
+            if(!h || ch >= h->n) {
                 fprintf(f, "%c0", sep);
             } else {
-                fprintf(f, "%c%e", sep, rh->bin[i]);
+                fprintf(f, "%c%.8g", sep, h->bin[ch]);
             }
         }
         fprintf(f, "\n");

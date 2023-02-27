@@ -27,6 +27,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     QIcon icon(":/icons/jabs.svg");
     QApplication::setWindowIcon(icon);
+    highlighter = new Highlighter(ui->editor->document());
     ui->widget->setVisible(false);
     ui->detectorFrame->setVisible(false); /* Will be made visible if necessary */
     setWindowIcon(icon);
@@ -45,6 +46,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->action_Run->setShortcut(QKeySequence::Refresh);
     ui->action_Run->setShortcutVisibleInContextMenu(true);
     ui->action_Quit->setShortcut(QKeySequence::Quit);
+    ui->actionPrevious_detector->setShortcut(QKeySequence::Back);
+    ui->actionNext_detector->setShortcut(QKeySequence::Forward);
     setNeedsSaving(false);
     firstRun = true;
     statusBar()->showMessage(QString("JaBS ") + jabs_version() + ", cwd: " +  QDir::currentPath(), 2000);
@@ -69,6 +72,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->widget, &SpectrumPlot::energyAxisSet, this, &MainWindow::onEnergyAxisSet);
     connect(ui->widget, &SpectrumPlot::legendMoved, this, &MainWindow::onSpectrumLegendMoved);
     connect(ui->widget, &SpectrumPlot::graphVisibilityChanged, this, &MainWindow::updateListOfVisibleGraphs);
+
+    updateDetectorList();
 
     ui->msgTextBrowser->append("\n");
     ui->msgTextBrowser->ensureCursorVisible();
@@ -95,7 +100,7 @@ void MainWindow::addMessage(jabs_msg_level level, const char *msg)
         ui->msgTextBrowser->setTextColor(Qt::gray);
         break;
     default:
-        ui->msgTextBrowser->setTextColor(Qt::black); /* TODO: defaults from theme? */
+        ui->msgTextBrowser->setTextColor(messageColor);
         break;
     }
     ui->msgTextBrowser->insertPlainText(msg);
@@ -129,7 +134,7 @@ void MainWindow::openFile(const QString &filename)
 }
 
 void MainWindow::runRoi(const QString &roi) {
-    runLine(QString("roi %1 %2").arg(ui->comboBox->currentIndex()).arg(roi));
+    runLine(QString("roi %1 %2").arg(ui->comboBox->currentIndex() + 1).arg(roi));
 }
 
 void MainWindow::plotDialogClosed()
@@ -277,7 +282,6 @@ int MainWindow::initSession()
         return -1;
     }
     session->fit_iter_callback = &fit_iter_callback;
-    highlighter = new Highlighter(ui->editor->document());
     highlighter->setSession(session);
     return 0;
 }
@@ -318,6 +322,23 @@ void MainWindow::readSettings()
     messageFont.setPointSize(settings.value("messageFontSize", 10).toInt());
     ui->msgTextBrowser->setFont(messageFont);
     defaultVerbosity = settings.value("defaultVerbosity", JABS_DEFAULT_VERBOSITY).toInt();
+
+    QString messageColorStr = settings.value("messageColor").toString();
+    if(messageColorStr.isEmpty()) {
+        messageColor = this->palette().color(QPalette::Text);
+    } else {
+        messageColor = QColor::fromString(messageColorStr);
+    }
+
+    QTextCharFormat format;
+    format.setForeground(QColor::fromString(settings.value("commentColor", "lightslategray").toString()));
+    highlighter->setCommentFormat(format);
+    format.setForeground(QColor::fromString(settings.value("commandColor", "cornflowerblue").toString()));
+    format.setFontWeight(QFont::Bold);
+    highlighter->setCommandFormat(format);
+    format.setForeground(QColor::fromString(settings.value("variableColor", "lightcoral").toString()));
+    format.setFontWeight(QFont::StyleItalic);
+    highlighter->setVariableFormat(format);
 }
 
 void MainWindow::setNeedsSaving(bool value)
@@ -359,6 +380,7 @@ int MainWindow::fitCallback(fit_stats stats)
     } else {
         ui->widget->setVisible(false);
     }
+    repaint();
     QCoreApplication::processEvents();
     return fitDialog->isAborted();
 }
@@ -440,69 +462,83 @@ void MainWindow::on_action_Run_triggered()
 void MainWindow::plotSpectrum(size_t i_det)
 {
     ui->widget->clearAll();
-    if(!session || !session->fit || !session->fit->sim || i_det >= session->fit->sim->n_det) {
+    if(!session || !session->fit || !session->fit->spectra || i_det >= session->fit->n_det_spectra) {
         ui->widget->setVisible(false);
         return;
     }
-    gsl_histogram *sim_histo = fit_data_histo_sum(session->fit, i_det);
-    gsl_histogram *exp_histo = fit_data_exp(session->fit, i_det);
     gsl_histogram *ref_histo = session->fit->ref;
-    sim_workspace *ws = fit_data_ws(session->fit, i_det);
-    if(exp_histo) {
-        ui->widget->drawDataToChart("Experimental", exp_histo->range, exp_histo->bin, exp_histo->n, QColor("Black"));
-    }
-    if(sim_histo) {
-        ui->widget->drawDataToChart("Simulated", sim_histo->range, sim_histo->bin, sim_histo->n, QColor("Blue"));
-    }
     if(ref_histo) {
         ui->widget->drawDataToChart("Reference", ref_histo->range, ref_histo->bin, ref_histo->n, QColor("Gray"));
     }
-    if(ws) {
+    result_spectra *spectra = &session->fit->spectra[i_det];
+    if(spectra) {
+        size_t n_spectra = spectra->n_spectra;
         gsl_histogram *histo = NULL;
         int colorindex = 0;
-        for(int i = 0; i < ws->n_reactions; ++i) {
-            const sim_reaction *r = ws->reactions[i];
-            if(!r) {
+        for(int i = 0; i < n_spectra; ++i) {
+            const result_spectrum *s = &spectra->s[i];
+            if(!s || !s->histo || !s->histo->n) {
                 continue;
             }
-            const sim_reaction *r_next = NULL;
-            if(i+1 < ws->n_reactions) {
-                r_next = ws->reactions[i+1];
+            int Z_this = s->target_isotope ? s->target_isotope->Z : JIBAL_ANY_Z;
+            /* TODO: spectrum can be empty (e.g. if reaction is not possible), detect and continue without plotting it */
+            const result_spectrum *s_next;
+            int Z_next;
+            if(i+1 < n_spectra) {
+                s_next = &spectra->s[i + 1];
+                Z_next = s_next->target_isotope ? s_next->target_isotope->Z : JIBAL_ANY_Z;
+            } else {
+                s_next = NULL;
+                Z_next = JIBAL_ANY_Z;
             }
-            if(!r->histo || r->histo->n == 0) { /* No or empty histogram, shouldn't happen. */
-                continue;
-            }
-            if(r->n_convolution_calls == 0) { /* Nobody has even attempted to add anything here. */
-                continue;
-            }
+
             if(histo) {
-                for(size_t i = 0; i < histo->n && i < r->histo->n; i++) {
-                    /* ignores different ranges in GSL histograms */
-                    histo->bin[i] += r->histo->bin[i];
+                for(size_t i = 0; i < histo->n && i < s->histo->n; i++) {
+                    /* ignores different ranges in GSL histograms so energy histograms could, in theory, be different */
+                    histo->bin[i] += s->histo->bin[i];
                 }
             } else {
-                histo = gsl_histogram_clone(r->histo);
+                histo = gsl_histogram_clone(s->histo);
             }
-            bool showThisIsotope = showIsotopes &&  (plotIsotopesZ == JIBAL_ANY_Z || plotIsotopesZ == r->r->target->Z);
-            if(showThisIsotope || !r_next || (r->r->type != r_next->r->type || r->r->target->Z != r_next->r->target->Z)) {
-                /* Plot histo if:
-                     * 1. If show isotopes is set and Z is JIBAL_ANY_Z or matches with target->Z
-                     * 2. If this is the last reaction (there is no r_next), therefore the last histogram
-                     * 3. Next reaction has different type (e.g. RBS vs ERD) or different Z
-                     * */
-                if(histo) {
-                    QString name = QString("") + reaction_type_to_string(r->r->type) + " ";
+            bool nextMatches = s_next && s->type == s_next->type && Z_this == Z_next && Z_this != JIBAL_ANY_Z;
+            bool showThisIsotope = showIsotopes &&  (plotIsotopesZ == JIBAL_ANY_Z || plotIsotopesZ == Z_this);
+            if(nextMatches && !showThisIsotope) {
+                continue;
+            }
+            if(showThisIsotope || !nextMatches) {
+            /* Plot histo (accumulated histogram) if:
+                 * 1. If show isotopes is set and Z is JIBAL_ANY_Z or we have a match with plotIsotopesZ
+                 * 2. If this is the last reaction (there is no s_next), therefore the last histogram
+                 * 3. Next reaction has different type (e.g. RBS vs ERD) or different Z
+                 * */
+                QString name;
+                if(s->target_isotope == NULL || s->type == 0) {
+                    name = s->name;
+                } else {
+                    name = QString("") + reaction_type_to_string(s->type) + " ";
                     if(showThisIsotope) {
-                        name.append(r->r->target->name);
+                        name.append(s->target_isotope->name);
                     } else {
-                        name.append(jibal_element_name(jibal->elements, r->r->target->Z));
+                        name.append(jibal_element_name(jibal->elements, Z_this));
                     }
-                    ui->widget->drawDataToChart(name, histo->range, histo->bin, histo->n, SpectrumPlot::getColor(colorindex));
-                    colorindex++;
-                    ui->widget->setGraphVisibility(ui->widget->graph(), false);
-                    gsl_histogram_free(histo);
-                    histo = NULL;
                 }
+                QColor color;
+                switch(i) {
+                case RESULT_SPECTRA_SIMULATED:
+                    color = QColor("Blue");
+                    break;
+                case RESULT_SPECTRA_EXPERIMENTAL:
+                    color = QColor("Black");
+                    break;
+                default:
+                    color = SpectrumPlot::getColor(colorindex);
+                    colorindex++;
+                    break;
+                }
+                ui->widget->drawDataToChart(name, histo->range, histo->bin, histo->n, color);
+                ui->widget->setGraphVisibility(ui->widget->graph(), false);
+                gsl_histogram_free(histo);
+                histo = NULL;
             }
         }
     }
@@ -512,8 +548,8 @@ void MainWindow::plotSpectrum(size_t i_det)
     }
     ui->widget->setVisible(true);
     if(ui->widget->visibleGraphs().isEmpty()) {
-        ui->widget->visibleGraphs().append("Simulated");
-        ui->widget->visibleGraphs().append("Experimental");
+        visibleGraphs.append("Simulated");
+        visibleGraphs.append("Experimental");
     }
     for(int i = 0; i < ui->widget->graphCount(); ++i) {
         QString name = ui->widget->graph(i)->name();
@@ -784,20 +820,39 @@ void MainWindow::updateDetectorList()
 {
     if(!session || !session->fit || !session->fit->sim) {
         ui->detectorFrame->setVisible(false);
+        ui->actionNext_detector->setVisible(false);
+        ui->actionPrevious_detector->setVisible(false);
         return;
     }
     ui->detectorFrame->setVisible(session->fit->sim->n_det > 1);
+    ui->actionPrevious_detector->setVisible(session->fit->sim->n_det > 1);
+    ui->actionNext_detector->setVisible(session->fit->sim->n_det > 1);
     int old_i_det = ui->comboBox->currentIndex();
     ui->comboBox->clear();
     for(size_t i_det = 0; i_det < session->fit->sim->n_det; i_det++) {
         ui->comboBox->addItem(QString(session->fit->sim->det[i_det]->name));
     }
     ui->comboBox->setCurrentIndex(old_i_det < session->fit->sim->n_det ? old_i_det : 0);
+
 }
 
 
 void MainWindow::on_comboBox_currentIndexChanged(int index)
 {
+    ui->actionPrevious_detector->setEnabled(index > 0);
+    ui->actionNext_detector->setEnabled(index < session->fit->sim->n_det - 1);
     plotSpectrum(index);
+}
+
+
+void MainWindow::on_actionNext_detector_triggered()
+{
+    ui->comboBox->setCurrentIndex(ui->comboBox->currentIndex() + 1);
+}
+
+
+void MainWindow::on_actionPrevious_detector_triggered()
+{
+    ui->comboBox->setCurrentIndex(ui->comboBox->currentIndex() - 1);
 }
 

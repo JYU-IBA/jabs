@@ -25,11 +25,10 @@ typedef enum jabs_msg_level {
     MSG_ERROR = 5
 } jabs_msg_level;
 
-static const char *jabs_msg_levels[MSG_ERROR+1] = {"Debug", "Verbose", "Default", "Important", "Warning", "Error"};
-
 #define JABS_DEFAULT_VERBOSITY (MSG_INFO)
 
 extern jabs_msg_level jabs_message_verbosity;
 
 void jabs_message(jabs_msg_level level, FILE *f, const char *format, ...);
+const char *jabs_message_level_str(jabs_msg_level level);
 #endif // _JABS_MESSAGE_H_

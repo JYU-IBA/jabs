@@ -91,6 +91,8 @@ set(PROJECT_SOURCES
         ../src/simulation_workspace.c
         ../src/sim_reaction.c
         ../src/sim_calc_params.c
+        ../src/histogram.c
+        ../src/gsl_inline.c
         "$<$<BOOL:${PLUGINS}>:plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui

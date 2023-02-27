@@ -16,11 +16,20 @@
 #define JABS_FIT_VARIABLE_H
 #include <stdlib.h>
 
+typedef enum fit_variable_type {
+    FIT_VARIABLE_NONE = 0,
+    FIT_VARIABLE_GENERIC = 1,
+    FIT_VARIABLE_BEAM = 2,
+    FIT_VARIABLE_GEOMETRY = 3,
+    FIT_VARIABLE_DETECTOR = 4,
+    FIT_VARIABLE_SAMPLE = 5
+} fit_variable_type;
+
 typedef struct fit_variable {
+    fit_variable_type type;
     double *value; /* Pointer to a value. This is not allocated or free'd by fitting related methods. */
     double value_orig;
     double value_final;
-    double value_iter; /* On first call of fit_function(), store *value to this */
     double err; /* Error estimate of fit will be stored here. */
     double err_rel; /* Relative error */
     double sigmas; /* Change, relative to error */
@@ -28,7 +37,6 @@ typedef struct fit_variable {
     const char *unit;
     double unit_factor;
     int active; /* Set to FALSE by default, if this variable is to be used it should be set to TRUE */
-    int active_iter_call; /* The *value is different from value_iter, i.e. the value is being changed by the fit algorithm */
     size_t i_v; /* Index in fit */
     size_t i_det; /* For detector parameters, [0,sim->n_det). Set to sim->n_det or higher to mean all workspaces. */
 } fit_variable;

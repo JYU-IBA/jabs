@@ -101,6 +101,10 @@ private slots:
     void on_comboBox_currentIndexChanged(int index);
 
 
+    void on_actionNext_detector_triggered();
+
+    void on_actionPrevious_detector_triggered();
+
 private:
     void updateWindowTitle();
     void setFilename(const QString &filename);
@@ -136,5 +140,6 @@ private:
     QStringList visibleGraphs;
     int warningCounter;
     int defaultVerbosity;
+    QColor messageColor;
 };
 #endif // MAINWINDOW_H

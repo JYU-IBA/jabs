@@ -21,6 +21,27 @@ calibration *calibration_init() {
     return c;
 }
 
+calibration *calibration_clone(const calibration *c_orig) {
+    if(!c_orig) {
+        return NULL;
+    }
+    calibration *c;
+    switch(c_orig->type) {
+        case CALIBRATION_POLY:
+            c = calibration_init_poly(calibration_get_number_of_params(c_orig));
+            calibration_copy_params(c, c_orig);
+            break;
+        case CALIBRATION_LINEAR:
+            c = calibration_init_linear();
+            calibration_copy_params(c, c_orig);
+            break;
+        default:
+            c = NULL;
+            break;
+    }
+    return c;
+}
+
 void calibration_free(calibration *c) {
     if(!c)
         return;
@@ -201,7 +222,7 @@ double *calibration_get_param_ref(calibration *c, int i) {
     return NULL;
 }
 
-int calibration_copy_params(calibration *dst, calibration *src) {
+int calibration_copy_params(calibration *dst, const calibration *src) {
     if(!src || !dst)
         return EXIT_FAILURE;
     size_t n_dst = calibration_get_number_of_params(dst);

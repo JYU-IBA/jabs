@@ -26,6 +26,7 @@
 #else
 #include <time.h>
 #endif
+#include <stdint.h>
 #include <jibal_generic.h>
 #include "jabs_debug.h"
 #include "win_compat.h"

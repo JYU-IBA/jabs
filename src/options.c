@@ -97,7 +97,7 @@ void read_options(cmdline_options *cmd_opt, int *argc, char *const **argv) {
                     if(cmd_opt->verbose < 0) {
                         cmd_opt->verbose = 0;
                     } else if(cmd_opt->verbose > MSG_ERROR) {
-                        cmd_opt->verbose = cmd_opt->verbose = MSG_ERROR;
+                        cmd_opt->verbose = MSG_ERROR;
                     }
                 }
                 else

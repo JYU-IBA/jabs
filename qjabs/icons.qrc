@@ -6,5 +6,7 @@
         <file>icons/content-save.svg</file>
         <file>icons/folder-open.svg</file> 
         <file>icons/play-box.svg</file> 
+        <file>icons/chevron-left.svg</file>
+        <file>icons/chevron-right.svg</file>
     </qresource>
 </RCC>
