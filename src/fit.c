@@ -127,10 +127,11 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
 
     double start = jabs_clock();
     volatile int error = FALSE;
-    const size_t n = fit->fit_params->n_active;
+    const int n = (int) fit->fit_params->n_active;
+    int j;
 #pragma omp parallel default(none) shared(fit, J, error, stderr, n)
 #pragma omp for schedule(dynamic)
-    for(size_t j = 0; j < n; j++) {
+    for(j = 0; j < n; j++) {
         //fprintf(stderr, "Thread id %i got %zu.\n", omp_get_thread_num(), j);
         struct jacobian_space *spc = &fit->jspace[j];
         fit_variable *var = spc->var;
@@ -142,7 +143,7 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
             i_start = 0;
             i_stop = fit->sim->n_det - 1;
         }
-        DEBUGMSG("Variable %s (i_v = %zu, j = %zu) Jacobian. i_det = [%zu, %zu]", var->name, var->i_v, j, i_start, i_stop);
+        DEBUGMSG("Variable %s (i_v = %zu, j = %i) Jacobian. i_det = [%zu, %zu]", var->name, var->i_v, j, i_start, i_stop);
         for(size_t i_det = i_start; i_det <= i_stop; i_det++) {
             fit_data_det *fdd = &fit->fdd[i_det];
             gsl_vector_view v = gsl_vector_subvector(spc->f_param, fdd->f_offset, fdd->n_ch); /* The ROIs of this detector are a subvector of f_param (all channels in fit) */
@@ -202,11 +203,13 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
         result_spectra *spectra = (fit->stats.iter_call == 1 ? &fit->spectra[fdd->i_det] : NULL);
         error = fit_detector(fit->jibal, fdd, fit->sim, spectra, f);
     } else {
-#pragma omp parallel default(none) shared(fit, error, f, stderr)
+        int i;
+        const int n = (int) fit->sim->n_det;
+#pragma omp parallel default(none) shared(fit, error, f, n, stderr)
 #pragma omp for
-        for(size_t i = 0; i < fit->sim->n_det; i++) {
+        for(i = 0; i < n; i++) {
 #ifdef _OPENMP
-            DEBUGMSG("Thread id %i got %zu.", omp_get_thread_num(), i);
+            DEBUGMSG("Thread id %i got %i.", omp_get_thread_num(), i);
 #endif
             fit_data_det *fdd = &fit->fdd[i];
             if(fdd->n_ranges == 0) { /* This will NOT simulate those detectors that don't participate in fit! */
