@@ -73,8 +73,8 @@ The scripting language is not a programming language, there is no flow control, 
  - Higher accuracy mode using adaptive integration for more accurate handling of sharp peaks in cross sections (resonances) and accurate weighting of cross sections by (Gaussian) straggling.
  - Conversion tool from IDF to JaBS script (partial support)
  - Simulation of large angle plural scattering (dual scattering model), with the assumption that first scattering is RBS (not ERD).
- - Multiprocessor support when fitting multidetector spectra 
-
+ - Multiprocessor support when simulating multiple detectors and when fitting multiple parameters
+ - 
 ### Not implemented, but planned or being worked on
  - Support for more input and output data formats (CSV, ...)
  - Multiple scattering (small angle)
