@@ -105,12 +105,12 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         return NULL;
     }
 
-    ws->histo_sum = gsl_histogram_alloc(ws->n_channels);
+    ws->histo_sum = jabs_histogram_alloc(ws->n_channels);
     if(!ws->histo_sum) {
         return NULL;
     }
     spectrum_set_calibration(ws->histo_sum, ws->det->calibration); /* Calibration (assuming default calibration) can be set now. */
-    gsl_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
+    jabs_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
 
     sim_workspace_calculate_number_of_bricks(ws);
     sim_workspace_init_reactions(ws);
@@ -147,7 +147,7 @@ void sim_workspace_free(sim_workspace *ws) {
     free(ws->reactions);
     gsl_integration_workspace_free(ws->w_int_cs);
     gsl_integration_workspace_free(ws->w_int_cs_stragg);
-    gsl_histogram_free(ws->histo_sum);
+    jabs_histogram_free(ws->histo_sum);
     free(ws);
 }
 
@@ -207,12 +207,12 @@ void sim_workspace_calculate_sum_spectra(sim_workspace *ws) {
 }
 
 void sim_workspace_histograms_reset(sim_workspace *ws) {
-    gsl_histogram_reset(ws->histo_sum);
+    jabs_histogram_reset(ws->histo_sum);
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = ws->reactions[i];
         if(!r)
             continue;
-        gsl_histogram_reset(r->histo);
+        jabs_histogram_reset(r->histo);
     }
 }
 
@@ -253,7 +253,7 @@ void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
         sim_reaction *r = ws->reactions[i];
         if(!r || !r->histo)
             continue;
-        gsl_histogram_scale(r->histo, scale);
+        jabs_histogram_scale(r->histo, scale);
     }
 }
 
@@ -264,8 +264,8 @@ int sim_workspace_print_spectra(const result_spectra *spectra, const char *filen
         jabs_message(MSG_ERROR, stderr, "No spectra!\n");
         return EXIT_FAILURE;
     }
-    gsl_histogram *h_sum = result_spectra_simulated_histo(spectra);
-    gsl_histogram *h_exp = result_spectra_experimental_histo(spectra);
+    jabs_histogram *h_sum = result_spectra_simulated_histo(spectra);
+    jabs_histogram *h_exp = result_spectra_experimental_histo(spectra);
     if(!h_sum) {
         jabs_message(MSG_ERROR, stderr, "No simulated spectrum!\n");
         return EXIT_FAILURE;
@@ -296,7 +296,7 @@ int sim_workspace_print_spectra(const result_spectra *spectra, const char *filen
     for(size_t ch = 0; ch < n_ch; ch++) {
         fprintf(f, "%zu%c%.3lf", ch, sep, range[ch] / C_KEV); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
         for(size_t j = 0; j < spectra->n_spectra; j++) {
-            gsl_histogram *h = spectra->s[j].histo;
+            jabs_histogram *h = spectra->s[j].histo;
             if(!h || ch >= h->n) {
                 fprintf(f, "%c0", sep);
             } else {

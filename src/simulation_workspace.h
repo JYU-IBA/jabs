@@ -25,7 +25,7 @@ typedef struct sim_workspace {
     size_t n_reactions;
     const jibal_gsto *gsto;
     size_t n_channels; /* in histograms */
-    gsl_histogram *histo_sum;
+    jabs_histogram *histo_sum;
     ion ion;
     sim_reaction **reactions; /* table of reaction pointers, size n_reactions */
     const jibal_isotope *isotopes;

@@ -36,6 +36,7 @@
 #include "spectrum.h"
 #include "message.h"
 #include "gsl_inline.h"
+#include "histogram.h"
 #include "fit.h"
 #ifdef _OPENMP
 #include <omp.h>
@@ -317,7 +318,7 @@ void fit_data_fit_ranges_free(struct fit_data *fit_data) {
     fit_data->n_fit_ranges = 0;
 }
 
-void fit_data_det_residual_vector_set(const fit_data_det *fdd, const gsl_histogram *histo_sum, gsl_vector *f) { /* Sets residual vector (f) based on histo_sum */
+void fit_data_det_residual_vector_set(const fit_data_det *fdd, const jabs_histogram *histo_sum, gsl_vector *f) { /* Sets residual vector (f) based on histo_sum */
     size_t i_vec = 0;
     if(fdd->n_ranges == 0) {
         fprintf(stderr, "No ranges!\n");
@@ -410,7 +411,7 @@ void fit_data_reset(fit_data *fit) {
 
 void fit_data_exp_reset(fit_data *fit) {
     for(size_t i = 0; i < fit->n_exp; i++) {
-        gsl_histogram_free(fit->exp[i]);
+        jabs_histogram_free(fit->exp[i]);
         fit->exp[i] = NULL;
     }
 }
@@ -419,9 +420,9 @@ void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct r
     if(!fit_data) {
         return;
     }
-    gsl_histogram *histo_sim = fit_data_histo_sum(fit_data, roi->i_det);
-    gsl_histogram *histo_exp = fit_data_exp(fit_data, roi->i_det);
-    gsl_histogram *histo_ref = fit_data->ref;
+    jabs_histogram *histo_sim = fit_data_histo_sum(fit_data, roi->i_det);
+    jabs_histogram *histo_exp = fit_data_exp(fit_data, roi->i_det);
+    jabs_histogram *histo_ref = fit_data->ref;
     size_t n_sim = spectrum_channels_in_range(histo_sim, roi->low, roi->high);
     size_t n_exp = spectrum_channels_in_range(histo_exp, roi->low, roi->high);
     size_t n_ref = spectrum_channels_in_range(histo_ref, roi->low, roi->high);
@@ -466,7 +467,7 @@ void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct r
     }
 }
 
-gsl_histogram *fit_data_exp(const fit_data *fit, size_t i_det) {
+jabs_histogram *fit_data_exp(const fit_data *fit, size_t i_det) {
     if(!fit || !fit->exp)
         return NULL;
     if(i_det >= fit->sim->n_det)
@@ -644,9 +645,9 @@ void fit_data_exp_alloc(fit_data *fit) {
     }
     size_t n_alloc = fit->sim->n_det;
     if(fit->n_exp == 0) { /* This could be handled by realloc too, but this is an easy way to get null pointers as contents. */
-        fit->exp = calloc(n_alloc, sizeof(gsl_histogram *));
+        fit->exp = calloc(n_alloc, sizeof(jabs_histogram *));
     } else {
-        fit->exp = realloc(fit->exp, sizeof(gsl_histogram *) * n_alloc);
+        fit->exp = realloc(fit->exp, sizeof(jabs_histogram *) * n_alloc);
         for(size_t i = fit->n_exp; i < n_alloc; i++) { /* Reset newly allocated space */
             fit->exp[i] = NULL;
         }
@@ -664,19 +665,19 @@ void fit_data_exp_free(fit_data *fit) {
 }
 
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename) {
-    gsl_histogram *h = spectrum_read_detector(filename, sim_det(fit->sim, i_det));
+    jabs_histogram *h = spectrum_read_detector(filename, sim_det(fit->sim, i_det));
     if(!h) {
         jabs_message(MSG_ERROR, stderr, "Reading spectrum from file \"%s\" was not successful.\n", filename);
         return EXIT_FAILURE;
     }
     if(fit->exp[i_det]) {
-        gsl_histogram_free(fit->exp[i_det]);
+        jabs_histogram_free(fit->exp[i_det]);
     }
     fit->exp[i_det] = h;
     return EXIT_SUCCESS;
 }
 
-gsl_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det) {
+jabs_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det) {
     if(!fit)
         return NULL;
     if(i_det >= fit->n_det_spectra)
@@ -686,7 +687,7 @@ gsl_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det) {
     return result_spectra_simulated_histo(&fit->spectra[i_det]);
 }
 
-void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *spectra, const detector *det, const gsl_histogram *exp, const sim_workspace *ws) {
+void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *spectra, const detector *det, const jabs_histogram *exp, const sim_workspace *ws) {
     spectra->n_spectra = ws->n_reactions + RESULT_SPECTRA_N_FIXED; /* Simulated, experimental + reaction spectra */
     spectra->s = calloc(spectra->n_spectra, sizeof(result_spectrum));
     result_spectrum_set(&spectra->s[RESULT_SPECTRA_SIMULATED], ws->histo_sum, "Simulated", NULL, REACTION_NONE);
@@ -696,7 +697,7 @@ void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *spectra, const det
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const reaction *r = ws->reactions[i]->r;
         result_spectrum *s = &spectra->s[RESULT_SPECTRA_REACTION_SPECTRUM(i)];
-        s->histo = gsl_histogram_clone(ws->reactions[i]->histo);
+        s->histo = jabs_histogram_clone(ws->reactions[i]->histo);
         if(asprintf(&s->name, ",\"%s (%s)\"", r->target->name, reaction_type_to_string(r->type)) < 0) {
             s->name = NULL;
         }
@@ -920,7 +921,7 @@ int fit(fit_data *fit) {
         roi *range = &fit->fit_ranges[i_range];
         assert(range);
         detector *det = sim_det(fit->sim, range->i_det);
-        gsl_histogram *exp = fit_data_exp(fit, range->i_det);
+        jabs_histogram *exp = fit_data_exp(fit, range->i_det);
         if(!det) {
             jabs_message(MSG_ERROR, stderr, "Detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
             return EXIT_FAILURE;
@@ -968,7 +969,7 @@ int fit(fit_data *fit) {
     for(size_t i_range = 0; i_range < fit->n_fit_ranges; i_range++) {
         roi *range = &fit->fit_ranges[i_range];
         assert(range);
-        gsl_histogram *exp = fit_data_exp(fit, range->i_det);
+        jabs_histogram *exp = fit_data_exp(fit, range->i_det);
         for(size_t i = range->low; i <= range->high && i < exp->n; i++) {
             if(exp->bin[i] > 1.0) {
                 weights[i_w] = 1.0 / (exp->bin[i]);

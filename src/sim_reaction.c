@@ -35,9 +35,9 @@ sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const
             sim_r->i_isotope = i_isotope;
         }
     }
-    sim_r->histo = gsl_histogram_alloc(n_channels); /* free'd by sim_workspace_free */
+    sim_r->histo = jabs_histogram_alloc(n_channels); /* free'd by sim_workspace_free */
     spectrum_set_calibration(sim_r->histo, detector_get_calibration(det, r->product->Z)); /* Setting histogram with Z-specific (or as fallback, default) calibration. */
-    gsl_histogram_reset(sim_r->histo);
+    jabs_histogram_reset(sim_r->histo);
     sim_r->n_bricks = n_bricks;
     sim_r->bricks = calloc(sim_r->n_bricks, sizeof(brick));
     ion_set_isotope(p, r->product);
@@ -56,7 +56,7 @@ void sim_reaction_free(sim_reaction *sim_r) {
         return;
     }
     if(sim_r->histo) {
-        gsl_histogram_free(sim_r->histo);
+        jabs_histogram_free(sim_r->histo);
         sim_r->histo = NULL;
     }
     if(sim_r->bricks) {

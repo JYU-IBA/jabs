@@ -14,7 +14,6 @@
 #ifndef JABS_SIMULATION_H
 #define JABS_SIMULATION_H
 
-#include <gsl/gsl_histogram.h>
 #include <gsl/gsl_integration.h>
 #include <jibal.h>
 #include <time.h>

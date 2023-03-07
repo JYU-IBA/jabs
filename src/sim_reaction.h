@@ -21,7 +21,7 @@
 typedef struct sim_reaction {
     const reaction *r;
     ion p; /* Reaction product */
-    gsl_histogram *histo;
+    jabs_histogram *histo;
     brick *bricks;
     size_t n_bricks;
     size_t last_brick; /* inclusive, from 0 up to n_bricks-1 */

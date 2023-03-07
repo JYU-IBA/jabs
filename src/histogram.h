@@ -22,9 +22,17 @@
  */
 #ifndef JABS_HISTOGRAM_H
 #define JABS_HISTOGRAM_H
-#include <gsl/gsl_histogram.h>
 
-typedef gsl_histogram jabs_histogram;
+typedef struct {
+    size_t n;
+    double *range ;
+    double *bin ;
+} jabs_histogram; /* This is the same as gsl_histogram. */
 
+/* The functions are re-implemented to avoid GSL error checking. */
 jabs_histogram *jabs_histogram_clone(const jabs_histogram *h_orig); /* Doesn't do range checking */
+void jabs_histogram_free(jabs_histogram *h);
+jabs_histogram *jabs_histogram_alloc(size_t n);
+void jabs_histogram_reset(jabs_histogram *h);
+void jabs_histogram_scale(jabs_histogram *h, double scale);
 #endif // JABS_HISTOGRAM_H

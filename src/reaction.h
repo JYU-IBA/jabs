@@ -15,7 +15,6 @@
 #define JABS_REACTION_H
 
 #include <jibal_masses.h>
-#include <gsl/gsl_histogram.h>
 #include <jibal.h>
 #include <jibal_cross_section.h>
 #include <jibal_kin.h>

@@ -37,7 +37,7 @@ void result_spectra_free(result_spectra *spectra) {
         if(!s) {
             continue;
         }
-        gsl_histogram_free(s->histo);
+        jabs_histogram_free(s->histo);
         free(s->name);
     }
     free(spectra->s);
@@ -59,7 +59,7 @@ int result_spectrum_copy(result_spectrum *dest, const result_spectrum *src) {
     return EXIT_SUCCESS;
 }
 
-int result_spectrum_set(result_spectrum *dest, const gsl_histogram *h, const char *name, const jibal_isotope *target_isotope, reaction_type type) {
+int result_spectrum_set(result_spectrum *dest, const jabs_histogram *h, const char *name, const jibal_isotope *target_isotope, reaction_type type) {
     dest->histo = h ? jabs_histogram_clone(h) : NULL;
     dest->name = name ? strdup(name) : NULL;
     dest->target_isotope = target_isotope;
@@ -78,25 +78,25 @@ size_t result_spectra_n_ch(const result_spectra *spectra) {
     return n_ch;
 }
 
-gsl_histogram *result_spectrum_histo(const result_spectra *spectra, size_t i_spectrum) {
+jabs_histogram *result_spectrum_histo(const result_spectra *spectra, size_t i_spectrum) {
     if(i_spectrum < spectra->n_spectra) {
         return spectra->s[i_spectrum].histo;
     }
     return NULL;
 }
-gsl_histogram *result_spectra_reaction_histo(const result_spectra *spectra, size_t i_reaction) {
+jabs_histogram *result_spectra_reaction_histo(const result_spectra *spectra, size_t i_reaction) {
     return result_spectrum_histo(spectra, RESULT_SPECTRA_N_FIXED + i_reaction);
 }
 
-gsl_histogram *result_spectra_simulated_histo(const result_spectra *spectra) {
+jabs_histogram *result_spectra_simulated_histo(const result_spectra *spectra) {
     return result_spectrum_histo(spectra, RESULT_SPECTRA_SIMULATED);
 }
 
-gsl_histogram *result_spectra_experimental_histo(const result_spectra *spectra) {
+jabs_histogram *result_spectra_experimental_histo(const result_spectra *spectra) {
     return result_spectrum_histo(spectra, RESULT_SPECTRA_EXPERIMENTAL);
 }
 
-gsl_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_max, size_t column, size_t compress) {
+jabs_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_max, size_t column, size_t compress) {
     char *line=NULL;
     size_t line_size=0;
     FILE *in = fopen_file_or_stream(filename, "r");
@@ -111,8 +111,8 @@ gsl_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_
     } else {
         delim = " \t";
     }
-    gsl_histogram *h = gsl_histogram_alloc(channels_max);
-    gsl_histogram_reset(h);
+    jabs_histogram *h = jabs_histogram_alloc(channels_max);
+    jabs_histogram_reset(h);
     h->n = 0; /* We will calculate the real number of channels based on input. */
     size_t lineno = 0;
     size_t n_columns = 0; /* Number of columns (largest in file) */
@@ -182,7 +182,7 @@ gsl_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_
     }
     if(h->n == 0 || error) {
         jabs_message(MSG_ERROR, stderr, "Experimental spectrum could not be read from file \"%s\". Read %zu lines before stopping.\n", filename, lineno);
-        gsl_histogram_free(h);
+        jabs_histogram_free(h);
         h = NULL;
     } else {
         h->n++;
@@ -194,13 +194,13 @@ gsl_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_
     return h;
 }
 
-gsl_histogram *spectrum_read_detector(const char *filename, const detector *det) {
+jabs_histogram *spectrum_read_detector(const char *filename, const detector *det) {
     if(!det)
         return NULL;
     return spectrum_read(filename, 0, det->channels, det->column, det->compress);
 }
 
-void spectrum_set_calibration(gsl_histogram *h, const calibration *cal) {
+void spectrum_set_calibration(jabs_histogram *h, const calibration *cal) {
     if(!h) {
         return;
     }
@@ -210,7 +210,7 @@ void spectrum_set_calibration(gsl_histogram *h, const calibration *cal) {
     }
 }
 
-double spectrum_roi(const gsl_histogram *h, size_t low, size_t high) {
+double spectrum_roi(const jabs_histogram *h, size_t low, size_t high) {
     if(!h || h->n == 0)
         return 0.0;
     if(low >= h->n)
@@ -224,7 +224,7 @@ double spectrum_roi(const gsl_histogram *h, size_t low, size_t high) {
     return sum;
 }
 
-size_t spectrum_channels_in_range(const gsl_histogram *h, size_t low, size_t high) {
+size_t spectrum_channels_in_range(const jabs_histogram *h, size_t low, size_t high) {
     if(!h || h->n == 0) {
         return 0;
     }
@@ -240,7 +240,7 @@ size_t spectrum_channels_in_range(const gsl_histogram *h, size_t low, size_t hig
     return high - low + 1;
 }
 
-int spectrum_compare(const gsl_histogram *h1, const gsl_histogram *h2, size_t low, size_t high, double *out) {
+int spectrum_compare(const jabs_histogram *h1, const jabs_histogram *h2, size_t low, size_t high, double *out) {
     if(!h1 || !h2)
         return EXIT_FAILURE;
     if(h1->n == 0 || h2->n == 0)

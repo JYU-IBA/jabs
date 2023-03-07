@@ -1503,7 +1503,7 @@ script_command_status script_load_experimental(script_session *s, int argc, char
             if(fit_data_load_exp(s->fit, i_det, argv[0])) {
                 return SCRIPT_COMMAND_FAILURE;
             } else {
-                const gsl_histogram *h = fit->exp[i_det];
+                const jabs_histogram *h = fit->exp[i_det];
                 jabs_message(MSG_VERBOSE, stderr, "Detector %zu: experimental spectrum with %zu channels loaded.\n", i_det + 1, h?h->n:0);
                 spectrum_set_calibration(fit_data_exp(fit, i_det), detector_get_calibration(sim_det(fit->sim, i_det), JIBAL_ANY_Z));
             }
@@ -1521,12 +1521,12 @@ script_command_status script_load_reference(script_session *s, int argc, char *c
         jabs_message(MSG_ERROR, stderr, "Usage: load reference <filename>\n");
     }
     const char *filename = argv[0];
-    gsl_histogram *h =spectrum_read(filename, 0, CHANNELS_MAX_DEFAULT, 1, 1);
+    jabs_histogram *h =spectrum_read(filename, 0, CHANNELS_MAX_DEFAULT, 1, 1);
     if(!h) {
         jabs_message(MSG_ERROR, stderr, "Reading reference spectrum from file \"%s\" was not successful.\n", filename);
         return EXIT_FAILURE;
     }
-    gsl_histogram_free(fit->ref);
+    jabs_histogram_free(fit->ref);
     fit->ref = h;
     argc--;
     argv++;
@@ -1633,7 +1633,7 @@ script_command_status script_reset_experimental(script_session *s, int argc, cha
 script_command_status script_reset_reference(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
-    gsl_histogram_free(s->fit->ref);
+    jabs_histogram_free(s->fit->ref);
     s->fit->ref = NULL;
     return 0;
 }
@@ -1653,7 +1653,7 @@ script_command_status script_reset(script_session *s, int argc, char *const *arg
     }
     DEBUGSTR("Resetting everything!\n");
     fit_data_exp_reset(fit);
-    gsl_histogram_free(fit->ref);
+    jabs_histogram_free(fit->ref);
     fit->ref = NULL;
 
     sample_model_free(fit->sm);
@@ -2165,7 +2165,7 @@ script_command_status script_test_reference(struct script_session *s, int argc, 
         jabs_message(MSG_ERROR, stderr, "Usage: test reference {detector number} <range> <tolerance>\nTests if simulated spectrum is within tolerance to a reference spectrum.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    const gsl_histogram *sim = fit_data_histo_sum(fit, i_det);
+    const jabs_histogram *sim = fit_data_histo_sum(fit, i_det);
     if(!sim) {
         jabs_message(MSG_ERROR, stderr, "No simulation.\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -2221,7 +2221,7 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
     }
     double sum_ref = strtod(argv[1], NULL);
     double tolerance = strtod(argv[2], NULL);
-    gsl_histogram *h = exp ? fit_data_exp(fit, i_det) : fit_data_histo_sum(fit, i_det);
+    jabs_histogram *h = exp ? fit_data_exp(fit, i_det) : fit_data_histo_sum(fit, i_det);
     if(!h) {
         jabs_message(MSG_ERROR, stderr, "No histogram.\n");
         return SCRIPT_COMMAND_FAILURE;

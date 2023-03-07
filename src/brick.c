@@ -18,7 +18,7 @@ void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, b
     }
 }
 
-void bricks_convolute(gsl_histogram *h, const calibration *c, const brick *bricks, size_t last_brick, const double scale, const double sigmas_cutoff, double emin, int accurate) {
+void bricks_convolute(jabs_histogram *h, const calibration *c, const brick *bricks, size_t last_brick, const double scale, const double sigmas_cutoff, double emin, int accurate) {
     double (*erf_Q)(double);
     if(accurate) {
         erf_Q = gsl_sf_erf_Q;

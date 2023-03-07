@@ -17,7 +17,6 @@
 
 #include <gsl/gsl_multifit.h>
 #include <gsl/gsl_multifit_nlinear.h>
-#include <gsl/gsl_histogram.h>
 #include <gsl/gsl_vector.h>
 #include <jibal.h>
 
@@ -30,6 +29,7 @@
 #include "reaction.h"
 #include "sample.h"
 #include "spectrum.h"
+#include "histogram.h"
 
 #define FIT_SUCCESS_CHISQ (2)
 #define FIT_SUCCESS_DELTA (1)
@@ -73,7 +73,7 @@ typedef struct roi {
 typedef struct fit_data_det {
     size_t i_det;
     detector *det; /* Not stored here, same as sim->det[i_det], but we need a non-const pointer. TODO: make a copy */
-    const gsl_histogram *exp; /* Not a copy! */
+    const jabs_histogram *exp; /* Not a copy! */
     roi *ranges; /* Same ranges as in fit_data, but only those relevant for "det". Full copies are made. */
     size_t n_ranges;
     size_t n_ch; /* in fit ranges */
@@ -94,9 +94,9 @@ typedef struct fit_data {
     fit_data_det *fdd; /* Detector specific stuff */
     result_spectra *spectra; /* all spectra (array of n_det_spectra), updates every iter at the start of iter. */
     size_t n_det_spectra; /* n_det (= n_fdd) when histograms were copied */
-    gsl_histogram **exp; /* experimental data to be fitted, array of n_exp elements */
+    jabs_histogram **exp; /* experimental data to be fitted, array of n_exp elements */
     size_t n_exp; /* same as sim->n_det, but this keeps track on how many spectra we have allocated in exp and ref */ /* TODO: remove */
-    gsl_histogram *ref; /* reference spectra, exactly one */
+    jabs_histogram *ref; /* reference spectra, exactly one */
     simulation *sim;
     const jibal *jibal; /* This shouldn't be here, but it is the only place I can think of */
     sample_model *sm;
@@ -118,7 +118,7 @@ typedef struct fit_data {
     jacobian_space *jspace;
 } fit_data;
 
-void fit_data_det_residual_vector_set(const fit_data_det *fdd, const gsl_histogram *histo_sum, gsl_vector *f);
+void fit_data_det_residual_vector_set(const fit_data_det *fdd, const jabs_histogram *histo_sum, gsl_vector *f);
 fit_data *fit_data_new(const jibal *jibal, simulation *sim);
 int fit_data_jspace_init(fit_data *fit, size_t n_channels_in_fit);
 void fit_data_jspace_free(fit_data *fit);
@@ -128,16 +128,16 @@ void fit_data_reset(fit_data *fit);
 void fit_data_exp_reset(fit_data *fit);
 void fit_data_print(const fit_data *fit, jabs_msg_level msg_level);
 void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct roi *roi);
-gsl_histogram *fit_data_exp(const fit_data *fit, size_t i_det);
-gsl_histogram *fit_data_ref(const fit_data *fit_data);
+jabs_histogram *fit_data_exp(const fit_data *fit, size_t i_det);
+jabs_histogram *fit_data_ref(const fit_data *fit_data);
 fit_params *fit_params_all(fit_data *fit);
 int fit_data_fdd_init(fit_data *fit);
 void fit_data_fdd_free(fit_data *fit);
 void fit_data_exp_alloc(fit_data *fit);
 void fit_data_exp_free(fit_data *fit);
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename);
-gsl_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det);
-void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *s, const detector *det, const gsl_histogram *exp, const sim_workspace *ws); /* Makes deep copies of histograms */
+jabs_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det);
+void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *s, const detector *det, const jabs_histogram *exp, const sim_workspace *ws); /* Makes deep copies of histograms */
 int fit_data_spectra_alloc(fit_data *fit);
 void fit_data_spectra_free(fit_data *fit);
 int fit_data_add_det(struct fit_data *fit, detector *det);
