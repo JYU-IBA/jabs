@@ -466,14 +466,14 @@ void MainWindow::plotSpectrum(size_t i_det)
         ui->widget->setVisible(false);
         return;
     }
-    gsl_histogram *ref_histo = session->fit->ref;
+    const jabs_histogram *ref_histo = session->fit->ref;
     if(ref_histo) {
         ui->widget->drawDataToChart("Reference", ref_histo->range, ref_histo->bin, ref_histo->n, QColor("Gray"));
     }
     result_spectra *spectra = &session->fit->spectra[i_det];
     if(spectra) {
         size_t n_spectra = spectra->n_spectra;
-        gsl_histogram *histo = NULL;
+        jabs_histogram *histo = NULL;
         int colorindex = 0;
         for(int i = 0; i < n_spectra; ++i) {
             const result_spectrum *s = &spectra->s[i];
@@ -498,7 +498,7 @@ void MainWindow::plotSpectrum(size_t i_det)
                     histo->bin[i] += s->histo->bin[i];
                 }
             } else {
-                histo = gsl_histogram_clone(s->histo);
+                histo = jabs_histogram_clone(s->histo);
             }
             bool nextMatches = s_next && s->type == s_next->type && Z_this == Z_next && Z_this != JIBAL_ANY_Z;
             bool showThisIsotope = showIsotopes &&  (plotIsotopesZ == JIBAL_ANY_Z || plotIsotopesZ == Z_this);
@@ -537,7 +537,7 @@ void MainWindow::plotSpectrum(size_t i_det)
                 }
                 ui->widget->drawDataToChart(name, histo->range, histo->bin, histo->n, color);
                 ui->widget->setGraphVisibility(ui->widget->graph(), false);
-                gsl_histogram_free(histo);
+                jabs_histogram_free(histo);
                 histo = NULL;
             }
         }
