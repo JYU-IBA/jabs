@@ -49,8 +49,4 @@ jabs_histogram *result_spectra_experimental_histo(const result_spectra *spectra)
 
 jabs_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_max, size_t column, size_t compress);
 jabs_histogram *spectrum_read_detector(const char *filename, const detector *det);
-void spectrum_set_calibration(jabs_histogram *h, const calibration *cal);
-double spectrum_roi(const jabs_histogram *h, size_t low, size_t high); /* low and high are both inclusive channel numbers*/
-size_t spectrum_channels_in_range(const jabs_histogram *h, size_t low, size_t high);
-int spectrum_compare(const jabs_histogram *h1, const jabs_histogram *h2, size_t low, size_t high, double *out);
 #endif // JABS_SPECTRUM_H

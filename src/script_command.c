@@ -1505,7 +1505,7 @@ script_command_status script_load_experimental(script_session *s, int argc, char
             } else {
                 const jabs_histogram *h = fit->exp[i_det];
                 jabs_message(MSG_VERBOSE, stderr, "Detector %zu: experimental spectrum with %zu channels loaded.\n", i_det + 1, h?h->n:0);
-                spectrum_set_calibration(fit_data_exp(fit, i_det), detector_get_calibration(sim_det(fit->sim, i_det), JIBAL_ANY_Z));
+                calibration_apply_to_histogram(detector_get_calibration(sim_det(fit->sim, i_det), JIBAL_ANY_Z), fit_data_exp(fit, i_det));
             }
         }
     }
@@ -2180,7 +2180,7 @@ script_command_status script_test_reference(struct script_session *s, int argc, 
     argc -= 2;
     argv += 2;
     int return_value = argc_orig - argc;
-    if(spectrum_compare(sim, fit->ref, r.low, r.high, &error)) { /* Failed, test fails */
+    if(jabs_histogram_compare(sim, fit->ref, r.low, r.high, &error)) { /* Failed, test fails */
         jabs_message(MSG_ERROR, stderr, "Test of detector %zu from %zu to %zu failed. Is range valid?\n", r.i_det + 1, r.low, r.high);
         return_value = SCRIPT_COMMAND_FAILURE;
     } else {
@@ -2226,7 +2226,7 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
         jabs_message(MSG_ERROR, stderr, "No histogram.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    double sum = spectrum_roi(h, r.low, r.high);
+    double sum = jabs_histogram_roi(h, r.low, r.high);
     argc -= 3;
     argv += 3;
     double rel_err = fabs(1.0 - sum / sum_ref);

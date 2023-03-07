@@ -36,7 +36,7 @@ sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const
         }
     }
     sim_r->histo = jabs_histogram_alloc(n_channels); /* free'd by sim_workspace_free */
-    spectrum_set_calibration(sim_r->histo, detector_get_calibration(det, r->product->Z)); /* Setting histogram with Z-specific (or as fallback, default) calibration. */
+    calibration_apply_to_histogram(detector_get_calibration(det, r->product->Z), sim_r->histo); /* Setting histogram with Z-specific (or as fallback, default) calibration. */
     jabs_histogram_reset(sim_r->histo);
     sim_r->n_bricks = n_bricks;
     sim_r->bricks = calloc(sim_r->n_bricks, sizeof(brick));

@@ -109,7 +109,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     if(!ws->histo_sum) {
         return NULL;
     }
-    spectrum_set_calibration(ws->histo_sum, ws->det->calibration); /* Calibration (assuming default calibration) can be set now. */
+    calibration_apply_to_histogram(ws->det->calibration, ws->histo_sum); /* Calibration (assuming default calibration) can be set now. */
     jabs_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
 
     sim_workspace_calculate_number_of_bricks(ws);

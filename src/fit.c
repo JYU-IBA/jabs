@@ -423,12 +423,12 @@ void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct r
     jabs_histogram *histo_sim = fit_data_histo_sum(fit_data, roi->i_det);
     jabs_histogram *histo_exp = fit_data_exp(fit_data, roi->i_det);
     jabs_histogram *histo_ref = fit_data->ref;
-    size_t n_sim = spectrum_channels_in_range(histo_sim, roi->low, roi->high);
-    size_t n_exp = spectrum_channels_in_range(histo_exp, roi->low, roi->high);
-    size_t n_ref = spectrum_channels_in_range(histo_ref, roi->low, roi->high);
-    double sim_cts = spectrum_roi(histo_sim, roi->low, roi->high);
-    double exp_cts = spectrum_roi(histo_exp, roi->low, roi->high);
-    double ref_cts = spectrum_roi(histo_ref, roi->low, roi->high);
+    size_t n_sim = jabs_histogram_channels_in_range(histo_sim, roi->low, roi->high);
+    size_t n_exp = jabs_histogram_channels_in_range(histo_exp, roi->low, roi->high);
+    size_t n_ref = jabs_histogram_channels_in_range(histo_ref, roi->low, roi->high);
+    double sim_cts = jabs_histogram_roi(histo_sim, roi->low, roi->high);
+    double exp_cts = jabs_histogram_roi(histo_exp, roi->low, roi->high);
+    double ref_cts = jabs_histogram_roi(histo_ref, roi->low, roi->high);
     const detector *det = sim_det(fit_data->sim, roi->i_det);
 
     jabs_message(MSG_INFO, f, "          low = %12zu\n", roi->low);
@@ -692,7 +692,7 @@ void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *spectra, const det
     spectra->s = calloc(spectra->n_spectra, sizeof(result_spectrum));
     result_spectrum_set(&spectra->s[RESULT_SPECTRA_SIMULATED], ws->histo_sum, "Simulated", NULL, REACTION_NONE);
     result_spectrum_set(&spectra->s[RESULT_SPECTRA_EXPERIMENTAL], exp, "Experimental", NULL, REACTION_NONE);
-    spectrum_set_calibration(result_spectra_experimental_histo(spectra), det->calibration);
+    calibration_apply_to_histogram(det->calibration, result_spectra_experimental_histo(spectra));
     DEBUGMSG("Copying %zu spectra (%zu reactions) from ws to spectra structure.", spectra->n_spectra, ws->n_reactions);
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const reaction *r = ws->reactions[i]->r;
@@ -794,8 +794,8 @@ void fit_data_print(const fit_data *fit, jabs_msg_level msg_level) {
     jabs_message(msg_level, stderr, "Fit ROI # | detector name |  low ch | high ch | exp counts | sim counts\n");
     for(size_t i = 0; i < fit->n_fit_ranges; i++) {
         roi *range = &fit->fit_ranges[i];
-        double exp = spectrum_roi(fit_data_exp(fit, range->i_det), range->low, range->high);
-        double sim = spectrum_roi(fit_data_histo_sum(fit, range->i_det), range->low, range->high);
+        double exp = jabs_histogram_roi(fit_data_exp(fit, range->i_det), range->low, range->high);
+        double sim = jabs_histogram_roi(fit_data_histo_sum(fit, range->i_det), range->low, range->high);
         jabs_message(msg_level, stderr, " %8zu | %13s | %7zu | %7zu | %10g | %10g\n",
                      i + 1, detector_name(sim_det(fit->sim, range->i_det)), range->low, range->high,
                      exp, sim);

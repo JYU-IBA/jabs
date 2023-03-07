@@ -17,6 +17,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <jibal_option.h>
+#include "histogram.h"
 
 typedef enum calibration_type {
     CALIBRATION_NONE = 0,
@@ -77,4 +78,5 @@ const char *calibration_name(const calibration *c);
 char *calibration_to_string(const calibration *c);
 char *calibration_param_name(calibration_type type, calibration_param_type i); /* Name of i'th param (e.g. "slope"). Returns a string that can be free'd */
 int calibration_is_monotonically_increasing(const calibration *cal, size_t n_channels);
+void calibration_apply_to_histogram(const calibration *cal, jabs_histogram *h);
 #endif //CALIB_CALIBRATION_H

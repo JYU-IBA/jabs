@@ -328,3 +328,12 @@ int calibration_is_monotonically_increasing(const calibration *cal, size_t n_cha
         return TRUE;
     }
 }
+
+void calibration_apply_to_histogram(const calibration *cal, jabs_histogram *h) {
+    if(!h || !cal) {
+        return;
+    }
+    for(size_t i = 0; i < h->n + 1; i++) {
+        h->range[i] = calibration_eval(cal, i);
+    }
+}
