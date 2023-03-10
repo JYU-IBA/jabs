@@ -384,7 +384,8 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
             sim_r->last_brick = i_brick;
             DEBUGMSG("Max depth of %g tfu reached (d_after.x is %g).", sim_r->max_depth / C_TFU,  d_after.x / C_TFU);
             break;
-        } else if(ion1.inverse_cosine_theta < 0.0 && d_after.x < DEPTH_TOLERANCE) {
+        }
+        if(ion1.inverse_cosine_theta < 0.0 && d_after.x < DEPTH_TOLERANCE) {
             sim_r->last_brick = i_brick;
             DEBUGMSG("Surface reached, d_after.x = %g tfu.", d_after.x);
             break;
@@ -400,11 +401,7 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
             double E_change = -ws->params->brick_width_sigmas * S_sigma / E_deriv;
             assert(E_change < 0.0);
             ion1.E += E_change;
-            if(E_deriv > 9.999) {
-                DEBUGMSG("Using a high deriv energy changes by %g keV.", E_change/C_KEV);
-            }
         }
-
     }
     assert(sim_r->last_brick < sim_r->n_bricks);
 }
@@ -542,9 +539,7 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
             }
         }
     }
-    if(fail)
-        return EXIT_FAILURE;
-    return EXIT_SUCCESS;
+    return fail ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
 int simulate_with_roughness(sim_workspace *ws) {
@@ -658,7 +653,7 @@ int simulate_with_ds(sim_workspace *ws) {
         jabs_message(MSG_ERROR, stderr, "Congratulations, you've found a bug in %s:%i.\n", __FILE__, __LINE__);
         return EXIT_FAILURE;
     }
-    double fluence = ws->fluence;
+    const double fluence = ws->fluence;
     if(simulate_with_roughness(ws) < 0) {
         return EXIT_FAILURE;
     }

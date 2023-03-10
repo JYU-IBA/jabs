@@ -127,7 +127,7 @@ void fit_data_free(fit_data *fit); /* Doesn't free everything in fit, like sm, j
 void fit_data_reset(fit_data *fit);
 void fit_data_exp_reset(fit_data *fit);
 void fit_data_print(const fit_data *fit, jabs_msg_level msg_level);
-void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct roi *roi);
+void fit_data_roi_print(const struct fit_data *fit_data, const struct roi *roi);
 jabs_histogram *fit_data_exp(const fit_data *fit, size_t i_det);
 jabs_histogram *fit_data_ref(const fit_data *fit_data);
 fit_params *fit_params_all(fit_data *fit);
@@ -152,7 +152,7 @@ int fit_determine_active_detectors(fit_data *fit);
 int fit_sanity_check(const fit_data *fit);
 void fit_iter_stats_update(struct fit_data *params, const gsl_multifit_nlinear_workspace *w);
 void fit_iter_stats_print(const struct fit_stats *stats);
-void fit_stats_print(FILE *f, const struct fit_stats *stats, jabs_msg_level msg_level);
+void fit_stats_print(const struct fit_stats *stats, jabs_msg_level msg_level);
 int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range); /* Makes a deep copy */
 void fit_data_fit_ranges_free(struct fit_data *fit_data);
 int fit_set_roi_from_string(roi *r, const char *str); /* Parses only low and high from "[low:high]". */

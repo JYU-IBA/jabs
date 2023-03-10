@@ -246,7 +246,7 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
     jabs_message(MSG_VERBOSE, stderr, "\nFinal sample model:\n");
     sample_model_print(NULL, fit_data->sm, MSG_VERBOSE);
     jabs_message(MSG_INFO, stderr, "\n");
-    fit_stats_print(stderr, &fit_data->stats, MSG_INFO);
+    fit_stats_print(&fit_data->stats, MSG_INFO);
     script_finish_sim_or_fit(s);
     return 1;
 }
@@ -377,7 +377,7 @@ script_command_status script_roi(script_session *s, int argc, char *const *argv)
             return SCRIPT_COMMAND_FAILURE;
             break;
         }
-        fit_data_roi_print(stderr, s->fit, &r);
+        fit_data_roi_print(s->fit, &r);
         argc--;
         argv++;
     }

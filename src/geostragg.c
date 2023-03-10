@@ -162,14 +162,6 @@ double beta_deriv(double sample_theta, double sample_phi, const detector *det, c
     return result;
 }
 
-int geostragg_vars_print(FILE *f, const geostragg_vars *g) {
-    if(!g)
-        return EXIT_FAILURE;
-    jabs_message(MSG_INFO, f, "theta_product = %g deg\n", g->theta_product);
-    jabs_message(MSG_INFO, f, "phi_product = %g deg\n", g->theta_product);
-    return EXIT_SUCCESS;
-}
-
 double exit_angle(double sample_theta, double sample_phi, double det_theta, double det_phi) {
     double theta, phi;
     rotate(sample_theta, sample_phi, det_theta, det_phi, &theta, &phi);

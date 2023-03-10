@@ -345,8 +345,12 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
 }
 
 int sample_model_print(const char *filename, const sample_model *sm, jabs_msg_level msg_level) {
-    if(!sm)
+    if(!sm) {
         return EXIT_FAILURE;
+    }
+    if(sm->type == SAMPLE_MODEL_NONE) {
+        return 0;
+    }
     FILE *f = fopen_file_or_stream(filename, "w");
     if(!f) {
         return EXIT_FAILURE;
@@ -357,9 +361,7 @@ int sample_model_print(const char *filename, const sample_model *sm, jabs_msg_le
     size_t n_nonzero_density = sample_model_number_of_range_with_non_zero_density(sm);
     switch(sm->type) {
         case SAMPLE_MODEL_NONE:
-            jabs_message(msg_level, f, "Sample model is none.\n"); /* Not an error as such. No output (to f) is created. */
             return 0;
-            break;
         case SAMPLE_MODEL_POINT_BY_POINT:
             jabs_message(msg_level, f, "       depth");
             break;

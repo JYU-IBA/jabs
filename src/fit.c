@@ -286,9 +286,9 @@ void fit_iter_stats_print(const struct fit_stats *stats) {
                  stats->cputime_cumul, 1000.0 * stats->cputime_iter / stats->n_spectra_iter);
 }
 
-void fit_stats_print(FILE *f, const struct fit_stats *stats, jabs_msg_level msg_level) {
+void fit_stats_print(const struct fit_stats *stats, jabs_msg_level msg_level) {
     if(stats->chisq_dof > 0.0) {
-        jabs_message(msg_level, f, "Final chisq/dof = %.7lf\n", stats->chisq_dof);
+        jabs_message(msg_level, stderr, "Final chisq/dof = %.7lf\n", stats->chisq_dof);
     }
 }
 
@@ -416,7 +416,7 @@ void fit_data_exp_reset(fit_data *fit) {
     }
 }
 
-void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct roi *roi) {
+void fit_data_roi_print(const struct fit_data *fit_data, const struct roi *roi) {
     if(!fit_data) {
         return;
     }
@@ -431,39 +431,39 @@ void fit_data_roi_print(FILE *f, const struct fit_data *fit_data, const struct r
     double ref_cts = jabs_histogram_roi(histo_ref, roi->low, roi->high);
     const detector *det = sim_det(fit_data->sim, roi->i_det);
 
-    jabs_message(MSG_INFO, f, "          low = %12zu\n", roi->low);
-    jabs_message(MSG_INFO, f, "         high = %12zu\n", roi->high);
+    jabs_message(MSG_INFO, stderr, "          low = %12zu\n", roi->low);
+    jabs_message(MSG_INFO, stderr, "         high = %12zu\n", roi->high);
     if(det) {
-        jabs_message(MSG_INFO, f, "        E_low = %12.3lf keV (low energy edge of bin)\n", detector_calibrated(det, JIBAL_ANY_Z, roi->low) / C_KEV);
-        jabs_message(MSG_INFO, f, "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(det, JIBAL_ANY_Z, roi->high + 1) / C_KEV);
+        jabs_message(MSG_INFO, stderr, "        E_low = %12.3lf keV (low energy edge of bin)\n", detector_calibrated(det, JIBAL_ANY_Z, roi->low) / C_KEV);
+        jabs_message(MSG_INFO, stderr, "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(det, JIBAL_ANY_Z, roi->high + 1) / C_KEV);
     }
     if(histo_sim) {
-        jabs_message(MSG_INFO, f, "        n_sim = %12zu (number of channels)\n", n_sim);
-        jabs_message(MSG_INFO, f, "          sim = %12.8g (number of counts)\n", sim_cts);
+        jabs_message(MSG_INFO, stderr, "        n_sim = %12zu (number of channels)\n", n_sim);
+        jabs_message(MSG_INFO, stderr, "          sim = %12.8g (number of counts)\n", sim_cts);
     }
     if(histo_exp) {
-        jabs_message(MSG_INFO, f, "        n_exp = %12zu (number of channels)\n", n_exp);
-        jabs_message(MSG_INFO, f, "          exp = %12.8g (number of counts)\n", exp_cts);
-        jabs_message(MSG_INFO, f, "    sqrt(exp) = %12.5lf\n", sqrt(exp_cts));
+        jabs_message(MSG_INFO, stderr, "        n_exp = %12zu (number of channels)\n", n_exp);
+        jabs_message(MSG_INFO, stderr, "          exp = %12.8g (number of counts)\n", exp_cts);
+        jabs_message(MSG_INFO, stderr, "    sqrt(exp) = %12.5lf\n", sqrt(exp_cts));
     }
     if(histo_ref) {
-        jabs_message(MSG_INFO, f, "        n_ref = %12zu (number of channels)\n", n_ref);
-        jabs_message(MSG_INFO, f, "          ref = %12.8g (number of counts)\n", ref_cts);
-        jabs_message(MSG_INFO, f, "    sqrt(ref) = %12.5lf\n", sqrt(ref_cts));
+        jabs_message(MSG_INFO, stderr, "        n_ref = %12zu (number of channels)\n", n_ref);
+        jabs_message(MSG_INFO, stderr, "          ref = %12.8g (number of counts)\n", ref_cts);
+        jabs_message(MSG_INFO, stderr, "    sqrt(ref) = %12.5lf\n", sqrt(ref_cts));
     }
     if(histo_sim && histo_exp && sim_cts > 0 && exp_cts > 0) {
-        jabs_message(MSG_INFO, f, "      exp-sim = %12.8g\n", exp_cts - sim_cts);
-        jabs_message(MSG_INFO, f, "      sim/exp = %12.5lf\n", sim_cts / exp_cts);
-        jabs_message(MSG_INFO, f, "      exp/sim = %12.5lf\n", exp_cts / sim_cts);
-        jabs_message(MSG_INFO, f, "  1/sqrt(exp) = %12.5lf%%\n", 100.0 / sqrt(exp_cts));
-        jabs_message(MSG_INFO, f, "(exp-sim)/exp = %12.5lf%%\n", 100.0 * (exp_cts - sim_cts) / exp_cts);
+        jabs_message(MSG_INFO, stderr, "      exp-sim = %12.8g\n", exp_cts - sim_cts);
+        jabs_message(MSG_INFO, stderr, "      sim/exp = %12.5lf\n", sim_cts / exp_cts);
+        jabs_message(MSG_INFO, stderr, "      exp/sim = %12.5lf\n", exp_cts / sim_cts);
+        jabs_message(MSG_INFO, stderr, "  1/sqrt(exp) = %12.5lf%%\n", 100.0 / sqrt(exp_cts));
+        jabs_message(MSG_INFO, stderr, "(exp-sim)/exp = %12.5lf%%\n", 100.0 * (exp_cts - sim_cts) / exp_cts);
     }
     if(histo_sim && histo_ref && sim_cts > 0 && ref_cts > 0) {
-        jabs_message(MSG_INFO, f, "      ref-sim = %12g\n", ref_cts - sim_cts);
-        jabs_message(MSG_INFO, f, "      sim/ref = %12.5lf\n", sim_cts / ref_cts);
-        jabs_message(MSG_INFO, f, "      ref/sim = %12.5lf\n", ref_cts / sim_cts);
-        jabs_message(MSG_INFO, f, "  1/sqrt(ref) = %12.5lf%%\n", 100.0 / sqrt(ref_cts));
-        jabs_message(MSG_INFO, f, "(ref-sim)/ref = %12.5lf%%\n", 100.0 * (ref_cts - sim_cts) / ref_cts);
+        jabs_message(MSG_INFO, stderr, "      ref-sim = %12g\n", ref_cts - sim_cts);
+        jabs_message(MSG_INFO, stderr, "      sim/ref = %12.5lf\n", sim_cts / ref_cts);
+        jabs_message(MSG_INFO, stderr, "      ref/sim = %12.5lf\n", ref_cts / sim_cts);
+        jabs_message(MSG_INFO, stderr, "  1/sqrt(ref) = %12.5lf%%\n", 100.0 / sqrt(ref_cts));
+        jabs_message(MSG_INFO, stderr, "(ref-sim)/ref = %12.5lf%%\n", 100.0 * (ref_cts - sim_cts) / ref_cts);
     }
 }
 
