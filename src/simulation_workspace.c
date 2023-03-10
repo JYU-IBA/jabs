@@ -49,7 +49,7 @@ void sim_workspace_calculate_number_of_bricks(sim_workspace *ws) {
         }
         if(n_bricks > BRICKS_MAX) {
             n_bricks = BRICKS_MAX;
-            jabs_message(MSG_WARNING, stderr,  "Number of bricks limited to %zu.\n", n_bricks);
+            jabs_message(MSG_WARNING,  "Number of bricks limited to %zu.\n", n_bricks);
         }
     }
     ws->n_bricks = n_bricks;
@@ -58,11 +58,11 @@ void sim_workspace_calculate_number_of_bricks(sim_workspace *ws) {
 
 sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det) {
     if(!jibal || !sim || !det) {
-        jabs_message(MSG_ERROR, stderr,  "No JIBAL, sim or det. Guru thinks: %p, %p %p.\n", jibal, sim, det);
+        jabs_message(MSG_ERROR,  "No JIBAL, sim or det. Guru thinks: %p, %p %p.\n", jibal, sim, det);
         return NULL;
     }
     if(!sim->sample) {
-        jabs_message(MSG_ERROR, stderr,  "No sample has been set. Will not initialize workspace.\n");
+        jabs_message(MSG_ERROR,  "No sample has been set. Will not initialize workspace.\n");
         return NULL;
     }
     sim_workspace *ws = calloc(1, sizeof(sim_workspace));
@@ -79,12 +79,12 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->n_reactions = 0; /* Will be incremented later */
 
     if(sim->params->beta_manual && sim->params->ds) {
-        jabs_message(MSG_WARNING, stderr,  "Manual exit angle is enabled in addition to dual scattering. This is an unsupported combination. Manual exit angle calculation will be disabled.\n");
+        jabs_message(MSG_WARNING,  "Manual exit angle is enabled in addition to dual scattering. This is an unsupported combination. Manual exit angle calculation will be disabled.\n");
         ws->params->beta_manual  = FALSE;
     }
 
     if(sim->params->beta_manual && sim->params->geostragg) {
-        jabs_message(MSG_WARNING, stderr,  "Manual exit angle is enabled in addition to geometric scattering. This is an unsupported combination. Geometric straggling calculation will be disabled.\n");
+        jabs_message(MSG_WARNING,  "Manual exit angle is enabled in addition to geometric scattering. This is an unsupported combination. Geometric straggling calculation will be disabled.\n");
         ws->params->geostragg = FALSE;
     }
     ws->ion = sim->ion; /* Shallow copy, but that is ok */
@@ -94,13 +94,13 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     sim_workspace_recalculate_n_channels(ws, ws->sim);
 
     if(ws->n_channels == 0) {
-        jabs_message(MSG_ERROR, stderr,  "Number of channels in workspace is zero. Aborting initialization.\n");
+        jabs_message(MSG_ERROR,  "Number of channels in workspace is zero. Aborting initialization.\n");
         free(ws);
         return NULL;
     }
 
     if(detector_sanity_check(det, ws->n_channels)) {
-        jabs_message(MSG_ERROR, stderr, "Detector %zu failed sanity check!", det->name);
+        jabs_message(MSG_ERROR, "Detector %zu failed sanity check!", det->name);
         free(ws);
         return NULL;
     }
@@ -169,9 +169,9 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
             double E_det = calibration_eval(cal, n_max);
             if(E_det < E_old) {
                 DEBUGMSG("Monotonicity fail at %zu, %g keV < %g keV\n", n_max, E_det / C_KEV, E_old / C_KEV); /* This monotonicity check does not guarantee the monotonicity of all calibrations every time, so further checks are necessary */
-                jabs_message(MSG_ERROR, stderr, "Could not determine number of channels required in simulation while processing reaction %zu, since calibrations must be monotonous, but channel %zu gives %.14g keV, which is less than %.14g keV on the previous channel.\n", i_reaction + 1, n_max, E_det / C_KEV, E_old / C_KEV);
+                jabs_message(MSG_ERROR, "Could not determine number of channels required in simulation while processing reaction %zu, since calibrations must be monotonous, but channel %zu gives %.14g keV, which is less than %.14g keV on the previous channel.\n", i_reaction + 1, n_max, E_det / C_KEV, E_old / C_KEV);
                 char *cal_str = calibration_to_string(cal);
-                jabs_message(MSG_ERROR, stderr, "The offending calibration is currently \"%s\"\n", cal_str);
+                jabs_message(MSG_ERROR, "The offending calibration is currently \"%s\"\n", cal_str);
                 free(cal_str);
                 ws->n_channels = 0;
                 return;
@@ -261,13 +261,13 @@ void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
 int sim_workspace_print_spectra(const result_spectra *spectra, const char *filename) {
     char sep = ' ';
     if(!spectra || spectra->n_spectra == 0) {
-        jabs_message(MSG_ERROR, stderr, "No spectra!\n");
+        jabs_message(MSG_ERROR, "No spectra!\n");
         return EXIT_FAILURE;
     }
     jabs_histogram *h_sum = result_spectra_simulated_histo(spectra);
     jabs_histogram *h_exp = result_spectra_experimental_histo(spectra);
     if(!h_sum) {
-        jabs_message(MSG_ERROR, stderr, "No simulated spectrum!\n");
+        jabs_message(MSG_ERROR, "No simulated spectrum!\n");
         return EXIT_FAILURE;
     }
     FILE *f = fopen_file_or_stream(filename, "w");

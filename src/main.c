@@ -48,15 +48,15 @@ int idf2jbs(int argc, char * const *argv) {
     if(argc == 1) {
         idf_error idferr = idf_parse(argv[0], &filename_out);
         if(idferr == IDF2JBS_SUCCESS) {
-            jabs_message(MSG_INFO, stderr, "Success. Wrote script to file \"%s\"\n", filename_out);
+            jabs_message(MSG_INFO, "Success. Wrote script to file \"%s\"\n", filename_out);
             free(filename_out);
             return EXIT_SUCCESS;
         } else {
-            jabs_message(MSG_ERROR, stderr, "IDF2JBS failed with error code %i (%s).\n", idferr, idf_error_code_to_str(idferr));
+            jabs_message(MSG_ERROR, "IDF2JBS failed with error code %i (%s).\n", idferr, idf_error_code_to_str(idferr));
             return EXIT_FAILURE;
         }
     } else {
-        jabs_message(MSG_INFO, stderr, "Usage (idf2jbs): jabs idf2jbs <idf file>\nNote that idf file must have suffix .xml or .idf.\nOn successful run .jbs (simulation script) and .dat (spectrum) files will be created.\n");
+        jabs_message(MSG_INFO, "Usage (idf2jbs): jabs idf2jbs <idf file>\nNote that idf file must have suffix .xml or .idf.\nOn successful run .jbs (simulation script) and .dat (spectrum) files will be created.\n");
         return EXIT_FAILURE;
     }
 }
@@ -74,12 +74,12 @@ int main(int argc, char * const *argv) {
     }
     jibal *jibal = jibal_init(NULL);
     if(jibal->error) {
-        jabs_message(MSG_ERROR, stderr, "Initializing JIBAL failed with error code %i (%s)\n", jibal->error, jibal_error_string(jibal->error));
+        jabs_message(MSG_ERROR, "Initializing JIBAL failed with error code %i (%s)\n", jibal->error, jibal_error_string(jibal->error));
         return EXIT_FAILURE;
     }
     script_session *session = script_session_init(jibal, NULL);
     if(!session) {
-        jabs_message(MSG_ERROR, stderr, "Can not initialize session.\n");
+        jabs_message(MSG_ERROR, "Can not initialize session.\n");
         jibal_free(jibal);
         return EXIT_FAILURE;
     }

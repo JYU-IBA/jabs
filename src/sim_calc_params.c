@@ -149,37 +149,37 @@ void sim_calc_params_ds(sim_calc_params *p, int ds) {
 void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_level) {
     if(!params)
         return;
-    jabs_message(msg_level, stderr, "step for incident ions = %.3lf keV (0 = auto)\n", params->incident_stop_params.step / C_KEV);
+    jabs_message(msg_level, "step for incident ions = %.3lf keV (0 = auto)\n", params->incident_stop_params.step / C_KEV);
     if(params->incident_stop_params.step == 0.0) {
-        jabs_message(msg_level, stderr, "step for incident ions = %g times straggling sigma\n", params->incident_stop_params.sigmas);
-        jabs_message(msg_level, stderr, "minimum step for incident ions = %.3lf keV\n", params->incident_stop_params.min / C_KEV);
-        jabs_message(msg_level, stderr, "maximum step for incident ions = %.3lf keV\n", params->incident_stop_params.max / C_KEV);
+        jabs_message(msg_level, "step for incident ions = %g times straggling sigma\n", params->incident_stop_params.sigmas);
+        jabs_message(msg_level, "minimum step for incident ions = %.3lf keV\n", params->incident_stop_params.min / C_KEV);
+        jabs_message(msg_level, "maximum step for incident ions = %.3lf keV\n", params->incident_stop_params.max / C_KEV);
     }
-    jabs_message(msg_level, stderr, "step for exiting ions = %.3lf keV (0 = auto)\n", params->exiting_stop_params.step / C_KEV);
+    jabs_message(msg_level, "step for exiting ions = %.3lf keV (0 = auto)\n", params->exiting_stop_params.step / C_KEV);
     if(params->exiting_stop_params.step == 0.0) {
-        jabs_message(msg_level, stderr, "step for exiting ions = %g times straggling sigma\n", params->exiting_stop_params.sigmas);
-        jabs_message(msg_level, stderr, "minimum step for exiting ions = %.3lf keV\n", params->exiting_stop_params.min / C_KEV);
-        jabs_message(msg_level, stderr, "maximum step for exiting ions = %.3lf keV\n", params->exiting_stop_params.max / C_KEV);
+        jabs_message(msg_level, "step for exiting ions = %g times straggling sigma\n", params->exiting_stop_params.sigmas);
+        jabs_message(msg_level, "minimum step for exiting ions = %.3lf keV\n", params->exiting_stop_params.min / C_KEV);
+        jabs_message(msg_level, "maximum step for exiting ions = %.3lf keV\n", params->exiting_stop_params.max / C_KEV);
     }
-    jabs_message(msg_level, stderr, "stopping RK4 = %s\n", params->rk4?"true":"false");
-    jabs_message(msg_level, stderr, "accurate nuclear stopping = %s\n", params->nuclear_stopping_accurate?"true":"false");
-    jabs_message(msg_level, stderr, "maximum number of bricks = %zu\n", params->n_bricks_max);
-    jabs_message(msg_level, stderr, "geometric broadening = %s\n", params->geostragg?"true":"false");
-    jabs_message(msg_level, stderr, "brick width = %g times detector and straggling sum sigma\n", params->brick_width_sigmas);
-    jabs_message(msg_level, stderr, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");
+    jabs_message(msg_level, "stopping RK4 = %s\n", params->rk4?"true":"false");
+    jabs_message(msg_level, "accurate nuclear stopping = %s\n", params->nuclear_stopping_accurate?"true":"false");
+    jabs_message(msg_level, "maximum number of bricks = %zu\n", params->n_bricks_max);
+    jabs_message(msg_level, "geometric broadening = %s\n", params->geostragg?"true":"false");
+    jabs_message(msg_level, "brick width = %g times detector and straggling sum sigma\n", params->brick_width_sigmas);
+    jabs_message(msg_level, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");
     if(!params->mean_conc_and_energy) {
         if(params->cs_adaptive) {
-            jabs_message(msg_level, stderr, "cross section integration accuracy = %g\n", params->int_cs_accuracy);
+            jabs_message(msg_level, "cross section integration accuracy = %g\n", params->int_cs_accuracy);
         } else {
-            jabs_message(msg_level, stderr, "cross section evaluation step = %g times straggling sigma\n", params->cs_stragg_step_sigmas);
-            jabs_message(msg_level, stderr, "maximum energy step for cross section evaluation = %g keV\n", params->cs_energy_step_max / C_KEV);
-            jabs_message(msg_level, stderr, "maximum depth step for cross section evaluation = %g tfu\n", params->cs_depth_step_max / C_TFU);
+            jabs_message(msg_level, "cross section evaluation step = %g times straggling sigma\n", params->cs_stragg_step_sigmas);
+            jabs_message(msg_level, "maximum energy step for cross section evaluation = %g keV\n", params->cs_energy_step_max / C_KEV);
+            jabs_message(msg_level, "maximum depth step for cross section evaluation = %g tfu\n", params->cs_depth_step_max / C_TFU);
         }
         if(params->cs_n_stragg_steps == 0) {
-            jabs_message(msg_level, stderr, "straggling weighting integration accuracy = %g\n", params->int_cs_stragg_accuracy);
+            jabs_message(msg_level, "straggling weighting integration accuracy = %g\n", params->int_cs_stragg_accuracy);
         } else {
-            jabs_message(msg_level, stderr, "straggling substeps = %zu\n", params->cs_n_stragg_steps);
+            jabs_message(msg_level, "straggling substeps = %zu\n", params->cs_n_stragg_steps);
         }
     }
-    jabs_message(msg_level, stderr, "reaction file (R33) angle tolerance = %g deg\n", params->reaction_file_angle_tolerance / C_DEG);
+    jabs_message(msg_level, "reaction file (R33) angle tolerance = %g deg\n", params->reaction_file_angle_tolerance / C_DEG);
 }

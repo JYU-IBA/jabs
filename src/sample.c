@@ -86,34 +86,34 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
 
 int sample_model_sanity_check(const sample_model *sm) {
     if(!sm) {
-        jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (null pointer).\n");
+        jabs_message(MSG_ERROR, "Sample model fails sanity check (null pointer).\n");
         return EXIT_FAILURE;
     }
     for(size_t i = 0; i < sm->n_ranges; i++) {
         const sample_range *r = &sm->ranges[i];
         if(sm->type == SAMPLE_MODEL_LAYERED) {
             if(r->x < 0.0) {
-                jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (layer %zu thickness negative).\n", i + 1);
+                jabs_message(MSG_ERROR, "Sample model fails sanity check (layer %zu thickness negative).\n", i + 1);
                 return EXIT_FAILURE;
             }
         } else if(sm->type == SAMPLE_MODEL_POINT_BY_POINT) {
             if(i && r->x < sm->ranges[i-1].x) {
-                jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (non-monotonous range %zu).\n", i + 1);
+                jabs_message(MSG_ERROR, "Sample model fails sanity check (non-monotonous range %zu).\n", i + 1);
                 return EXIT_FAILURE;
             }
         }
         for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
             if(*(sample_model_conc_bin(sm, i, i_mat)) < 0.0) {
-                jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative concentration of %s (%zu) in layer/range %zu).   \n", sm->materials[i_mat]->name, i_mat + 1, i + 1);
+                jabs_message(MSG_ERROR, "Sample model fails sanity check (negative concentration of %s (%zu) in layer/range %zu).   \n", sm->materials[i_mat]->name, i_mat + 1, i + 1);
                 return EXIT_FAILURE;
             }
         }
         if(r->rough.x < 0.0) {
-            jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative roughness range at layer/range %zu).\n", i + 1);
+            jabs_message(MSG_ERROR, "Sample model fails sanity check (negative roughness range at layer/range %zu).\n", i + 1);
             return EXIT_FAILURE;
         }
         if(r->bragg < 0.0 || r->stragg < 0.0 || r->yield < 0.0) {
-            jabs_message(MSG_ERROR, stderr, "Sample model fails sanity check (negative ad-hoc correction parameter (bragg (%g), stragg (%g) or yield (%g)) at layer/range %zu).\n",
+            jabs_message(MSG_ERROR, "Sample model fails sanity check (negative ad-hoc correction parameter (bragg (%g), stragg (%g) or yield (%g)) at layer/range %zu).\n",
                          r->bragg, r->stragg, r->yield, i + 1);
 #ifdef DEBUG
             sample_model_print("debug_sample.txt", sm, MSG_INFO);
@@ -363,55 +363,55 @@ int sample_model_print(const char *filename, const sample_model *sm, jabs_msg_le
         case SAMPLE_MODEL_NONE:
             return 0;
         case SAMPLE_MODEL_POINT_BY_POINT:
-            jabs_message(msg_level, f, "       depth");
+            jabs_message_printf(msg_level, f, "       depth");
             break;
         case SAMPLE_MODEL_LAYERED:
-            jabs_message(msg_level, f, "       thick");
+            jabs_message_printf(msg_level, f, "       thick");
             break;
     }
     if(n_rl) {
-        jabs_message(msg_level, f, "          rough");
-        jabs_message(msg_level, f, " n_rough");
+        jabs_message_printf(msg_level, f, "          rough");
+        jabs_message_printf(msg_level, f, " n_rough");
     }
     if(n_nonzero_density) {
-        jabs_message(msg_level, f, "  density");
+        jabs_message_printf(msg_level, f, "  density");
     }
     if(n_yield) {
-        jabs_message(msg_level, f, "  yield");
-        jabs_message(msg_level, f, "  yield_slope");
+        jabs_message_printf(msg_level, f, "  yield");
+        jabs_message_printf(msg_level, f, "  yield_slope");
     }
     if(n_braggstragg) {
-        jabs_message(msg_level, f, "  bragg");
-        jabs_message(msg_level, f, "  stragg");
+        jabs_message_printf(msg_level, f, "  bragg");
+        jabs_message_printf(msg_level, f, "  stragg");
     }
     for (size_t i = 0; i < sm->n_materials; i++) {
-        jabs_message(msg_level, f, " %8s", sm->materials[i]->name);
+        jabs_message_printf(msg_level, f, " %8s", sm->materials[i]->name);
     }
-    jabs_message(msg_level, f, "\n");
+    jabs_message_printf(msg_level, f, "\n");
     for (size_t i = 0; i < sm->n_ranges; i++) {
         const sample_range *r = &(sm->ranges[i]);
-        jabs_message(msg_level, f, "%12.3lf", r->x / C_TFU);
+        jabs_message_printf(msg_level, f, "%12.3lf", r->x / C_TFU);
         if(n_rl) {
             if(r->rough.model == ROUGHNESS_FILE) {
-                jabs_message(msg_level, f, " %14s", r->rough.file->filename);
+                jabs_message_printf(msg_level, f, " %14s", r->rough.file->filename);
             } else {
-                jabs_message(msg_level, f, " %14.3lf", r->rough.x / C_TFU);
+                jabs_message_printf(msg_level, f, " %14.3lf", r->rough.x / C_TFU);
             }
-            jabs_message(msg_level, f, " %7zu", r->rough.n);
+            jabs_message_printf(msg_level, f, " %7zu", r->rough.n);
         }
         if(n_nonzero_density) {
-            jabs_message(msg_level, f, " %8.4lf", r->density / C_G_CM3);
+            jabs_message_printf(msg_level, f, " %8.4lf", r->density / C_G_CM3);
         }
         if(n_yield) {
-            jabs_message(msg_level, f, " %5.4lf %12.8lf", r->yield, r->yield_slope);
+            jabs_message_printf(msg_level, f, " %5.4lf %12.8lf", r->yield, r->yield_slope);
         }
         if(n_braggstragg) {
-            jabs_message(msg_level, f, " %6.4lf %7.4lf", r->bragg, r->stragg);
+            jabs_message_printf(msg_level, f, " %6.4lf %7.4lf", r->bragg, r->stragg);
         }
         for (size_t j = 0; j < sm->n_materials; j++) {
-            jabs_message(msg_level, f, " %8.4lf", *sample_model_conc_bin(sm, i, j) * 100.0);
+            jabs_message_printf(msg_level, f, " %8.4lf", *sample_model_conc_bin(sm, i, j) * 100.0);
         }
-        jabs_message(msg_level, f, "\n");
+        jabs_message_printf(msg_level, f, "\n");
     }
     fclose_file_or_stream(f);
     return 0;
@@ -542,7 +542,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                     sm->materials = realloc(sm->materials, sizeof (jibal_material *) * (sm->n_materials + 1)); /* TODO: check allocation */
                     sm->materials[sm->n_materials] = jibal_material_create(jibal->elements, col);
                     if(!sm->materials[sm->n_materials]) {
-                        jabs_message(MSG_WARNING, stderr, "Could not create material %s, ignoring it!\n", col);
+                        jabs_message(MSG_WARNING, "Could not create material %s, ignoring it!\n", col);
                     } else {
                         sm->n_materials++;
                     }
@@ -696,11 +696,11 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             if(range->rough.model == ROUGHNESS_GAMMA) {
                 range->rough.n = strtoul((*argv)[1], NULL, 10);
             } else {
-                jabs_message(MSG_WARNING, stderr, "Warning: setting rough_n to %.\n", (*argv)[1]);
+                jabs_message(MSG_WARNING, "Warning: setting rough_n to %.\n", (*argv)[1]);
             }
         } else if(range && strcmp((*argv)[0], "roughnessfile") == 0) {
             if(roughness_set_from_file(&range->rough, (*argv)[1])) {
-                jabs_message(MSG_WARNING, stderr, "Warning: setting roughness from file \"%s\" failed.\n", (*argv)[1]);
+                jabs_message(MSG_WARNING, "Warning: setting roughness from file \"%s\" failed.\n", (*argv)[1]);
             } else {
                 range->x = thickness_probability_table_areal_density(range->rough.file->tpd);
             }
@@ -878,18 +878,18 @@ double sample_areal_density_isotope_range(const sample *sample, size_t i_isotope
 void sample_areal_densities_print(const sample *sample, int print_isotopes, jabs_msg_level msg_level) {
     if(!sample)
         return;
-    jabs_message(msg_level, stderr, "SUM (tfu)        ");
+    jabs_message(msg_level, "SUM (tfu)        ");
     double sum = 0.0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         for (size_t j = 1; j < sample->n_ranges; j++) {
             sum += sample_areal_density_isotope_range(sample, i, j);
         }
         if (print_isotopes || i == sample->n_isotopes-1 || sample->isotopes[i]->Z != sample->isotopes[i+1]->Z) {
-            jabs_message(msg_level, stderr, " %9.3lf", sum/C_TFU);
+            jabs_message(msg_level, " %9.3lf", sum/C_TFU);
             sum = 0.0;
         }
     }
-    jabs_message(msg_level, stderr, "\n");
+    jabs_message(msg_level, "\n");
 }
 
 
@@ -900,12 +900,12 @@ int sample_print_thicknesses(const char *filename, const sample *sample, jabs_ms
     if(!f)
         return EXIT_FAILURE;
     if(sample->no_conc_gradients) {
-        jabs_message(msg_level, f, "Layer       tfu     ug/cm2       nm\n");
+        jabs_message_printf(msg_level, f, "Layer       tfu     ug/cm2       nm\n");
         for(size_t i = 1; i < sample->n_ranges; i += 2) {
-            jabs_message(msg_level, f, "%5zu %9.3lf  %9.3lf %8.1lf\n", (i + 1) / 2,
-                         (sample->ranges[i].x - sample->ranges[i-1].x) / C_TFU,
-                         sample_mass_density_range(sample, i) / (C_UG / C_CM2),
-                         sample_thickness_in_nm_range(sample, i) / C_NM);
+            jabs_message_printf(msg_level, f, "%5zu %9.3lf  %9.3lf %8.1lf\n", (i + 1) / 2,
+                                (sample->ranges[i].x - sample->ranges[i-1].x) / C_TFU,
+                                sample_mass_density_range(sample, i) / (C_UG / C_CM2),
+                                sample_thickness_in_nm_range(sample, i) / C_NM);
         }
     }
     fclose_file_or_stream(f);
@@ -915,32 +915,32 @@ int sample_print_thicknesses(const char *filename, const sample *sample, jabs_ms
 int sample_print(const sample *sample, int print_isotopes, jabs_msg_level msg_level) {
     if(!sample)
         return EXIT_FAILURE;
-    jabs_message(msg_level, stderr, "    DEPTH   ROUGH");
+    jabs_message(msg_level, "    DEPTH   ROUGH");
     int Z = 0;
     for (size_t i = 0; i < sample->n_isotopes; i++) {
         if(print_isotopes) {
-            jabs_message(msg_level, stderr, " %9s", sample->isotopes[i]->name);
+            jabs_message(msg_level, " %9s", sample->isotopes[i]->name);
         } else if(Z != sample->isotopes[i]->Z){
             const char *s = sample->isotopes[i]->name;
             while(*s >= '0' && *s <= '9') {s++;} /* Skip numbers, e.g. 28Si -> Si */
-            jabs_message(msg_level, stderr, " %9s", s);
+            jabs_message(msg_level, " %9s", s);
             Z = sample->isotopes[i]->Z; /* New element */
         }
     }
-    jabs_message(msg_level, stderr, "\n");
-    jabs_message(msg_level, stderr, "      tfu     tfu\n");
+    jabs_message(msg_level, "\n");
+    jabs_message(msg_level, "      tfu     tfu\n");
     for (size_t i = 0; i < sample->n_ranges; i++) {
-        jabs_message(msg_level, stderr, "%9.3lf", sample->ranges[i].x / C_TFU);
-        jabs_message(msg_level, stderr, " %7.3lf", sample->ranges[i].rough.x / C_TFU);
+        jabs_message(msg_level, "%9.3lf", sample->ranges[i].x / C_TFU);
+        jabs_message(msg_level, " %7.3lf", sample->ranges[i].rough.x / C_TFU);
         double sum = 0.0;
         for (size_t j = 0; j < sample->n_isotopes; j++) {
             sum += sample->cbins[i * sample->n_isotopes + j];
             if (print_isotopes || j == sample->n_isotopes-1 || sample->isotopes[j]->Z != sample->isotopes[j+1]->Z) { /* Last isotope or next isotope belongs to another element, print. */
-                jabs_message(msg_level, stderr, " %9.4lf", sum * 100.0);
+                jabs_message(msg_level, " %9.4lf", sum * 100.0);
                 sum = 0.0;
             }
         }
-        jabs_message(msg_level, stderr, "\n");
+        jabs_message(msg_level, "\n");
     }
     if(!print_isotopes) {
         sample_areal_densities_print(sample, FALSE, msg_level);

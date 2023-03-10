@@ -150,7 +150,7 @@ jabs_histogram *spectrum_read(const char *filename, size_t skip, size_t channels
         size_t ch;
         char *end;
         if(column >= n) {
-            jabs_message(MSG_ERROR, stderr, "Not enough columns in experimental spectra on line %zu. Expected %zu, got %zu.\n", lineno, column, n);
+            jabs_message(MSG_ERROR, "Not enough columns in experimental spectra on line %zu. Expected %zu, got %zu.\n", lineno, column, n);
             error = TRUE;
             break;
         }
@@ -159,20 +159,20 @@ jabs_histogram *spectrum_read(const char *filename, size_t skip, size_t channels
         } else {
             ch = strtoul(columns[0], &end, 10);
             if(*end != '\0') {
-                jabs_message(MSG_ERROR, stderr, "Error converting %s to channel number (must be unsigned integer). Issue on line %zu of file %s.\n", columns[0], lineno, filename);
+                jabs_message(MSG_ERROR, "Error converting %s to channel number (must be unsigned integer). Issue on line %zu of file %s.\n", columns[0], lineno, filename);
                 error = TRUE;
                 break;
             }
         }
         if(ch >= channels_max) {
-            jabs_message(MSG_ERROR, stderr, "Channel %zu is too large (max %zu channels). Issue on line %zu of file %s.\n", ch, channels_max, lineno, filename);
+            jabs_message(MSG_ERROR, "Channel %zu is too large (max %zu channels). Issue on line %zu of file %s.\n", ch, channels_max, lineno, filename);
             error = TRUE;
             break;
         }
         ch /= compress;
         double y = strtod(columns[column], &end);
         if(*end != '\0') {
-            jabs_message(MSG_ERROR, stderr, "Error converting col %zu \"%s\" to histogram value (floating point). Issue on line %zu of file %s.\n", column, columns[column], lineno, filename);
+            jabs_message(MSG_ERROR, "Error converting col %zu \"%s\" to histogram value (floating point). Issue on line %zu of file %s.\n", column, columns[column], lineno, filename);
             error = TRUE;
             break;
         }
@@ -181,7 +181,7 @@ jabs_histogram *spectrum_read(const char *filename, size_t skip, size_t channels
             h->n = ch;
     }
     if(h->n == 0 || error) {
-        jabs_message(MSG_ERROR, stderr, "Experimental spectrum could not be read from file \"%s\". Read %zu lines before stopping.\n", filename, lineno);
+        jabs_message(MSG_ERROR, "Experimental spectrum could not be read from file \"%s\". Read %zu lines before stopping.\n", filename, lineno);
         jabs_histogram_free(h);
         h = NULL;
     } else {

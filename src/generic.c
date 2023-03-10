@@ -263,7 +263,7 @@ int jabs_unit_convert(const jibal_units *units, char type, const char *str, doub
     int error;
     DEBUGMSG("JaBS unit conversion, type '%c' (%i), string %s", type, type, str);
     if((error = jibal_unit_convert(units, type, str, out)) < 0) {
-        jabs_message(MSG_ERROR, stderr, "Conversion of value \"%s\" failed: %s\n", str, jibal_unit_conversion_error_string(error));
+        jabs_message(MSG_ERROR, "Conversion of value \"%s\" failed: %s\n", str, jibal_unit_conversion_error_string(error));
         return error;
     }
     DEBUGMSG("Converted output to %p should have been set to %g successfully, running sanity check.", (void *)out, *out);
@@ -274,31 +274,31 @@ int jabs_unit_sanity_check(double value, int type) {
     switch(type) {
         case JIBAL_UNIT_TYPE_LAYER_THICKNESS:
             if(value < 0.1 * C_TFU) {
-                jabs_message(MSG_WARNING, stderr, "Layer thickness %g tfu (1e15 at./cm2) sounds quite small. Check your units.\n", value / C_TFU);
+                jabs_message(MSG_WARNING, "Layer thickness %g tfu (1e15 at./cm2) sounds quite small. Check your units.\n", value / C_TFU);
                 return 0;
             }
             break;
         case JIBAL_UNIT_TYPE_ANGLE:
             if(value < -C_2PI || value> C_2PI) {
-                jabs_message(MSG_WARNING, stderr, "Angle of %g degrees given. Check your units.\n", value / C_DEG);
+                jabs_message(MSG_WARNING, "Angle of %g degrees given. Check your units.\n", value / C_DEG);
                 return 0;
             }
             break;
         case JIBAL_UNIT_TYPE_ENERGY:
             if(value> E_MAX) {
-                jabs_message(MSG_ERROR, stderr, "Energy of %g MeV given. Check your units.\n", value / C_MEV);
+                jabs_message(MSG_ERROR, "Energy of %g MeV given. Check your units.\n", value / C_MEV);
                 return -1;
             }
             break;
         case JIBAL_UNIT_TYPE_DENSITY:
             if(value< 0.025 * C_G_CM3 || value> 25 * C_G_CM3) {
-                jabs_message(MSG_WARNING, stderr, "Density %g g/cm3 given. Check your units.\n", value/ C_G_CM3);
+                jabs_message(MSG_WARNING, "Density %g g/cm3 given. Check your units.\n", value/ C_G_CM3);
                 return 0;
             }
             break;
         case JIBAL_UNIT_TYPE_SOLID_ANGLE:
             if(value < 0.001 * C_MSR || value > 4.0 * C_PI) {
-                jabs_message(MSG_WARNING, stderr, "Solid angle %g msr given. Check your units.\n", value / C_MSR);
+                jabs_message(MSG_WARNING, "Solid angle %g msr given. Check your units.\n", value / C_MSR);
                 return 0;
             }
             break;
@@ -319,26 +319,26 @@ double jabs_clock() {
 
 int jabs_str_to_size_t(const char *str, size_t *out) {
     if(!str) {
-        jabs_message(MSG_ERROR, stderr, "Conversion error, null pointer.\n");
+        jabs_message(MSG_ERROR, "Conversion error, null pointer.\n");
         return -1;
     }
     if(*str == '\0') {
-        jabs_message(MSG_ERROR, stderr, "Conversion error, empty string.\n");
+        jabs_message(MSG_ERROR, "Conversion error, empty string.\n");
         return -1;
     }
     char *end;
     long val = strtol(str, &end, 10);
     DEBUGMSG("strtol reports %li\n", val);
     if(*end != '\0') { /* Not entirely valid */
-        jabs_message(MSG_ERROR, stderr, "Conversion error, \"%s\" is not a valid unsigned number.\n", str);
+        jabs_message(MSG_ERROR, "Conversion error, \"%s\" is not a valid unsigned number.\n", str);
         return -1;
     }
     if(val < 0) {
-        jabs_message(MSG_ERROR, stderr, "Positive value expected, you gave \"%s\"\n", str);
+        jabs_message(MSG_ERROR, "Positive value expected, you gave \"%s\"\n", str);
         return -1;
     }
     if(val == LONG_MAX) {
-        jabs_message(MSG_ERROR, stderr, "Overflow: \"%s\"\n", str);
+        jabs_message(MSG_ERROR, "Overflow: \"%s\"\n", str);
         return -1;
     }
     if((unsigned long long)val < SIZE_MAX) { /* SIZE_MAX could theoretically be quite small (65535) */

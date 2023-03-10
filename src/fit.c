@@ -46,13 +46,13 @@
 int fit_detector(const jibal *jibal, const fit_data_det *fdd, const simulation *sim, result_spectra *spectra, gsl_vector *f) {
     detector *det = sim_det(sim, fdd->i_det);
     if(!det) {
-        jabs_message(MSG_ERROR, stderr, "No detector set.\n");
+        jabs_message(MSG_ERROR, "No detector set.\n");
         return EXIT_FAILURE;
     }
     detector_update(det); /* non-const pointer inside const... not great */
     sim_workspace *ws = sim_workspace_init(jibal, sim, det);
     if(simulate_with_ds(ws)) {
-        jabs_message(MSG_ERROR, stderr, "Simulation of detector %s spectrum failed!\n", det->name);
+        jabs_message(MSG_ERROR, "Simulation of detector %s spectrum failed!\n", det->name);
         return EXIT_FAILURE;
     }
     fit_data_det_residual_vector_set(fdd, ws->histo_sum, f);
@@ -226,7 +226,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     double end = jabs_clock();
     DEBUGMSG("Fit iteration %zu call %zu simulation done.", fit->stats.iter, fit->stats.iter_call);
     if(error) {
-        jabs_message(MSG_ERROR, stderr, "Error in simulating (during fit).");
+        jabs_message(MSG_ERROR, "Error in simulating (during fit).");
         return EXIT_FAILURE;
     }
     fit->stats.cputime_iter += (end - start);
@@ -280,7 +280,7 @@ void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear
 }
 
 void fit_iter_stats_print(const struct fit_stats *stats) {
-    jabs_message(MSG_INFO, stderr, "%4zu | %12.6e | %14.8e | %12.7lf | %11zu | %9zu | %10.3lf | %13.1lf |\n",
+    jabs_message(MSG_INFO, "%4zu | %12.6e | %14.8e | %12.7lf | %11zu | %9zu | %10.3lf | %13.1lf |\n",
                  stats->iter, 1.0 / stats->rcond, stats->norm,
                  stats->chisq_dof, stats->n_evals, stats->n_spectra,
                  stats->cputime_cumul, 1000.0 * stats->cputime_iter / stats->n_spectra_iter);
@@ -288,7 +288,7 @@ void fit_iter_stats_print(const struct fit_stats *stats) {
 
 void fit_stats_print(const struct fit_stats *stats, jabs_msg_level msg_level) {
     if(stats->chisq_dof > 0.0) {
-        jabs_message(msg_level, stderr, "Final chisq/dof = %.7lf\n", stats->chisq_dof);
+        jabs_message(msg_level, "Final chisq/dof = %.7lf\n", stats->chisq_dof);
     }
 }
 
@@ -431,39 +431,39 @@ void fit_data_roi_print(const struct fit_data *fit_data, const struct roi *roi) 
     double ref_cts = jabs_histogram_roi(histo_ref, roi->low, roi->high);
     const detector *det = sim_det(fit_data->sim, roi->i_det);
 
-    jabs_message(MSG_INFO, stderr, "          low = %12zu\n", roi->low);
-    jabs_message(MSG_INFO, stderr, "         high = %12zu\n", roi->high);
+    jabs_message(MSG_INFO, "          low = %12zu\n", roi->low);
+    jabs_message(MSG_INFO, "         high = %12zu\n", roi->high);
     if(det) {
-        jabs_message(MSG_INFO, stderr, "        E_low = %12.3lf keV (low energy edge of bin)\n", detector_calibrated(det, JIBAL_ANY_Z, roi->low) / C_KEV);
-        jabs_message(MSG_INFO, stderr, "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(det, JIBAL_ANY_Z, roi->high + 1) / C_KEV);
+        jabs_message(MSG_INFO, "        E_low = %12.3lf keV (low energy edge of bin)\n", detector_calibrated(det, JIBAL_ANY_Z, roi->low) / C_KEV);
+        jabs_message(MSG_INFO, "       E_high = %12.3lf keV (high energy edge of bin)\n", detector_calibrated(det, JIBAL_ANY_Z, roi->high + 1) / C_KEV);
     }
     if(histo_sim) {
-        jabs_message(MSG_INFO, stderr, "        n_sim = %12zu (number of channels)\n", n_sim);
-        jabs_message(MSG_INFO, stderr, "          sim = %12.8g (number of counts)\n", sim_cts);
+        jabs_message(MSG_INFO, "        n_sim = %12zu (number of channels)\n", n_sim);
+        jabs_message(MSG_INFO, "          sim = %12.8g (number of counts)\n", sim_cts);
     }
     if(histo_exp) {
-        jabs_message(MSG_INFO, stderr, "        n_exp = %12zu (number of channels)\n", n_exp);
-        jabs_message(MSG_INFO, stderr, "          exp = %12.8g (number of counts)\n", exp_cts);
-        jabs_message(MSG_INFO, stderr, "    sqrt(exp) = %12.5lf\n", sqrt(exp_cts));
+        jabs_message(MSG_INFO, "        n_exp = %12zu (number of channels)\n", n_exp);
+        jabs_message(MSG_INFO, "          exp = %12.8g (number of counts)\n", exp_cts);
+        jabs_message(MSG_INFO, "    sqrt(exp) = %12.5lf\n", sqrt(exp_cts));
     }
     if(histo_ref) {
-        jabs_message(MSG_INFO, stderr, "        n_ref = %12zu (number of channels)\n", n_ref);
-        jabs_message(MSG_INFO, stderr, "          ref = %12.8g (number of counts)\n", ref_cts);
-        jabs_message(MSG_INFO, stderr, "    sqrt(ref) = %12.5lf\n", sqrt(ref_cts));
+        jabs_message(MSG_INFO, "        n_ref = %12zu (number of channels)\n", n_ref);
+        jabs_message(MSG_INFO, "          ref = %12.8g (number of counts)\n", ref_cts);
+        jabs_message(MSG_INFO, "    sqrt(ref) = %12.5lf\n", sqrt(ref_cts));
     }
     if(histo_sim && histo_exp && sim_cts > 0 && exp_cts > 0) {
-        jabs_message(MSG_INFO, stderr, "      exp-sim = %12.8g\n", exp_cts - sim_cts);
-        jabs_message(MSG_INFO, stderr, "      sim/exp = %12.5lf\n", sim_cts / exp_cts);
-        jabs_message(MSG_INFO, stderr, "      exp/sim = %12.5lf\n", exp_cts / sim_cts);
-        jabs_message(MSG_INFO, stderr, "  1/sqrt(exp) = %12.5lf%%\n", 100.0 / sqrt(exp_cts));
-        jabs_message(MSG_INFO, stderr, "(exp-sim)/exp = %12.5lf%%\n", 100.0 * (exp_cts - sim_cts) / exp_cts);
+        jabs_message(MSG_INFO, "      exp-sim = %12.8g\n", exp_cts - sim_cts);
+        jabs_message(MSG_INFO, "      sim/exp = %12.5lf\n", sim_cts / exp_cts);
+        jabs_message(MSG_INFO, "      exp/sim = %12.5lf\n", exp_cts / sim_cts);
+        jabs_message(MSG_INFO, "  1/sqrt(exp) = %12.5lf%%\n", 100.0 / sqrt(exp_cts));
+        jabs_message(MSG_INFO, "(exp-sim)/exp = %12.5lf%%\n", 100.0 * (exp_cts - sim_cts) / exp_cts);
     }
     if(histo_sim && histo_ref && sim_cts > 0 && ref_cts > 0) {
-        jabs_message(MSG_INFO, stderr, "      ref-sim = %12g\n", ref_cts - sim_cts);
-        jabs_message(MSG_INFO, stderr, "      sim/ref = %12.5lf\n", sim_cts / ref_cts);
-        jabs_message(MSG_INFO, stderr, "      ref/sim = %12.5lf\n", ref_cts / sim_cts);
-        jabs_message(MSG_INFO, stderr, "  1/sqrt(ref) = %12.5lf%%\n", 100.0 / sqrt(ref_cts));
-        jabs_message(MSG_INFO, stderr, "(ref-sim)/ref = %12.5lf%%\n", 100.0 * (ref_cts - sim_cts) / ref_cts);
+        jabs_message(MSG_INFO, "      ref-sim = %12g\n", ref_cts - sim_cts);
+        jabs_message(MSG_INFO, "      sim/ref = %12.5lf\n", sim_cts / ref_cts);
+        jabs_message(MSG_INFO, "      ref/sim = %12.5lf\n", ref_cts / sim_cts);
+        jabs_message(MSG_INFO, "  1/sqrt(ref) = %12.5lf%%\n", 100.0 / sqrt(ref_cts));
+        jabs_message(MSG_INFO, "(ref-sim)/ref = %12.5lf%%\n", 100.0 * (ref_cts - sim_cts) / ref_cts);
     }
 }
 
@@ -667,7 +667,7 @@ void fit_data_exp_free(fit_data *fit) {
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename) {
     jabs_histogram *h = spectrum_read_detector(filename, sim_det(fit->sim, i_det));
     if(!h) {
-        jabs_message(MSG_ERROR, stderr, "Reading spectrum from file \"%s\" was not successful.\n", filename);
+        jabs_message(MSG_ERROR, "Reading spectrum from file \"%s\" was not successful.\n", filename);
         return EXIT_FAILURE;
     }
     if(fit->exp[i_det]) {
@@ -788,21 +788,21 @@ void fit_data_print(const fit_data *fit, jabs_msg_level msg_level) {
         return;
     }
     if(fit->n_fit_ranges == 0) {
-        jabs_message(MSG_ERROR, stderr, "No fit ranges.\n");
+        jabs_message(MSG_ERROR, "No fit ranges.\n");
         return;
     }
-    jabs_message(msg_level, stderr, "Fit ROI # | detector name |  low ch | high ch | exp counts | sim counts\n");
+    jabs_message(msg_level, "Fit ROI # | detector name |  low ch | high ch | exp counts | sim counts\n");
     for(size_t i = 0; i < fit->n_fit_ranges; i++) {
         roi *range = &fit->fit_ranges[i];
         double exp = jabs_histogram_roi(fit_data_exp(fit, range->i_det), range->low, range->high);
         double sim = jabs_histogram_roi(fit_data_histo_sum(fit, range->i_det), range->low, range->high);
-        jabs_message(msg_level, stderr, " %8zu | %13s | %7zu | %7zu | %10g | %10g\n",
+        jabs_message(msg_level, " %8zu | %13s | %7zu | %7zu | %10g | %10g\n",
                      i + 1, detector_name(sim_det(fit->sim, range->i_det)), range->low, range->high,
                      exp, sim);
 
     }
 
-    jabs_message(msg_level, stderr, "\nFit %zu ranges with %zu channels total.\n", fit->n_fit_ranges, fit_data_ranges_calculate_number_of_channels(fit));
+    jabs_message(msg_level, "\nFit %zu ranges with %zu channels total.\n", fit->n_fit_ranges, fit_data_ranges_calculate_number_of_channels(fit));
 }
 
 int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, double epsrel) { /* test_delta() copied from GSL convergence.c and modified */
@@ -829,8 +829,8 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
     int status = 0;
     size_t iter;
     double chisq_dof_old;
-    jabs_message(MSG_INFO, stderr, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | evaluations |   spectra | time cumul | time/spectrum |\n");
-    jabs_message(MSG_INFO, stderr, "     |              |                |              |  cumulative | cumulative|          s |            ms |\n");
+    jabs_message(MSG_INFO, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | evaluations |   spectra | time cumul | time/spectrum |\n");
+    jabs_message(MSG_INFO, "     |              |                |              |  cumulative | cumulative|          s |            ms |\n");
     for(iter = 0; iter <= maxiter; iter++) {
         fit_data->stats.iter_call = 0;
         fit_data->stats.iter = iter;
@@ -864,7 +864,7 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
         }
         double chisq_change = 1.0 - fit_data->stats.chisq_dof / chisq_dof_old;
         if(fit_data->stats.chisq_dof > chisq_dof_old) {
-            jabs_message(MSG_WARNING, stderr, "Chisq increased, this probably shouldn't happen.\n");
+            jabs_message(MSG_WARNING, "Chisq increased, this probably shouldn't happen.\n");
         }
         if(chisq_change < chisq_tol) {
             return FIT_SUCCESS_CHISQ;
@@ -874,47 +874,47 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
 }
 
 void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspace *w, const gsl_multifit_nlinear_fdf *fdf) {
-    jabs_message(MSG_INFO, stderr, "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
-    jabs_message(MSG_INFO, stderr, "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
-    jabs_message(MSG_INFO, stderr, "function evaluations: %zu\n", fit->stats.n_evals);
+    jabs_message(MSG_INFO, "summary from method '%s/%s'\n", gsl_multifit_nlinear_name(w), gsl_multifit_nlinear_trs_name(w));
+    jabs_message(MSG_INFO, "number of iterations: %zu\n", gsl_multifit_nlinear_niter(w));
+    jabs_message(MSG_INFO, "function evaluations: %zu\n", fit->stats.n_evals);
 #ifdef DEBUG
-    jabs_message(MSG_INFO, stderr, "function evaluations (GSL): %zu\n", fdf->nevalf);
+    jabs_message(MSG_INFO, "function evaluations (GSL): %zu\n", fdf->nevalf);
 #endif
-    jabs_message(MSG_INFO, stderr, "Jacobian evaluations: %zu\n", fdf->nevaldf);
-    jabs_message(MSG_INFO, stderr, "number of spectra simulated: %zu\n", fit->stats.n_spectra);
-    jabs_message(MSG_INFO, stderr, "reason for stopping: %s\n", fit_error_str(fit->stats.error));
-    jabs_message(MSG_INFO, stderr, "initial |f(x)| = %f\n", sqrt(fit->stats.chisq0));
-    jabs_message(MSG_INFO, stderr, "final   |f(x)| = %f\n", sqrt(fit->stats.chisq));
+    jabs_message(MSG_INFO, "Jacobian evaluations: %zu\n", fdf->nevaldf);
+    jabs_message(MSG_INFO, "number of spectra simulated: %zu\n", fit->stats.n_spectra);
+    jabs_message(MSG_INFO, "reason for stopping: %s\n", fit_error_str(fit->stats.error));
+    jabs_message(MSG_INFO, "initial |f(x)| = %f\n", sqrt(fit->stats.chisq0));
+    jabs_message(MSG_INFO, "final   |f(x)| = %f\n", sqrt(fit->stats.chisq));
 }
 
 
 void fit_covar_print(const gsl_matrix *covar, jabs_msg_level msg_level) {
-    jabs_message(msg_level, stderr, "\nCorrelation coefficients matrix:\n       | ");
+    jabs_message(msg_level, "\nCorrelation coefficients matrix:\n       | ");
     for(size_t i = 0; i < covar->size1; i++) {
-        jabs_message(msg_level, stderr, " %4zu  ", i + 1);
+        jabs_message(msg_level, " %4zu  ", i + 1);
     }
-    jabs_message(msg_level, stderr, "\n");
+    jabs_message(msg_level, "\n");
     for(size_t i = 0; i < covar->size1; i++) {
-        jabs_message(msg_level, stderr, "%6zu | ", i + 1);
+        jabs_message(msg_level, "%6zu | ", i + 1);
         for(size_t j = 0; j <= i && j < covar->size2; j++) {
-            jabs_message(msg_level, stderr, " %6.3f", gsl_matrix_get(covar, i, j) / sqrt(gsl_matrix_get(covar, i, i) * gsl_matrix_get(covar, j, j)));
+            jabs_message(msg_level, " %6.3f", gsl_matrix_get(covar, i, j) / sqrt(gsl_matrix_get(covar, i, i) * gsl_matrix_get(covar, j, j)));
         }
-        jabs_message(msg_level, stderr, "\n");
+        jabs_message(msg_level, "\n");
     }
 }
 
 int fit(fit_data *fit) {
     struct fit_params *fit_params = fit->fit_params;
     if(!fit_params || fit_params->n_active == 0) {
-        jabs_message(MSG_ERROR, stderr, "No parameters to fit.\n");
+        jabs_message(MSG_ERROR, "No parameters to fit.\n");
         return EXIT_FAILURE;
     }
     if(!fit->exp) {
-        jabs_message(MSG_ERROR, stderr, "No experimental spectrum to fit.\n");
+        jabs_message(MSG_ERROR, "No experimental spectrum to fit.\n");
         return EXIT_FAILURE;
     }
     if(!fit->n_fit_ranges) {
-        jabs_message(MSG_ERROR, stderr, "No fit range(s) given, can not fit.\n");
+        jabs_message(MSG_ERROR, "No fit range(s) given, can not fit.\n");
         return EXIT_FAILURE;
     }
     for(size_t i_range = 0; i_range < fit->n_fit_ranges; i_range++) {
@@ -923,11 +923,11 @@ int fit(fit_data *fit) {
         detector *det = sim_det(fit->sim, range->i_det);
         jabs_histogram *exp = fit_data_exp(fit, range->i_det);
         if(!det) {
-            jabs_message(MSG_ERROR, stderr, "Detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
+            jabs_message(MSG_ERROR, "Detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
             return EXIT_FAILURE;
         }
         if(!exp) {
-            jabs_message(MSG_ERROR, stderr, "Experimental spectrum for detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
+            jabs_message(MSG_ERROR, "Experimental spectrum for detector %zu (fit range %zu) does not exist.\n", range->i_det + 1, i_range + 1);
             return EXIT_FAILURE;
         }
     }
@@ -949,15 +949,15 @@ int fit(fit_data *fit) {
     fdf->n = fit_data_ranges_calculate_number_of_channels(fit);
     fdf->p = fit_params->n_active;
     if(fdf->n < fdf->p) {
-        jabs_message(MSG_ERROR, stderr, "Not enough data (%zu points) for given number of free parameters (%zu)\n", fdf->n, fdf->p);
+        jabs_message(MSG_ERROR, "Not enough data (%zu points) for given number of free parameters (%zu)\n", fdf->n, fdf->p);
         free(fdf);
         return -1;
     }
     fit->dof = fdf->n - fdf->p;
     fit->h_df = fdf_params.h_df;
-    jabs_message(MSG_INFO, stderr, "%zu channels and %zu parameters in fit, %zu degrees of %s\n", fdf->n, fdf->p, fit->dof, fit->dof < 10000 ? "freedom.":"FREEDOOOOM!!!");
+    jabs_message(MSG_INFO, "%zu channels and %zu parameters in fit, %zu degrees of %s\n", fdf->n, fdf->p, fit->dof, fit->dof < 10000 ? "freedom.":"FREEDOOOOM!!!");
     if(fit_data_jspace_init(fit, fdf->n)) {
-        jabs_message(MSG_ERROR, stderr, "Could not initialize Jacobian evaluation workspace for %zu parameters.\n", fit->fit_params->n_active);
+        jabs_message(MSG_ERROR, "Could not initialize Jacobian evaluation workspace for %zu parameters.\n", fit->fit_params->n_active);
     }
     gsl_vector *f;
     gsl_matrix *J;
@@ -1027,21 +1027,21 @@ int fit(fit_data *fit) {
                 gsl_vector_set(x, var->i_v, *(var->value)/var->value_orig); /* We'll pass normalized values to GSL, so we are actually starting fit with always with vector full of 1.0. Next phase starts where previous ends. */
             }
         }
-        jabs_message(MSG_INFO, stderr, "\nInitializing fit phase %i. Xtol = %e, chisq_tol %e\n", phase, xtol, chisq_tol);
-        jabs_message(MSG_VERBOSE, stderr, "Simulation parameters for this phase:\n");
+        jabs_message(MSG_INFO, "\nInitializing fit phase %i. Xtol = %e, chisq_tol %e\n", phase, xtol, chisq_tol);
+        jabs_message(MSG_VERBOSE, "Simulation parameters for this phase:\n");
         sim_calc_params_print(fit->sim->params, MSG_VERBOSE);
-        jabs_message(MSG_IMPORTANT, stderr, "Initializing fit...\n");
+        jabs_message(MSG_IMPORTANT, "Initializing fit...\n");
         gsl_multifit_nlinear_winit(x, &wts.vector, fdf, w);
         /* compute initial cost function */
         f = gsl_multifit_nlinear_residual(w);
         gsl_blas_ddot(f, f, &fit->stats.chisq0);
-        jabs_message(MSG_IMPORTANT, stderr, "Done. Starting iteration...\n");
+        jabs_message(MSG_IMPORTANT, "Done. Starting iteration...\n");
         status = jabs_gsl_multifit_nlinear_driver(fit->n_iters_max, xtol, chisq_tol, fit, w); /* Fit */fit->stats.error = status;
         if(status < 0) {
-            jabs_message(MSG_ERROR, stderr, "Fit aborted in phase %i, reason: %s.\n", phase, fit_error_str(fit->stats.error));
+            jabs_message(MSG_ERROR, "Fit aborted in phase %i, reason: %s.\n", phase, fit_error_str(fit->stats.error));
             break;
         }
-        jabs_message(MSG_IMPORTANT, stderr, "Phase %i finished. Time used for actual simulation so far: %.3lf s.\n", phase, fit->stats.cputime_cumul);
+        jabs_message(MSG_IMPORTANT, "Phase %i finished. Time used for actual simulation so far: %.3lf s.\n", phase, fit->stats.cputime_cumul);
         fit_report_results(fit, w, fdf);
     }
 
@@ -1091,23 +1091,23 @@ int fit_set_roi_from_string(roi *r, const char *str) {
     r->low = strtoull(str, &end, 10);
     str = end;
     if(*str != ':') {
-        jabs_message(MSG_ERROR, stderr, "Can not parse range from \"%s\". Is ':' missing?\n", str_orig);
+        jabs_message(MSG_ERROR, "Can not parse range from \"%s\". Is ':' missing?\n", str_orig);
         return EXIT_FAILURE;
     }
     str++; /* Skipping ':' */
     r->high = strtoull(str, &end, 10);
     str = end;
     if(*str != ']') {
-        jabs_message(MSG_ERROR, stderr, "Can not parse range from \"%s\". Is ']' missing near \"%s\"?\n", str_orig, str);
+        jabs_message(MSG_ERROR, "Can not parse range from \"%s\". Is ']' missing near \"%s\"?\n", str_orig, str);
         return EXIT_FAILURE;
     }
     str++;
     if(*str != '\0') {
-        jabs_message(MSG_ERROR, stderr, "Unexpected input when parsing a range, \"%s\" at end of \"%s\"\n", str, str_orig);
+        jabs_message(MSG_ERROR, "Unexpected input when parsing a range, \"%s\" at end of \"%s\"\n", str, str_orig);
         return EXIT_FAILURE;
     }
     if(r->low > r->high) {
-        jabs_message(MSG_ERROR, stderr, "Range from %zu to %zu is not valid, because %zu > %zu!\n", r->low, r->high, r->low, r->high);
+        jabs_message(MSG_ERROR, "Range from %zu to %zu is not valid, because %zu > %zu!\n", r->low, r->high, r->low, r->high);
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

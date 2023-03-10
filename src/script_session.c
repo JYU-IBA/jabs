@@ -36,7 +36,7 @@ script_session *script_session_init(jibal *jibal, simulation *sim) {
     s->fit_iter_callback = NULL;
     s->fit = fit_data_new(jibal, sim); /* Not just fit, but this conveniently holds everything we need. */
     if(!s->fit) {
-        jabs_message(MSG_ERROR, stderr,"Script session initialization failed.\n");
+        jabs_message(MSG_ERROR,"Script session initialization failed.\n");
         free(s);
         return NULL;
     }
@@ -50,12 +50,12 @@ int script_session_load_script(script_session *s, const char *filename) {
     if(!s)
         return EXIT_FAILURE;
     if(s->file_depth >= SCRIPT_FILES_NESTED_MAX) {
-        jabs_message(MSG_ERROR, stderr, "Script files nested too deep.\n");
+        jabs_message(MSG_ERROR, "Script files nested too deep.\n");
         return EXIT_FAILURE;
     }
     script_file *sfile = script_file_open(filename);
     if(!sfile) {
-        jabs_message(MSG_ERROR, stderr, "Can not open file \"%s\".\n", filename);
+        jabs_message(MSG_ERROR, "Can not open file \"%s\".\n", filename);
         return EXIT_FAILURE;
     }
     s->files[s->file_depth] = sfile;
@@ -96,7 +96,7 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
             DEBUGMSG("First detector, i_det = %zu", *i_det);
             found = TRUE;
         } else {
-            jabs_message(MSG_ERROR, stderr, "No detectors.\n");
+            jabs_message(MSG_ERROR, "No detectors.\n");
             return EXIT_FAILURE;
         }
     } else if(strcmp(s, "last") == 0) {
@@ -105,7 +105,7 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
             DEBUGMSG("Last detector, i_det = %zu", *i_det);
             found = TRUE;
         } else {
-            jabs_message(MSG_ERROR, stderr, "No detectors.\n");
+            jabs_message(MSG_ERROR, "No detectors.\n");
             return EXIT_FAILURE;
         }
     } else if(isdigit(*s)) {
@@ -114,12 +114,12 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
             *i_det = number - 1;
             DEBUGMSG("Detector, i_det = %zu", *i_det);
             if(*i_det >= sim->n_det) {
-                jabs_message(MSG_ERROR, stderr, "Detector number %zu is not valid (n_det = %zu).\n", number, sim->n_det);
+                jabs_message(MSG_ERROR, "Detector number %zu is not valid (n_det = %zu).\n", number, sim->n_det);
                 return EXIT_FAILURE;
             }
             found = TRUE;
         } else {
-            jabs_message(MSG_ERROR, stderr, "I thought %s could be a detector number (maybe %zu?) but it is garbage instead. \n", s, number);
+            jabs_message(MSG_ERROR, "I thought %s could be a detector number (maybe %zu?) but it is garbage instead. \n", s, number);
             return EXIT_FAILURE;
         }
     } else {

@@ -29,7 +29,7 @@ depth stop_next_crossing(const ion *incident, const sample *sample, const depth 
         if(d.i >= sample->n_ranges - 1) { /* There is probably a bug elsewhere in the code if you try to go this deep (deeper than last depth bin). */
             d.i = sample->n_ranges - 1;
             d.x = sample->ranges[d.i].x;
-            jabs_message(MSG_WARNING, stderr, "Warning: probably too deep! This is a bug!\n");
+            jabs_message(MSG_WARNING, "Warning: probably too deep! This is a bug!\n");
         } else {
             d.x = sample->ranges[d.i + 1].x;
         }

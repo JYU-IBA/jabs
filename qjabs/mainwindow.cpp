@@ -157,7 +157,7 @@ int MainWindow::runLine(const QString &line) {
     if(line.isEmpty()) {
         return SCRIPT_COMMAND_SUCCESS;
     }
-    jabs_message(MSG_INFO, stderr, "%s%s\n", PROMPT, qPrintable(line));
+    jabs_message(MSG_INFO, "%s%s\n", PROMPT, qPrintable(line));
     int status = script_execute_command(session, qPrintable(line));
     return status;
 }

@@ -70,15 +70,15 @@ const char *detector_type_name(const detector *det) {
 
 int detector_sanity_check(const detector *det, size_t n_channels) {
     if(!det) {
-        jabs_message(MSG_ERROR, stderr, "No detector!\n");
+        jabs_message(MSG_ERROR, "No detector!\n");
         return -1;
     }
     if(!isfinite(det->calibration->resolution) || det->calibration->resolution <= 0.0) {
-        jabs_message(MSG_ERROR, stderr, "Warning: detector resolution (%g) is negative or not finite.\n", det->calibration->resolution);
+        jabs_message(MSG_ERROR, "Warning: detector resolution (%g) is negative or not finite.\n", det->calibration->resolution);
         return -1;
     }
     if(calibration_is_monotonically_increasing(det->calibration, n_channels) == FALSE) {
-        jabs_message(MSG_ERROR, stderr, "Warning: detector default calibration is not monotonically increasing! (is slope, %g keV/ch, negative? are %zu channels too much?)\n", calibration_get_param(det->calibration, CALIBRATION_PARAM_SLOPE) / C_KEV, n_channels);
+        jabs_message(MSG_ERROR, "Warning: detector default calibration is not monotonically increasing! (is slope, %g keV/ch, negative? are %zu channels too much?)\n", calibration_get_param(det->calibration, CALIBRATION_PARAM_SLOPE) / C_KEV, n_channels);
         return -1;
     }
     for(int Z = 0; Z <= (int)det->cal_Z_max; Z++) {
@@ -86,12 +86,12 @@ int detector_sanity_check(const detector *det, size_t n_channels) {
         if(det->calibration == c || !c) /* Z calibration is same as default (fallback) or NULL (shouldn't happen) */
             continue;
         if(calibration_is_monotonically_increasing(det->calibration, det->channels) == FALSE) {
-            jabs_message(MSG_ERROR, stderr, "Warning: detector calibration for Z = %i is not monotonically increasing!\n", Z);
+            jabs_message(MSG_ERROR, "Warning: detector calibration for Z = %i is not monotonically increasing!\n", Z);
             return -1;
         }
     }
     if(det->type == DETECTOR_TOF && det->length < 1 * C_MM) {
-        jabs_message(MSG_ERROR, stderr, "Warning: ToF length is small (%g mm)\n", det->length/C_MM);
+        jabs_message(MSG_ERROR, "Warning: ToF length is small (%g mm)\n", det->length/C_MM);
         return -1;
     }
     return 0;
@@ -151,13 +151,13 @@ int detector_print(const jibal *jibal, const detector *det) {
         DEBUGSTR("Tried to print detector that does not exist.\n");
         return EXIT_FAILURE;
     }
-    jabs_message(MSG_INFO, stderr, "name = %s\n", det->name);
-    jabs_message(MSG_INFO, stderr, "type = %s\n", detector_type_name(det));
+    jabs_message(MSG_INFO, "name = %s\n", det->name);
+    jabs_message(MSG_INFO, "type = %s\n", detector_type_name(det));
     char *calib_str = calibration_to_string(det->calibration);
-    jabs_message(MSG_INFO, stderr, "calibration = %s\n", calib_str);
+    jabs_message(MSG_INFO, "calibration = %s\n", calib_str);
     free(calib_str);
     char *reso_str = detector_resolution_to_string(det, JIBAL_ANY_Z);
-    jabs_message(MSG_INFO, stderr, "resolution = %s\n", reso_str);
+    jabs_message(MSG_INFO, "resolution = %s\n", reso_str);
     free(reso_str);
 
     for(int Z = 0; Z <= (int)det->cal_Z_max; Z++) {
@@ -166,38 +166,38 @@ int detector_print(const jibal *jibal, const detector *det) {
             continue;
         const char *elem_name = jibal_element_name(jibal->elements, Z);
         char *Z_calib_str = calibration_to_string(c);
-        jabs_message(MSG_INFO, stderr, "calibration(%s) = %s\n", elem_name, Z_calib_str);
+        jabs_message(MSG_INFO, "calibration(%s) = %s\n", elem_name, Z_calib_str);
         free(Z_calib_str);
         char *Z_reso_str = detector_resolution_to_string(det, Z);
-        jabs_message(MSG_INFO, stderr, "resolution(%s) = %s\n", elem_name, Z_reso_str);
+        jabs_message(MSG_INFO, "resolution(%s) = %s\n", elem_name, Z_reso_str);
         free(Z_reso_str);
     }
     if(det->type == DETECTOR_TOF) {
-        jabs_message(MSG_INFO, stderr, "length = %g mm\n", det->length/C_MM);
+        jabs_message(MSG_INFO, "length = %g mm\n", det->length/C_MM);
     }
-    jabs_message(MSG_INFO, stderr, "theta = %g deg\n", det->theta/C_DEG);
-    jabs_message(MSG_INFO, stderr, "phi = %g deg\n", det->phi/C_DEG);
+    jabs_message(MSG_INFO, "theta = %g deg\n", det->theta/C_DEG);
+    jabs_message(MSG_INFO, "phi = %g deg\n", det->phi/C_DEG);
 #if 0
-    jabs_message(MSG_INFO, stderr, "angle from horizontal = %.3lf deg\n", detector_angle(det, 'x')/C_DEG);
-    jabs_message(MSG_INFO, stderr, "angle from vertical = %.3lf deg\n", detector_angle(det, 'y')/C_DEG);
+    jabs_message(MSG_INFO, "angle from horizontal = %.3lf deg\n", detector_angle(det, 'x')/C_DEG);
+    jabs_message(MSG_INFO, "angle from vertical = %.3lf deg\n", detector_angle(det, 'y')/C_DEG);
 #endif
 
-    jabs_message(MSG_INFO, stderr, "distance = %g mm\n", det->distance/C_MM);
-    jabs_message(MSG_INFO, stderr, "solid = %g msr\n", det->solid/C_MSR);
+    jabs_message(MSG_INFO, "distance = %g mm\n", det->distance/C_MM);
+    jabs_message(MSG_INFO, "solid = %g msr\n", det->solid/C_MSR);
     if(det->aperture) {
         char *s = aperture_to_string(det->aperture);
-        jabs_message(MSG_INFO, stderr, "aperture = %s\n", s);
+        jabs_message(MSG_INFO, "aperture = %s\n", s);
         free(s);
     }
     if(det->distance > 1.0*C_MM && det->aperture) {
-        jabs_message(MSG_INFO, stderr, "solid angle (calculated) = %.4lf msr\n", detector_solid_angle_calc(det)/C_MSR);
+        jabs_message(MSG_INFO, "solid angle (calculated) = %.4lf msr\n", detector_solid_angle_calc(det)/C_MSR);
     }
-    jabs_message(MSG_INFO, stderr, "column = %zu\n", det->column);
-    jabs_message(MSG_INFO, stderr, "channels = %zu\n", det->channels);
+    jabs_message(MSG_INFO, "column = %zu\n", det->column);
+    jabs_message(MSG_INFO, "channels = %zu\n", det->channels);
     if(det->foil) {
         char *foil_str = sample_model_to_string(det->foil_sm);
         if(foil_str) {
-            jabs_message(MSG_INFO, stderr, "foil = %s\n", foil_str);
+            jabs_message(MSG_INFO, "foil = %s\n", foil_str);
             free(foil_str);
         }
     }

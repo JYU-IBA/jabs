@@ -68,7 +68,21 @@ const char *jabs_message_level_str(jabs_msg_level level) {
     return NULL;
 }
 
-void jabs_message(jabs_msg_level level, FILE *f, const char * format, ...) {
+void jabs_message(jabs_msg_level level, const char * format, ...) {
+    if(level < jabs_message_verbosity) {
+        return;
+    }
+    va_list argp;
+    va_start(argp, format);
+    char *str_out;
+    vasprintf(&str_out, format, argp);
+    mainWindow->addMessage(level, str_out);
+    fputs(str_out, stderr);
+    free(str_out);
+    va_end(argp);
+}
+
+void jabs_message_printf(jabs_msg_level level, FILE *f, const char * format, ...) {
     if(level < jabs_message_verbosity) {
         return;
     }

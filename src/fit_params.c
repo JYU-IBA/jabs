@@ -39,12 +39,12 @@ int fit_params_update(fit_params *p) {
                 if(!p->vars[j].active)
                     continue;
                 if(var->value == p->vars[j].value) {
-                    jabs_message(MSG_ERROR, stderr, "Fit parameters %s and %s can not be used simultaneously, as they are actually the same variable.\n", var->name, p->vars[j].name);
+                    jabs_message(MSG_ERROR, "Fit parameters %s and %s can not be used simultaneously, as they are actually the same variable.\n", var->name, p->vars[j].name);
                     return EXIT_FAILURE;
                 }
             }
             if(*(var->value) == 0.0) {
-                jabs_message(MSG_ERROR, stderr, "Fit parameter %s has a zero value, which is not allowed for fitting. Try changing it a little bit or don't fit it.\n", var->name);
+                jabs_message(MSG_ERROR, "Fit parameter %s has a zero value, which is not allowed for fitting. Try changing it a little bit or don't fit it.\n", var->name);
                 return EXIT_FAILURE;
             }
             var->i_v = p->n_active;
@@ -96,12 +96,12 @@ void fit_params_print(const fit_params *params, int active, const char *pattern,
     const char *whatkind = active ? "active" : "possible";
     if(params->n) {
         if(pattern) {
-            jabs_message(msg_level, stderr, "All %s fit variables matching pattern \"%s\":\n", whatkind, pattern);
+            jabs_message(msg_level, "All %s fit variables matching pattern \"%s\":\n", whatkind, pattern);
         } else {
-            jabs_message(msg_level, stderr, "All %s fit variables (use 'show fit variables <pattern>' to see variables matching pattern, wildcards are '*' and '?'):\n", whatkind);
+            jabs_message(msg_level, "All %s fit variables (use 'show fit variables <pattern>' to see variables matching pattern, wildcards are '*' and '?'):\n", whatkind);
         }
     } else {
-        jabs_message(msg_level, stderr, "No %s fit variables.\n", whatkind);
+        jabs_message(msg_level, "No %s fit variables.\n", whatkind);
     }
     for(size_t i = 0; i < params->n; i++) {
         const fit_variable *var = &params->vars[i];
@@ -109,7 +109,7 @@ void fit_params_print(const fit_params *params, int active, const char *pattern,
             continue;
         if(pattern && !is_match(var->name, pattern))
             continue;
-        jabs_message(msg_level, stderr, "%s %24s = %g %s\n", var->active && !active ? "X" : "  ", var->name, *(var->value) / var->unit_factor, var->unit);
+        jabs_message(msg_level, "%s %24s = %g %s\n", var->active && !active ? "X" : "  ", var->name, *(var->value) / var->unit_factor, var->unit);
         DEBUGMSG("This one is %p, raw value %.12g, i_v = %zu", (void *)var->value, *var->value, var->i_v);
     }
 }
@@ -118,9 +118,9 @@ void fit_params_print_final(const fit_params *params) { /* Prints final values o
     if(!params)
         return;
     if(params->n_active) {
-        jabs_message(MSG_INFO, stderr, "Final fit variables (%zu/%zu):\n", params->n_active, params->n);
+        jabs_message(MSG_INFO, "Final fit variables (%zu/%zu):\n", params->n_active, params->n);
     } else {
-        jabs_message(MSG_INFO, stderr, "No fitted variables of total %zu.\n", params->n);
+        jabs_message(MSG_INFO, "No fitted variables of total %zu.\n", params->n);
         return;
     }
     size_t maxlen_name = 8;
@@ -131,13 +131,13 @@ void fit_params_print_final(const fit_params *params) { /* Prints final values o
         maxlen_name = JABS_MAX(maxlen_name, strlen(var->name));
     }
 
-    jabs_message(MSG_INFO, stderr, "  i | %*s |  unit |        value |     error |  rel %% |  orig. value | multipl. | sigmas |\n", maxlen_name, "variable");
+    jabs_message(MSG_INFO, "  i | %*s |  unit |        value |     error |  rel %% |  orig. value | multipl. | sigmas |\n", maxlen_name, "variable");
     for(size_t i = 0; i < params->n; i++) {
         const fit_variable *var = &params->vars[i];
         if(!var->active)
             continue;
         //jabs_message(MSG_INFO, stderr, "%24s(%3s) = %12g +- %12g (%.1lf%%)\n", var->name, var->unit, var->value_final/var->unit_factor, var->err/var->unit_factor, var->err/var->value_final*100.0);
-        jabs_message(MSG_INFO, stderr, "%3zu | %*s | %5s | %12.6g | %9.3g | %6.1lf | %12.6g | %8.4lf | %6.1lf |\n", var->i_v + 1, maxlen_name, var->name, var->unit,
+        jabs_message(MSG_INFO, "%3zu | %*s | %5s | %12.6g | %9.3g | %6.1lf | %12.6g | %8.4lf | %6.1lf |\n", var->i_v + 1, maxlen_name, var->name, var->unit,
                      var->value_final / var->unit_factor,
                      var->err / var->unit_factor,
                      100.0 * var->err_rel,
@@ -202,7 +202,7 @@ int fit_params_enable_using_string(fit_params *params, const char *fit_vars) {
     s_orig = s = strdup(fit_vars);
     while((token = jibal_strsep_with_quotes(&s, ",")) != NULL) { /* parse comma separated list of parameters to fit */
         if(fit_params_enable(params, token, TRUE) == 0) {
-            jabs_message(MSG_ERROR, stderr, "No matches for %s. See 'show fit variables' for a list of possible fit variables.\n", token);
+            jabs_message(MSG_ERROR, "No matches for %s. See 'show fit variables' for a list of possible fit variables.\n", token);
             status = EXIT_FAILURE;
         }
         if(status == EXIT_FAILURE)

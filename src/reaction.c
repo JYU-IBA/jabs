@@ -25,7 +25,7 @@
 void reactions_print(reaction * const * reactions, size_t n_reactions) {
     if(!reactions)
         return;
-    jabs_message(MSG_INFO, stderr, "Reactions (%zu):\n", n_reactions);
+    jabs_message(MSG_INFO, "Reactions (%zu):\n", n_reactions);
     for(size_t i = 0; i < n_reactions; i++) {
         const reaction *r = reactions[i];
         if(!r) {
@@ -34,28 +34,28 @@ void reactions_print(reaction * const * reactions, size_t n_reactions) {
 #endif
             continue;
         }
-        jabs_message(MSG_INFO, stderr, "%3zu: %s", i + 1, reaction_name(r));
+        jabs_message(MSG_INFO, "%3zu: %s", i + 1, reaction_name(r));
 #ifdef DEBUG
-        jabs_message(MSG_INFO, stderr, " Reaction product stopping emin %g keV ", r->ion_gsto->emin / C_KEV); /* This is only valid after sim has been prepared */
+        jabs_message(MSG_INFO, " Reaction product stopping emin %g keV ", r->ion_gsto->emin / C_KEV); /* This is only valid after sim has been prepared */
 #endif
         if(r->E_min > E_MIN || r->E_max < E_MAX) {
-            jabs_message(MSG_INFO, stderr, ", E = [%.6g MeV, %.6g MeV]", r->E_min / C_MEV, r->E_max / C_MEV);
+            jabs_message(MSG_INFO, ", E = [%.6g MeV, %.6g MeV]", r->E_min / C_MEV, r->E_max / C_MEV);
         }
         if(r->Q != 0.0) {
-            jabs_message(MSG_INFO, stderr, ", Q = %g MeV ", r->Q / C_KEV);
+            jabs_message(MSG_INFO, ", Q = %g MeV ", r->Q / C_KEV);
         }
         if(r->type == REACTION_FILE) {
-            jabs_message(MSG_INFO, stderr, ", Theta = %g deg,  Data from file \"%s\".\n", r->theta/C_DEG, r->filename);
+            jabs_message(MSG_INFO, ", Theta = %g deg,  Data from file \"%s\".\n", r->theta/C_DEG, r->filename);
         }
 #ifdef JABS_PLUGINS
         else if(r->type == REACTION_PLUGIN) {
-            jabs_message(MSG_INFO, stderr, ", Plugin \"%s\" filename \"%s\".\n", r->plugin->name, r->filename);
+            jabs_message(MSG_INFO, ", Plugin \"%s\" filename \"%s\".\n", r->plugin->name, r->filename);
         }
 #endif
         else if(r->type == REACTION_RBS || r->type == REACTION_RBS_ALT || r->type == REACTION_ERD){
             assert(r->Q == 0.0);
-            jabs_message(MSG_INFO, stderr, ", %s cross sections (built-in).", jabs_reaction_cs_to_string(r->cs));
-            jabs_message(MSG_INFO, stderr, "\n");
+            jabs_message(MSG_INFO, ", %s cross sections (built-in).", jabs_reaction_cs_to_string(r->cs));
+            jabs_message(MSG_INFO, "\n");
         }
     }
 }
@@ -136,17 +136,17 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
 
 reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incident, int *argc, char * const **argv) {
     if((*argc) < 2) {
-        jabs_message(MSG_ERROR, stderr, "Not enough arguments\n");
+        jabs_message(MSG_ERROR, "Not enough arguments\n");
         return NULL;
     }
     reaction_type type = reaction_type_from_string((*argv)[0]);
     const jibal_isotope *target = jibal_isotope_find(jibal->isotopes, (*argv)[1], 0, 0);
     if(type == REACTION_NONE) {
-        jabs_message(MSG_ERROR, stderr, "This is not a valid reaction type: \"%s\".\n", (*argv)[0]);
+        jabs_message(MSG_ERROR, "This is not a valid reaction type: \"%s\".\n", (*argv)[0]);
         return NULL;
     }
     if(!target) {
-        jabs_message(MSG_ERROR, stderr, "This is not a valid isotope: \"%s\".\n", (*argv)[1]);
+        jabs_message(MSG_ERROR, "This is not a valid isotope: \"%s\".\n", (*argv)[1]);
         return NULL;
     }
     reaction *r = reaction_make(incident, target, type, JABS_CS_NONE); /* Warning: JABS_CS_NONE used here, something sane must be supplied after this somewhere! */
@@ -166,7 +166,7 @@ reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incid
         } else if(strcmp((*argv)[0], "cs") == 0) {
             r->cs = jibal_option_get_value(jibal_cs_types, (*argv)[1]);
             if(r->cs == 0) {
-                jabs_message(MSG_ERROR, stderr, "Cross section type \"%s\" not recognized.\n", (*argv)[1]);
+                jabs_message(MSG_ERROR, "Cross section type \"%s\" not recognized.\n", (*argv)[1]);
             }
         }
         (*argc) -= 2;
@@ -223,7 +223,7 @@ int reaction_theta_within_tolerance(const reaction *r, const sim_calc_params *p,
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile) {
     const jibal_isotope *nuclei[R33_N_NUCLEI];
     if(rfile->n_data < 2) {
-        jabs_message(MSG_ERROR, stderr, "Not enough data in file (n = %zu).\n", rfile->n_data);
+        jabs_message(MSG_ERROR, "Not enough data in file (n = %zu).\n", rfile->n_data);
         return NULL;
     }
     for(size_t i = 0; i < R33_N_NUCLEI; i++) {
@@ -236,13 +236,13 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
 #ifdef R33_IGNORE_REACTION_STRING
             fprintf(stderr, "Could not parse an isotope from Z=%g, mass=%g.", rfile->zeds[i], rfile->masses[i]);
 #else
-            jabs_message(MSG_ERROR, stderr, "Could not parse an isotope from \"%s\".\n", rfile->reaction_nuclei[i]);
+            jabs_message(MSG_ERROR, "Could not parse an isotope from \"%s\".\n", rfile->reaction_nuclei[i]);
 #endif
             return NULL;
         }
     }
     if(rfile->composition) {
-        jabs_message(MSG_ERROR, stderr, "This program does not currently support \"Composition\" in R33 files.\n");
+        jabs_message(MSG_ERROR, "This program does not currently support \"Composition\" in R33 files.\n");
         return NULL;
     }
 
@@ -260,7 +260,7 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     r->product = nuclei[2];
     r->residual = nuclei[3];
     if(rfile->unit == R33_UNIT_RR && r->incident != r->product) {
-        jabs_message(MSG_ERROR, stderr, "R33 file is in units of ratio to Rutherford, but reaction product (%s) is not the same as target (%s). I don't know what to do.\n", r->product->name, r->target->name);
+        jabs_message(MSG_ERROR, "R33 file is in units of ratio to Rutherford, but reaction product (%s) is not the same as target (%s). I don't know what to do.\n", r->product->name, r->target->name);
         return NULL;
     }
     r->theta = rfile->theta * C_DEG;

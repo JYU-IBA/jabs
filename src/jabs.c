@@ -415,7 +415,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
                                                 ws->params->geostragg, ws->params->beta_manual);
     des_table *dt = des_table_compute(&ws->stop, &ws->stragg, ws->params, sample, incident, depth_start, ws->emin); /* Depth, energy and straggling of incident ion */
     if(!dt) {
-        jabs_message(MSG_ERROR, stderr, "DES table computation failed.\n");
+        jabs_message(MSG_ERROR, "DES table computation failed.\n");
         return -1;
     }
 #ifdef DEBUG_VERBOSE
@@ -467,7 +467,7 @@ int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) { /* Ass
     int Z1 = sim->beam_isotope->Z;
     DEBUGMSG("Assigning stopping in Z2 = %i.", Z2);
     if(assign_stopping_Z1_Z2(gsto, Z1, Z2)) {
-        jabs_message(MSG_ERROR, stderr, "Can not assign stopping or straggling for beam.");
+        jabs_message(MSG_ERROR, "Can not assign stopping or straggling for beam.");
         fail = TRUE;
     }
     for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
@@ -479,7 +479,7 @@ int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) { /* Ass
         }
         Z1 = r->product->Z;
         if(assign_stopping_Z1_Z2(gsto, Z1, Z2)) {
-            jabs_message(MSG_ERROR, stderr, "Can not assign stopping or straggling for reaction product. Reaction: %s.\n", reaction_name(r));
+            jabs_message(MSG_ERROR, "Can not assign stopping or straggling for reaction product. Reaction: %s.\n", reaction_name(r));
             fail = TRUE;
         }
     }
@@ -488,19 +488,19 @@ int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) { /* Ass
 
 int assign_stopping_Z1_Z2(jibal_gsto *gsto, int Z1, int Z2) {
     if(Z1 < 1 || Z2 < 1) {
-        jabs_message(MSG_WARNING, stderr, "Assigning stopping for Z1 = %i in Z2 = %i is not possible.\n");
+        jabs_message(MSG_WARNING, "Assigning stopping for Z1 = %i in Z2 = %i is not possible.\n");
         return EXIT_SUCCESS; /* Skips, doesn't fail */
     }
     if(!jibal_gsto_auto_assign(gsto, Z1, Z2)) {
-        jabs_message(MSG_ERROR, stderr, "Assigning stopping for Z1 = %i in Z2 = %i fails.\n", Z1, Z2);
+        jabs_message(MSG_ERROR, "Assigning stopping for Z1 = %i in Z2 = %i fails.\n", Z1, Z2);
         return EXIT_FAILURE;
     }
     if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, Z1, Z2)) {
-        jabs_message(MSG_ERROR, stderr, "No electronic stopping assigned for Z1 = %i in Z2 = %i.\n", Z1, Z2);
+        jabs_message(MSG_ERROR, "No electronic stopping assigned for Z1 = %i in Z2 = %i.\n", Z1, Z2);
         return EXIT_FAILURE;
     }
     if(!jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, Z1, Z2)) {
-        jabs_message(MSG_ERROR, stderr, "No energy loss straggling assigned for Z1 = %i in Z2 = %i.\n", Z1, Z2);
+        jabs_message(MSG_ERROR, "No energy loss straggling assigned for Z1 = %i in Z2 = %i.\n", Z1, Z2);
         return EXIT_FAILURE;
     }
     DEBUGMSG("Assigning stopping Z1 = %i, Z2 = %i was a great success.", Z1, Z2);
@@ -511,7 +511,7 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
     /* TODO: simplify this by finding all possible Z1, Z2 combinations, considering target elements, beam and reactions before attempting to assign stopping/straggling (GSTO) */
     struct sample *sample = sim->sample;
     if(!sample) {
-        jabs_message(MSG_ERROR, stderr, "Could not assign stopping, because sample is not set!\n");
+        jabs_message(MSG_ERROR, "Could not assign stopping, because sample is not set!\n");
         return 1;
     }
     int Z2 = -1;
@@ -650,7 +650,7 @@ int simulate_with_roughness(sim_workspace *ws) {
 
 int simulate_with_ds(sim_workspace *ws) {
     if(!ws) {
-        jabs_message(MSG_ERROR, stderr, "Congratulations, you've found a bug in %s:%i.\n", __FILE__, __LINE__);
+        jabs_message(MSG_ERROR, "Congratulations, you've found a bug in %s:%i.\n", __FILE__, __LINE__);
         return EXIT_FAILURE;
     }
     const double fluence = ws->fluence;
@@ -673,7 +673,7 @@ int simulate_with_ds(sim_workspace *ws) {
     sim_calc_params_update(ws->params);
     const jibal_isotope *incident = ws->sim->beam_isotope;
     int last = FALSE;
-    jabs_message(MSG_VERBOSE, stderr, "Dual scattering simulation starts.\n\n");
+    jabs_message(MSG_VERBOSE, "Dual scattering simulation starts.\n\n");
     double emin = ws->emin;
 
     while(1) {
@@ -698,7 +698,7 @@ int simulate_with_ds(sim_workspace *ws) {
         double E_back = ion1.E;
         const double E_mean = (E_front + E_back) / 2.0;
 
-        jabs_message(MSG_VERBOSE, stderr, "\rDS depth from %9.3lf to %9.3lf tfu, E from %6.1lf to %6.1lf keV.", d_before.x / C_TFU, d_after.x / C_TFU, E_front / C_KEV,
+        jabs_message(MSG_VERBOSE, "\rDS depth from %9.3lf to %9.3lf tfu, E from %6.1lf to %6.1lf keV.", d_before.x / C_TFU, d_after.x / C_TFU, E_front / C_KEV,
                      E_back / C_KEV);
         int n_running = 0; /* How many reactions are still producing data, largest number of all simulations for this depth step. */
         for(int i_polar = 0; i_polar < ds_steps_polar; i_polar++) {
@@ -752,12 +752,12 @@ int simulate_with_ds(sim_workspace *ws) {
         if(ws->sample->ranges[ws->sample->n_ranges - 1].x - d_after.x < 0.01 * C_TFU)
             break;
         d_before = d_after;
-        jabs_message(MSG_VERBOSE, stderr, " %3i reactions ok.", n_running);
+        jabs_message(MSG_VERBOSE, " %3i reactions ok.", n_running);
         if(n_running == 0) {
             break;
         }
     }
-    jabs_message(MSG_VERBOSE, stderr, "\nDual scattering simulation complete.\n");
+    jabs_message(MSG_VERBOSE, "\nDual scattering simulation complete.\n");
     sim_workspace_calculate_sum_spectra(ws);
     return EXIT_SUCCESS;
 }
