@@ -51,6 +51,10 @@ int fit_detector(const jibal *jibal, const fit_data_det *fdd, const simulation *
     }
     detector_update(det); /* non-const pointer inside const... not great */
     sim_workspace *ws = sim_workspace_init(jibal, sim, det);
+    if(!ws) {
+        jabs_message(MSG_ERROR, "Could not initialize workspace of detector %s.\n", det->name);
+        return EXIT_FAILURE;
+    }
     if(simulate_with_ds(ws)) {
         jabs_message(MSG_ERROR, "Simulation of detector %s spectrum failed!\n", det->name);
         return EXIT_FAILURE;
@@ -1031,7 +1035,12 @@ int fit(fit_data *fit) {
         jabs_message(MSG_VERBOSE, "Simulation parameters for this phase:\n");
         sim_calc_params_print(fit->sim->params, MSG_VERBOSE);
         jabs_message(MSG_IMPORTANT, "Initializing fit...\n");
-        gsl_multifit_nlinear_winit(x, &wts.vector, fdf, w);
+        status = gsl_multifit_nlinear_winit(x, &wts.vector, fdf, w);
+        if(status != 0) {
+            jabs_message(MSG_ERROR, "Fit aborted in initialization.\n");
+            fit->stats.error = FIT_ERROR_INIT;
+            break;
+        }
         /* compute initial cost function */
         f = gsl_multifit_nlinear_residual(w);
         gsl_blas_ddot(f, f, &fit->stats.chisq0);
@@ -1155,6 +1164,8 @@ const char *fit_error_str(int error) {
             return "an impossible thing has happened";
         case FIT_ERROR_ABORTED:
             return "user requested abort";
+        case FIT_ERROR_INIT:
+            return "error during initialization";
         default:
             return "unknown";
     }
