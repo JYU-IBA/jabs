@@ -522,11 +522,13 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
             if(headers) { /* Headers */
                 if(strncmp(col, "bragg", 5) == 0) {
                     i_bragg = n;
+                } else if(strcmp(col, "yield_slope") == 0) {
+                    i_yield_slope = n;
                 } else if(strncmp(col, "yield", 5) == 0) {
                     i_yield = n;
                 } else if(strncmp(col, "stragg", 5) == 0) {
                     i_stragg = n;
-                } else if(strncmp(col, "density", 7) == 0) {
+                } else if(strcmp(col, "density") == 0) {
                     i_density = n;
                 } else if(strncmp(col, "rough", 5) == 0) {
                     i_rough = n;
