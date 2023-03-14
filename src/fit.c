@@ -1069,7 +1069,9 @@ int fit(fit_data *fit) {
         fit->stats.chisq_dof = fit->stats.chisq / fit->dof;
 
         fit_parameters_update(fit_params, w, covar, fit->stats.chisq_dof);
-        sample_model_renormalize(fit->sm);
+        if(sample_model_renormalize(fit->sm)) {
+            jabs_message(MSG_WARNING, "Could not renormalize concentrations of sample model after the fit.\n");
+        }
         fit_parameters_update_changed(fit_params); /* sample_model_renormalize() can and will change concentration values, this will recompute error (assuming relative error stays the same) */
         fit_params_print_final(fit_params);
         fit_covar_print(covar, MSG_VERBOSE);

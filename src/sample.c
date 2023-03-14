@@ -124,7 +124,7 @@ int sample_model_sanity_check(const sample_model *sm) {
     return EXIT_SUCCESS;
 }
 
-void sample_model_renormalize(sample_model *sm) {
+int sample_model_renormalize(sample_model *sm) {
 #ifdef SAMPLE_MODEL_RENORM_MATERIALS
     /* This step should be unnecessary, unless materials are modified after they are created. */
     for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
@@ -143,16 +143,20 @@ void sample_model_renormalize(sample_model *sm) {
         }
         double sum = 0.0;
         for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
-            if(*(sample_model_conc_bin(sm, i, i_mat)) < 0.0)
+            if(*(sample_model_conc_bin(sm, i, i_mat)) < 0.0) {
                 *(sample_model_conc_bin(sm, i, i_mat)) = 0.0;
+            }
             sum += *(sample_model_conc_bin(sm, i, i_mat));
         }
-        if(sum == 0.0)
+        if(sum == 0.0) {
+            return EXIT_FAILURE;
             continue;
+        }
         for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
             *(sample_model_conc_bin(sm, i, i_mat)) /= sum;
         }
     }
+    return EXIT_SUCCESS;
 }
 
 void sample_renormalize(sample *sample) {
@@ -497,11 +501,13 @@ size_t sample_number_of_rough_ranges(const sample *sample) {
 
 sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
     FILE *in;
-    if(!filename)
+    if(!filename) {
         return NULL;
+    }
     in = fopen(filename, "r");
-    if(!in)
+    if(!in) {
         return NULL;
+    }
     sample_model *sm = malloc(sizeof(sample_model));
     sm->n_ranges = 0;
     sm->n_materials = 0;
@@ -548,14 +554,26 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 } else if(strncmp(col, "n_rough", 7) == 0) {
                     i_nrough = n;
                 } else if(strncmp(col, "thick", 5) == 0) {
-                    i_depth = n;
-                    sm->type = SAMPLE_MODEL_LAYERED;
+                    if(sm->type == SAMPLE_MODEL_NONE) {
+                        i_depth = n;
+                        sm->type = SAMPLE_MODEL_LAYERED;
+                    } else {
+                        jabs_message(MSG_WARNING, "Ignoring column %s (multiple depth/thick/width columns defined)\n");
+                    }
                 } else if(strncmp(col, "depth", 5) == 0) {
-                    i_depth = n;
-                    sm->type = SAMPLE_MODEL_POINT_BY_POINT;
+                    if(sm->type == SAMPLE_MODEL_NONE) {
+                        sm->type = SAMPLE_MODEL_POINT_BY_POINT;
+                        i_depth = n;
+                    } else {
+                        jabs_message(MSG_WARNING, "Ignoring column %s (multiple depth/thick/width columns defined)\n");
+                    }
                 } else if(strncmp(col, "width", 5) == 0) {
-                    i_depth = n;
-                    sm->type = SAMPLE_MODEL_POINT_BY_POINT_CUMULATIVE;
+                    if(sm->type == SAMPLE_MODEL_NONE) {
+                        i_depth = n;
+                        sm->type = SAMPLE_MODEL_POINT_BY_POINT_CUMULATIVE;
+                    } else {
+                        jabs_message(MSG_WARNING, "Ignoring column %s (multiple depth/thick/width columns defined)\n");
+                    }
                 } else {
                     sm->materials = realloc(sm->materials, sizeof (jibal_material *) * (sm->n_materials + 1)); /* TODO: check allocation */
                     sm->materials[sm->n_materials] = jibal_material_create(jibal->elements, col);
@@ -592,6 +610,9 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
 
             double x = strtod(col, NULL);
             if(n == i_depth) {
+                if(sm->n_ranges == 1 && (sm->type == SAMPLE_MODEL_POINT_BY_POINT || sm->type == SAMPLE_MODEL_POINT_BY_POINT_CUMULATIVE) && x != 0.0) {
+                    jabs_message(MSG_WARNING, "Point-by-point profiles should define sample starting from surface. Depth %g tfu will be interpreted as zero.\n", x);
+                }
                 r->x = x*C_TFU; /* Will be corrected later in case of a layer model*/
                 /* TODO: for p by p profile, check depth monotonicity */
             } else if (n == i_bragg) {
@@ -616,9 +637,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
         }
         headers = 0;
     }
-
-    sample_model_renormalize(sm);
-
+    free(line);
     for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Set defaults (roughness model) for roughness. */
         sample_range *r = &sm->ranges[i_range];
         if(r->rough.x > ROUGH_TOLERANCE) {
@@ -627,8 +646,34 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
             roughness_reset(&r->rough);
         }
     }
-    free(line);
-    return sm;
+
+    int valid = TRUE; /* Unless proved otherwise */
+    if(sm->type == SAMPLE_MODEL_NONE) {
+        jabs_message(MSG_ERROR, "Sample model type undefined. Please specify one column of type \"depth\", \"thick\" or \"width\" for depth information.\n");
+        valid = FALSE;
+    }
+    if(sm->n_ranges == 0) {
+        jabs_message(MSG_ERROR, "No valid ranges (sample layers) defined.\n");
+        valid = FALSE;
+    }
+    if(sm->type == SAMPLE_MODEL_POINT_BY_POINT || sm->type == SAMPLE_MODEL_POINT_BY_POINT_CUMULATIVE) {
+        if(sm->n_ranges < 2) {
+            jabs_message(MSG_ERROR, "Need at least two ranges for point-by-point profiles, I got %zu.\n", sm->n_ranges);
+            valid = FALSE;
+        }
+    }
+
+    if(sample_model_renormalize(sm)) {
+        jabs_message(MSG_ERROR, "Could not renormalize concentrations.\n");
+        valid = FALSE;
+    }
+
+    if(valid) {
+        return sm;
+    } else {
+        sample_model_free(sm);
+        return NULL;
+    }
 }
 
 void sample_model_free(sample_model *sm) {

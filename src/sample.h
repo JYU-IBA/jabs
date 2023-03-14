@@ -71,7 +71,7 @@ inline double *sample_conc_bin(const sample *s, size_t i_range, size_t i_isotope
 }
 sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges);
 int sample_model_sanity_check(const sample_model *sm);
-void sample_model_renormalize(sample_model *sm);
+int sample_model_renormalize(sample_model *sm);
 void sample_renormalize(sample *sample);
 sample_model *sample_model_split_elements(const struct sample_model *sm);
 sample_model *sample_model_from_file(const jibal *jibal, const char *filename);
