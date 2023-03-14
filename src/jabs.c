@@ -182,7 +182,7 @@ double cross_section_concentration_product_stepping(const sim_workspace *ws, con
     depth d = *d_before;
     double E_diff = E_back - E_front;
     size_t n_steps = ceil(GSL_MAX_DBL(E_diff/E_step_nominal, d_diff/depth_step_max)); /* Choose the bigger of two evils. Should not be possible to take zero steps since d_diff should always be greater than zero. */
-    double frac = 1.0/(1.0*(n_steps+1));
+    const double frac = 1.0/(1.0*(n_steps+1));
     const double x_step = (d_after->x - d_before->x) * frac;
     const double E_step = (E_back - E_front) * frac;
     const double S_step = (S_back - S_front) * frac;
@@ -627,7 +627,7 @@ int simulate_with_roughness(sim_workspace *ws) {
             }
         }
 #ifdef DEBUG
-        jabs_message(MSG_DEBUG, stderr, "Roughness subspectrum %zu / %zu", i_iter, iter_total);
+        jabs_message(MSG_DEBUG, "Roughness subspectrum %zu / %zu", i_iter, iter_total);
         sample_print(sample_rough, FALSE, MSG_DEBUG);
 #endif
         ws->fluence = p * fluence_original;

@@ -40,7 +40,8 @@ typedef struct depth {
 typedef enum sample_model_type {
     SAMPLE_MODEL_NONE = 0,
     SAMPLE_MODEL_POINT_BY_POINT = 1,
-    SAMPLE_MODEL_LAYERED = 2
+    SAMPLE_MODEL_POINT_BY_POINT_CUMULATIVE = 2,
+    SAMPLE_MODEL_LAYERED = 3,
 } sample_model_type;
 
 typedef struct sample {

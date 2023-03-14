@@ -91,14 +91,14 @@ int sample_model_sanity_check(const sample_model *sm) {
     }
     for(size_t i = 0; i < sm->n_ranges; i++) {
         const sample_range *r = &sm->ranges[i];
-        if(sm->type == SAMPLE_MODEL_LAYERED) {
+        if(sm->type == SAMPLE_MODEL_LAYERED || sm->type == SAMPLE_MODEL_POINT_BY_POINT_CUMULATIVE) {
             if(r->x < 0.0) {
                 jabs_message(MSG_ERROR, "Sample model fails sanity check (layer %zu thickness negative).\n", i + 1);
                 return EXIT_FAILURE;
             }
         } else if(sm->type == SAMPLE_MODEL_POINT_BY_POINT) {
             if(i && r->x < sm->ranges[i-1].x) {
-                jabs_message(MSG_ERROR, "Sample model fails sanity check (non-monotonous range %zu).\n", i + 1);
+                jabs_message(MSG_ERROR, "Sample model fails sanity check (non-monotonous range %zu, %.12g tfu < %.12g tfu).\n", i + 1, r->x / C_TFU, sm->ranges[i-1].x / C_TFU);
                 return EXIT_FAILURE;
             }
         }
@@ -132,12 +132,12 @@ void sample_model_renormalize(sample_model *sm) {
     }
 #endif
     for(size_t i = 0; i < sm->n_ranges; i++) {
-        //fprintf(stderr, "Range %zu: %g tfu\n", i, sm->ranges[i].x/C_TFU);
-        if(sm->type == SAMPLE_MODEL_LAYERED) {
-            if(sm->ranges[i].x < 0.0)
+        if(sm->type == SAMPLE_MODEL_LAYERED || sm->type == SAMPLE_MODEL_POINT_BY_POINT_CUMULATIVE) {
+            if(sm->ranges[i].x < 0.0) {
                 sm->ranges[i].x = 0.0;
+            }
         } else if (sm->type == SAMPLE_MODEL_POINT_BY_POINT) {
-            if(i && sm->ranges[i].x < sm->ranges[i-1].x) {
+            if(i && sm->ranges[i].x < sm->ranges[i-1].x) { /* Forces monotonicity */
                 sm->ranges[i].x = sm->ranges[i - 1].x;
             }
         }
@@ -245,6 +245,16 @@ sample_model *sample_model_to_point_by_point(const sample_model *sm) { /* Conver
         }
         sm_out->type = SAMPLE_MODEL_LAYERED; /* Yes, this is odd. */
     }
+    if(sm->type == SAMPLE_MODEL_POINT_BY_POINT_CUMULATIVE) { /* We have concentration gradient like in point-by-point profiles, but instead of depth we have thickness. We need to accumulate thickness to get depth in output. */
+        sm_out = sample_model_clone(sm);
+        for(size_t i = 0; i < sm_out->n_ranges; i++) {
+            if(i) {
+                sm_out->ranges[i].x += sm_out->ranges[i - 1].x;
+            } else { /* i == 0 */
+                sm_out->ranges[i].x = 0.0; /* Surface */
+            }
+        }
+    }
     return sm_out;
 }
 
@@ -254,14 +264,14 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
     }
     sample *s = malloc(sizeof(sample));
     sample_model *sm_copy = NULL;
-    if(sm->type == SAMPLE_MODEL_LAYERED) {
+    if(sm->type == SAMPLE_MODEL_LAYERED || sm->type == SAMPLE_MODEL_POINT_BY_POINT_CUMULATIVE) {
         sm_copy = sample_model_to_point_by_point(sm);
         if(!sm_copy) {
             free(s);
             return NULL;
         }
         sm = sm_copy;
-        s->no_conc_gradients = TRUE;
+        s->no_conc_gradients = (sm->type == SAMPLE_MODEL_LAYERED);
     } else {
         s->no_conc_gradients = FALSE;
     }
@@ -367,6 +377,9 @@ int sample_model_print(const char *filename, const sample_model *sm, jabs_msg_le
             break;
         case SAMPLE_MODEL_LAYERED:
             jabs_message_printf(msg_level, f, "       thick");
+            break;
+        case SAMPLE_MODEL_POINT_BY_POINT_CUMULATIVE:
+            jabs_message_printf(msg_level, f, "       width");
             break;
     }
     if(n_rl) {
@@ -540,6 +553,9 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 } else if(strncmp(col, "depth", 5) == 0) {
                     i_depth = n;
                     sm->type = SAMPLE_MODEL_POINT_BY_POINT;
+                } else if(strncmp(col, "width", 5) == 0) {
+                    i_depth = n;
+                    sm->type = SAMPLE_MODEL_POINT_BY_POINT_CUMULATIVE;
                 } else {
                     sm->materials = realloc(sm->materials, sizeof (jibal_material *) * (sm->n_materials + 1)); /* TODO: check allocation */
                     sm->materials[sm->n_materials] = jibal_material_create(jibal->elements, col);
@@ -576,7 +592,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
 
             double x = strtod(col, NULL);
             if(n == i_depth) {
-                r->x += x*C_TFU; /* Will be corrected later in case of a layer model*/
+                r->x = x*C_TFU; /* Will be corrected later in case of a layer model*/
                 /* TODO: for p by p profile, check depth monotonicity */
             } else if (n == i_bragg) {
                 r->bragg = x;
@@ -963,13 +979,18 @@ void sample_free(sample *sample) {
 }
 
 double sample_isotope_max_depth(const sample *sample, size_t i_isotope) {
-    for(size_t i = sample->n_ranges; i--;) {
-        double *c = sample_conc_bin(sample, i, i_isotope);
-        if(*c > ABUNDANCE_THRESHOLD) {
-            return sample->ranges[i].x;
+    const size_t i_max = sample->n_ranges - 1;
+    double out = 0.0;
+    for(size_t i = i_max; i > 0; i--) {
+        double c_deeper = *(sample_conc_bin(sample, i, i_isotope));
+        double c = *(sample_conc_bin(sample, i - 1, i_isotope));
+        if(c_deeper > ABUNDANCE_THRESHOLD || c > ABUNDANCE_THRESHOLD) { /* If either end of range has non-zero concentration the entire range (up to depth given by range i) might contain the isotope, since gradients can go down to zero. Consider the trivial case of one element at surface (i == 0) with concentration of 100% and drop to 0% in range with i == 1. We must return sample->range[1].x and not [0].x (== 0.0!). */
+            out = sample->ranges[i].x;
+            break;
         }
     }
-    return 0.0;
+    DEBUGMSG("Isotope %zu max depth %g tfu.\n", i_isotope, out / C_TFU);
+    return out;
 }
 
 void sample_sort_isotopes(sample *sample) {
