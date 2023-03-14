@@ -3,5 +3,14 @@ set energy 1.6MeV
 set alpha 10deg
 set det theta 165deg
 set det calib linear slope 2keV offset 100keV resolution 10keV
+
+#Point-by-point profile (depth profile) with concentration gradients
 load sample "point_by_point_profile.txt"
 simulate
+load ref "point_by_point_ref.dat"
+test ref [100:600] 1e-4
+
+#Alternative way of defining point-by-point profiles with concentration gradients. Should yield the same spectrum.
+load sample "point_by_point_profile_alternative.txt"
+simulate
+test ref [100:600] 1e-4
