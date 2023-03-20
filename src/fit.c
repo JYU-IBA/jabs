@@ -829,6 +829,23 @@ int jabs_test_delta(const gsl_vector *dx, const gsl_vector *x, double epsabs, do
     return GSL_CONTINUE;
 }
 
+int multifit_nlinear_print_jacobian(const gsl_multifit_nlinear_workspace *w, const char *filename) {
+    gsl_matrix *J = gsl_multifit_nlinear_jac(w);
+    FILE *f = fopen_file_or_stream(filename, "w");
+    if(!f) {
+        return EXIT_FAILURE;
+    }
+    for(size_t i = 0; i < J->size1; i++) {
+        for(size_t j = 0; j < J->size2; j++) {
+            double val = gsl_matrix_get(J, i, j);
+            fprintf(f, " %12e", val);
+        }
+        fprintf(f, "\n");
+    }
+    fclose_file_or_stream(f);
+    return EXIT_SUCCESS;
+}
+
 int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, const double chisq_tol, struct fit_data *fit_data, gsl_multifit_nlinear_workspace *w) {
     int status = 0;
     size_t iter;
@@ -854,6 +871,16 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
         }
         fit_iter_stats_update(fit_data, w);
         fit_iter_stats_print(&fit_data->stats);
+#ifdef DEBUG
+        if(fit_data->stats.phase > FIT_PHASE_FAST) {
+            char *jacobian_filename;
+            asprintf(&jacobian_filename, "jacobian_iter%zu.dat", fit_data->stats.iter);
+            if(jacobian_filename) {
+                multifit_nlinear_print_jacobian(w, jacobian_filename);
+                free(jacobian_filename);
+            }
+        }
+#endif
         if(fit_data->fit_iter_callback) {
             if(fit_data->fit_iter_callback(fit_data->stats)) {
                 return FIT_ERROR_ABORTED;
