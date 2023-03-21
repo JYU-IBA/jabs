@@ -35,6 +35,7 @@ void jabs_histogram_free(jabs_histogram *h);
 jabs_histogram *jabs_histogram_alloc(size_t n);
 void jabs_histogram_reset(jabs_histogram *h);
 void jabs_histogram_scale(jabs_histogram *h, double scale);
+inline double jabs_histogram_get(const jabs_histogram *h, size_t i) {return h->bin[i];}
 
 /* These functions are JaBS additions */
 int jabs_histogram_compare(const jabs_histogram *h1, const jabs_histogram *h2, size_t low, size_t high, double *out);

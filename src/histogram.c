@@ -3,6 +3,8 @@
 #include <jibal_phys.h>
 #include "histogram.h"
 
+extern inline double jabs_histogram_get(const jabs_histogram *h, size_t i);
+
 jabs_histogram *jabs_histogram_clone(const jabs_histogram *h_orig) {
     if(!h_orig) {
         return NULL;
