@@ -934,6 +934,51 @@ void fit_covar_print(const gsl_matrix *covar, jabs_msg_level msg_level) {
     }
 }
 
+int fit_uncertainty_print(const fit_data *fit, const gsl_matrix *J, const gsl_matrix *covar, const gsl_vector *f, const gsl_vector *w, const char *filename) {
+    FILE *f_errvec = fopen(filename, "w");
+    if(!f_errvec) {
+        return EXIT_FAILURE;
+    }
+    gsl_matrix *JC = gsl_matrix_alloc(J->size1, covar->size2); /* Product of J*C */
+    gsl_matrix *JCJT = gsl_matrix_alloc(J->size1, J->size1); /* Product J*C*JT */
+    gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, J, covar, 0.0, JC);
+    gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, JC, J, 0.0, JCJT);
+    gsl_vector_view err_vec = gsl_matrix_diagonal(JCJT);
+    size_t i_vec = 0;
+    for(size_t i_roi = 0; i_roi < fit->n_fit_ranges; i_roi++) {
+        const roi *roi = &fit->fit_ranges[i_roi];
+        const result_spectra *s = &(fit->spectra[roi->i_det]);
+        for(size_t ch = roi->low; ch <= roi->high; ch++) {
+            double sim_counts = jabs_histogram_get(result_spectra_simulated_histo(s), ch);
+            double exp_counts = jabs_histogram_get(result_spectra_experimental_histo(s), ch);
+            double residuals_weighted = gsl_vector_get(f, i_vec);  /* Residuals (with weights sqrt(W)) */
+            double residuals_unweighted = exp_counts - sim_counts;
+            double weight = gsl_vector_get(w, i_vec); /* Fit weight (1/variance, i.e. 1 / N_exp in bin) */
+            double err = gsl_vector_get(&err_vec.vector, i_vec); /* Something(J x C x J^T diagonal), should be standard error of the fit, i.e. how much do the (statistical) errors in parameters propagated to this particular bin give us uncertainty. This is probably variance. */
+            double error_fit_final = 2.0 * sqrt(err) * sqrt(sim_counts); /* TODO: sqrt(sim_counts)? */
+            double error_prediction_final = 2.0 * sqrt(err + weight) * sqrt(sim_counts);
+            double error_positive = sim_counts + error_prediction_final;
+            double error_negative = sim_counts - error_prediction_final;
+            if(error_negative < 0.0) {
+                error_negative = 0.0;
+            }
+            fprintf(f_errvec, "%3zu %3zu %4zu %12g %12g %12g %12g %12g %12g %12g %12g %12g %12g\n",
+                    i_vec, i_roi, ch,
+                    sim_counts, exp_counts,
+                    residuals_unweighted, residuals_weighted,
+                    weight,
+                    err, error_fit_final,
+                    error_prediction_final,
+                    error_negative, error_positive);
+            i_vec++;
+        }
+    }
+    fclose(f_errvec);
+    gsl_matrix_free(JCJT);
+    gsl_matrix_free(JC);
+    return EXIT_SUCCESS;
+}
+
 int fit(fit_data *fit) {
     struct fit_params *fit_params = fit->fit_params;
     if(!fit_params || fit_params->n_active == 0) {
@@ -1072,7 +1117,8 @@ int fit(fit_data *fit) {
         f = gsl_multifit_nlinear_residual(w);
         gsl_blas_ddot(f, f, &fit->stats.chisq0);
         jabs_message(MSG_IMPORTANT, "Done. Starting iteration...\n");
-        status = jabs_gsl_multifit_nlinear_driver(fit->n_iters_max, xtol, chisq_tol, fit, w); /* Fit */fit->stats.error = status;
+        status = jabs_gsl_multifit_nlinear_driver(fit->n_iters_max, xtol, chisq_tol, fit, w); /* Fit */
+        fit->stats.error = status;
         if(status < 0) {
             jabs_message(MSG_ERROR, "Fit aborted in phase %i, reason: %s.\n", phase, fit_error_str(fit->stats.error));
             break;
@@ -1103,6 +1149,9 @@ int fit(fit_data *fit) {
         fit_params_print_final(fit_params);
         fit_covar_print(covar, MSG_VERBOSE);
         fit_data_print(fit, MSG_VERBOSE);
+#ifdef DEBUG
+        fit_uncertainty_print(fit, J, covar, f, &wts.vector, "errors.dat");
+#endif
     }
     gsl_multifit_nlinear_free(w);
     gsl_vector_free(fit->f_iter);
