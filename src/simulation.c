@@ -79,9 +79,26 @@ jabs_reaction_cs sim_cs(const simulation *sim, const reaction_type type) {
     return JABS_CS_NONE;
 }
 
+reaction *sim_reaction_make_from_argv(const jibal *jibal, const simulation *sim, int *argc, char * const **argv) {
+    reaction *r = reaction_make_from_argv(jibal, sim->beam_isotope, argc, argv);
+    if(!r) {
+        return NULL;
+    }
+    if(r->cs == JABS_CS_NONE) {
+        jabs_reaction_cs cs = sim_cs(sim, r->type);
+        r->cs = cs;
+        jabs_message(MSG_DEBUG, "Reaction cross section not given, assuming default for %s: %s.\n", reaction_type_to_string(r->type), jabs_reaction_cs_to_string(cs));
+    }
+    return r;
+}
+
 int sim_reactions_add_reaction(simulation *sim, reaction *r, int silent) {
     if(!sim || !r)
         return EXIT_FAILURE;
+    if(r->product == NULL) {
+        jabs_message(MSG_ERROR, "Reaction product is not defined, can not add reaction.\n");
+        return EXIT_FAILURE;
+    }
     sim->n_reactions++;
     sim->reactions = realloc(sim->reactions, sim->n_reactions * sizeof(reaction *));
     sim->reactions[sim->n_reactions - 1] = r;

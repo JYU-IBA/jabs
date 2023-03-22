@@ -350,7 +350,7 @@ int detector_set_name(detector *det, const char *name) {
     return EXIT_SUCCESS;
 }
 
-const char *detector_name(detector *det) {
+const char *detector_name(const detector *det) {
     if(det){
         if(det->name) {
             return det->name;

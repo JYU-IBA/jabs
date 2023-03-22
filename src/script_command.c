@@ -1367,6 +1367,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&head, script_command_new("pwd", "Display current working directory.", 0, 0, script_cwd));
     script_command_list_add_command(&head, script_command_new("cd", "Change current working directory.", 0, 0, script_cd));
     script_command_list_add_command(&head, script_command_new("idf2jbs", "Convert IDF file to a JaBS script.", 0, 0, script_idf2jbs));
+    script_command_list_add_command(&head, script_command_new("kinematics", "Calculate kinematics.", 0, 0, script_kinematics));
     return script_commands_sort_all(head);
 }
 
@@ -2253,22 +2254,15 @@ script_command_status script_split_sample_elements(struct script_session *s, int
 script_command_status script_add_reaction(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
     if(argc < 2) {
-        jabs_message(MSG_ERROR, "Usage: add reaction TYPE isotope\n");
+        jabs_message(MSG_ERROR, "Usage: add reaction <type> <isotope> {cs <cross section model>} {min <min energy>} {max <max energy}.\n Type should be one of the following: RBS RBS- ERD\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     const int argc_orig = argc;
-    reaction *r = reaction_make_from_argv(fit->jibal, fit->sim->beam_isotope, &argc, &argv);
+    reaction *r = sim_reaction_make_from_argv(fit->jibal, fit->sim, &argc, &argv);
     int argc_consumed = argc_orig - argc;
     if(!r) {
         jabs_message(MSG_ERROR, "Could not make a reaction based on given description.\n");
         return SCRIPT_COMMAND_FAILURE;
-    }
-    if(r->cs == JABS_CS_NONE) {
-        jabs_reaction_cs cs = sim_cs(fit->sim, r->type);
-        r->cs = cs;
-        jabs_message(MSG_WARNING,
-                     "Reaction cross section not given, assuming default for %s: %s.\n",
-                     reaction_type_to_string(r->type), jabs_reaction_cs_to_string(cs));
     }
     if(sim_reactions_add_reaction(fit->sim, r, FALSE)) {
         return SCRIPT_COMMAND_FAILURE;
@@ -2538,5 +2532,55 @@ script_command_status script_idf2jbs(struct script_session *s, int argc, char * 
     free(filename_out);
     argc--;
     argv++;
+    return argc_orig - argc;
+}
+
+script_command_status script_kinematics(struct script_session *s, int argc, char * const *argv) {
+    const int argc_orig = argc;
+    struct fit_data *fit = s->fit;
+    const simulation *sim = s->fit->sim;
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, "Usage: kinematics <type> <target atom>\nSyntax of \"add reaction\" is used.");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(sim->n_det == 0) {
+        jabs_message(MSG_ERROR, "No detectors defined.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    reaction *r = sim_reaction_make_from_argv(fit->jibal, fit->sim, &argc, &argv);
+    if(!r) {
+        jabs_message(MSG_ERROR, "Reaction could not be initialized.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    jabs_message(MSG_INFO, "Detector name | theta |  product |   energy | channel | cross section\n");
+    jabs_message(MSG_INFO, "              |   deg |          |      keV |         |         mb/sr\n");
+    for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
+
+        const detector *det = sim->det[i_det];
+        if(reaction_is_possible(r, sim->params, det->theta)) {
+            sim_reaction *sim_r = calloc(1, sizeof(sim_reaction)); /* We skip initializing the complete reaction, just use parts of it */
+            sim_r->r = r;
+            sim_reaction_set_cross_section_by_type(sim_r);
+            sim_reaction_recalculate_internal_variables(sim_r, sim->params, det->theta, r->E_min, r->E_max);
+            double E = reaction_product_energy(r, det->theta, sim->beam_E);
+            const jibal_isotope *product = r->product;
+            if(!product) {
+                continue;
+            }
+            size_t ch = calibration_inverse(detector_get_calibration(det, product->Z), E, CHANNELS_ABSOLUTE_MAX);
+            double sigma = sim_r->cross_section ? sim_r->cross_section(sim_r, E) : 0.0;
+            jabs_message(MSG_INFO, "%13s | %5g | %8s | %8g | %7zu | %13g\n",
+                         detector_name(det),
+                         det->theta / C_DEG,
+                         product->name,
+                         E / C_KEV,
+                         ch,
+                         sigma / C_MB_SR);
+            free(sim_r);
+        } else {
+
+        }
+    }
+    reaction_free(r);
     return argc_orig - argc;
 }

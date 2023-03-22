@@ -77,6 +77,6 @@ void detector_update(detector *det);
 const char *detector_param_unit(const detector *det); /* return a suitable unit based on detector type, e.g. "keV" when type == DETECTOR_ENERGY. TODO: use this wisely (we can simulate energy spectra with a ToF detector!) */
 double detector_param_unit_factor(const detector *det);
 int detector_set_name(detector *det, const char *name);
-const char *detector_name(detector *det);
+const char *detector_name(const detector *det);
 detector *detector_clone(const detector *det_orig);
 #endif //JABS_DETECTOR_H

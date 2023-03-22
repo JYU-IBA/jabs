@@ -54,6 +54,7 @@ typedef struct simulation {
 simulation *sim_init(jibal *jibal);
 void sim_free(simulation *sim);
 jabs_reaction_cs sim_cs(const simulation *sim, reaction_type type);
+reaction *sim_reaction_make_from_argv(const jibal *jibal, const simulation *sim, int *argc, char * const **argv); /* Note confusing naming, this does not make a sim_reaction */
 int sim_reactions_add_reaction(simulation *sim, reaction *r, int silent);
 int sim_reactions_remove_reaction(simulation *sim, size_t i);
 int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jabs_reaction_cs cs, int silent); /* Add RBS or ERD reactions automagically */
