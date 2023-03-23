@@ -104,7 +104,12 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
     } else {
         stopping = k1;
     }
+#ifdef DEBUG
+    if(stopping <= 0.0) {
+        DEBUGMSG("Stopping is %g eV/tfu at E = %g keV\n", stopping / C_EV_TFU, E / C_KEV);
+    }
     assert(stopping > 0.0);
+#endif
     dE = -1.0 * h * stopping; /* Energy change in thickness "h". It is always negative! */
 #ifndef NO_STATISTICAL_STRAGGLING
     double s_ratio = stop_sample(stop, incident, sample, fulldepth, E + dE) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
@@ -222,6 +227,8 @@ double stop_step_calc(const jabs_stop_step_params *params, const ion *ion) {
 
 int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, const depth depth_start, const sample *sample) {
     depth d = depth_start;
+    int last = FALSE;
+    double emin = GSL_MAX_DBL(stop->emin, p->ion_gsto->emin);
     while(1) { /* Exit from sample (hopefully) */
         if(p->inverse_cosine_theta > 0.0 && d.x >= (sample->thickness - DEPTH_TOLERANCE)) { /* Exit through back (transmission) */
             return 0;
@@ -229,12 +236,24 @@ int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_
         if(p->inverse_cosine_theta < 0.0 && d.x <= DEPTH_TOLERANCE) { /* Exit (surface, front of sample) */
             return 0;
         }
-        double E_step = stop_step_calc(params_exiting, p);
-        depth d_after = stop_step(stop, stragg, p, sample, d, E_step);
-        if(p->E < stop->emin) {
-            DEBUGVERBOSEMSG("Energy %g keV below EMIN when surfacing from %.3lf tfu, break break.", p->E / C_KEV, d_after.x / C_TFU);
-            return -1;
+        if(last) {
+            DEBUGMSG("Last step taken, E = %g keV, depth still %.3lf tfu, break break.", p->E / C_KEV, d.x / C_TFU);
+            break;
         }
+        double E_step = stop_step_calc(params_exiting, p);
+
+        if(p->E - E_step <= emin) {
+            if(p->E <= emin) {
+                DEBUGMSG("Energy %g keV is below %g keV. Assuming ion stops.\n", p->E / C_KEV, emin / C_KEV);
+                return -1;
+            }
+            E_step = p->E - emin;
+            DEBUGMSG("Energy %g keV will go below emin = %g keV if we take the suggested step. Taking one final step of (approximately) %g keV at depth %g tfu and seeing what happens then.",
+                            p->E / C_KEV, emin / C_KEV, E_step / C_KEV, d.x / C_TFU);
+            last = TRUE;
+        }
+        depth d_after = stop_step(stop, stragg, p, sample, d, E_step);
         d = d_after;
     }
+    return -1; /* Stopped inside the sample */
 }
