@@ -46,6 +46,7 @@ typedef struct sim_calc_params {
     double cs_stragg_step_sigmas; /*  Cross section * concentration evaluation straggling step multiplier. Step is standard deviation times this. Maximum step may also be limited by cs_depth_step_max, cs_energy_step_max  */
     double reaction_file_angle_tolerance;
     int bricks_skip_zero_conc_ranges; /* TRUE/FALSE, determines if we should calculate so-called "empty" bricks or skip over them.*/
+    int screening_tables;
 } sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
 
 sim_calc_params *sim_calc_params_defaults(sim_calc_params *p); /* if p is NULL, allocates params */

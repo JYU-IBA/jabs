@@ -1258,6 +1258,7 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_DOUBLE, "cs_stragg_step_sigmas",         0,     0,                               &sim->params->cs_stragg_step_sigmas,         NULL},
             {JIBAL_CONFIG_VAR_UNIT,   "reaction_file_angle_tolerance", "deg", JIBAL_UNIT_TYPE_ANGLE,           &sim->params->reaction_file_angle_tolerance, NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "bricks_skip_zero_conc_ranges",  0,     0,                               &sim->params->bricks_skip_zero_conc_ranges,  NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "screening_tables",              0,     0,                               &sim->params->screening_tables,              NULL},
             {JIBAL_CONFIG_VAR_NONE, NULL,                              0,     0, NULL,                                                                      NULL}
     };
     c = script_command_list_from_vars_array(vars, 0);
@@ -2239,7 +2240,7 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
     argc -= 3;
     argv += 3;
     double rel_err = fabs(1.0 - sum / sum_ref);
-    jabs_message(MSG_INFO, "Test of ROI from %zu to %zu. Sum %g. Relative error %e.\n", r.low, r.high, sum, rel_err);
+    jabs_message(MSG_INFO, "Test of ROI from %zu to %zu. Sum %.10g. Relative error %e.\n", r.low, r.high, sum, rel_err);
     if(rel_err < tolerance) {
         jabs_message(MSG_INFO, "Test passed.\n");
     } else {
@@ -2569,7 +2570,7 @@ script_command_status script_kinematics(struct script_session *s, int argc, char
             sim_reaction *sim_r = calloc(1, sizeof(sim_reaction)); /* We skip initializing the complete reaction, just use parts of it */
             sim_r->r = r;
             sim_reaction_set_cross_section_by_type(sim_r);
-            sim_reaction_recalculate_internal_variables(sim_r, sim->params, det->theta, r->E_min, r->E_max);
+            sim_reaction_recalculate_internal_variables(sim_r, sim->params, det->theta, sim->emin, r->E_min, r->E_max);
             double E = reaction_product_energy(r, det->theta, sim->beam_E);
             const jibal_isotope *product = r->product;
             if(!product) {

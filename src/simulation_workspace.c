@@ -334,6 +334,8 @@ int sim_workspace_print_bricks(const sim_workspace *ws, const char *filename) {
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const sim_reaction *r = ws->reactions[i];
         fprintf(f, "#Reaction %zu, %zu bricks.\n", i + 1, r->last_brick);
+        fprintf(f, "#Reaction incident E = [%g keV, %g keV], product = [%g keV, %g keV]\n",
+                r->emin_incident / C_KEV, r->emax_incident / C_KEV, r->emin_product / C_KEV, r->emax_product / C_KEV);
         if(r->last_brick == 0) {
             continue;
         }

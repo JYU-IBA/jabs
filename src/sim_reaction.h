@@ -38,12 +38,21 @@ typedef struct sim_reaction {
     double cs_constant; /* Non-energy dependent Rutherford cross section terms for RBS or ERD */
     double r_VE_factor; /* Andersen correction factor r_VE = this / E_cm */
     double r_VE_factor2;
-    double emin; /* Calculated */
+    double emin_incident; /* Set on sim_reaction_recalculate_internal_variables(), should reflect lowest usable TODO: *incident*? energy  by "ws", reaction and stopping */
+    double emax_incident; /* Set on sim_reaction_recalculate_internal_variables(), should reflect highest usable TODO: *incident*? energy limited by "ws", reaction, stopping and ion (incident E_0) */
+    double emin_product;
+    double emax_product;
+    struct reaction_point *cs_table; /* precalculated screening corrections from emin to emax, n_cs_table points */
+    size_t n_cs_table;
+    double cs_estep; /* calculated by sim_reaction_recalculate_screening_table(), step size based on n_cs_table */
 } sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
 
 sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks);
 void sim_reaction_free(sim_reaction *sim_r);
-void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_calc_params *params, double theta, double E_min, double E_max);
+void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_calc_params *params, double theta, double emin, double emin_incident, double emax_incident);
+int sim_reaction_recalculate_screening_table(sim_reaction *sim_r);
+void sim_reaction_reset_screening_table(sim_reaction *sim_r);
+double sim_reaction_evaluate_screening_table(const sim_reaction *sim_r, double E);
 void sim_reaction_reset_bricks(sim_reaction *sim_r);
 void sim_reaction_set_cross_section_by_type(sim_reaction *sim_r);
 double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);

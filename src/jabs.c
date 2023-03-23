@@ -244,11 +244,7 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
 
 void simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
     ion ion1 = *incident; /* Shallow copy */
-    sim_r->emin = GSL_MAX_DBL(ws->emin, incident->ion_gsto->emin);
-    sim_r->emin = GSL_MAX_DBL(sim_r->emin, sim_r->p.ion_gsto->emin);
-    DEBUGMSG("E_min = %g keV\n", sim_r->emin / C_KEV);
-    simulate_init_reaction(sim_r, sample, ws->params, g, sim_r->emin, ion1.E);
-
+    simulate_init_reaction(sim_r, sample, ws->params, g, ws->emin, ion1.ion_gsto->emin, ion1.E + ws->params->sigmas_cutoff * sqrt(ion1.S));
     if(sim_r->stop) {
         sim_r->last_brick = 0;
         return;
@@ -314,7 +310,11 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
         b->S_r = sim_r->p.S;
 
         if(stop_sample_exit(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, &sim_r->p, d_after, sample) != 0) {
-            DEBUGSTR("Stop before exit.");
+            DEBUGMSG("Stop before exit, energy of reaction product after reaction %g keV.", b->E_r / C_KEV);
+            if(product_and_incident_go_in_different_directions) { /* Lowering incident energy will lower reaction product energy */
+                DEBUGSTR("We can stop calculation, because lowering incident energy will also lower reaction product energy. This will be the last brick.");
+                last = TRUE;
+            }
         }
 
         if(ws->det->foil) { /* Energy loss in detector foil */
@@ -375,9 +375,9 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
                 crossed + skipped
                 );
         assert(!isnan(ion1.E));
-        if(product_and_incident_go_in_different_directions && b->E < sim_r->emin) { /* Reaction product energy decreases as incident ion energy decreases */
+        if(ion1.E < sim_r->emin_incident) {
             sim_r->last_brick = i_brick;
-            DEBUGMSG("Brick E = %g keV sufficiently below emin %g keV.", b->E / C_KEV, sim_r->emin / C_KEV);
+            DEBUGMSG("E = %g keV sufficiently below reaction emin_incident %g keV.", b->E / C_KEV, sim_r->emin_incident / C_KEV);
             break;
         }
         if(ion1.inverse_cosine_theta > 0.0 && d_after.x >= sim_r->max_depth) {
@@ -392,7 +392,7 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
         }
         if(last) {
             sim_r->last_brick = i_brick;
-            DEBUGMSG("Last brick (earlier decision, because des_min = %g keV).", des_min->E / C_KEV);
+            DEBUGMSG("Last brick (earlier decision, because des_min = %g keV or because reaction product stopped).", des_min->E / C_KEV);
             break;
         }
         if(!skipped) {
@@ -441,12 +441,12 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     return (int)n_meaningful;
 }
 
-void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim_calc_params *params, const geostragg_vars *g, double E_min, double E_max) {
+void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim_calc_params *params, const geostragg_vars *g, double emin, double emin_incident, double emax_incident) {
     assert(sim_r);
     sim_r->last_brick = 0;
     sim_r->stop = FALSE;
     ion_set_angle(&sim_r->p, g->theta_product, g->phi_product);
-    sim_reaction_recalculate_internal_variables(sim_r, params, g->scatter_theta, E_min, E_max);
+    sim_reaction_recalculate_internal_variables(sim_r, params, g->scatter_theta, emin, emin_incident, emax_incident);
     if(sim_r->stop) {
         sim_r->max_depth = 0.0;
         return;
@@ -456,10 +456,8 @@ void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim
     if(sim_r->i_isotope >= sample->n_isotopes) { /* No target isotope for reaction. */
         sim_r->stop = TRUE;
     }
-    DEBUGMSG("Simulation reaction %s initialized, E_max = %g keV, E_min = %g keV. Max depth %g tfu. i_isotope=%zu, stop = %i.",
-            reaction_name(sim_r->r),
-            E_max / C_KEV, E_min / C_KEV,
-            sim_r->max_depth / C_TFU, sim_r->i_isotope, sim_r->stop);
+    DEBUGMSG("Simulation reaction %s initialized. Max depth %g tfu. i_isotope=%zu, stop = %i.",
+            reaction_name(sim_r->r), sim_r->max_depth / C_TFU, sim_r->i_isotope, sim_r->stop);
 }
 
 int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) { /* Assigns stopping and straggling (GSTO) for given Z2. Goes through all possible Z1s (beam and reaction products). */
