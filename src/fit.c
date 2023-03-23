@@ -284,7 +284,7 @@ void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear
 }
 
 void fit_iter_stats_print(const struct fit_stats *stats) {
-    jabs_message(MSG_INFO, "%4zu | %12.6e | %14.8e | %12.7lf | %11zu | %9zu | %10.3lf | %13.1lf |\n",
+    jabs_message(MSG_INFO, "%4zu | %10.2e | %14.7e | %12.7lf | %7zu | %7zu | %10.3lf | %13.1lf |\n",
                  stats->iter, 1.0 / stats->rcond, stats->norm,
                  stats->chisq_dof, stats->n_evals, stats->n_spectra,
                  stats->cputime_cumul, 1000.0 * stats->cputime_iter / stats->n_spectra_iter);
@@ -850,8 +850,8 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
     int status = 0;
     size_t iter;
     double chisq_dof_old;
-    jabs_message(MSG_INFO, "iter |    cond(J)   |     |f(x)|     |   chisq/dof  | evaluations |   spectra | time cumul | time/spectrum |\n");
-    jabs_message(MSG_INFO, "     |              |                |              |  cumulative | cumulative|          s |            ms |\n");
+    jabs_message(MSG_INFO, "iter |   cond(J)  |     |f(x)|     |   chisq/dof  |   evals | spectra | time cumul | time/spectrum |\n");
+    jabs_message(MSG_INFO, "     |            |                |              |  cumul. |  cumul. |          s |            ms |\n");
     for(iter = 0; iter <= maxiter; iter++) {
         fit_data->stats.iter_call = 0;
         fit_data->stats.iter = iter;
