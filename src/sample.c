@@ -727,7 +727,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
     }
     while ((*argc) >= 2) {
         if(sm->n_ranges == n) {
-            size_t n_old = 0;
+            size_t n_old = n;
             if(n == 0) {
                 n = 8;
             } else {
@@ -786,7 +786,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
                 DEBUGMSG("Material from formula \"%s\" was NOT created. Finishing after %zu ranges and %zu materials.", (*argv)[0], sm->n_ranges, sm->n_materials);
                 break;
             }
-            DEBUGMSG("Material from formula \"%s\" was created", (*argv)[0]);
+            DEBUGMSG("Material from formula \"%s\" was created, there are now %zu ranges", (*argv)[0], sm->n_ranges);
             range = &sm->ranges[sm->n_ranges];
             if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_LAYER_THICKNESS, (*argv)[1], &range->x) < 0) {
                 sample_model_free(sm);
