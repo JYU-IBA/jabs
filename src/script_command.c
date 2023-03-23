@@ -109,9 +109,17 @@ int script_prepare_sim_or_fit(script_session *s) {
     jabs_message(MSG_VERBOSE, "Simulation parameters:\n");
     sim_print(fit->sim, MSG_VERBOSE);
 
-    sim_prepare_ion(&fit->sim->ion, fit->sim, fit->jibal->isotopes, fit->jibal->gsto);
+    if(sim_prepare_ion(&fit->sim->ion, fit->sim, fit->jibal->isotopes, fit->jibal->gsto)) {
+        jabs_message(MSG_ERROR, "Preparing incident ion failed. Possibly issue with either nuclear stopping or GSTO stopping.\n");
+        return EXIT_FAILURE;
+    }
+    if(fit->sim->ion.ion_gsto->emax < fit->sim->beam_E) {
+        jabs_message(MSG_ERROR, "Maximum energy for incident %s is %g keV for some target element(s) based on stopping data (GSTO), which is more than beam energy of %g keV.\n",
+                     fit->sim->ion.isotope->name, fit->sim->ion.ion_gsto->emax / C_KEV, fit->sim->beam_E / C_KEV);
+        return EXIT_FAILURE;
+    }
     if(fit->sim->ion.ion_gsto->emin > fit->sim->emin) {
-        jabs_message(MSG_WARNING, "Stopping data (see above) has minimum energy for incident %s is %g keV for some target element(s), which is more than current workspace minimum energy of %g keV.\n",
+        jabs_message(MSG_WARNING, "Minimum energy for incident %s is %g keV for some target element(s) based on stopping data (GSTO), which is more than current workspace minimum energy of %g keV.\n",
                      fit->sim->ion.isotope->name, fit->sim->ion.ion_gsto->emin / C_KEV, fit->sim->emin / C_KEV);
     }
     sim_prepare_reactions(fit->sim, fit->jibal->isotopes, fit->jibal->gsto);

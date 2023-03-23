@@ -21,6 +21,7 @@
 #include "rotate.h"
 #include "message.h"
 #include "geostragg.h"
+#include "jabs_debug.h"
 
 simulation *sim_init(jibal *jibal) {
     simulation *sim = calloc(1, sizeof(simulation));
@@ -353,14 +354,20 @@ int sim_do_we_need_erd(const simulation *sim) {
     return forward_angles; /* If any detector is in forward angle, we might need ERD */
 }
 
-void sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto) {
+int sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto) {
     nuclear_stopping_free(ion->nucl_stop);
     ion_gsto_free(ion->ion_gsto);
     ion_reset(ion);
     ion_set_isotope(ion, sim->beam_isotope);
     ion->nucl_stop = nuclear_stopping_new(sim->beam_isotope, isotopes);
     ion->ion_gsto = ion_gsto_new(sim->beam_isotope, gsto);
-    assert(ion->nucl_stop && ion->ion_gsto);
+    if(!ion->nucl_stop || !ion->ion_gsto) {
+        DEBUGMSG("Preparing ion failed, nucl_stop = %p, ion_gsto = %p.", (void *)ion->nucl_stop, (void *)ion->ion_gsto);
+        nuclear_stopping_free(ion->nucl_stop);
+        ion_gsto_free(ion->ion_gsto);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
 }
 
 void sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto) {

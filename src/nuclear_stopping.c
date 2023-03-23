@@ -22,7 +22,10 @@ nuclear_stopping *nuclear_stopping_new(const jibal_isotope *incident, const jiba
         return NULL;
     }
     size_t n_isotopes = jibal_isotopes_n(isotopes);
-    assert(n_isotopes > 0);
+    if(n_isotopes == 0) {
+        free(ns);
+        return NULL;
+    }
     ns->t = calloc(n_isotopes, sizeof(nucl_stop_pair));
     size_t i = 0;
     ns->incident = incident;

@@ -14,6 +14,7 @@ typedef struct jabs_gsto_assignment {
 typedef struct jabs_ion_gsto {
     jabs_ion_gsto_data *gsto_data; /* Array of gsto->Z2_max + 1 elements */
     double emin;
+    double emax;
     const jibal_isotope *incident;
     int refcount;
 } jabs_ion_gsto;

@@ -15,6 +15,7 @@
 #include <assert.h>
 #include <math.h>
 #include <gsl/gsl_minmax.h>
+#include "defaults.h"
 #include "ion.h"
 #include "rotate.h"
 #include "jabs_debug.h"
@@ -97,21 +98,38 @@ jabs_ion_gsto *ion_gsto_new(const jibal_isotope *incident, const jibal_gsto *gst
     ig->incident = incident;
     ig->gsto_data = calloc(gsto->Z2_max + 1, sizeof(jabs_ion_gsto_data));
     ig->emin = 0.0;
+    ig->emax = E_MAX;
     ig->refcount = 1;
     for(int Z2 = 1; Z2 < gsto->Z2_max; Z2++) {
         jabs_ion_gsto_data *gd = &ig->gsto_data[Z2];
         gd->stopfile = jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, incident->Z, Z2);
         if(gd->stopfile) {
             gd->stopdata = jibal_gsto_file_get_data(gd->stopfile, incident->Z, Z2);
-            ig->emin = GSL_MAX(ig->emin, jibal_gsto_xunit_to_energy(gd->stopfile->xunit, gd->stopfile->xmin, incident->mass));
-            DEBUGMSG("There is some stopping %s -> Z = %i, emin (highest so far) %g keV", incident->name, Z2, ig->emin/C_KEV);
+            double emin = jibal_gsto_xunit_to_energy(gd->stopfile->xunit, gd->stopfile->xmin, incident->mass);
+            double emax = jibal_gsto_xunit_to_energy(gd->stopfile->xunit, gd->stopfile->xmax, incident->mass);
+            DEBUGMSG("Stop data Z1 = %i, Z2 = %i, file: %s, emin = %g keV, emax %g keV", incident->Z, Z2, gd->stopfile->name, emin / C_KEV, emax / C_KEV);
+            ig->emin = GSL_MAX_DBL(ig->emin, emin);
+            if(emax > 0.0) {
+                ig->emax = GSL_MIN_DBL(ig->emax, emax);
+            }
+        } else {
+            DEBUGVERBOSEMSG("No stopfile, Z1 = %i, Z2 = %i", incident->Z, Z2);
         }
         gd->straggfile = jibal_gsto_get_assigned_file(gsto, GSTO_STO_STRAGG, incident->Z, Z2);
         if(gd->straggfile) {
             gd->straggdata = jibal_gsto_file_get_data(gd->straggfile, incident->Z, Z2);
-            ig->emin  = GSL_MAX(ig->emin, jibal_gsto_xunit_to_energy(gd->stopfile->xunit, gd->stopfile->xmin, incident->mass));
+            double emin = jibal_gsto_xunit_to_energy(gd->straggfile->xunit, gd->straggfile->xmin, incident->mass);
+            double emax = jibal_gsto_xunit_to_energy(gd->straggfile->xunit, gd->straggfile->xmax, incident->mass);
+            DEBUGMSG("Stragg data Z1 = %i, Z2 = %i, file: %s, emin = %g keV, emax %g keV", incident->Z, Z2, gd->straggfile->name, emin / C_KEV, emax / C_KEV);
+            ig->emin = GSL_MAX_DBL(ig->emin, emin);
+            if(emax > 0.0) {
+                ig->emax = GSL_MIN_DBL(ig->emax, emax);
+            }
+        }  else {
+            DEBUGVERBOSEMSG("No straggfile, Z1 = %i, Z2 = %i", incident->Z, Z2);
         }
     }
+    DEBUGMSG("Ion %s stop E range [%g keV, %g keV]", incident->name, ig->emin / C_KEV, ig->emax / C_KEV);
     return ig;
 }
 
