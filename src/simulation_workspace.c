@@ -235,7 +235,7 @@ size_t sim_workspace_histograms_calculate(sim_workspace *ws) {
 #ifdef DEBUG_BRICK_OUTPUT
         fprintf(stdout, "BRICK #Reaction %zu: %s, last brick %zu\n", i + 1, r->r->name, r->last_brick);
 #endif
-        bricks_convolute(r->histo, c, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, r->emin, ws->params->gaussian_accurate);
+        bricks_convolute(r->histo, c, r->bricks, r->last_brick, ws->fluence * ws->det->solid, ws->params->sigmas_cutoff, ws->emin, ws->params->gaussian_accurate);
 #ifdef DEBUG_BRICK_OUTPUT
         fprintf(stdout, "BRICK \nBRICK \n");
 #endif

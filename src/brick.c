@@ -32,17 +32,19 @@ void bricks_convolute(jabs_histogram *h, const calibration *c, const brick *bric
             continue;
         }
         const brick *b_high = &bricks[i-1];
-        double E_low, E_cutoff_low, E_cutoff_high; /* Lower energy edge of brick, Low energy cutoff (gaussian), High energy cutoff (gaussian) */
+        double E_high, E_low, E_cutoff_low, E_cutoff_high; /* Lower energy edge of brick, Low energy cutoff (gaussian), High energy cutoff (gaussian) */
         if(b_low->E < b_high->E) { /* Detected energy increasing as brick number increases */
             E_low = b_low->E;
+            E_high = b_high->E;
             E_cutoff_low = b_low->E - b_low->S_sum * sigmas_cutoff;
             E_cutoff_high = b_high->E + b_high->S_sum * sigmas_cutoff;
         } else { /* Energy decreasing as brick number increases */
             E_low = b_high->E;
+            E_high = b_low->E;
             E_cutoff_low = b_high->E - b_high->S_sum * sigmas_cutoff;
             E_cutoff_high = b_low->E + b_low->S_sum * sigmas_cutoff;
         }
-        if(E_low < emin) { /* Brick is already partially below emin (without convolution), it's low enough! */
+        if(E_cutoff_high < emin) { /* Brick (before convolution) is entirely far below emin. Safe to ignore. */
             continue;
         }
         E_cutoff_low = GSL_MAX_DBL(E_cutoff_low, emin);
