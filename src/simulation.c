@@ -163,8 +163,8 @@ int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_typ
         }
         reaction *r_new = reaction_make(sim->beam_isotope, isotope, type, cs);
         if(!r_new) {
-            jabs_message(MSG_ERROR, "Failed to make an %s reaction with %s cross sections for isotope %zu (%s)\n", reaction_type_to_string(type), jabs_reaction_cs_to_string(cs), i,
-                         isotope->name);
+            jabs_message(MSG_ERROR, "Failed to make an %s reaction with %s cross sections for isotope %zu (%s)\n",
+                         reaction_type_to_string(type), jabs_reaction_cs_to_string(cs), i, isotope->name);
             continue;
         }
         sim_reactions_add_reaction(sim, r_new, silent);
@@ -370,7 +370,7 @@ int sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotop
     return EXIT_SUCCESS;
 }
 
-void sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto) {
+int sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto) {
     for(size_t i = 0; i < sim->n_reactions; i++) {
         reaction *r = sim->reactions[i];
         nuclear_stopping_free(r->nucl_stop);
@@ -382,5 +382,14 @@ void sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes,
             r->nucl_stop = nuclear_stopping_new(r->product, isotopes);
             r->ion_gsto = ion_gsto_new(r->product, gsto);
         }
+        if(!r->nucl_stop || !r->ion_gsto) {
+            jabs_message(MSG_ERROR, "Error in preparing reaction %s: problems assigning stopping data.", r->name);
+            return EXIT_FAILURE;
+        }
+        if(r->cs == JABS_CS_UNIVERSAL && !sim->params->screening_tables) {
+            jabs_message(MSG_ERROR, "Cross section model \"%s\" has been enabled for reaction %s, but screening tables are disabled. Please issue command \"enable screening_tables\".\n", jabs_reaction_cs_to_string(r->cs), r->name);
+            return EXIT_FAILURE;
+        }
     }
+    return EXIT_SUCCESS;
 }

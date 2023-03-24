@@ -17,6 +17,7 @@
 #include "jabs_debug.h"
 #include "spectrum.h"
 #include "sim_reaction.h"
+#include "scatint.h"
 #include "defaults.h"
 
 sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks) {
@@ -136,10 +137,17 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
     jabs_reaction_cs cs = sim_r->r->cs;
     size_t n;
     sim_reaction_reset_screening_table(sim_r);
-    if(cs == JABS_CS_ANDERSEN) {
-        n = SCREENING_TABLE_ELEMENTS_ANDERSEN; /* TODO: make more clever */
-    } else {
-        return EXIT_SUCCESS;
+    scatint_params *sp = NULL;
+    switch(cs) {
+        case JABS_CS_ANDERSEN:
+            n = SCREENING_TABLE_ELEMENTS_ANDERSEN; /* TODO: make more clever */
+            break;
+        case JABS_CS_UNIVERSAL:
+            n = SCREENING_TABLE_ELEMENTS_UNIVERSAL; /* TODO: make more clever */
+            sp = scatint_init(sim_r->r->type, POTENTIAL_UNIVERSAL, sim_r->r->incident, sim_r->r->target);
+            break;
+        default:
+            return EXIT_SUCCESS;
     }
     sim_r->cs_table = malloc(n * sizeof(struct reaction_point));
     if(!sim_r->cs_table) {
@@ -149,22 +157,22 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
     double emin = sim_r->emin_incident * 0.9; /* Safety factor included, note that screening table is *just* a screening table, cross section below sim_r->r->E_min should be zero, but screening is not! */
     double emax = sim_r->emax_incident * 1.1;
     sim_r->cs_estep = (emax - emin)/(n - 1);
-
     for(size_t i = 0; i < n; i++) {
         double E = sim_r->emin_incident + (sim_r->cs_estep) * i;
         const double E_cm = sim_r->E_cm_ratio * E;
-        //double sigma_r = sim_r->cs_constant / pow2(E_cm) ;
-        double screening;
-        switch(cs) {
-            case JABS_CS_ANDERSEN:
-                screening = sim_reaction_andersen(sim_r, E_cm);
-                break;
-            default:
-                screening = 0.0;
-        }
+        double sigma_r = sim_r->cs_constant / pow2(E_cm) ;
         struct reaction_point *rp = &sim_r->cs_table[i];
         rp->E = E;
-        rp->sigma = screening; /* Note: only screening correction, not cross section */
+        switch(cs) {
+            case JABS_CS_ANDERSEN:
+                rp->sigma = sim_reaction_andersen(sim_r, E_cm);
+                break;
+            case JABS_CS_UNIVERSAL:
+                rp->sigma  = scatint_sigma_lab(sp, E, sim_r->theta) / sigma_r; /* Note: only screening correction, not cross section! */
+                break;
+            default: /* Not reached */
+                rp->sigma  = 0.0;
+        }
     }
     DEBUGVERBOSEMSG("Screening table with %zu points recalculated, energy in range [%g keV, %g keV]", sim_r->n_cs_table, emin / C_KEV, emax / C_KEV);
     return EXIT_SUCCESS;
@@ -239,6 +247,8 @@ double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E
             return sigma_r;
         case JABS_CS_ANDERSEN:
             return sigma_r * sim_reaction_andersen(sim_r, E_cm);
+        case JABS_CS_UNIVERSAL:
+            return 0.0; /* Universal screening should be combined with screening table calculation */
         default:
             return 0.0;
     }

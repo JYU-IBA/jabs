@@ -122,7 +122,9 @@ int script_prepare_sim_or_fit(script_session *s) {
         jabs_message(MSG_WARNING, "Minimum energy for incident %s is %g keV for some target element(s) based on stopping data (GSTO), which is more than current workspace minimum energy of %g keV.\n",
                      fit->sim->ion.isotope->name, fit->sim->ion.ion_gsto->emin / C_KEV, fit->sim->emin / C_KEV);
     }
-    sim_prepare_reactions(fit->sim, fit->jibal->isotopes, fit->jibal->gsto);
+    if(sim_prepare_reactions(fit->sim, fit->jibal->isotopes, fit->jibal->gsto)) {
+        return EXIT_FAILURE;
+    }
     reactions_print(fit->sim->reactions, fit->sim->n_reactions);
     fit_data_spectra_alloc(fit);
     s->start = jabs_clock();

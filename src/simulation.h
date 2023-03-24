@@ -71,5 +71,5 @@ double sim_alpha_angle(const simulation *sim);
 double sim_exit_angle(const simulation *sim, const detector *det);
 int sim_do_we_need_erd(const simulation *sim);
 int sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto);
-void sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto);
+int sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto);
 #endif // JABS_SIMULATION_H

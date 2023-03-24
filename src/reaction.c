@@ -164,9 +164,11 @@ reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incid
                 return NULL;
             }
         } else if(strcmp((*argv)[0], "cs") == 0) {
-            r->cs = jibal_option_get_value(jibal_cs_types, (*argv)[1]);
+            r->cs = jibal_option_get_value(jabs_cs_types, (*argv)[1]);
             if(r->cs == 0) {
                 jabs_message(MSG_ERROR, "Cross section type \"%s\" not recognized.\n", (*argv)[1]);
+                reaction_free(r);
+                return NULL;
             }
         }
         (*argc) -= 2;
@@ -341,16 +343,7 @@ double reaction_product_energy(const reaction *r, double theta, double E) { /* H
 }
 
 const char *jabs_reaction_cs_to_string(jabs_reaction_cs cs) {
-    switch(cs) {
-        case JABS_CS_NONE:
-            return "none";
-        case JABS_CS_RUTHERFORD:
-            return "Rutherford";
-        case JABS_CS_ANDERSEN:
-            return "Andersen";
-        default:
-            return "???";
-    }
+    return jabs_cs_types[cs].s;
 }
 
 int reaction_generate_name(reaction *r) {

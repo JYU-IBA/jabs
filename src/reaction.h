@@ -40,8 +40,17 @@ struct reaction_point {
 typedef enum jabs_reaction_cs {
     JABS_CS_NONE = 0,
     JABS_CS_RUTHERFORD = 1,
-    JABS_CS_ANDERSEN = 2
+    JABS_CS_ANDERSEN = 2,
+    JABS_CS_UNIVERSAL = 3
 } jabs_reaction_cs;
+
+static const jibal_option jabs_cs_types[] = {
+        {JIBAL_OPTION_STR_NONE, JABS_CS_NONE},
+        {"Rutherford", JABS_CS_RUTHERFORD},
+        {"Andersen", JABS_CS_ANDERSEN},
+        {"Universal", JABS_CS_UNIVERSAL},
+        {NULL, 0}
+};
 
 typedef struct reaction {
     reaction_type type;
