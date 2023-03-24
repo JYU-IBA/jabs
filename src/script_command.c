@@ -1128,6 +1128,21 @@ script_command *script_command_list_from_vars_array(const jibal_config_var *vars
 
             c  = script_command_new(var->name, help_text, 0, 0, NULL);
             free(help_text);
+        } else if(var->type == JIBAL_CONFIG_VAR_OPTION) {
+            if(!var->option_list) {
+                DEBUGMSG("Option (%s) without option list!", var->name);
+                continue;
+            }
+            char *help_text;
+            if(asprintf(&help_text, "one of:") < 0) {
+                DEBUGMSG("asprintf failed when adding command %s\n", var->name);
+                break;
+            }
+            for(const jibal_option *opt = var->option_list; opt->s != NULL; opt++) {
+                asprintf_append(&help_text, " \"%s\"", opt->s);
+            }
+            c  = script_command_new(var->name, help_text, 0, 0, NULL);
+            free(help_text);
         } else {
             c = script_command_new(var->name, jibal_config_var_type_name(var->type), 0, 0, NULL);
         }
@@ -1261,6 +1276,8 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_UNIT,   "reaction_file_angle_tolerance", "deg", JIBAL_UNIT_TYPE_ANGLE,           &sim->params->reaction_file_angle_tolerance, NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "bricks_skip_zero_conc_ranges",  0,     0,                               &sim->params->bricks_skip_zero_conc_ranges,  NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "screening_tables",              0,     0,                               &sim->params->screening_tables,              NULL},
+            {JIBAL_CONFIG_VAR_OPTION, "cs_rbs",                        0,     0,                               &sim->cs_rbs,                                jabs_cs_types},
+            {JIBAL_CONFIG_VAR_OPTION, "cs_erd",                        0,     0,                               &sim->cs_erd,                                jabs_cs_types},
             {JIBAL_CONFIG_VAR_NONE, NULL,                              0,     0, NULL,                                                                      NULL}
     };
     c = script_command_list_from_vars_array(vars, 0);
