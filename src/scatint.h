@@ -1,7 +1,7 @@
 #define IMPACT_MIN (1e-9) /* In units of screening length. Apsis can not be below this! */
 #define IMPACT_MAX (100.0)
 #define INTEGRATION_WORKSPACE_N (20000)
-#define INTEGRATION_ACCURACY (1e-9)
+#define INTEGRATION_ACCURACY (1e-8)
 #define IMPACT_FACTOR_ACCURACY (1e-9)
 
 #include "reaction.h"
@@ -45,7 +45,8 @@ typedef struct scatint_params {
     double accuracy;
 } scatint_params;
 
-double scatint_sigma_lab(scatint_params *p, double E_lab, double theta_lab); /* This is the one to use */
+double scatint_sigma_lab(scatint_params *p, double E_lab, double theta_lab); /* This is the easiest one to use */
+double scatint_sigma(scatint_params *p);
 double potential_universal(double x);
 double potential_andersen(double x);
 double potential_rutherford(double x);
@@ -62,7 +63,7 @@ scatint_params *scatint_init(reaction_type rt, potential_type pt, const jibal_is
 void scatint_params_free(scatint_params *p);
 int scatint_set_energy(scatint_params *p, double E_lab);
 int scatint_set_energy_cm(scatint_params *p, double E_cm);
-int scatint_set_theta(scatint_params *o, double theta_lab);
+int scatint_set_theta(scatint_params *p, double theta_lab);
 double scatint_get_impact_parameter(const scatint_params *p); /* Returns impact parameter in SI units (m) */
 int s_seek(scatint_params *p, double theta_cm);
 int print_cs(scatint_params *p, int verbose);

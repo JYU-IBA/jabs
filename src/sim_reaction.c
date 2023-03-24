@@ -69,11 +69,11 @@ void sim_reaction_free(sim_reaction *sim_r) {
     free(sim_r);
 }
 
-void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_calc_params *params, double theta, double emin, double emin_incident, double emax_incident) {
+int sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_calc_params *params, double theta, double emin, double emin_incident, double emax_incident) {
     /* Calculate variables for Rutherford (and Andersen) cross sections. This is done for all reactions, even if they are not RBS or ERD reactions! */
     /* E_min and E_max are assumed to be minimum and maximum (respectively) for the incident ion energy (given by simulation, stopping data availability etc) */
     if(!sim_r || !sim_r->r) {
-        return;
+        return EXIT_FAILURE;
     }
     const jibal_isotope *incident = sim_r->r->incident;
     const jibal_isotope *target = sim_r->r->target;
@@ -87,14 +87,14 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_
     sim_r->emin_incident = GSL_MAX_DBL(sim_r->emin_incident, sim_r->r->E_min);
     sim_r->emax_incident = GSL_MIN_DBL(emax_incident, sim_r->r->E_max); /* Note that sometimes going below this energy is required (straggling) */
 
-    sim_r->emin_product = GSL_MAX_DBL(reaction_product_energy(sim_r->r, sim_r->theta, sim_r->emin_incident), sim_r->p.ion_gsto->emin);
-    sim_r->emax_product = GSL_MIN_DBL(reaction_product_energy(sim_r->r, sim_r->theta, sim_r->emax_incident), sim_r->p.ion_gsto->emax);
+    sim_r->emin_product = GSL_MAX_DBL(reaction_product_energy(sim_r->r, sim_r->theta, sim_r->emin_incident), sim_r->p.ion_gsto ? sim_r->p.ion_gsto->emin : 0.0);
+    sim_r->emax_product = GSL_MIN_DBL(reaction_product_energy(sim_r->r, sim_r->theta, sim_r->emax_incident), sim_r->p.ion_gsto ? sim_r->p.ion_gsto->emax : 0.0);
     reaction_type type = sim_r->r->type;
 
     if(!reaction_is_possible(sim_r->r, params, theta)) {
         sim_r->stop = TRUE;
         DEBUGSTR("Reaction not possible, returning.");
-        return;
+        return EXIT_SUCCESS; /* Not a failure as such */
     }
     if(sim_r->r->Q == 0.0) {
         sim_r->K = reaction_product_energy(sim_r->r, sim_r->theta, 1.0);
@@ -119,9 +119,16 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_
     if(sim_r->r->cs == JABS_CS_ANDERSEN) {
         sim_r->r_VE_factor = 48.73 * C_EV * incident->Z * target->Z * sqrt(pow(incident->Z, 2.0 / 3.0) + pow(target->Z, 2.0 / 3.0)); /* Factors for Andersen correction */
         sim_r->r_VE_factor2 = pow2(0.5 / sin(sim_r->theta_cm / 2.0));
+    } else if(sim_r->r->cs == JABS_CS_LECUYER) {
+        sim_r->lecuyer_factor = 48.73 * C_EV * incident->Z * pow(target->Z, 4.0/3.0); /* Factor 0.049 given in NIM 160 (1979) 337-346 */
     }
-    if(params->screening_tables && sim_r->r->cs != JABS_CS_NONE && (type == REACTION_RBS || type == REACTION_RBS_ALT || type == REACTION_ERD)) {
-        sim_reaction_recalculate_screening_table(sim_r);
+    if(sim_r->r->cs != JABS_CS_NONE && (type == REACTION_RBS || type == REACTION_RBS_ALT || type == REACTION_ERD)) {
+        if(params->screening_tables || sim_r->r->cs == JABS_CS_UNIVERSAL) { /* Universal needs to be precalculated to be remotely useful. Forcing it! */
+            if(sim_reaction_recalculate_screening_table(sim_r)) {
+                DEBUGMSG("Recalculating screening table for reaction %s failed.", sim_r->r->name);
+                return EXIT_FAILURE;
+            }
+        }
     } else {
         sim_reaction_reset_screening_table(sim_r);
     }
@@ -131,6 +138,7 @@ void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_
              sim_r->emin_incident / C_KEV, sim_r->emax_incident / C_KEV,
              sim_r->emin_product / C_KEV, sim_r->emax_product / C_KEV
     );
+    return EXIT_SUCCESS;
 }
 
 int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
@@ -138,13 +146,18 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
     size_t n;
     sim_reaction_reset_screening_table(sim_r);
     scatint_params *sp = NULL;
+    n = SCREENING_TABLE_ELEMENTS; /* TODO: make more clever */
     switch(cs) {
         case JABS_CS_ANDERSEN:
-            n = SCREENING_TABLE_ELEMENTS_ANDERSEN; /* TODO: make more clever */
             break;
         case JABS_CS_UNIVERSAL:
-            n = SCREENING_TABLE_ELEMENTS_UNIVERSAL; /* TODO: make more clever */
             sp = scatint_init(sim_r->r->type, POTENTIAL_UNIVERSAL, sim_r->r->incident, sim_r->r->target);
+            if(!sp) {
+                return EXIT_FAILURE;
+            }
+            scatint_set_theta(sp, sim_r->theta);
+            break;
+        case JABS_CS_LECUYER:
             break;
         default:
             return EXIT_SUCCESS;
@@ -157,6 +170,7 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
     double emin = sim_r->emin_incident * 0.9; /* Safety factor included, note that screening table is *just* a screening table, cross section below sim_r->r->E_min should be zero, but screening is not! */
     double emax = sim_r->emax_incident * 1.1;
     sim_r->cs_estep = (emax - emin)/(n - 1);
+    DEBUGMSG("Computing screening, reaction %s, from %g keV to %g keV with %zu steps of %g keV", sim_r->r->name, emin/ C_KEV, emax / C_KEV, n, sim_r->cs_estep / C_KEV);
     for(size_t i = 0; i < n; i++) {
         double E = sim_r->emin_incident + (sim_r->cs_estep) * i;
         const double E_cm = sim_r->E_cm_ratio * E;
@@ -167,13 +181,23 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
             case JABS_CS_ANDERSEN:
                 rp->sigma = sim_reaction_andersen(sim_r, E_cm);
                 break;
+            case JABS_CS_LECUYER:
+                rp->sigma = sim_reaction_lecuyer(sim_r, E_cm);
+                break;
             case JABS_CS_UNIVERSAL:
-                rp->sigma  = scatint_sigma_lab(sp, E, sim_r->theta) / sigma_r; /* Note: only screening correction, not cross section! */
+                scatint_set_energy(sp, E);
+                rp->sigma  = scatint_sigma(sp) / sigma_r; /* Note: only screening correction, not cross section! */
                 break;
             default: /* Not reached */
                 rp->sigma  = 0.0;
         }
+        if(rp->sigma == 0.0) {
+            DEBUGMSG("Could not compute screening correction for E = %g keV, reaction %s\n", E / C_KEV, sim_r->r->name)
+            scatint_params_free(sp);
+            return EXIT_FAILURE;
+        }
     }
+    scatint_params_free(sp);
     DEBUGVERBOSEMSG("Screening table with %zu points recalculated, energy in range [%g keV, %g keV]", sim_r->n_cs_table, emin / C_KEV, emax / C_KEV);
     return EXIT_SUCCESS;
 }
@@ -230,6 +254,10 @@ double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm) {
     return pow2(1 + 0.5 * r_VE) / pow2(1 + r_VE + sim_r->r_VE_factor2 * pow2(r_VE));
 }
 
+double sim_reaction_lecuyer(const sim_reaction *sim_r, double E_cm) {
+    return (1.0 - sim_r->lecuyer_factor/E_cm);
+}
+
 double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E) {
 #ifdef CROSS_SECTIONS_FROM_JIBAL
     return jibal_cross_section_erd(sim_r->r->incident, sim_r->r->target, sim_r->theta, E, sim_r->r->cs);
@@ -249,6 +277,8 @@ double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E
             return sigma_r * sim_reaction_andersen(sim_r, E_cm);
         case JABS_CS_UNIVERSAL:
             return 0.0; /* Universal screening should be combined with screening table calculation */
+        case JABS_CS_LECUYER:
+            return sigma_r * sim_reaction_lecuyer(sim_r, E_cm);
         default:
             return 0.0;
     }

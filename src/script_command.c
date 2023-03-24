@@ -2589,7 +2589,9 @@ script_command_status script_kinematics(struct script_session *s, int argc, char
             sim_reaction *sim_r = calloc(1, sizeof(sim_reaction)); /* We skip initializing the complete reaction, just use parts of it */
             sim_r->r = r;
             sim_reaction_set_cross_section_by_type(sim_r);
-            sim_reaction_recalculate_internal_variables(sim_r, sim->params, det->theta, sim->emin, r->E_min, r->E_max);
+            sim_r->emax_incident = sim->beam_E;
+            sim_reaction_recalculate_internal_variables(sim_r, sim->params, det->theta, sim->emin, sim->beam_E, sim->beam_E);
+            sim_reaction_recalculate_screening_table(sim_r); /* TODO: only when necessary (Universal) */
             double E = reaction_product_energy(r, det->theta, sim->beam_E);
             const jibal_isotope *product = r->product;
             if(!product) {

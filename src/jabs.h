@@ -25,8 +25,8 @@
 #include "des.h"
 
 int simulate(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample);
-void simulate_reaction(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r);
-void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim_calc_params *params, const geostragg_vars *g, double emin, double emin_incident, double emax_incident);
+int simulate_reaction(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r);
+int simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim_calc_params *params, const geostragg_vars *g, double emin, double emin_incident, double emax_incident);
 int assign_stopping(jibal_gsto *gsto, const simulation *sim);
 int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2); /* Assigns stopping and straggling (GSTO) for given Z2. Goes through all possible Z1s (beam and reaction products). */
 int assign_stopping_Z1_Z2(jibal_gsto *gsto, int Z1, int Z2);

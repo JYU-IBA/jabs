@@ -73,10 +73,12 @@ void sim_free(simulation *sim) {
 }
 
 jabs_reaction_cs sim_cs(const simulation *sim, const reaction_type type) {
-    if(type == REACTION_RBS || type == REACTION_RBS_ALT)
+    if(type == REACTION_RBS || type == REACTION_RBS_ALT) {
         return sim->cs_rbs;
-    if(type == REACTION_ERD)
+    }
+    if(type == REACTION_ERD) {
         return sim->cs_erd;
+    }
     return JABS_CS_NONE;
 }
 
@@ -384,10 +386,6 @@ int sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes, 
         }
         if(!r->nucl_stop || !r->ion_gsto) {
             jabs_message(MSG_ERROR, "Error in preparing reaction %s: problems assigning stopping data.", r->name);
-            return EXIT_FAILURE;
-        }
-        if(r->cs == JABS_CS_UNIVERSAL && !sim->params->screening_tables) {
-            jabs_message(MSG_ERROR, "Cross section model \"%s\" has been enabled for reaction %s, but screening tables are disabled. Please issue command \"enable screening_tables\".\n", jabs_reaction_cs_to_string(r->cs), r->name);
             return EXIT_FAILURE;
         }
     }

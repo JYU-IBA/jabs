@@ -38,6 +38,7 @@ typedef struct sim_reaction {
     double cs_constant; /* Non-energy dependent Rutherford cross section terms for RBS or ERD */
     double r_VE_factor; /* Andersen correction factor r_VE = this / E_cm */
     double r_VE_factor2;
+    double lecuyer_factor; /* F_LEcyuer = 1 - this / E_cm */
     double emin_incident; /* Set on sim_reaction_recalculate_internal_variables(), should reflect lowest usable TODO: *incident*? energy  by "ws", reaction and stopping */
     double emax_incident; /* Set on sim_reaction_recalculate_internal_variables(), should reflect highest usable TODO: *incident*? energy limited by "ws", reaction, stopping and ion (incident E_0) */
     double emin_product;
@@ -49,7 +50,7 @@ typedef struct sim_reaction {
 
 sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks);
 void sim_reaction_free(sim_reaction *sim_r);
-void sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_calc_params *params, double theta, double emin, double emin_incident, double emax_incident);
+int sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_calc_params *params, double theta, double emin, double emin_incident, double emax_incident);
 int sim_reaction_recalculate_screening_table(sim_reaction *sim_r);
 void sim_reaction_reset_screening_table(sim_reaction *sim_r);
 double sim_reaction_evaluate_screening_table(const sim_reaction *sim_r, double E);
@@ -61,6 +62,7 @@ double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E)
 double sim_reaction_cross_section_plugin(const sim_reaction *sim_r, double E);
 #endif
 double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);
+double sim_reaction_lecuyer(const sim_reaction *sim_r, double E_cm);
 void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident);
 void sim_reaction_print_bricks(FILE *f, const sim_reaction *r, double psr);
 #endif // JABS_SIM_REACTION_H

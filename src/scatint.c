@@ -13,12 +13,7 @@
 #include "jabs_debug.h"
 #include "scatint.h"
 
-double scatint_sigma_lab(scatint_params *p, double E_lab, double theta_lab) { /* This can be called after scatint_init(), returns lab cross section or zero on failure */
-    if(!p) {
-        return 0.0;
-    }
-    scatint_set_theta(p, theta_lab);
-    scatint_set_energy(p, E_lab);
+double scatint_sigma(scatint_params *p) {
     if(s_seek(p, p->theta_cm)) {
         DEBUGSTR("Did not work.");
         return 0.0;
@@ -28,6 +23,15 @@ double scatint_sigma_lab(scatint_params *p, double E_lab, double theta_lab) { /*
         return 0.0;
     }
     return p->sigma_lab * p->ik_scaling;
+}
+
+double scatint_sigma_lab(scatint_params *p, double E_lab, double theta_lab) { /* This can be called after scatint_init(), returns lab cross section or zero on failure */
+    if(!p) {
+        return 0.0;
+    }
+    scatint_set_theta(p, theta_lab);
+    scatint_set_energy(p, E_lab);
+    return scatint_sigma(p);
 }
 
 int main_scatint(int argc, char **argv) {
@@ -202,21 +206,21 @@ int calc_scattering_angle(struct scatint_params *params) {
         fprintf(stderr, "Could not calculate apsis.\n");
         return EXIT_FAILURE;
     }
-    DEBUGMSG("Integration from %g to infinity, accuracy %g.", params->R, params->accuracy);
+    DEBUGVERBOSEMSG("Integration from %g to infinity, accuracy %g.", params->R, params->accuracy);
     gsl_set_error_handler_off();
     int status = gsl_integration_qagiu(&F, params->R, 0, params->accuracy, params->w->limit, params->w, &result, &error);
-    DEBUGMSG("result          = % .18f", result);
-    DEBUGMSG("estimated error = %.18f", error);
-    DEBUGMSG("intervals       = %zu", params->w->size);
+    DEBUGVERBOSEMSG("result          = % .18f", result);
+    DEBUGVERBOSEMSG("estimated error = %.18f", error);
+    DEBUGVERBOSEMSG("intervals       = %zu", params->w->size);
     params->theta_cm = C_PI - 2.0 * params->s * result;
     return status;
 }
 
 int cs(scatint_params *p) {
-    DEBUGMSG("E_cm = %g keV\n", p->E_cm/C_KEV);
-    DEBUGMSG("E_rel = %g\n", p->E_rel);
-    DEBUGMSG("a = %g (%g angstrom)\n", p->a, p->a/ C_ANGSTROM);
-    DEBUGMSG("c = %g (%g keV)\n", p->c, p->c/C_KEV);
+    DEBUGVERBOSEMSG("E_cm = %g keV", p->E_cm/C_KEV);
+    DEBUGVERBOSEMSG("E_rel = %g", p->E_rel);
+    DEBUGVERBOSEMSG("a = %g (%g angstrom)", p->a, p->a/ C_ANGSTROM);
+    DEBUGVERBOSEMSG("c = %g (%g keV)", p->c, p->c/C_KEV);
 
     if(calc_scattering_angle(p)) {
         DEBUGSTR("Failed to calculate angle.");
@@ -232,14 +236,14 @@ int cs(scatint_params *p) {
     double sigma_cm = 2.0 * C_PI * (pow2(p2.s)-pow2(p->s))/cos_theta_cm_delta; /* TODO: this is positive diff */
     sigma_cm *= p->a * p->a / (4.0 * C_PI);
     double theta_lab = atan2(sin(p->theta_cm), (cos(p->theta_cm) + p->m12));
-    DEBUGMSG("Sigma conversion from C.M to lab is %g", p->sigma_lab_to_cm_ratio);
+    DEBUGVERBOSEMSG("Sigma conversion from C.M to lab is %g", p->sigma_lab_to_cm_ratio);
     double sigma_lab = fabs(p->sigma_lab_to_cm_ratio * sigma_cm);
-    DEBUGMSG("theta_cm = %g (%.5lf deg)\n", p->theta_cm, p->theta_cm/C_DEG);
-    DEBUGMSG("ratio %g", p->sigma_lab_to_cm_ratio);
-    DEBUGMSG("Diff. scatt. cross-section = %g", sigma_cm);
-    DEBUGMSG("In other units = %g mb/sr (C.M.)", sigma_cm / C_MB_SR);
-    DEBUGMSG("Cross section (lab) = %g mb/sr", sigma_lab / C_MB_SR);
-    DEBUGMSG("theta_lab = %g (%g deg)", theta_lab, 180.0*theta_lab/C_PI);
+    DEBUGVERBOSEMSG("theta_cm = %g (%.5lf deg)\n", p->theta_cm, p->theta_cm/C_DEG);
+    DEBUGVERBOSEMSG("ratio %g", p->sigma_lab_to_cm_ratio);
+    DEBUGVERBOSEMSG("Diff. scatt. cross-section = %g", sigma_cm);
+    DEBUGVERBOSEMSG("In other units = %g mb/sr (C.M.)", sigma_cm / C_MB_SR);
+    DEBUGVERBOSEMSG("Cross section (lab) = %g mb/sr", sigma_lab / C_MB_SR);
+    DEBUGVERBOSEMSG("theta_lab = %g (%g deg)", theta_lab, 180.0*theta_lab/C_PI);
     p->theta_lab = theta_lab;
     p->sigma_lab = sigma_lab;
     p->sigma_cm = sigma_cm;
@@ -319,7 +323,7 @@ void scatint_params_free(scatint_params *p) {
     free(p);
 }
 
-int scatint_set_energy(scatint_params *p, double E_lab) { /* theta must be set first if inverse kinematics are used (ERD)! */
+int scatint_set_energy(scatint_params *p, double E_lab) {
     if(p->rt == REACTION_ERD) { /* ERD: calculate inverse kinematics */
         p->E_lab = p->E_ik_ratio * E_lab;
     } else {
@@ -385,7 +389,7 @@ int s_seek(scatint_params *p, double theta_cm) {
             return EXIT_FAILURE;
         }
         double result = p->theta_cm;
-        DEBUGMSG("Iter %zu [%g, %g], tried %g got %g, diff %g", i+1, s_low, s_high, s, result, result - theta_cm);
+        DEBUGVERBOSEMSG("Iter %zu [%g, %g], tried %g got %g, diff %g", i+1, s_low, s_high, s, result, result - theta_cm);
         if(fabs(theta_cm - result) / theta_cm < accuracy) {
             return EXIT_SUCCESS;
         }

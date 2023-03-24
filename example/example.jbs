@@ -7,6 +7,9 @@ set alpha 0
 set alpha 0deg
 set alpha "0 deg"
 
+#Default cross sections can be changed easily between the built-in models, see other examples on how to define reactions
+#set cs_rbs Rutherford
+
 #Fluence is actually total number of ions, not ions/cm2... this should not be multiplied by detector solid angle (JaBS will do that)
 set fluence 2.0e13
 load exp "experimental.dat"

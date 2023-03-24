@@ -22,4 +22,4 @@ reset reactions
 enable screening_tables
 add reaction RBS 197Au cs Universal
 simulate
-test roi [1825:1865] 8219.47 2e-5
+test roi [1825:1865] 8269.33 2e-5

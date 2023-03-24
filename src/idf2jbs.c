@@ -3,6 +3,7 @@
 #include "idfparse.h"
 #include "idfelementparsers.h"
 #include "idf2jbs.h"
+#include "options.h"
 
 idf_error idf_parse(const char *filename, char **filename_out) {
     idf_parser *idf = idf_file_read(filename);
@@ -12,6 +13,7 @@ idf_error idf_parse(const char *filename, char **filename_out) {
     if(idf->error) {
         return idf->error;
     }
+    idf_output_printf(idf, "#Converted from IDF file \"%s\" by JaBS version %s\n", filename, jabs_version());
     idf_foreach(idf, idf_findnode(idf->root_element, "notes"), "note", idf_parse_note);
     idf->n_samples = idf_foreach(idf, idf->root_element, "sample", NULL);
 

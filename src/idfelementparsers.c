@@ -30,7 +30,7 @@ idf_error idf_parse_note(idf_parser *idf, xmlNode *note) {
     if(*s == '\0') { /* Empty */
         return IDF2JBS_SUCCESS;
     }
-    idf_output_printf(idf, "#Note in IDF file: %s\n", jabs_strip_newline(s)); /* TODO: Support multiline notes. This truncates the string. */
+    idf_output_printf(idf, "#Note in file: %s\n", jabs_strip_newline(s)); /* TODO: Support multiline notes. This truncates the string. */
     free(s);
     return IDF2JBS_SUCCESS;
 }
@@ -46,7 +46,7 @@ idf_error idf_parse_sample(idf_parser *idf, xmlNode *sample) {
             return IDF2JBS_FAILURE;
         }
     }
-    idf_output_printf(idf, "#Sample number %zu in file %s\n", idf->i_sample, idf->filename);
+    idf_output_printf(idf, "#Sample number %zu\n", idf->i_sample);
     char *description = idf_node_content_to_str(idf_findnode(sample, "description"));
     if(strlen(description) > 0) {
         idf_output_printf(idf, "#Description: %s\n", jabs_strip_newline(description));
@@ -366,6 +366,26 @@ idf_error idf_parse_physicsdefaults(idf_parser *idf, xmlNode *physicsdefaults) {
     if(!physicsdefaults) {
         return IDF2JBS_FAILURE;
     }
+    xmlNode *crosssectiondefault = idf_findnode(physicsdefaults, "crosssectiondefault");
+    if(crosssectiondefault) {
+        char *screening = idf_node_content_to_str(idf_findnode(crosssectiondefault, "screening"));
+        const char *cs;
+        if(idf_stringeq(screening, "Andersen") || idf_stringeq(screening, "Universal")) {
+            cs = screening;
+        } else if(idf_stringeq(screening, "Ecuyer")) {
+            cs = "LEcuyer";
+        } else if(idf_stringeq(screening, "none")) {
+            cs = "Rutherford";
+        } else {
+            cs = NULL;
+        }
+        if(cs) {
+            idf_output_printf(idf, "set cs_rbs %s\n", cs);
+            idf_output_printf(idf, "set cs_erd %s\n", cs);
+        }
+    }
+
+
     xmlNode *energyspreaddefault = idf_findnode(physicsdefaults, "energyspreaddefault");
     if(energyspreaddefault) {
         int beamsizespread = idf_node_content_to_boolean(idf_findnode(energyspreaddefault, "geometricspread/beamsize"));

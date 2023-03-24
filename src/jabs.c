@@ -242,12 +242,14 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
     return sigmaconc;
 }
 
-void simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
+int simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
     ion ion1 = *incident; /* Shallow copy */
-    simulate_init_reaction(sim_r, sample, ws->params, g, ws->emin, ion1.ion_gsto->emin, ion1.E + ws->params->sigmas_cutoff * sqrt(ion1.S));
+    if(simulate_init_reaction(sim_r, sample, ws->params, g, ws->emin, ion1.ion_gsto->emin, ion1.E + ws->params->sigmas_cutoff * sqrt(ion1.S))) {
+        return EXIT_FAILURE;
+    }
     if(sim_r->stop) {
         sim_r->last_brick = 0;
-        return;
+        return EXIT_SUCCESS;
     }
     depth d_before, d_after = depth_start;
     size_t i_des = 0;
@@ -404,6 +406,7 @@ void simulate_reaction(const ion *incident, const depth depth_start, sim_workspa
         }
     }
     assert(sim_r->last_brick < sim_r->n_bricks);
+    return EXIT_SUCCESS;
 }
 
 int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample) {
@@ -421,35 +424,40 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
 #ifdef DEBUG_VERBOSE
     des_table_print(stderr, dt);
 #endif
-
-#if 0
-#pragma omp parallel default(none) shared(ws, incident, depth_start, sample, dt, g)
-#pragma omp for nowait
-#endif
+    int error = FALSE;
     for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
         sim_reaction *sim_r = ws->reactions[i_reaction];
         DEBUGMSG("Simulating reaction i_reaction = %zu type %s target %s (i_isotope = %zu, i_jibal = %zu) product %s (i_jibal = %zu)",
                 i_reaction, reaction_type_to_string(sim_r->r->type),
                 sim_r->r->target->name, sim_r->i_isotope, sim_r->r->target->i,
                 sim_r->r->product->name, sim_r->r->product->i);
-        simulate_reaction(incident, depth_start, ws, sample, dt, &g, sim_r);
+        if(simulate_reaction(incident, depth_start, ws, sample, dt, &g, sim_r)) {
+            DEBUGMSG("Simulating reaction i_reaction = %zu failed.", i_reaction);
+            error = TRUE;
+            break;
+        }
         DEBUGMSG("Finished. sim_r->last_brick = %zu (%zu/%zu). depth = %g tfu", sim_r->last_brick, sim_r->last_brick + 1, sim_r->n_bricks, sim_r->bricks[sim_r->last_brick].d.x / C_TFU);
     }
     des_table_free(dt);
+    if(error) {
+        return -1;
+    }
     size_t n_meaningful = sim_workspace_histograms_calculate(ws);
     DEBUGMSG("Finished simulate(), %zu out of %zu reactions managed to actually produce something.", n_meaningful, ws->n_reactions);
     return (int)n_meaningful;
 }
 
-void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim_calc_params *params, const geostragg_vars *g, double emin, double emin_incident, double emax_incident) {
+int simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim_calc_params *params, const geostragg_vars *g, double emin, double emin_incident, double emax_incident) {
     assert(sim_r);
     sim_r->last_brick = 0;
     sim_r->stop = FALSE;
     ion_set_angle(&sim_r->p, g->theta_product, g->phi_product);
-    sim_reaction_recalculate_internal_variables(sim_r, params, g->scatter_theta, emin, emin_incident, emax_incident);
+    if(sim_reaction_recalculate_internal_variables(sim_r, params, g->scatter_theta, emin, emin_incident, emax_incident)) {
+        return EXIT_FAILURE;
+    }
     if(sim_r->stop) {
         sim_r->max_depth = 0.0;
-        return;
+        return EXIT_SUCCESS;
     }
     sim_r->max_depth = sample_isotope_max_depth(sample, sim_r->i_isotope);
     sim_reaction_reset_bricks(sim_r);
@@ -458,6 +466,7 @@ void simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim
     }
     DEBUGMSG("Simulation reaction %s initialized. Max depth %g tfu. i_isotope=%zu, stop = %i.",
             reaction_name(sim_r->r), sim_r->max_depth / C_TFU, sim_r->i_isotope, sim_r->stop);
+    return EXIT_SUCCESS;
 }
 
 int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) { /* Assigns stopping and straggling (GSTO) for given Z2. Goes through all possible Z1s (beam and reaction products). */
@@ -575,8 +584,9 @@ int simulate_with_roughness(sim_workspace *ws) {
     }
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
         sample_range *r = &(ws->sample->ranges[i]);
-        if(r->rough.model == ROUGHNESS_NONE)
+        if(r->rough.model == ROUGHNESS_NONE) {
             continue;
+        }
         tpds[i_rl] = NULL;
         if(r->rough.model == ROUGHNESS_GAMMA) {
             DEBUGMSG("Range %zu is rough (gamma), amount %g tfu, n = %zu spectra", i, ws->sample->ranges[i].rough.x/C_TFU, ws->sample->ranges[i].rough.n);
