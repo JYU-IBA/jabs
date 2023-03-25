@@ -457,11 +457,34 @@ script_command_status script_set_var(struct script_session *s, jibal_config_var 
         jabs_message(MSG_ERROR, "Not enough arguments to set variable.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(var->type == JIBAL_CONFIG_VAR_UNIT) {
+    if(var->type == JIBAL_CONFIG_VAR_UNIT) { /* Provides error checking, which JIBAL doesn't */
         double out;
-        if(jabs_unit_convert(s->jibal->units, var->unit_type, argv[0], &out) < 0) { /* The final conversion is performed by jibal_config_var_set(), but let's check sanity first */
+        if(jabs_unit_convert(s->jibal->units, var->unit_type, argv[0], &out) < 0) {
             return EXIT_FAILURE;
         }
+        *((double *)var->variable) = out;
+        return 1;
+    }
+    if(var->type == JIBAL_CONFIG_VAR_OPTION) { /* Provides slightly different functionality than JIBAL (partial matches are ok) */
+        int value;
+        size_t l = strlen(argv[0]);
+        int found = 0;
+        for(const jibal_option *o = var->option_list; o->s; o++) {
+            if(strncmp(o->s, argv[0], l) == 0) { /* Partial matches are suitable candidates */
+                value = o->val;
+                found++;
+            }
+        }
+        if(found > 1) {
+            jabs_message(MSG_ERROR, "Value \"%s\" is ambiguous (%i matches).\n", argv[0], found);
+            return SCRIPT_COMMAND_FAILURE;
+        }
+        if(found == 0) {
+            jabs_message(MSG_ERROR, "Value \"%s\" doesn't match with any known option.\n", argv[0]);
+            return SCRIPT_COMMAND_FAILURE;
+        }
+        *((int *)var->variable) = value; /* Exactly one hit, assign. */
+        return 1;
     }
     jibal_config_var_set(s->jibal->units, var, argv[0], NULL);
     return 1; /* Number of arguments */
