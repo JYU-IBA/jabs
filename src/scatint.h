@@ -11,7 +11,8 @@ typedef enum potential_type {
     POTENTIAL_BOHR = 1,
     POTENTIAL_UNIVERSAL = 2,
     POTENTIAL_ANDERSEN = 3,
-    POTENTIAL_RUTHERFORD = 4
+    POTENTIAL_RUTHERFORD = 4,
+    POTENTIAL_TEST = 5
 } potential_type;
 
 typedef struct scatint_params {
@@ -51,6 +52,7 @@ double potential_universal(double x);
 double potential_andersen(double x);
 double potential_rutherford(double x);
 double screening_length_universal(int Z1, int Z2);
+double screening_length_test(int Z1, int Z2, double em);
 double screening_length_andersen(int Z1, int Z2);
 double screening_length_bohr(int Z1, int Z2);
 double potential_bohr(double x);

@@ -122,6 +122,10 @@ double potential_universal(double x) {
     return 0.1818*exp(-3.2*(x)) +  0.5099*exp(-0.9423*(x)) + 0.2802*exp(-0.4029*(x)) + 0.02817*exp(-0.2016*(x));
 }
 
+double potential_test(double x) {
+    return 0.1818*exp(-3.2*(x)) +  0.5099*exp(-0.9423*(x)) + 0.2802*exp(-0.4029*(x)) + 0.02817*exp(-0.2016*(x));
+}
+
 double potential_andersen(double x) {
     if(x < 1.0/1.586) {
         return 1.0 - 1.586 * x;
@@ -277,6 +281,11 @@ scatint_params *scatint_init(reaction_type rt, potential_type pt, const jibal_is
             p->a = screening_length_universal(incident->Z, target->Z);
             p->potential = potential_universal;
             break;
+        case POTENTIAL_TEST:
+            //p->a = screening_length_test(incident->Z, target->Z, 0.0);
+            p->a = 0.0;
+            p->potential = potential_test;
+            break;
         case POTENTIAL_ANDERSEN:
             p->a = screening_length_andersen(incident->Z, target->Z);
             p->potential = potential_andersen;
@@ -324,6 +333,11 @@ void scatint_params_free(scatint_params *p) {
 }
 
 int scatint_set_energy(scatint_params *p, double E_lab) {
+    if(p->pt == POTENTIAL_TEST) { /* If screening length has energy dependence, p->a and p->c must be recomputed here. */
+        p->a = screening_length_test(p->Z1, p->Z2, E_lab / p->m1);
+        p->c = (1.0 / (4.0 * C_PI * C_EPSILON0)) * p->Z1 * p->Z2 * C_E * C_E / p->a;
+        //fprintf(stderr, "Screening length %g is %g times Universal\n", p->a, p->a/screening_length_universal(p->Z1, p->Z2));
+    }
     if(p->rt == REACTION_ERD) { /* ERD: calculate inverse kinematics */
         p->E_lab = p->E_ik_ratio * E_lab;
     } else {
@@ -469,8 +483,15 @@ double scatint_sigma_rutherford_cm(const scatint_params *p) {
 }
 
 double screening_length_universal(int Z1, int Z2) {
-    return 0.8853 * C_BOHR_RADIUS / (pow(Z1 * 1.0, 0.23) + pow(Z2 * 1.0, 0.23));
+    return 0.8853 * C_BOHR_RADIUS / (pow(Z1 * 1.0, 0.23) + pow(Z2 * 1.0, 0.23)); /* 0.5*pow(3.0*C_PI/4.0, 2.0/3.0) = 0.885341377 */
 }
+
+double screening_length_test(int Z1, int Z2, double em) { /* It is possible to include an energy dependence to screening length. */
+    (void) em;
+    double gamma = 0.0;
+    return 0.8853 * C_BOHR_RADIUS / (pow((1.0 - gamma) * Z1 * 1.0, 0.23) + pow(Z2 * 1.0, 0.23)); /* 0.5*pow(3.0*C_PI/4.0, 2.0/3.0) = 0.885341377 */
+}
+
 double screening_length_bohr(int Z1, int Z2) {
     return C_BOHR_RADIUS / sqrt(pow(Z1, 2.0/3.0) + pow(Z2, 2.0/3.0));
 }
@@ -485,6 +506,8 @@ const char *scatint_potential_name(potential_type pt) {
             return "Bohr";
         case POTENTIAL_UNIVERSAL:
             return "Universal";
+        case POTENTIAL_TEST:
+            return "Test";
         case POTENTIAL_ANDERSEN:
             return "Andersen";
         case POTENTIAL_RUTHERFORD:

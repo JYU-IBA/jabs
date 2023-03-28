@@ -2621,7 +2621,7 @@ script_command_status script_kinematics(struct script_session *s, int argc, char
                 continue;
             }
             size_t ch = calibration_inverse(detector_get_calibration(det, product->Z), E, CHANNELS_ABSOLUTE_MAX);
-            double sigma = sim_r->cross_section ? sim_r->cross_section(sim_r, E) : 0.0;
+            double sigma = sim_r->cross_section ? sim_r->cross_section(sim_r, sim->beam_E) : 0.0;
             jabs_message(MSG_INFO, "%13s | %5g | %8s | %8g | %7zu | %13g\n",
                          detector_name(det),
                          det->theta / C_DEG,

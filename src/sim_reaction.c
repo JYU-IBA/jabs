@@ -157,6 +157,13 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
             }
             scatint_set_theta(sp, sim_r->theta);
             break;
+        case JABS_CS_TEST:
+            sp = scatint_init(sim_r->r->type, POTENTIAL_TEST, sim_r->r->incident, sim_r->r->target);
+            if(!sp) {
+                return EXIT_FAILURE;
+            }
+            scatint_set_theta(sp, sim_r->theta);
+            break;
         case JABS_CS_LECUYER:
             break;
         default:
@@ -184,6 +191,7 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
             case JABS_CS_LECUYER:
                 rp->sigma = sim_reaction_lecuyer(sim_r, E_cm);
                 break;
+            case JABS_CS_TEST:
             case JABS_CS_UNIVERSAL:
                 scatint_set_energy(sp, E);
                 rp->sigma  = scatint_sigma(sp) / sigma_r; /* Note: only screening correction, not cross section! */
