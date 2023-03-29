@@ -37,6 +37,9 @@ add_executable(jabs
         "$<$<BOOL:${WIN32}>:win_compat.c>"
         )
 
+add_executable(amsel amsel.c)
+target_link_libraries(amsel PRIVATE jibal)
+
 target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
 
 target_link_libraries(jabs
@@ -46,6 +49,7 @@ target_link_libraries(jabs
     PRIVATE "$<$<BOOL:${UNIX}>:m>"
     ${GETOPT_LIBRARY} gitwatcher
     )
+
 
 if(OpenMP_C_FOUND)
     target_link_libraries(jabs PUBLIC OpenMP::OpenMP_C)
