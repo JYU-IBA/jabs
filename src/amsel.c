@@ -105,8 +105,8 @@ double wa_hwhm(const amsel_table *t, double tau) {
     double h1 = - a * tanh(b * (- e * e / fabs(e + log(tau) + c/d) + e)) + d;
     fprintf(stderr, "1/v = h1 = %g\n", h1);
     fprintf(stderr, "1.0/v_w = %g\n", 1.0/p->v_w);
-   // return p->w * pow(tau / p->tau, 1.0/p->v_w);
-    return p->w * pow(tau / p->tau, h1);
+    return p->w * pow(tau / p->tau, 1.0/p->v_w);
+    //return p->w * pow(tau / p->tau, h1);
 }
 
 double screening_length_TF(int Z1) {
@@ -128,9 +128,33 @@ double gamma_beta_TF(double tau) {
     return pow(1 + 1/h1, h1);
 }
 
+int amsel_calc(amsel_table *t, double depth, double phi, double E_lab, const jibal_isotope *incident, const jibal_element *target) {
+    fprintf(stderr, "depth = %g tfu\n", depth / C_TFU);
+    double thickness = depth / cos(phi);
+    fprintf(stderr, "thickness = %g tfu\n", thickness / C_TFU);
+    double tau = reduced_thickness(thickness, target->Z);
+    fprintf(stderr, "tau = %g\n", tau);
+    double wa = wa_hwhm(t, tau);
+    fprintf(stderr, "wa = %g (HWHM), angular spread\n", wa);
+    fprintf(stderr, "screening length TF = %g m\n", screening_length_TF(incident->Z));
+    double mu = E_lab * screening_length_TF(target->Z) / (2.0 * incident->Z * C_E * target->Z * C_E);
+    mu *= (4.0 * C_PI * C_EPSILON0); /* Damn it again! */
+    fprintf(stderr, "mu = %g\n", mu);
+    double angle = wa / mu;
+    fprintf(stderr, "angle = %g mrad (%g deg) HWHM\n", angle / 0.001, angle / C_DEG);
+    double gamma_b = gamma_beta_TF(tau);
+    fprintf(stderr, "Gamma_b = %g\n", gamma_b);
+    double wb = wa / gamma_b;
+    fprintf(stderr, "wb = %g (HWHM), chord\n", wb);
+    double angle_chord = wb / mu;
+    fprintf(stderr, "chord angle = %g mrad (%g deg) HWHM\n", angle_chord / 0.001, angle_chord / C_DEG); /* Lateral displacement is this angle times thickness */
+    fprintf(stdout, "%12.3lf %12.3lf %12.3lf %12.3lf\n", depth / C_TFU, thickness / C_TFU, 2.0 * angle / C_DEG, 2.0 * angle_chord / C_DEG);
+    return 0;
+}
+
 int main(int argc, char **argv) {
-    if(argc < 4) {
-        fprintf(stderr, "Not enough arguments!\n");
+    if(argc < 5) {
+        fprintf(stderr, "Not enough arguments! Usage: amsel <incident isotope> <target element> <max thickness> <incident E lab> <phi>\n");
         return EXIT_FAILURE;
     }
     jibal *jibal = jibal_init(NULL);
@@ -139,40 +163,30 @@ int main(int argc, char **argv) {
         fprintf(stderr, "No such isotope: %s\n", argv[1]);
         return EXIT_FAILURE;
     }
-    const jibal_element *element = jibal_element_find(jibal->elements, argv[2]);
-    if(!element) {
-        fprintf(stderr, "No such element: %s\n", argv[2]);
+    const jibal_element *target = jibal_element_find(jibal->elements, argv[2]);
+    if(!target) {
+        fprintf(stderr, "No such target: %s\n", argv[2]);
         return EXIT_FAILURE;
     }
-    double thickness = 0.0;
+    double thickness_max = 0.0;
     fprintf(stderr, "incident = %s\n", incident->name);
-    fprintf(stderr, "element = %s\n", element->name);
-    jibal_unit_convert(jibal->units, JIBAL_UNIT_TYPE_LAYER_THICKNESS, argv[3], &thickness);
-    fprintf(stderr, "thickness = %g tfu\n", thickness / C_TFU);
-    double tau = reduced_thickness(thickness, element->Z);
-    fprintf(stderr, "tau = %g\n", tau);
-
-
-    amsel_table *t = amsel_table_generate();
-    double wa = wa_hwhm(t, tau);
-    fprintf(stderr, "wa = %g (HWHM), angular spread\n", wa);
-
+    fprintf(stderr, "target target = %s\n", target->name);
+    jibal_unit_convert(jibal->units, JIBAL_UNIT_TYPE_LAYER_THICKNESS, argv[3], &thickness_max);
     double E_lab = 0.0;
     jibal_unit_convert(jibal->units, JIBAL_UNIT_TYPE_ENERGY, argv[4], &E_lab);
     fprintf(stderr, "E_lab = %g keV\n", E_lab / C_KEV);
 
-    fprintf(stderr, "screening length TF = %g m\n", screening_length_TF(incident->Z));
-    double mu = E_lab * screening_length_TF(element->Z) / (2.0 * incident->Z * C_E * element->Z * C_E);
-    mu *= (4.0 * C_PI * C_EPSILON0); /* Damn it again! */
-    fprintf(stderr, "mu = %g\n", mu);
-    double angle = wa/mu;
-    fprintf(stderr, "angle = %g mrad (%g deg) HWHM\n", angle / 0.001, angle / C_DEG);
-    double gamma_b = gamma_beta_TF(tau);
-    fprintf(stderr, "Gamma_b = %g\n", gamma_b);
-    double wb = wa / gamma_b;
-    fprintf(stderr, "wb = %g (HWHM), chord\n", wb);
-    double angle_chord = wb/mu;
-    fprintf(stderr, "chord angle = %g mrad (%g deg) HWHM\n", angle_chord/0.001, angle_chord / C_DEG); /* Lateral displacement is this angle times thickness */
+    double phi = 0.0;
+    jibal_unit_convert(jibal->units, JIBAL_UNIT_TYPE_ANGLE, argv[5], &phi);
+    fprintf(stderr, "phi = %g deg (incidence angle, zero for beam perpendicular to surface)\n", phi / C_DEG);
+
+    amsel_table *t = amsel_table_generate();
+    size_t n_steps = 50;
+    double thickness_step = thickness_max / (n_steps - 1);
+    for(size_t i_step = 0; i_step < n_steps; i_step++) {
+        double thickness = thickness_step * i_step;
+        amsel_calc(t, thickness, phi, E_lab, incident, target);
+    }
     amsel_table_free(t);
     jibal_free(jibal);
     return EXIT_SUCCESS;
