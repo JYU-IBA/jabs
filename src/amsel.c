@@ -3,6 +3,8 @@
 #include <math.h>
 #include <jibal.h>
 #include <jibal_masses.h>
+#include <jibal_stop.h>
+#include <jibal_stragg.h>
 
 typedef struct amsel_angular_spread {
     double tau;
@@ -30,7 +32,7 @@ int amsel_table_index_n(const amsel_table *t, int n) { /* Returns index of t->p 
 
 int amsel_table_index_tau(const amsel_table *t, double tau) { /* Returns index in t->p table with p.tau *closest* to tau in log2 */
     double logtau = log2(tau);
-    int n = (int) round(log2(tau)); /* Note: nearest index! */
+    int n = (int) round(logtau); /* Note: nearest index! */
     //fprintf(stderr, " n = %i (log2 of tau is %g)\n", n, logtau);
     return amsel_table_index_n(t, n);
 }
@@ -113,9 +115,17 @@ double screening_length_TF(int Z1) {
     return 0.8853 * C_BOHR_RADIUS * pow(Z1, -1.0/3.0);
 }
 
-double reduced_thickness(double t, int Z) {
+double reduced_thickness_Z(double t, int Z) {
     double a = screening_length_TF(Z);
     return C_PI * pow2(a) * t;
+}
+
+double reduced_thickness_material(double t, jibal_material *material) {
+    double result = 0.0;
+    for(size_t i_element = 0; i_element < material->n_elements; i_element++) {
+        result += material->concs[i_element] * reduced_thickness_Z(t, material->elements[i_element].Z);
+    }
+    return result;
 }
 
 double gamma_beta_TF(double tau) {
@@ -128,27 +138,48 @@ double gamma_beta_TF(double tau) {
     return pow(1 + 1/h1, h1);
 }
 
-int amsel_calc(amsel_table *t, double depth, double phi, double E_lab, const jibal_isotope *incident, const jibal_element *target) {
+int amsel_calc(const jibal *jibal, const amsel_table *t, double depth, double phi, double E_lab, const jibal_isotope *incident, const jibal_material *material) {
     fprintf(stderr, "depth = %g tfu\n", depth / C_TFU);
     double thickness = depth / cos(phi);
     fprintf(stderr, "thickness = %g tfu\n", thickness / C_TFU);
-    double tau = reduced_thickness(thickness, target->Z);
-    fprintf(stderr, "tau = %g\n", tau);
-    double wa = wa_hwhm(t, tau);
-    fprintf(stderr, "wa = %g (HWHM), angular spread\n", wa);
-    fprintf(stderr, "screening length TF = %g m\n", screening_length_TF(incident->Z));
-    double mu = E_lab * screening_length_TF(target->Z) / (2.0 * incident->Z * C_E * target->Z * C_E);
-    mu *= (4.0 * C_PI * C_EPSILON0); /* Damn it again! */
-    fprintf(stderr, "mu = %g\n", mu);
-    double angle = wa / mu;
-    fprintf(stderr, "angle = %g mrad (%g deg) HWHM\n", angle / 0.001, angle / C_DEG);
-    double gamma_b = gamma_beta_TF(tau);
-    fprintf(stderr, "Gamma_b = %g\n", gamma_b);
-    double wb = wa / gamma_b;
-    fprintf(stderr, "wb = %g (HWHM), chord\n", wb);
-    double angle_chord = wb / mu;
-    fprintf(stderr, "chord angle = %g mrad (%g deg) HWHM\n", angle_chord / 0.001, angle_chord / C_DEG); /* Lateral displacement is this angle times thickness */
-    fprintf(stdout, "%12.3lf %12.3lf %12.3lf %12.3lf\n", depth / C_TFU, thickness / C_TFU, 2.0 * angle / C_DEG, 2.0 * angle_chord / C_DEG);
+
+    double angle_sum = 0.0;
+    double angle_chord_sum = 0.0;
+    jibal_layer *layer = jibal_layer_new(jibal_material_copy(material), thickness);
+    double S = 0.0;
+    double E_deep = jibal_layer_energy_loss_with_straggling(jibal->gsto, incident, layer, E_lab, -1.0, &S);
+    fprintf(stderr, "E_lab (surface) = %g keV\n", E_lab / C_KEV);
+    fprintf(stderr, "E_deep = %g keV\n", E_deep / C_KEV);
+    double E_avg = (E_lab + E_deep) / 2.0;
+    for(size_t i_element = 0; i_element < material->n_elements; i_element++) {
+        int Z2 = material->elements[i_element].Z;
+        double a = screening_length_TF(Z2);
+        double tau =  C_PI * pow2(a) * thickness;
+        double wa = wa_hwhm(t, tau);
+        fprintf(stderr, "wa = %g (HWHM), angular spread\n", wa);
+        double mu = E_avg * screening_length_TF(Z2) / (2.0 * incident->Z * C_E * Z2 * C_E);
+        mu *= (4.0 * C_PI * C_EPSILON0); /* Damn it again! */
+        double angle = wa / mu;
+        fprintf(stderr, "angle = %g mrad (%g deg) HWHM\n", angle / 0.001, angle / C_DEG);
+        double gamma_b = gamma_beta_TF(tau);
+        fprintf(stderr, "Gamma_b = %g\n", gamma_b);
+        double wb = wa / gamma_b;
+        fprintf(stderr, "wb = %g (HWHM), chord\n", wb);
+        double angle_chord = wb / mu;
+        fprintf(stderr, "chord angle = %g mrad (%g deg) HWHM\n", angle_chord / 0.001, angle_chord / C_DEG); /* Lateral displacement is this angle times thickness */
+        angle_sum += pow2(angle);
+        angle_chord_sum += pow2(angle_chord);
+
+    }
+    double angle = 2.0 * sqrt(angle_sum); /* FWHM */
+    double angle_chord = 2.0 * sqrt(angle_chord_sum);  /* FWHM */
+    double dt = thickness * angle_chord * tan(phi);
+    fprintf(stderr, "trajectory length difference %g tfu\n", dt / C_TFU);
+    double stop = jibal_stop(jibal->gsto, incident, layer->material, E_deep);
+    fprintf(stderr, "stopping force at depth = %g eV/tfu\n", stop / C_EV_TFU);
+    double dE = dt * stop;
+    fprintf(stdout, "%12.3lf %12.3lf %12.3lf %12.3lf %12.3lf\n", depth / C_TFU, thickness / C_TFU, angle / C_DEG, angle_chord / C_DEG, dE / C_KEV);
+    jibal_layer_free(layer);
     return 0;
 }
 
@@ -163,14 +194,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "No such isotope: %s\n", argv[1]);
         return EXIT_FAILURE;
     }
-    const jibal_element *target = jibal_element_find(jibal->elements, argv[2]);
-    if(!target) {
-        fprintf(stderr, "No such target: %s\n", argv[2]);
-        return EXIT_FAILURE;
-    }
     double thickness_max = 0.0;
     fprintf(stderr, "incident = %s\n", incident->name);
-    fprintf(stderr, "target target = %s\n", target->name);
     jibal_unit_convert(jibal->units, JIBAL_UNIT_TYPE_LAYER_THICKNESS, argv[3], &thickness_max);
     double E_lab = 0.0;
     jibal_unit_convert(jibal->units, JIBAL_UNIT_TYPE_ENERGY, argv[4], &E_lab);
@@ -183,9 +208,20 @@ int main(int argc, char **argv) {
     amsel_table *t = amsel_table_generate();
     size_t n_steps = 50;
     double thickness_step = thickness_max / (n_steps - 1);
+
+    jibal_material *material = jibal_material_create(jibal->elements, argv[2]);
+    if(!material) {
+        fprintf(stderr, "Material could not be created from this: %s\n", argv[2]);
+        return EXIT_FAILURE;
+    }
+    if(!jibal_gsto_auto_assign_material(jibal->gsto, incident, material)) {
+        fprintf(stderr, "Couldn't assign stopping.\n");
+        return EXIT_FAILURE;
+    }
+    jibal_gsto_load_all(jibal->gsto);
     for(size_t i_step = 0; i_step < n_steps; i_step++) {
         double thickness = thickness_step * i_step;
-        amsel_calc(t, thickness, phi, E_lab, incident, target);
+        amsel_calc(jibal, t, thickness, phi, E_lab, incident, material);
     }
     amsel_table_free(t);
     jibal_free(jibal);
