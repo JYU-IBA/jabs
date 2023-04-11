@@ -12,7 +12,8 @@ typedef enum potential_type {
     POTENTIAL_UNIVERSAL = 2,
     POTENTIAL_ANDERSEN = 3,
     POTENTIAL_RUTHERFORD = 4,
-    POTENTIAL_TEST = 5
+    POTENTIAL_TF_SOMMERFELD = 5,
+    POTENTIAL_TEST = 6
 } potential_type;
 
 typedef struct scatint_params {
@@ -55,6 +56,7 @@ double screening_length_universal(int Z1, int Z2);
 double screening_length_test(int Z1, int Z2, double em);
 double screening_length_andersen(int Z1, int Z2);
 double screening_length_bohr(int Z1, int Z2);
+double screening_length_thomas_fermi(int Z2);
 double potential_bohr(double x);
 double apsis_f (double x, void *p);
 int apsis(scatint_params *params);

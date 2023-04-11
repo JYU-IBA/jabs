@@ -139,6 +139,14 @@ double potential_rutherford(double x) { /* Good old Coulomb */
     return 1.0;
 }
 
+double potential_thomas_fermi_sommerfeld(double x) { /* Sommerfeld approximation of Thomas-Fermi screening function */
+    const double alpha = 5.2414828; /* 12^(2/3) */
+    const double beta = 0.8034;
+    const double gamma = 3.734;
+    return pow(1.0 + pow(x / alpha, beta), -1.0 * gamma);
+}
+
+
 double potential_bohr(double x) {
     return exp(-(x));
 }
@@ -293,6 +301,10 @@ scatint_params *scatint_init(reaction_type rt, potential_type pt, const jibal_is
         case POTENTIAL_RUTHERFORD:
             p->a = C_BOHR_RADIUS; /* This can be an arbitrary number (no screening length) but it is best to choose a number comparable to the other models */
             p->potential = potential_rutherford;
+            break;
+        case POTENTIAL_TF_SOMMERFELD:
+            p->a = screening_length_thomas_fermi(target->Z);
+            p->potential = potential_thomas_fermi_sommerfeld;
             break;
         case POTENTIAL_NONE:
         default:
@@ -498,6 +510,10 @@ double screening_length_bohr(int Z1, int Z2) {
 
 double screening_length_andersen(int Z1, int Z2) { /* Screening length used by Andersen */
     return 0.8853 * C_BOHR_RADIUS / sqrt(pow(Z1, 2.0/3.0) + pow(Z2, 2.0/3.0));
+}
+
+double screening_length_thomas_fermi(int Z2) {
+    return 0.8853 * C_BOHR_RADIUS * pow(Z2, -1.0/3.0);
 }
 
 const char *scatint_potential_name(potential_type pt) {

@@ -2591,7 +2591,7 @@ script_command_status script_kinematics(struct script_session *s, int argc, char
     struct fit_data *fit = s->fit;
     const simulation *sim = s->fit->sim;
     if(argc < 1) {
-        jabs_message(MSG_ERROR, "Usage: kinematics <type> <target atom>\nSyntax of \"add reaction\" is used.");
+        jabs_message(MSG_ERROR, "Usage: kinematics <type> <target atom>\nSyntax of \"add reaction\" is used.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(sim->n_det == 0) {

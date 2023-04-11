@@ -147,27 +147,30 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
     sim_reaction_reset_screening_table(sim_r);
     scatint_params *sp = NULL;
     n = SCREENING_TABLE_ELEMENTS; /* TODO: make more clever */
-    switch(cs) {
+    potential_type pt = POTENTIAL_NONE;
+    switch(cs) { /* Set potential type for those cross sections that use scatint (= numerical scattering integral solver). If analytical solution is used (e.g. Andersen), keep as POTENTIAL_NONE */
         case JABS_CS_ANDERSEN:
             break;
         case JABS_CS_UNIVERSAL:
-            sp = scatint_init(sim_r->r->type, POTENTIAL_UNIVERSAL, sim_r->r->incident, sim_r->r->target);
-            if(!sp) {
-                return EXIT_FAILURE;
-            }
-            scatint_set_theta(sp, sim_r->theta);
+            pt = POTENTIAL_UNIVERSAL;
             break;
         case JABS_CS_TEST:
-            sp = scatint_init(sim_r->r->type, POTENTIAL_TEST, sim_r->r->incident, sim_r->r->target);
-            if(!sp) {
-                return EXIT_FAILURE;
-            }
-            scatint_set_theta(sp, sim_r->theta);
+            pt = POTENTIAL_TEST;
+            break;
+        case JABS_CS_THOMASFERMI:
+            pt = POTENTIAL_TF_SOMMERFELD;
             break;
         case JABS_CS_LECUYER:
             break;
         default:
             return EXIT_SUCCESS;
+    }
+    if(pt != POTENTIAL_NONE) {
+        sp = scatint_init(sim_r->r->type, pt, sim_r->r->incident, sim_r->r->target);
+        if(!sp) {
+            return EXIT_FAILURE;
+        }
+        scatint_set_theta(sp, sim_r->theta);
     }
     sim_r->cs_table = malloc(n * sizeof(struct reaction_point));
     if(!sim_r->cs_table) {
@@ -192,6 +195,7 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
                 rp->sigma = sim_reaction_lecuyer(sim_r, E_cm);
                 break;
             case JABS_CS_TEST:
+            case JABS_CS_THOMASFERMI:
             case JABS_CS_UNIVERSAL:
                 scatint_set_energy(sp, E);
                 rp->sigma  = scatint_sigma(sp) / sigma_r; /* Note: only screening correction, not cross section! */
