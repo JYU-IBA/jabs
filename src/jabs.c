@@ -432,6 +432,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
                 sim_r->r->target->name, sim_r->i_isotope, sim_r->r->target->i,
                 sim_r->r->product->name, sim_r->r->product->i);
         if(simulate_reaction(incident, depth_start, ws, sample, dt, &g, sim_r)) {
+            jabs_message(MSG_ERROR, "Simulating reaction %zu (%s) failed.\n", i_reaction + 1, reaction_name(sim_r->r));
             DEBUGMSG("Simulating reaction i_reaction = %zu failed.", i_reaction);
             error = TRUE;
             break;
@@ -453,6 +454,7 @@ int simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim_
     sim_r->stop = FALSE;
     ion_set_angle(&sim_r->p, g->theta_product, g->phi_product);
     if(sim_reaction_recalculate_internal_variables(sim_r, params, g->scatter_theta, emin, emin_incident, emax_incident)) {
+        jabs_message(MSG_ERROR, "Recalculating internal variables of reaction failed.\n");
         return EXIT_FAILURE;
     }
     if(sim_r->stop) {

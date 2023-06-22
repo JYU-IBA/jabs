@@ -215,12 +215,16 @@ int calc_scattering_angle(struct scatint_params *params) {
     F.function = &scat_theta_f;
     F.params = params;
     if(apsis(params)) {
-        fprintf(stderr, "Could not calculate apsis.\n");
+        DEBUGSTR("Could not calculate apsis.");
         return EXIT_FAILURE;
     }
     DEBUGVERBOSEMSG("Integration from %g to infinity, accuracy %g.", params->R, params->accuracy);
     gsl_set_error_handler_off();
     int status = gsl_integration_qagiu(&F, params->R, 0, params->accuracy, params->w->limit, params->w, &result, &error);
+    if(status == GSL_ESING) { /* TODO: GSL probably reports an error for a reason. We choose to ignore it here.  */
+        DEBUGSTR("GSL reports a non-integrable singularity or other bad integrand behavior was found in the integration interval.")
+        status = 0;
+    }
     DEBUGVERBOSEMSG("result          = % .18f", result);
     DEBUGVERBOSEMSG("estimated error = %.18f", error);
     DEBUGVERBOSEMSG("intervals       = %zu", params->w->size);

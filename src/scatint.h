@@ -1,7 +1,7 @@
 #define IMPACT_MIN (1e-9) /* In units of screening length. Apsis can not be below this! */
 #define IMPACT_MAX (100.0)
 #define INTEGRATION_WORKSPACE_N (20000)
-#define INTEGRATION_ACCURACY (1e-8)
+#define INTEGRATION_ACCURACY (1e-7)
 #define IMPACT_FACTOR_ACCURACY (1e-9)
 
 #include "reaction.h"

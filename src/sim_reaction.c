@@ -125,7 +125,8 @@ int sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_c
     if(sim_r->r->cs != JABS_CS_NONE && (type == REACTION_RBS || type == REACTION_RBS_ALT || type == REACTION_ERD)) {
         if(params->screening_tables || sim_r->r->cs == JABS_CS_UNIVERSAL) { /* Universal needs to be precalculated to be remotely useful. Forcing it! */
             if(sim_reaction_recalculate_screening_table(sim_r)) {
-                DEBUGMSG("Recalculating screening table for reaction %s failed.", sim_r->r->name);
+                jabs_message(MSG_ERROR, "Recalculating screening table for reaction %s failed.\n", reaction_name(sim_r->r));
+                DEBUGMSG("Recalculating screening table for reaction %s failed.", reaction_name(sim_r->r));
                 return EXIT_FAILURE;
             }
         }
@@ -204,6 +205,7 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
                 rp->sigma  = 0.0;
         }
         if(rp->sigma == 0.0) {
+            jabs_message(MSG_ERROR, "Could not compute screening correction for E = %g keV (emin = %g keV, emax = %g keV), Rutherford = %g mb/sr, reaction %s\n", E / C_KEV, emin / C_KEV, emax / C_KEV, sigma_r / C_MB_SR, reaction_name(sim_r->r));
             DEBUGMSG("Could not compute screening correction for E = %g keV, reaction %s\n", E / C_KEV, sim_r->r->name)
             scatint_params_free(sp);
             return EXIT_FAILURE;
