@@ -273,13 +273,16 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         d_before = d_after;
         DEBUGVERBOSEMSG("E = %g keV (incident)", ion1.E / C_KEV);
         if(ion1.E < des_min->E) {
-            DEBUGMSG("E = %g keV (incident) is below %g keV. Changing energy. This will be the last brick!", ion1.E / C_KEV, des_min->E / C_KEV);
+            DEBUGMSG("E = %g keV (incident) is below %g keV. Changing energy.", ion1.E / C_KEV, des_min->E / C_KEV);
             des_set_ion(des_min, &ion1);
-            d_after = des_min->d;
-            last = TRUE;
+            d_after = des_min->d; /* des_table_find_depth() might change the depth */
         }
         if(i_brick != 0) {
             d_after = des_table_find_depth(dt, &i_des, d_before, &ion1); /* Does this handle E below min? */
+        }
+        if(ion1.E <= des_min->E) {
+            DEBUGMSG("This will be the last brick due to incident energy hitting DES minimum %g keV. d_after = %g tfu.", des_min->E / C_KEV, d_after.x / C_TFU);
+            last = TRUE;
         }
         if(i_brick == 0 || d_after.i != d_before.i) { /* There was a layer (depth range) crossing. If step() took this into account when making DES table the only issue is the .i index. depth (.x) is not changed. */
             if(ws->params->bricks_skip_zero_conc_ranges) {
@@ -374,7 +377,7 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
                 b->E_r / C_KEV, sqrt(b->S_r) / C_KEV,
                 b->E / C_KEV, sqrt(b->S) / C_KEV,
                 E_deriv, get_conc(sample, d_after, sim_r->i_isotope) * 100.0, sigma_conc / C_MB_SR, b->Q, b->deriv,
-                crossed + skipped
+                skipped
                 );
         assert(!isnan(ion1.E));
         if(ion1.E < sim_r->emin_incident) {
