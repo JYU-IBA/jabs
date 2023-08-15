@@ -313,9 +313,11 @@ int sim_workspace_print_bricks(const sim_workspace *ws, const char *filename) {
     fprintf(f, "#In case of roughness, this represents the bricks of the last simulated roughness subspectrum.\n");
     fprintf(f, "#Turn roughness and DS off if you want to understand the contents of this file.\n");
     fprintf(f, "#Each brick has two edges, the high energy edge and the low energy edge.\n");
+    fprintf(f, "#v indicates validity of the brick, if this is zero, brick (edge) is ignored\n");
     fprintf(f, "#\"depth\" is the depth of the low energy edge in tfu (1e15 at./cm2), thick is thickness of the brick (difference in depth to high energy edge) in the same units.\n");
     fprintf(f, "#\"E_0\" and \"S_0(el)\" are the energy and electronic energy loss straggling in keVs FWHM of the incident ion at the particular depth (low energy edge).\n");
     fprintf(f, "#\"E_r\" and \"S_r(el)\" are the same, but for the reaction product at the particular depth. For elastic scattering E_r = K * E_0.\n");
+    fprintf(f, "#\"E_s\" and \"S_s(el)\" are the same, but for the reaction product at the surface (before detector foil)\n");
     fprintf(f, "#\"E(det)\" and \"S(el)\" are the same, but for the reaction product at the detector (after detector foil, if one is set).\n");
     fprintf(f, "#\"S(geo)\" is the broadening due to finite beam spot and detector size (keV FWHM) at the surface if calculated, zero otherwise.\n");
     fprintf(f, "#\"S(sum)\" is the sum of all broadening (electronic, geometric and detector resolution) in keV FWHM. This is the actual broadening used for convolution.\n");

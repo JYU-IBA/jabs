@@ -270,6 +270,7 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
 #endif
         b_prev = b;
         b = &sim_r->bricks[i_brick];
+        b->valid = TRUE; /* Will be invalidated if necessary */
         d_before = d_after;
         DEBUGVERBOSEMSG("E = %g keV (incident)", ion1.E / C_KEV);
         if(ion1.E < des_min->E) {
@@ -321,12 +322,21 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
                 last = TRUE;
             }
         }
+        b->E_s = sim_r->p.E;
+        b->S_s = sim_r->p.S;
 
         if(ws->det->foil) { /* Energy loss in detector foil */
             depth d_foil = {.i = 0, .x = 0.0};
             ion ion_foil = *&sim_r->p;
             ion_set_angle(&ion_foil, 0.0, 0.0); /* Foils are not tilted. We use a temporary copy of "p" to do this step. */
-            stop_sample_exit(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, &ion_foil, d_foil, ws->det->foil);
+            if(stop_sample_exit(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, &ion_foil, d_foil, ws->det->foil)) {
+                DEBUGMSG("Stop in detector foil. Energy after reaction was %g keV.", b->E_r / C_KEV);
+                if(product_and_incident_go_in_different_directions) { /* Lowering incident energy will lower reaction product energy */
+                    DEBUGSTR("We can stop calculation, because lowering incident energy will also lower reaction product energy. This will be the last brick.");
+                    last = TRUE; /* Discards entire brick, may not be the perfect choice! */
+                    b->valid = FALSE;
+                }
+            }
             b->E = ion_foil.E;
             b->S = ion_foil.S;
         } else {
@@ -368,13 +378,14 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         b->thick = d_diff;
         b->sc = sigma_conc;
         b->Q = ion1.inverse_cosine_theta * sigma_conc * b->thick;
-        DEBUGVERBOSEMSG("%s %s %3zu %3zu:%10.3lf %3zu:%10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3e %8.3lf %2i",
+        DEBUGVERBOSEMSG("%s %s %3zu %3zu:%10.3lf %3zu:%10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3e %8.3lf %2i",
                 sim_r->r->target->name, reaction_type_to_string(sim_r->r->type), i_brick,
                 d_before.i, d_before.x / C_TFU,
                 d_after.i, d_after.x / C_TFU,
                 i_des,
                 b->E_0 / C_KEV, sqrt(b->S_0) / C_KEV,
                 b->E_r / C_KEV, sqrt(b->S_r) / C_KEV,
+                b->E_s / C_KEV, sqrt(b->S_s) / C_KEV,
                 b->E / C_KEV, sqrt(b->S) / C_KEV,
                 E_deriv, get_conc(sample, d_after, sim_r->i_isotope) * 100.0, sigma_conc / C_MB_SR, b->Q, b->deriv,
                 skipped
@@ -397,7 +408,7 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         }
         if(last) {
             sim_r->last_brick = i_brick;
-            DEBUGMSG("Last brick (earlier decision, because des_min = %g keV or because reaction product stopped).", des_min->E / C_KEV);
+            DEBUGMSG("Last brick (earlier decision, because des_min = %g keV or because reaction product stopped in the sample or detector foil).", des_min->E / C_KEV);
             break;
         }
         if(!skipped) {

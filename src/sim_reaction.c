@@ -355,13 +355,14 @@ void sim_reaction_print_bricks(FILE *f, const sim_reaction *r, double psr) {
     if(r->r->filename) {
         fprintf(f, "#Filename: %s\n", r->r->filename);
     }
-    fprintf(f, "#brick    depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo)    S(sum) sigma*conc     Q (counts)  dE(det)/dE_0\n");
+    fprintf(f, "#  i v      depth    thick      E_0   S_0(el)      E_r   S_r(el)      E_s  S_s(el)   E(det)    S(el)    S(geo)    S(sum) sigma*conc     Q (counts)  dE(det)/dE_0\n");
     for(size_t j = 0; j <= r->last_brick; j++) {
         brick *b = &r->bricks[j];
-        fprintf(f, "%4zu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %10.3lf %14.6e %8.3lf\n",
-                j, b->d.x / C_TFU, b->thick / C_TFU,
+        fprintf(f, "%4zu %1i %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf  %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %10.3lf %14.6e %8.3lf\n",
+                j, b->valid, b->d.x / C_TFU, b->thick / C_TFU,
                 b->E_0 / C_KEV, C_FWHM * sqrt(b->S_0) / C_KEV,
                 b->E_r / C_KEV, C_FWHM * sqrt(b->S_r) / C_KEV,
+                b->E_s / C_KEV, C_FWHM * sqrt(b->S_s) / C_KEV,
                 b->E / C_KEV, C_FWHM * sqrt(b->S) / C_KEV,
                 C_FWHM * sqrt(b->S_geo_x + b->S_geo_y) / C_KEV, C_FWHM * b->S_sum / C_KEV,
                 b->sc / C_MB_SR, b->Q * psr,
