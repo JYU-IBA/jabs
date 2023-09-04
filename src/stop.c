@@ -128,6 +128,9 @@ double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sam
     const gsto_file_t *file;
     const double *data;
     double unit_factor;
+    if(incident->Z == 0) {
+        return 0.0;
+    }
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
         double c;
         const jibal_isotope *target = sample->isotopes[i_isotope];
