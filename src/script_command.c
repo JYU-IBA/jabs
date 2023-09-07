@@ -1578,6 +1578,7 @@ script_command_status script_load_reference(script_session *s, int argc, char *c
         jabs_message(MSG_ERROR, "Reading reference spectrum from file \"%s\" was not successful.\n", filename);
         return EXIT_FAILURE;
     }
+    jabs_message(MSG_VERBOSE, "Reference spectrum from file \"%s\" loaded. %zu channels.\n", filename, h->n);
     jabs_histogram_free(fit->ref);
     fit->ref = h;
     argc--;

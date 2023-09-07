@@ -116,3 +116,15 @@ size_t jabs_histogram_channels_in_range(const jabs_histogram *h, size_t low, siz
     }
     return high - low + 1;
 }
+
+int jabs_histogram_fprintf(FILE *stream, const jabs_histogram *h, const char *range_format, const char *bin_format) {
+    for(size_t i = 0; i < h->n; i++) {
+        fprintf(stream, range_format, h->range[i]);
+        fputc(' ', stream);
+        fprintf(stream, range_format, h->range[i + 1]);
+        fputc(' ', stream);
+        fprintf(stream, bin_format, h->bin[i]);
+        fputc('\n', stream);
+    }
+    return EXIT_SUCCESS;
+}
