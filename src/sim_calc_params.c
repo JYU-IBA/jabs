@@ -87,6 +87,7 @@ sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
     p->incident_stop_params.min *= 0.5;
     p->exiting_stop_params.min *= 0.5;
     p->exiting_stop_params.sigmas *= 0.5;
+    p->brick_width_sigmas *= 0.25;
     return p;
 }
 
@@ -113,6 +114,7 @@ sim_calc_params *sim_calc_params_defaults_improved(sim_calc_params *p) {
     p->cs_energy_step_max *= 0.75;
     p->cs_depth_step_max *= 0.75;
     p->cs_stragg_step_sigmas = 0.75;
+    p->brick_width_sigmas *= 0.5;
     return p;
 }
 

@@ -41,7 +41,7 @@
 #define DES_TABLE_MAX_SIZE (256 * DES_TABLE_INITIAL_ALLOC)
 #define ENERGY_DERIVATIVE_MIN (0.1) /* dE(detected)/dE(incident) is forced to be higher or equal to this. */
 #define ENERGY_DERIVATIVE_MAX (10.0)
-#define BRICK_WIDTH_SIGMAS_DEFAULT (C_FWHM) /* Attempt to make bricks width energy difference equal to this many times the detector resolution and straggling sigmas combined (in quadrature (variances)) */
+#define BRICK_WIDTH_SIGMAS_DEFAULT (2.0) /* Attempt to make bricks width energy difference equal to this many times the detector resolution and straggling sigmas combined (in quadrature (variances)) */
 #define INCIDENT_STOP_STEP_DEFAULT (0.0*C_KEV) /* Zero is automatic */
 #define INCIDENT_STOP_STEP_SIGMAS_DEFAULT (1.0)
 #define INCIDENT_STOP_STEP_MIN_DEFAULT (0.5 * C_KEV) /* Default minimum stopping step. */

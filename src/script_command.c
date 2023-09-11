@@ -1578,6 +1578,7 @@ script_command_status script_load_reference(script_session *s, int argc, char *c
         jabs_message(MSG_ERROR, "Reading reference spectrum from file \"%s\" was not successful.\n", filename);
         return EXIT_FAILURE;
     }
+    jabs_message(MSG_VERBOSE, "Reference spectrum from file \"%s\" loaded. %zu channels.\n", filename, h->n);
     jabs_histogram_free(fit->ref);
     fit->ref = h;
     argc--;
@@ -2454,7 +2455,7 @@ script_command_status script_help_version(script_session *s, int argc, char *con
     jabs_message(MSG_INFO,  "Compiled with compiler version: %s\n", __VERSION__);
 #endif
 #ifdef _MSC_VER
-    jabs_message(MSG_INFO, "Compiled with MSVC version %s\n", _MSC_VER);
+    jabs_message(MSG_INFO, "Compiled with MSVC version %i\n", _MSC_VER);
 #endif
 #ifdef JABS_PLUGINS
     jabs_message(MSG_INFO,  "Plugin support enabled.\n");
@@ -2591,7 +2592,7 @@ script_command_status script_kinematics(struct script_session *s, int argc, char
     struct fit_data *fit = s->fit;
     const simulation *sim = s->fit->sim;
     if(argc < 1) {
-        jabs_message(MSG_ERROR, "Usage: kinematics <type> <target atom>\nSyntax of \"add reaction\" is used.");
+        jabs_message(MSG_ERROR, "Usage: kinematics <type> <target atom>\nSyntax of \"add reaction\" is used.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(sim->n_det == 0) {

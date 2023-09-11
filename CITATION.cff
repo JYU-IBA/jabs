@@ -6,6 +6,6 @@ authors:
 title: "JaBS"
 repository-code: "https://github.com/JYU-IBA/jabs"
 license: GPL-2.0-or-later
-version: 0.7.0
+version: 0.7.1
 doi: 10.5281/zenodo.6362701
-date-released: 2023-02-27
+date-released: 2023-04-10

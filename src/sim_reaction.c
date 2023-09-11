@@ -125,7 +125,8 @@ int sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_c
     if(sim_r->r->cs != JABS_CS_NONE && (type == REACTION_RBS || type == REACTION_RBS_ALT || type == REACTION_ERD)) {
         if(params->screening_tables || sim_r->r->cs == JABS_CS_UNIVERSAL) { /* Universal needs to be precalculated to be remotely useful. Forcing it! */
             if(sim_reaction_recalculate_screening_table(sim_r)) {
-                DEBUGMSG("Recalculating screening table for reaction %s failed.", sim_r->r->name);
+                jabs_message(MSG_ERROR, "Recalculating screening table for reaction %s failed.\n", reaction_name(sim_r->r));
+                DEBUGMSG("Recalculating screening table for reaction %s failed.", reaction_name(sim_r->r));
                 return EXIT_FAILURE;
             }
         }
@@ -147,27 +148,30 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
     sim_reaction_reset_screening_table(sim_r);
     scatint_params *sp = NULL;
     n = SCREENING_TABLE_ELEMENTS; /* TODO: make more clever */
-    switch(cs) {
+    potential_type pt = POTENTIAL_NONE;
+    switch(cs) { /* Set potential type for those cross sections that use scatint (= numerical scattering integral solver). If analytical solution is used (e.g. Andersen), keep as POTENTIAL_NONE */
         case JABS_CS_ANDERSEN:
             break;
         case JABS_CS_UNIVERSAL:
-            sp = scatint_init(sim_r->r->type, POTENTIAL_UNIVERSAL, sim_r->r->incident, sim_r->r->target);
-            if(!sp) {
-                return EXIT_FAILURE;
-            }
-            scatint_set_theta(sp, sim_r->theta);
+            pt = POTENTIAL_UNIVERSAL;
             break;
         case JABS_CS_TEST:
-            sp = scatint_init(sim_r->r->type, POTENTIAL_TEST, sim_r->r->incident, sim_r->r->target);
-            if(!sp) {
-                return EXIT_FAILURE;
-            }
-            scatint_set_theta(sp, sim_r->theta);
+            pt = POTENTIAL_TEST;
+            break;
+        case JABS_CS_THOMASFERMI:
+            pt = POTENTIAL_TF_SOMMERFELD;
             break;
         case JABS_CS_LECUYER:
             break;
         default:
             return EXIT_SUCCESS;
+    }
+    if(pt != POTENTIAL_NONE) {
+        sp = scatint_init(sim_r->r->type, pt, sim_r->r->incident, sim_r->r->target);
+        if(!sp) {
+            return EXIT_FAILURE;
+        }
+        scatint_set_theta(sp, sim_r->theta);
     }
     sim_r->cs_table = malloc(n * sizeof(struct reaction_point));
     if(!sim_r->cs_table) {
@@ -192,6 +196,7 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
                 rp->sigma = sim_reaction_lecuyer(sim_r, E_cm);
                 break;
             case JABS_CS_TEST:
+            case JABS_CS_THOMASFERMI:
             case JABS_CS_UNIVERSAL:
                 scatint_set_energy(sp, E);
                 rp->sigma  = scatint_sigma(sp) / sigma_r; /* Note: only screening correction, not cross section! */
@@ -200,6 +205,7 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
                 rp->sigma  = 0.0;
         }
         if(rp->sigma == 0.0) {
+            jabs_message(MSG_ERROR, "Could not compute screening correction for E = %g keV (emin = %g keV, emax = %g keV), Rutherford = %g mb/sr, reaction %s\n", E / C_KEV, emin / C_KEV, emax / C_KEV, sigma_r / C_MB_SR, reaction_name(sim_r->r));
             DEBUGMSG("Could not compute screening correction for E = %g keV, reaction %s\n", E / C_KEV, sim_r->r->name)
             scatint_params_free(sp);
             return EXIT_FAILURE;
@@ -349,13 +355,14 @@ void sim_reaction_print_bricks(FILE *f, const sim_reaction *r, double psr) {
     if(r->r->filename) {
         fprintf(f, "#Filename: %s\n", r->r->filename);
     }
-    fprintf(f, "#brick    depth    thick      E_0  S_0(el)      E_r  S_r(el)   E(det)    S(el)    S(geo)    S(sum) sigma*conc     Q (counts)  dE(det)/dE_0\n");
+    fprintf(f, "#  i v      depth    thick      E_0   S_0(el)      E_r   S_r(el)      E_s  S_s(el)   E(det)    S(el)    S(geo)    S(sum) sigma*conc     Q (counts)  dE(det)/dE_0\n");
     for(size_t j = 0; j <= r->last_brick; j++) {
         brick *b = &r->bricks[j];
-        fprintf(f, "%4zu %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %10.3lf %14.6e %8.3lf\n",
-                j, b->d.x / C_TFU, b->thick / C_TFU,
+        fprintf(f, "%4zu %1i %10.3lf %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf  %8.3lf %8.3lf %8.3lf %8.3lf %8.3lf %10.1lf %10.3lf %14.6e %8.3lf\n",
+                j, b->valid, b->d.x / C_TFU, b->thick / C_TFU,
                 b->E_0 / C_KEV, C_FWHM * sqrt(b->S_0) / C_KEV,
                 b->E_r / C_KEV, C_FWHM * sqrt(b->S_r) / C_KEV,
+                b->E_s / C_KEV, C_FWHM * sqrt(b->S_s) / C_KEV,
                 b->E / C_KEV, C_FWHM * sqrt(b->S) / C_KEV,
                 C_FWHM * sqrt(b->S_geo_x + b->S_geo_y) / C_KEV, C_FWHM * b->S_sum / C_KEV,
                 b->sc / C_MB_SR, b->Q * psr,

@@ -31,6 +31,9 @@ void bricks_convolute(jabs_histogram *h, const calibration *c, const brick *bric
         if(b_low->Q == 0.0) {
             continue;
         }
+        if(!b_low->valid) {
+            continue;
+        }
         const brick *b_high = &bricks[i-1];
         double E_high, E_low, E_cutoff_low, E_cutoff_high; /* Lower energy edge of brick, Low energy cutoff (gaussian), High energy cutoff (gaussian) */
         if(b_low->E < b_high->E) { /* Detected energy increasing as brick number increases */

@@ -1,0 +1,22 @@
+set ion 4He
+set energy 2MeV
+set det theta 165deg
+
+#set ion 63Cu
+#set energy 13.6MeV
+#set det theta 40deg
+
+set cs_rbs Rutherford
+set cs_erd Rutherford
+kin RBS 197Au
+#kin ERD 59Co
+
+set cs_rbs Andersen
+set cs_erd Andersen
+kin RBS 197Au
+#kin ERD 59Co
+
+set cs_rbs Universal
+set cs_erd Universal
+kin RBS 197Au
+#kin ERD 59Co

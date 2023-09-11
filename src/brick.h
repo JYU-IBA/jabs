@@ -7,12 +7,15 @@
 #include "histogram.h"
 
 typedef struct {
+    int valid;
     depth d; /* Depth from sample surface */
     double thick; /* Thickness of brick (difference of depth compared to previous brick) */
     double E_0; /* Incident ion energy at depth */
     double S_0;  /* Incident ion energy loss straggling at depth */
     double E_r; /* Energy after reaction */
     double S_r; /* Energy loss straggling after reaction */
+    double E_s; /* Energy at surface (after reaction) */
+    double S_s; /* Energy loss straggling (after reaction) */
     double E; /* Energy of reaction product (as detected, after detector foil) */
     double S; /* Energy loss straggling (variance) of reaction product */
     double S_geo_x; /* Geometric straggling in "width" direction */

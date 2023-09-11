@@ -36,9 +36,11 @@ jabs_histogram *jabs_histogram_alloc(size_t n);
 void jabs_histogram_reset(jabs_histogram *h);
 void jabs_histogram_scale(jabs_histogram *h, double scale);
 inline double jabs_histogram_get(const jabs_histogram *h, size_t i) {return h->bin[i];}
+int jabs_histogram_fprintf(FILE *stream, const jabs_histogram *h, const char *range_format, const char *bin_format);
 
 /* These functions are JaBS additions */
 int jabs_histogram_compare(const jabs_histogram *h1, const jabs_histogram *h2, size_t low, size_t high, double *out);
 double jabs_histogram_roi(const jabs_histogram *h, size_t low, size_t high); /* low and high are both inclusive channel numbers*/
 size_t jabs_histogram_channels_in_range(const jabs_histogram *h, size_t low, size_t high);
+
 #endif // JABS_HISTOGRAM_H

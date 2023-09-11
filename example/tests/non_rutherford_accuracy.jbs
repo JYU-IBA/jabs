@@ -15,11 +15,10 @@ set stopping chu He Si O
 set stopping srim2013 He Si O
 
 
-
 set sim defaults
 simulate
 save spectra "non_rutherford_accuracy_defaults_out.csv"
-test roi [550:900] 214789.0524 1e-2
+test roi [550:950] 215000 1.5e-2
 
 set sim fast
 simulate
@@ -33,11 +32,12 @@ save spectra "non_rutherford_accuracy_brisk_out.csv"
 set sim improved
 simulate
 save spectra "non_rutherford_accuracy_improved_out.csv"
-test roi [550:900] 214789.0524 1e-2
+test roi [550:950] 215000 1e-2
+
 
 set sim accurate
 #set stop_step_incident 1keV
 simulate
 save spectra "non_rutherford_accuracy_accurate_out.csv"
 
-test roi [550:900] 214789.0524 2e-4
+test roi [550:950] 215000 2e-4

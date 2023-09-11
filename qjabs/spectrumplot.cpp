@@ -457,9 +457,7 @@ void SpectrumPlot::contextMenuRequest(const QPoint &pos)
     if(!energyAxis) { /* Selection of ranges is only implemented when X axis is channels */
         menu->addAction("Select range and copy to clipboard", this, &SpectrumPlot::startSelection);
     }
-#ifdef SAVING_QCUSTOMPLOT_PDF_DOES_NOT_CRASH
-    menu->addAction("Save as file...", this, &SpectrumPlot::saveAsFile);
-#endif
+    menu->addAction("Save as a PDF...", this, &SpectrumPlot::saveAsFile);
     menu->popup(mapToGlobal(pos));
 
 }

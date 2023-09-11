@@ -43,7 +43,8 @@ typedef enum jabs_reaction_cs {
     JABS_CS_ANDERSEN = 2,
     JABS_CS_UNIVERSAL = 3,
     JABS_CS_LECUYER = 4,
-    JABS_CS_TEST = 5
+    JABS_CS_THOMASFERMI = 5,
+    JABS_CS_TEST = 6,
 } jabs_reaction_cs;
 
 static const jibal_option jabs_cs_types[] = {
@@ -52,6 +53,7 @@ static const jibal_option jabs_cs_types[] = {
         {"Andersen", JABS_CS_ANDERSEN},
         {"Universal", JABS_CS_UNIVERSAL},
         {"LEcuyer", JABS_CS_LECUYER},
+        {"ThomasFermi", JABS_CS_THOMASFERMI},
 #ifdef JABS_CS_TEST
         {"Test", JABS_CS_TEST},
 #endif
