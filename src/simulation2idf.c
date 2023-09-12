@@ -40,6 +40,11 @@ int simulation2idf(struct fit_data *fit, const char *filename) {
         xmlAddChild(n, notes);
     }
 
+    xmlNodePtr attributes = simulation2idf_attributes(filename);
+    if(attributes) {
+        xmlAddChild(n, attributes);
+    }
+
     xmlNodePtr sample = xmlNewChild(n, NULL, BAD_CAST "sample", NULL);
 
     sample_model *sm2 = sample_model_split_elements(fit->sm); /* TODO: this splits molecules. We might not necessarily want it always, but it is a reasonable default. */
@@ -71,6 +76,13 @@ xmlNodePtr simulation2idf_notes() {
         free(jabs_note);
     }
     return notes;
+}
+
+xmlNodePtr simulation2idf_attributes(const char *filename) {
+    xmlNodePtr attributes = xmlNewNode(NULL, BAD_CAST "attributes");
+    xmlNewChild(attributes, NULL, BAD_CAST "idfversion", BAD_CAST "1.01");
+    /* xmlNewChild(attributes, NULL, BAD_CAST "filename", BAD_CAST filename); */
+    return attributes;
 }
 
 xmlNodePtr simulation2idf_elementsandmolecules(const sample_model *sm) {
