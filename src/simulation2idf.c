@@ -147,6 +147,7 @@ xmlNodePtr simulation2idf_spectra(const struct fit_data *fit) {
         xmlAddChild(spectrum, simulation2idf_beam(fit->sim));
         xmlAddChild(spectrum, simulation2idf_geometry(fit->sim, det));
         xmlAddChild(spectrum, simulation2idf_detection(fit->sim, det));
+        xmlAddChild(spectrum, simulation2idf_calibrations(fit->sim, det));
         xmlAddChild(spectra, spectrum);
     }
     return spectra;
@@ -207,18 +208,47 @@ xmlNodePtr simulation2idf_detection(const simulation *sim, const detector *det) 
     return detection;
 }
 
+xmlNodePtr simulation2idf_calibrations(const simulation *sim, const detector *det) {
+    xmlNodePtr calibrations = xmlNewNode(NULL, BAD_CAST "calibrations");
+    xmlNodePtr detectorresolutions = xmlNewChild(calibrations, NULL, BAD_CAST "detectorresolutions", NULL);
+    xmlNodePtr resolutionparameters = xmlNewChild(detectorresolutions, NULL, BAD_CAST "resolutionparameters", NULL);
+    if(det->type == DETECTOR_ENERGY) {
+        xmlAddChild(resolutionparameters, idf_new_node_units(BAD_CAST "resolutionparameter", BAD_CAST IDF_UNIT_KEV, BAD_CAST IDF_MODE_FWHM, sqrt(det->calibration->resolution_variance)));
+        xmlNodePtr energycalibrations = xmlNewChild(calibrations, NULL, BAD_CAST "energycalibrations", NULL);
+        xmlNodePtr energycalibration = xmlNewChild(energycalibrations, NULL, BAD_CAST "energycalibration", NULL);
+        xmlNewChild(energycalibration, NULL, BAD_CAST "calibrationmode", BAD_CAST "energy");
+        xmlNodePtr calibrationparameters = xmlNewChild(energycalibration, NULL, BAD_CAST "calibrationparameters", NULL);
+        if(det->calibration->type == CALIBRATION_LINEAR || det->calibration->type == CALIBRATION_POLY) {
+            xmlAddChild(calibrationparameters, idf_new_node_units(BAD_CAST "calibrationparameter", BAD_CAST IDF_UNIT_KEV, NULL, calibration_get_param(det->calibration, CALIBRATION_PARAM_OFFSET)));
+            xmlAddChild(calibrationparameters, idf_new_node_units(BAD_CAST "calibrationparameter", BAD_CAST IDF_UNIT_KEVCH, NULL, calibration_get_param(det->calibration, CALIBRATION_PARAM_SLOPE)));
+            if(calibration_get_number_of_params(det->calibration) > 2) {
+                xmlAddChild(calibrationparameters, idf_new_node_units(BAD_CAST "calibrationparameter", BAD_CAST IDF_UNIT_KEVCH2, NULL, calibration_get_param(det->calibration, CALIBRATION_PARAM_QUAD)));
+            }
+            /* TODO: higher degree polynomials could be supported, but then some solution for the units "channel^n" needs to be figured out */
+        }
+    }
+    return calibrations;
+}
+
 xmlNodePtr simulation2idf_aperture(const char *name, const aperture *aperture) {
     if(!aperture) {
         return NULL;
     }
     xmlNodePtr n = xmlNewNode(NULL, BAD_CAST name);
     if(aperture->type == APERTURE_CIRCLE) {
-            xmlNewChild(n, NULL, BAD_CAST "shape", BAD_CAST "circular");
-            xmlAddChild(n, idf_new_node_units(BAD_CAST "l1", BAD_CAST IDF_UNIT_MM, NULL, aperture->diameter));
+        xmlNewChild(n, NULL, BAD_CAST "shape", BAD_CAST "circular");
+        xmlAddChild(n, idf_new_node_units(BAD_CAST "l1", BAD_CAST IDF_UNIT_MM, NULL, aperture->width));
+    } else if(aperture->type == APERTURE_ELLIPSE) {
+        xmlNewChild(n, NULL, BAD_CAST "shape", BAD_CAST "ellipse");
+        xmlAddChild(n, idf_new_node_units(BAD_CAST "l1", BAD_CAST IDF_UNIT_MM, NULL, aperture->width));
+        xmlAddChild(n, idf_new_node_units(BAD_CAST "l2", BAD_CAST IDF_UNIT_MM, NULL, aperture->height));
     } else if(aperture->type == APERTURE_RECTANGLE) {
-            xmlNewChild(n, NULL, BAD_CAST "shape", BAD_CAST "rectangular");
-            xmlAddChild(n, idf_new_node_units(BAD_CAST "l1", BAD_CAST IDF_UNIT_MM, NULL, aperture->width));
-            xmlAddChild(n, idf_new_node_units(BAD_CAST "l2", BAD_CAST IDF_UNIT_MM, NULL, aperture->height));
+        xmlNewChild(n, NULL, BAD_CAST "shape", BAD_CAST "rectangular");
+        xmlAddChild(n, idf_new_node_units(BAD_CAST "l1", BAD_CAST IDF_UNIT_MM, NULL, aperture->width));
+        xmlAddChild(n, idf_new_node_units(BAD_CAST "l2", BAD_CAST IDF_UNIT_MM, NULL, aperture->height));
+    } else if(aperture->type == APERTURE_SQUARE) {
+        xmlNewChild(n, NULL, BAD_CAST "shape", BAD_CAST "square");
+        xmlAddChild(n, idf_new_node_units(BAD_CAST "l1", BAD_CAST IDF_UNIT_MM, NULL, aperture->width));
     }
     return n;
 }

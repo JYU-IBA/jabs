@@ -21,19 +21,22 @@
 typedef enum {
     APERTURE_NONE = 0,
     APERTURE_CIRCLE = 1,
-    APERTURE_RECTANGLE = 2
+    APERTURE_SQUARE = 2,
+    APERTURE_ELLIPSE = 3,
+    APERTURE_RECTANGLE = 4
 } aperture_type;
 
 static const jibal_option aperture_option[] = {
         {JIBAL_OPTION_STR_NONE, APERTURE_NONE},
         {"circle", APERTURE_CIRCLE},
+        {"square", APERTURE_SQUARE},
+        {"ellipse", APERTURE_ELLIPSE},
         {"rectangle", APERTURE_RECTANGLE},
         {NULL, 0}
 };
 
 typedef struct aperture {
     aperture_type type;
-    double diameter;
     double width;
     double height;
 } aperture;

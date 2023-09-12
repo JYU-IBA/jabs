@@ -27,5 +27,6 @@ xmlNodePtr simulation2idf_spectra(const struct fit_data *fit);
 xmlNodePtr simulation2idf_beam(const simulation *sim);
 xmlNodePtr simulation2idf_geometry(const simulation *sim, const detector *det);
 xmlNodePtr simulation2idf_detection(const simulation *sim, const detector *det);
+xmlNodePtr simulation2idf_calibrations(const simulation *sim, const detector *det);
 xmlNodePtr simulation2idf_aperture(const char *name, const aperture *aperture);
 #endif

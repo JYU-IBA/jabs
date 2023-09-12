@@ -178,8 +178,11 @@ int calibration_set_param(calibration *c, int i, double value) {
 double calibration_get_param(const calibration *c, int i) {
     assert(c && c->params);
     const double *val = calibration_get_param_ref((calibration *) c, i);
-    assert(val);
-    return *val;
+    if(val) {
+        return *val;
+    } else {
+        return 0.0;
+    }
 }
 
 size_t calibration_get_number_of_params(const calibration *c) { /* Number does not include "resolution" parameter! */

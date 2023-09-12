@@ -246,13 +246,14 @@ double detector_solid_angle_calc(const detector *det) {
     if(!det->aperture)
         return 0.0;
     if(det->aperture->type == APERTURE_CIRCLE) {
-        return 2.0*C_PI*(1.0 - 1.0/(sqrt(pow2(det->aperture->diameter/2.0/det->distance)+1.0)));
+        return 2.0*C_PI*(1.0 - 1.0/(sqrt(pow2(det->aperture->width/2.0/det->distance)+1.0)));
     }
-    if(det->aperture->type == APERTURE_RECTANGLE) {
+    if(det->aperture->type == APERTURE_RECTANGLE || det->aperture->type == APERTURE_SQUARE) {
         double alpha = det->aperture->width / det->distance / 2.0;
-        double beta =  det->aperture->height / det->distance / 2.0;
+        double beta = det->aperture->height / det->distance / 2.0;
         return 4.0 * atan(alpha * beta / sqrt(1 + pow2(alpha) + pow2(beta)));
     }
+    /* TODO: ellipse */
     return 0.0;
 }
 
