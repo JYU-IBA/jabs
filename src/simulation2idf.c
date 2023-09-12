@@ -16,8 +16,9 @@
 #endif
 #include <stdio.h>
 #include <string.h>
-#include "simulation2idf.h"
 #include "options.h"
+#include "idfparse.h"
+#include "simulation2idf.h"
 
 
 int simulation2idf(struct fit_data *fit, const char *filename) {
@@ -43,8 +44,10 @@ int simulation2idf(struct fit_data *fit, const char *filename) {
 
     sample_model *sm2 = sample_model_split_elements(fit->sm); /* TODO: this splits molecules. We might not necessarily want it always, but it is a reasonable default. */
     xmlNodePtr elementsandmolecules = simulation2idf_elementsandmolecules(sm2);
-    if(elementsandmolecules) {
+    xmlNodePtr structure = simulation2idf_structure(sm2);
+    if(elementsandmolecules && structure) {
         xmlAddChild(sample, elementsandmolecules);
+        xmlAddChild(sample, structure);
     }
     sample_model_free(sm2);
 
@@ -76,13 +79,28 @@ xmlNodePtr simulation2idf_elementsandmolecules(const sample_model *sm) {
     }
     xmlNodePtr elementsandmolecules = xmlNewNode(NULL, BAD_CAST "elementsandmolecules");
     xmlNodePtr elements = xmlNewChild(elementsandmolecules, NULL, BAD_CAST "elements", NULL);
-    char *nelements;
-    asprintf(&nelements, "%zu", sm->n_materials);
-    xmlNewChild(elements, NULL, BAD_CAST "nelements", BAD_CAST nelements);
-    free(nelements);
+    xmlAddChild(elements, idf_new_node_fprint("nelements", "%zu", sm->n_materials));
     for(size_t i = 0; i < sm->n_materials; i++) {
         xmlNodePtr element = xmlNewChild(elementsandmolecules, NULL, BAD_CAST "element", NULL);
         xmlNewChild(element, NULL, BAD_CAST "name", BAD_CAST sm->materials[i]->name);
     }
     return elementsandmolecules;
+}
+
+xmlNodePtr simulation2idf_structure(const sample_model *sm) {
+    if(!sm) {
+        return NULL;
+    }
+    xmlNodePtr structure = xmlNewNode(NULL, BAD_CAST "structure");
+    if(sm->type == SAMPLE_MODEL_LAYERED) {
+        xmlNodePtr layeredstructure = xmlNewChild(structure, NULL, BAD_CAST "layeredstructure", NULL);
+        xmlAddChild(layeredstructure, idf_new_node_fprint("nlayers", "%zu", sm->n_ranges));
+        xmlNodePtr layers = xmlNewChild(layeredstructure, NULL, BAD_CAST "layers", NULL);
+        for(size_t i = 0; i < sm->n_ranges; i++) {
+            xmlNodePtr layer = xmlNewChild(layers, NULL, BAD_CAST "layer", NULL);
+            xmlNodePtr layerthickness = idf_new_node_units("layerthickness", "1e15at/cm2", NULL, sm->ranges[i].x);
+            xmlAddChild(layer, layerthickness);
+        }
+    }
+    return structure;
 }

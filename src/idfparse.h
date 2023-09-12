@@ -100,4 +100,6 @@ char *idf_sim_name(const idf_parser *idf, size_t i_spectrum);
 char *idf_spectrum_out_name(const idf_parser *idf, size_t i_spectrum);
 const char *idf_boolean_to_str(int boolean); /* "true", "false", "unset" trinary */
 const char *idf_error_code_to_str(idf_error idferr);
+xmlNodePtr idf_new_node_fprint(const char *name, const char * restrict format, ...);
+xmlNodePtr idf_new_node_units(const char *name, const char *unit, const char *mode, double value);
 #endif // IDFPARSER_H

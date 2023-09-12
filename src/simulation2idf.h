@@ -21,4 +21,5 @@
 int simulation2idf(struct fit_data *fit, const char *filename);
 xmlNodePtr simulation2idf_notes();
 xmlNodePtr simulation2idf_elementsandmolecules(const sample_model *sm);
+xmlNodePtr simulation2idf_structure(const sample_model *sm);
 #endif

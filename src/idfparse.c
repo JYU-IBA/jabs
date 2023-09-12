@@ -17,6 +17,7 @@
 #define _GNU_SOURCE
 #endif
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include "generic.h"
 #ifdef WIN32
@@ -393,4 +394,26 @@ const char *idf_error_code_to_str(idf_error idferr) {
         default:
             return "unknown error code";
     }
+}
+
+xmlNodePtr idf_new_node_fprint(const char *name, const char * restrict format, ...) { /* Creates a new xmlNode with content using formatted print */
+    va_list argp;
+    va_start(argp, format);
+    char *s;
+    vasprintf(&s, format, argp);
+    va_end(argp);
+    xmlNodePtr n = xmlNewNode(NULL, BAD_CAST name);
+    if(s) {
+        xmlNodeSetContent(n, BAD_CAST s);
+    }
+    free(s);
+    return n;
+}
+
+xmlNodePtr idf_new_node_units(const char *name, const char *unit, const char *mode, double value) {
+    xmlNodePtr n = xmlNewNode(NULL, BAD_CAST name);
+    /* Find multipliers for the given unit and mode (handle cases where the pointers are NULL) */
+    /* Convert value from SI to given unit and from double to char */
+    /* Set node properties (unit, mode) and content (converted value) */
+    return n;
 }
