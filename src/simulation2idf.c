@@ -146,6 +146,7 @@ xmlNodePtr simulation2idf_spectra(const struct fit_data *fit) {
         xmlNodePtr spectrum = xmlNewNode(NULL, BAD_CAST "spectrum");
         xmlAddChild(spectrum, simulation2idf_beam(fit->sim));
         xmlAddChild(spectrum, simulation2idf_geometry(fit->sim, det));
+        xmlAddChild(spectrum, simulation2idf_detection(fit->sim, det));
         xmlAddChild(spectra, spectrum);
     }
     return spectra;
@@ -159,6 +160,9 @@ xmlNodePtr simulation2idf_beam(const simulation *sim) {
     xmlAddChild(beam, idf_new_node_units(BAD_CAST "beamenergy", BAD_CAST IDF_UNIT_KEV, NULL, sim->beam_E));
     xmlAddChild(beam, idf_new_node_units(BAD_CAST "beamenergyspread", BAD_CAST IDF_UNIT_KEV, BAD_CAST IDF_MODE_FWHM, sim->beam_E_broad));
     xmlAddChild(beam, idf_new_node_units(BAD_CAST "beamfluence", BAD_CAST IDF_UNIT_PARTICLES, NULL, sim->fluence));
+    if(sim->beam_aperture) {
+        xmlAddChild(beam, simulation2idf_aperture("beamshape", sim->beam_aperture));
+    }
     return beam;
 }
 
@@ -184,4 +188,37 @@ xmlNodePtr simulation2idf_geometry(const simulation *sim, const detector *det) {
     xmlAddChild(geometry, idf_new_node_units(BAD_CAST "scatteringangle", BAD_CAST IDF_UNIT_DEGREE, NULL, scatteringangle));
     xmlAddChild(geometry, idf_new_node_units(BAD_CAST "exitangle", BAD_CAST IDF_UNIT_DEGREE, NULL, exitangle));
     return geometry;
+}
+
+xmlNodePtr simulation2idf_detection(const simulation *sim, const detector *det) {
+    xmlNodePtr detection = xmlNewNode(NULL, BAD_CAST "detection");
+    xmlNodePtr detector = xmlNewChild(detection, NULL, BAD_CAST "detector", NULL);
+    char *detectortype = NULL;
+    if(det->type == DETECTOR_ENERGY) {
+        detectortype = "SSB";
+    }
+    if(detectortype) {
+        xmlAddChild(detector, idf_new_node_printf(BAD_CAST "detectortype", "%s", detectortype));
+    }
+    xmlAddChild(detector, idf_new_node_units(BAD_CAST "solidangle", BAD_CAST IDF_UNIT_MSR, NULL, det->solid));
+    if(det->aperture) {
+        xmlAddChild(detector, simulation2idf_aperture("detectorshape", det->aperture));
+    }
+    return detection;
+}
+
+xmlNodePtr simulation2idf_aperture(const char *name, const aperture *aperture) {
+    if(!aperture) {
+        return NULL;
+    }
+    xmlNodePtr n = xmlNewNode(NULL, BAD_CAST name);
+    if(aperture->type == APERTURE_CIRCLE) {
+            xmlNewChild(n, NULL, BAD_CAST "shape", BAD_CAST "circular");
+            xmlAddChild(n, idf_new_node_units(BAD_CAST "l1", BAD_CAST IDF_UNIT_MM, NULL, aperture->diameter));
+    } else if(aperture->type == APERTURE_RECTANGLE) {
+            xmlNewChild(n, NULL, BAD_CAST "shape", BAD_CAST "rectangular");
+            xmlAddChild(n, idf_new_node_units(BAD_CAST "l1", BAD_CAST IDF_UNIT_MM, NULL, aperture->width));
+            xmlAddChild(n, idf_new_node_units(BAD_CAST "l2", BAD_CAST IDF_UNIT_MM, NULL, aperture->height));
+    }
+    return n;
 }
