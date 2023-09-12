@@ -17,11 +17,12 @@
 #include <stdio.h>
 #include <string.h>
 #include "options.h"
+#include "geostragg.h"
 #include "idfparse.h"
 #include "simulation2idf.h"
 
 
-int simulation2idf(struct fit_data *fit, const char *filename) {
+int simulation2idf(const struct fit_data *fit, const char *filename) {
     if(!fit->sim) {
         return EXIT_FAILURE;
     }
@@ -55,6 +56,11 @@ int simulation2idf(struct fit_data *fit, const char *filename) {
         xmlAddChild(sample, structure);
     }
     sample_model_free(sm2);
+
+    xmlNodePtr spectra = simulation2idf_spectra(fit);
+    if(spectra) {
+        xmlAddChild(sample, spectra);
+    }
 
     xmlChar *xmlbuff;
     int buffersize;
@@ -91,7 +97,7 @@ xmlNodePtr simulation2idf_elementsandmolecules(const sample_model *sm) {
     }
     xmlNodePtr elementsandmolecules = xmlNewNode(NULL, BAD_CAST "elementsandmolecules");
     xmlNodePtr elements = xmlNewChild(elementsandmolecules, NULL, BAD_CAST "elements", NULL);
-    xmlAddChild(elements, idf_new_node_fprint(BAD_CAST "nelements", "%zu", sm->n_materials));
+    xmlAddChild(elements, idf_new_node_printf(BAD_CAST "nelements", "%zu", sm->n_materials));
     for(size_t i = 0; i < sm->n_materials; i++) {
         xmlNodePtr element = xmlNewChild(elementsandmolecules, NULL, BAD_CAST "element", NULL);
         xmlNewChild(element, NULL, BAD_CAST "name", BAD_CAST sm->materials[i]->name);
@@ -106,7 +112,7 @@ xmlNodePtr simulation2idf_structure(const sample_model *sm) {
     xmlNodePtr structure = xmlNewNode(NULL, BAD_CAST "structure");
     if(sm->type == SAMPLE_MODEL_LAYERED) {
         xmlNodePtr layeredstructure = xmlNewChild(structure, NULL, BAD_CAST "layeredstructure", NULL);
-        xmlAddChild(layeredstructure, idf_new_node_fprint(BAD_CAST "nlayers", "%zu", sm->n_ranges));
+        xmlAddChild(layeredstructure, idf_new_node_printf(BAD_CAST "nlayers", "%zu", sm->n_ranges));
         xmlNodePtr layers = xmlNewChild(layeredstructure, NULL, BAD_CAST "layers", NULL);
         for(size_t i = 0; i < sm->n_ranges; i++) {
             const sample_range *r = &sm->ranges[i];
@@ -128,4 +134,54 @@ xmlNodePtr simulation2idf_structure(const sample_model *sm) {
         }
     }
     return structure;
+}
+
+xmlNodePtr simulation2idf_spectra(const struct fit_data *fit) {
+    if(!fit || !fit->sim) {
+        return NULL;
+    }
+    xmlNodePtr spectra = xmlNewNode(NULL, BAD_CAST "spectra");
+    for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
+        const detector *det = sim_det(fit->sim, i_det);
+        xmlNodePtr spectrum = xmlNewNode(NULL, BAD_CAST "spectrum");
+        xmlAddChild(spectrum, simulation2idf_beam(fit->sim));
+        xmlAddChild(spectrum, simulation2idf_geometry(fit->sim, det));
+        xmlAddChild(spectra, spectrum);
+    }
+    return spectra;
+}
+
+xmlNodePtr simulation2idf_beam(const simulation *sim) {
+    xmlNodePtr beam = xmlNewNode(NULL, BAD_CAST "beam");
+    xmlAddChild(beam, idf_new_node_printf(BAD_CAST "beamparticle", "%s", sim->ion.isotope->name));
+    xmlAddChild(beam, idf_new_node_printf(BAD_CAST "beamZ", "%i", sim->ion.Z));
+    xmlAddChild(beam, idf_new_node_units(BAD_CAST "beammass", BAD_CAST IDF_UNIT_AMU, NULL, sim->ion.isotope->mass));
+    xmlAddChild(beam, idf_new_node_units(BAD_CAST "beamenergy", BAD_CAST IDF_UNIT_KEV, NULL, sim->beam_E));
+    xmlAddChild(beam, idf_new_node_units(BAD_CAST "beamenergyspread", BAD_CAST IDF_UNIT_KEV, BAD_CAST IDF_MODE_FWHM, sim->beam_E_broad));
+    xmlAddChild(beam, idf_new_node_units(BAD_CAST "beamfluence", BAD_CAST IDF_UNIT_PARTICLES, NULL, sim->fluence));
+    return beam;
+}
+
+xmlNodePtr simulation2idf_geometry(const simulation *sim, const detector *det) {
+    xmlNodePtr geometry = xmlNewNode(NULL, BAD_CAST "geometry");
+    double incidenceangle = sim_alpha_angle(sim);
+    double scatteringangle = det->theta;
+    double exitangle = sim_exit_angle(sim, det);
+
+    double ibm1 = exit_angle(incidenceangle, 0.0, scatteringangle, 0.0); /* Exit angle in IBM geometry */
+    double ibm2 = exit_angle(-1.0 * incidenceangle, 0.0, scatteringangle, 0.0); /* Exit angle in IBM geometry (another solution) */
+    double cornell = exit_angle(incidenceangle, 0.0, scatteringangle, 90.0 * C_DEG); /* Exit angle in Cornell geometry */
+    char *geometrytype;
+    if(fabs(exitangle - ibm1) < 0.1 * C_DEG || fabs(exitangle - ibm2) < 0.1 * C_DEG) {
+        geometrytype = "IBM";
+    } else if(fabs(exitangle - cornell) < 0.1 * C_DEG) {
+        geometrytype = "Cornell";
+    } else {
+        geometrytype = "general";
+    }
+    xmlNewChild(geometry, NULL, BAD_CAST "geometrytype", BAD_CAST geometrytype);
+    xmlAddChild(geometry, idf_new_node_units(BAD_CAST "incidenceangle", BAD_CAST IDF_UNIT_DEGREE, NULL, incidenceangle));
+    xmlAddChild(geometry, idf_new_node_units(BAD_CAST "scatteringangle", BAD_CAST IDF_UNIT_DEGREE, NULL, scatteringangle));
+    xmlAddChild(geometry, idf_new_node_units(BAD_CAST "exitangle", BAD_CAST IDF_UNIT_DEGREE, NULL, exitangle));
+    return geometry;
 }

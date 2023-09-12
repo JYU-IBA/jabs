@@ -145,7 +145,7 @@ double idf_unit_string_to_SI(const xmlChar *unit) {
 }
 
 double idf_unit_mode(const xmlChar *mode) {
-    if(idf_stringeq(mode, "FWHM")) {
+    if(idf_stringeq(mode, IDF_MODE_FWHM)) {
         return 1.0/C_FWHM;
     }
     return 1.0;
@@ -396,7 +396,7 @@ const char *idf_error_code_to_str(idf_error idferr) {
     }
 }
 
-xmlNodePtr idf_new_node_fprint(const xmlChar *name, const char * restrict format, ...) { /* Creates a new xmlNode with content using formatted print */
+xmlNodePtr idf_new_node_printf(const xmlChar *name, const char * restrict format, ...) { /* Creates a new xmlNode with content using formatted print */
     va_list argp;
     va_start(argp, format);
     char *s;
