@@ -34,13 +34,9 @@ int simulation2idf(struct fit_data *fit, const char *filename) {
     xmlSetProp(n, BAD_CAST "xmlns", BAD_CAST "http://idf.schemas.itn.pt");
     xmlDocSetRootElement(doc, n);
 
-    xmlNodePtr notes = xmlNewChild(n, NULL, BAD_CAST "notes", NULL);
-    xmlNodePtr note = xmlNewChild(notes, NULL, BAD_CAST "note", NULL);
-
-    char *jabs_note = NULL;
-    if(asprintf(&jabs_note, "File created by JaBS %s", jabs_version()) > 0) {
-        xmlNodeSetContent(note, BAD_CAST jabs_note);
-        free(jabs_note);
+    xmlNodePtr notes = simulation2idf_notes();
+    if(notes) {
+        xmlAddChild(n, notes);
     }
 
     xmlNodePtr sample = xmlNewChild(n, NULL, BAD_CAST "sample", NULL);
@@ -62,19 +58,31 @@ int simulation2idf(struct fit_data *fit, const char *filename) {
     return EXIT_SUCCESS;
 }
 
+xmlNodePtr simulation2idf_notes() {
+    xmlNodePtr notes = xmlNewNode(NULL, BAD_CAST "notes");
+    xmlNodePtr note = xmlNewChild(notes, NULL, BAD_CAST "note", NULL);
+
+    char *jabs_note = NULL;
+    if(asprintf(&jabs_note, "File created by JaBS %s", jabs_version()) > 0) {
+        xmlNodeSetContent(note, BAD_CAST jabs_note);
+        free(jabs_note);
+    }
+    return notes;
+}
+
 xmlNodePtr simulation2idf_elementsandmolecules(const sample_model *sm) {
     if(!sm) {
         return NULL;
     }
-    xmlNodePtr node = xmlNewNode(NULL, BAD_CAST "elementsandmolecules");
-    xmlNodePtr elements = xmlNewChild(node, NULL, BAD_CAST "elements", NULL);
+    xmlNodePtr elementsandmolecules = xmlNewNode(NULL, BAD_CAST "elementsandmolecules");
+    xmlNodePtr elements = xmlNewChild(elementsandmolecules, NULL, BAD_CAST "elements", NULL);
     char *nelements;
     asprintf(&nelements, "%zu", sm->n_materials);
     xmlNewChild(elements, NULL, BAD_CAST "nelements", BAD_CAST nelements);
     free(nelements);
     for(size_t i = 0; i < sm->n_materials; i++) {
-        xmlNodePtr element = xmlNewChild(node, NULL, BAD_CAST "element", NULL);
+        xmlNodePtr element = xmlNewChild(elementsandmolecules, NULL, BAD_CAST "element", NULL);
         xmlNewChild(element, NULL, BAD_CAST "name", BAD_CAST sm->materials[i]->name);
     }
-    return node;
+    return elementsandmolecules;
 }
