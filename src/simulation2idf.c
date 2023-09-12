@@ -109,9 +109,14 @@ xmlNodePtr simulation2idf_structure(const sample_model *sm) {
         xmlAddChild(layeredstructure, idf_new_node_fprint(BAD_CAST "nlayers", "%zu", sm->n_ranges));
         xmlNodePtr layers = xmlNewChild(layeredstructure, NULL, BAD_CAST "layers", NULL);
         for(size_t i = 0; i < sm->n_ranges; i++) {
+            const sample_range *r = &sm->ranges[i];
             xmlNodePtr layer = xmlNewChild(layers, NULL, BAD_CAST "layer", NULL);
-            xmlNodePtr layerthickness = idf_new_node_units(BAD_CAST "layerthickness", BAD_CAST IDF_UNIT_TFU, NULL, sm->ranges[i].x);
+            xmlNodePtr layerthickness = idf_new_node_units(BAD_CAST "layerthickness", BAD_CAST IDF_UNIT_TFU, NULL, r->x);
             xmlAddChild(layer, layerthickness);
+            if(r->rough.model == ROUGHNESS_GAMMA && r->rough.x > 0.0) {
+                xmlNodePtr layeruniformity = idf_new_node_units(BAD_CAST "layeruniformity", BAD_CAST IDF_UNIT_TFU, BAD_CAST "FWHM", r->rough.x);
+                xmlAddChild(layer, layeruniformity);
+            }
             xmlNodePtr layerelements = xmlNewChild(layer, NULL, BAD_CAST "layerelements", NULL);
             for(size_t j = 0; j < sm->n_materials; j++) {
                 xmlNodePtr layerelement = xmlNewNode(NULL, BAD_CAST "layerelement");
