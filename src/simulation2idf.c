@@ -79,7 +79,7 @@ xmlNodePtr simulation2idf_elementsandmolecules(const sample_model *sm) {
     }
     xmlNodePtr elementsandmolecules = xmlNewNode(NULL, BAD_CAST "elementsandmolecules");
     xmlNodePtr elements = xmlNewChild(elementsandmolecules, NULL, BAD_CAST "elements", NULL);
-    xmlAddChild(elements, idf_new_node_fprint("nelements", "%zu", sm->n_materials));
+    xmlAddChild(elements, idf_new_node_fprint(BAD_CAST "nelements", "%zu", sm->n_materials));
     for(size_t i = 0; i < sm->n_materials; i++) {
         xmlNodePtr element = xmlNewChild(elementsandmolecules, NULL, BAD_CAST "element", NULL);
         xmlNewChild(element, NULL, BAD_CAST "name", BAD_CAST sm->materials[i]->name);
@@ -94,12 +94,20 @@ xmlNodePtr simulation2idf_structure(const sample_model *sm) {
     xmlNodePtr structure = xmlNewNode(NULL, BAD_CAST "structure");
     if(sm->type == SAMPLE_MODEL_LAYERED) {
         xmlNodePtr layeredstructure = xmlNewChild(structure, NULL, BAD_CAST "layeredstructure", NULL);
-        xmlAddChild(layeredstructure, idf_new_node_fprint("nlayers", "%zu", sm->n_ranges));
+        xmlAddChild(layeredstructure, idf_new_node_fprint(BAD_CAST "nlayers", "%zu", sm->n_ranges));
         xmlNodePtr layers = xmlNewChild(layeredstructure, NULL, BAD_CAST "layers", NULL);
         for(size_t i = 0; i < sm->n_ranges; i++) {
             xmlNodePtr layer = xmlNewChild(layers, NULL, BAD_CAST "layer", NULL);
-            xmlNodePtr layerthickness = idf_new_node_units("layerthickness", "1e15at/cm2", NULL, sm->ranges[i].x);
+            xmlNodePtr layerthickness = idf_new_node_units(BAD_CAST "layerthickness", BAD_CAST IDF_UNIT_TFU, NULL, sm->ranges[i].x);
             xmlAddChild(layer, layerthickness);
+            xmlNodePtr layerelements = xmlNewChild(layer, NULL, BAD_CAST "layerelements", NULL);
+            for(size_t j = 0; j < sm->n_materials; j++) {
+                xmlNodePtr layerelement = xmlNewNode(NULL, BAD_CAST "layerelement");
+                xmlNewChild(layerelement, NULL, BAD_CAST "name", BAD_CAST sm->materials[j]->name);
+                xmlNodePtr concentration = idf_new_node_units(BAD_CAST "concentration", BAD_CAST IDF_UNIT_FRACTION, NULL, *sample_model_conc_bin(sm, i, j));
+                xmlAddChild(layerelement, concentration);
+                xmlAddChild(layerelements, layerelement);
+            }
         }
     }
     return structure;

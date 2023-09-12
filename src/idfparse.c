@@ -134,7 +134,7 @@ int idf_node_content_to_boolean(const xmlNode *node) {
     return out;
 }
 
-double idf_unit_string_to_SI(xmlChar *unit) {
+double idf_unit_string_to_SI(const xmlChar *unit) {
     for(const idf_unit *u = idf_units; u->unit; u++) {
         if(xmlStrEqual(unit, idf_xmlstr(u->unit))) {
             return u->factor;
@@ -144,7 +144,7 @@ double idf_unit_string_to_SI(xmlChar *unit) {
     return 0.0;
 }
 
-double idf_unit_mode(xmlChar *mode) {
+double idf_unit_mode(const xmlChar *mode) {
     if(idf_stringeq(mode, "FWHM")) {
         return 1.0/C_FWHM;
     }
@@ -396,7 +396,7 @@ const char *idf_error_code_to_str(idf_error idferr) {
     }
 }
 
-xmlNodePtr idf_new_node_fprint(const char *name, const char * restrict format, ...) { /* Creates a new xmlNode with content using formatted print */
+xmlNodePtr idf_new_node_fprint(const xmlChar *name, const char * restrict format, ...) { /* Creates a new xmlNode with content using formatted print */
     va_list argp;
     va_start(argp, format);
     char *s;
@@ -410,10 +410,21 @@ xmlNodePtr idf_new_node_fprint(const char *name, const char * restrict format, .
     return n;
 }
 
-xmlNodePtr idf_new_node_units(const char *name, const char *unit, const char *mode, double value) {
+xmlNodePtr idf_new_node_units(const xmlChar *name, const xmlChar *unit, const xmlChar *mode, double value) {
     xmlNodePtr n = xmlNewNode(NULL, BAD_CAST name);
-    /* Find multipliers for the given unit and mode (handle cases where the pointers are NULL) */
-    /* Convert value from SI to given unit and from double to char */
-    /* Set node properties (unit, mode) and content (converted value) */
+    if(unit) {
+        value /= idf_unit_string_to_SI(unit);
+        xmlSetProp(n, BAD_CAST "units", unit);
+    }
+    if(mode) {
+        value /= idf_unit_mode(mode);
+        xmlSetProp(n, BAD_CAST "mode", mode);
+    }
+    char *out;
+    asprintf(&out, "%g", value);
+    if(out) {
+        xmlNodeSetContent(n, BAD_CAST out);
+    }
+    free(out);
     return n;
 }
