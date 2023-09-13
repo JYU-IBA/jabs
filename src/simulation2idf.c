@@ -133,6 +133,7 @@ xmlNodePtr simulation2idf_structure(const sample_model *sm) {
             }
         }
     }
+    /* TODO: support point-by-point profiles using IDF "pointbypointstructure" */
     return structure;
 }
 
@@ -148,6 +149,13 @@ xmlNodePtr simulation2idf_spectra(const struct fit_data *fit) {
         xmlAddChild(spectrum, simulation2idf_geometry(fit->sim, det));
         xmlAddChild(spectrum, simulation2idf_detection(fit->sim, det));
         xmlAddChild(spectrum, simulation2idf_calibrations(fit->sim, det));
+        xmlAddChild(spectrum, simulation2idf_reactions(fit->sim, det));
+        if(i_det < fit->n_det_spectra) {
+            xmlNodePtr data = simulation2idf_data(&fit->spectra[i_det]);
+            if(data) {
+                xmlAddChild(spectrum, data);
+            }
+        }
         xmlAddChild(spectra, spectrum);
     }
     return spectra;
@@ -251,4 +259,112 @@ xmlNodePtr simulation2idf_aperture(const char *name, const aperture *aperture) {
         xmlAddChild(n, idf_new_node_units(BAD_CAST "l1", BAD_CAST IDF_UNIT_MM, NULL, aperture->width));
     }
     return n;
+}
+
+xmlNodePtr simulation2idf_reactions(const simulation *sim, const detector *det) {
+    xmlNodePtr reactions = xmlNewNode(NULL, BAD_CAST "reactions");
+    /* TODO: technique? We could see if any RBS reactions are used and mark (primary) technique as RBS? */
+
+    reaction_type default_reaction_type = REACTION_NONE;
+    for(size_t i = 0; i < sim->n_reactions; i++) {
+        const reaction *r = sim->reactions[i];
+        if(r->type == REACTION_ERD) {
+            default_reaction_type = REACTION_ERD;
+            break; /* Even one ERDA reaction => this is definitively ERDA (primary technique) */
+        }
+        if(r->type == REACTION_RBS) {
+            default_reaction_type = REACTION_RBS; /* One RBS reaction => this could be RBS (note no break after this assignment) */
+        }
+    }
+    char *technique;
+    switch(default_reaction_type) {
+        case REACTION_RBS:
+            technique = "RBS";
+            break;
+        case REACTION_ERD:
+            technique = "ERDA";
+            break;
+        default:
+            technique = NULL;
+    }
+    if(technique) {
+        xmlNewChild(reactions, NULL, BAD_CAST "technique", BAD_CAST technique);
+    }
+
+    xmlNodePtr reactionlist = xmlNewNode(NULL, BAD_CAST "reactionlist");
+    xmlAddChild(reactions, reactionlist);
+    for(size_t i = 0; i < sim->n_reactions; i++) {
+        const reaction *r = sim->reactions[i];
+        if(!reaction_is_possible(r, sim->params, det->theta)) { /* This is what is used to figure out which reaction is possible with this particular detector. We should probably use the result of an earlier calculation that actually was used to determine the viability. */
+            continue;
+        }
+        if(default_reaction_type == r->type) { /* Don't list reactions that are part of the "technique", usually RBS or ERDA */
+            continue;
+        }
+        xmlNodePtr reaction = xmlNewNode(NULL, BAD_CAST "reaction");
+        xmlNewChild(reaction, NULL, BAD_CAST "initialtargetparticle", BAD_CAST r->target->name);
+        xmlNewChild(reaction, NULL, BAD_CAST "incidentparticle", BAD_CAST r->incident->name);
+        xmlNewChild(reaction, NULL, BAD_CAST "exitparticle", BAD_CAST r->product->name);
+        xmlNewChild(reaction, NULL, BAD_CAST "finaltargetparticle", BAD_CAST r->residual->name);
+        xmlAddChild(reaction, idf_new_node_units(BAD_CAST "reactionQ", BAD_CAST IDF_UNIT_MEV, NULL, r->Q));
+        xmlAddChild(reactionlist, reaction);
+    }
+    return reactions;
+}
+
+xmlNodePtr simulation2idf_data(const result_spectra *spectra) { /* Experimental data */
+    const jabs_histogram *exp = result_spectra_experimental_histo(spectra);
+    xmlNodePtr data = xmlNewNode(NULL, BAD_CAST "data");
+    xmlNewChild(data, NULL, BAD_CAST "datamode", BAD_CAST "simple");
+    xmlNewChild(data, NULL, BAD_CAST "channelmode", BAD_CAST "left");
+    xmlNodePtr simpledata = simulation2idf_simpledata(exp);
+    if(simpledata) { /* Note that if there is no experimental spectrum, exp is NULL, simpledata becomes NULL and no <simpledata> is added at all! (We could make an all-zero spectrum if we wanted to) */
+        xmlAddChild(data, simpledata);
+    }
+    return data;
+}
+
+
+xmlNodePtr simulation2idf_simpledata(const jabs_histogram *h) {
+    if(!h) {
+        return NULL;
+    }
+    xmlNodePtr simpledata = xmlNewNode(NULL, BAD_CAST "simpledata");
+    xmlNodePtr xaxis = xmlNewChild(simpledata, NULL, BAD_CAST "xaxis", NULL);
+    xmlNewChild(xaxis, NULL, BAD_CAST "axisname", BAD_CAST "channel");
+    xmlNewChild(xaxis, NULL, BAD_CAST "axisunit", BAD_CAST "#");
+    xmlNodePtr yaxis = xmlNewChild(simpledata, NULL, BAD_CAST "yaxis", NULL);
+    xmlNewChild(yaxis, NULL, BAD_CAST "axisname", BAD_CAST "yield");
+    xmlNewChild(yaxis, NULL, BAD_CAST "axisunit", BAD_CAST "counts");
+
+    size_t l_max = 16; /* Max 16 chars per data point. This should be generous. If it is not enough, the output will be truncated. */
+    size_t x_alloc = l_max * h->n;
+    size_t y_alloc = l_max * h->n;
+    char *x_data_orig = calloc(x_alloc, sizeof(char));
+    char *y_data_orig = calloc(y_alloc, sizeof(char));
+    char *x_data = x_data_orig;
+    char *y_data = y_data_orig;
+    char *x_data_last = x_data_orig + x_alloc - 1;
+    char *y_data_last = y_data_orig + y_alloc - 1;
+    for(size_t i = 0; i <= h->n; i++) {
+        int l = snprintf(x_data, x_data_last - x_data, "%zu ", i);
+        if(l < 0) {
+            /* TODO: error handling */
+            break;
+        }
+        x_data += l;
+        l = snprintf(y_data, y_data_last - y_data , "%g ", i < h->n ? h->bin[i] : 0.0);
+        if(l < 0) {
+            /* TODO: error handling */
+            break;
+        }
+        y_data += l;
+    }
+    *x_data = '\0';
+    *y_data = '\0';
+    xmlNewChild(simpledata, NULL, BAD_CAST "x", BAD_CAST x_data_orig);
+    xmlNewChild(simpledata, NULL, BAD_CAST "y", BAD_CAST y_data_orig);
+    free(x_data_orig);
+    free(y_data_orig);
+    return simpledata;
 }

@@ -29,4 +29,7 @@ xmlNodePtr simulation2idf_geometry(const simulation *sim, const detector *det);
 xmlNodePtr simulation2idf_detection(const simulation *sim, const detector *det);
 xmlNodePtr simulation2idf_calibrations(const simulation *sim, const detector *det);
 xmlNodePtr simulation2idf_aperture(const char *name, const aperture *aperture);
+xmlNodePtr simulation2idf_reactions(const simulation *sim, const detector *det);
+xmlNodePtr simulation2idf_data(const result_spectra *spectra);
+xmlNodePtr simulation2idf_simpledata(const jabs_histogram *h);
 #endif
