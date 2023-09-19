@@ -93,8 +93,7 @@ int script_prepare_sim_or_fit(script_session *s) {
     sample_print(fit->sim->sample, TRUE, MSG_VERBOSE);
 
     if(assign_stopping(fit->jibal->gsto, fit->sim)) {
-        jabs_message(MSG_ERROR,
-                     "Could not assign stopping or straggling. Failure. Provide more data, check that JIBAL Z2_max is sufficiently large (currently %i) or disable unwanted reactions (e.g. ERD).\n",
+        jabs_message(MSG_ERROR, "Could not assign stopping or straggling. Failure. Provide more data, check that JIBAL Z2_max is sufficiently large (currently %i) or disable unwanted reactions (e.g. ERD).\n",
                      s->jibal->config->Z_max);
         return -1;
     }

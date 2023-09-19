@@ -490,7 +490,7 @@ int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) { /* Ass
     int Z1 = sim->beam_isotope->Z;
     DEBUGMSG("Assigning stopping in Z2 = %i.", Z2);
     if(assign_stopping_Z1_Z2(gsto, Z1, Z2)) {
-        jabs_message(MSG_ERROR, "Can not assign stopping or straggling for beam.");
+        jabs_message(MSG_ERROR, "Can not assign stopping or straggling (beam Z1 = %i). Z2 = %i.\n", Z1, Z2);
         fail = TRUE;
     }
     for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
