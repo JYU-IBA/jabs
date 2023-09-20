@@ -681,6 +681,20 @@ int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename) 
     return EXIT_SUCCESS;
 }
 
+int fit_data_set_sample_model(fit_data *fit, sample_model *sm_new) {
+    int sanity = sample_model_sanity_check(sm_new);
+    if(sanity) {
+        return sanity;
+    }
+    sample_model_free(fit->sm);
+    fit->sm = sm_new;
+    if(fit->sim->n_reactions > 0) {
+        jabs_message(MSG_WARNING, "Reactions were reset automatically, since the sample was changed.\n");
+        sim_reactions_free(fit->sim);
+    }
+    return EXIT_SUCCESS;
+}
+
 jabs_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det) {
     if(!fit)
         return NULL;
