@@ -7,6 +7,7 @@ set det calib linear slope 2keV offset 100keV resolution 10keV
 #Point-by-point profile (depth profile) with concentration gradients
 load sample "point_by_point_profile.txt"
 simulate
+save spectra "point_by_point_out.dat"
 load ref "point_by_point_ref.dat"
 test ref [100:600] 1e-4
 
