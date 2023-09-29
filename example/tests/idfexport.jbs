@@ -1,0 +1,8 @@
+set ion 4He
+set alpha 30deg
+set det theta 160deg aperture rect width 8mm height 8mm
+set det calib linear slope 2keV offset 10keV
+set sample FeNiCo 1000tfu rough 100tfu Si 10000tfu
+load exp "strange_data.dat"
+sim
+save sim "idf_out.xml"
