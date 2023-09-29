@@ -89,6 +89,26 @@ int sample_model_sanity_check(const sample_model *sm) {
         jabs_message(MSG_ERROR, "Sample model fails sanity check (null pointer).\n");
         return EXIT_FAILURE;
     }
+    for(size_t i_mat = 0; i_mat < sm->n_materials; i_mat++) {
+        const jibal_material *mat = sm->materials[i_mat];
+        double elemsum = 0.0;
+        for(size_t i_elem = 0; i_elem < mat->n_elements; i_elem++) {
+            const jibal_element *elem =&mat->elements[i_elem];
+            elemsum += mat->concs[i_elem];
+            double isotopesum = 0.0;
+            for(size_t i_isotope = 0; i_isotope < elem->n_isotopes; i_isotope++) {
+                isotopesum += elem->concs[i_isotope];
+            }
+            DEBUGMSG("Mat %zu elem %zu isotope sum %g", i_mat, i_elem, isotopesum);  /* isotopesum should be one (sum of concentrations of constituent isotopes) since element is normalized */
+            double isotopesum_err = fabs(1.0 - isotopesum); /* Should be zero */
+            if(isotopesum_err > 1e-3) {
+                jabs_message(MSG_ERROR, "Sample model fails sanity check (isotopic abundances of \"%s\" don't sum to unity, but rather to %g). Try specifying an isotope (or a mixture of isotopes) rather than a natural element.\n", mat->name, isotopesum);
+                return EXIT_FAILURE;
+            }
+        }
+        DEBUGMSG("Mat %zu elemsum %g", i_mat, elemsum); /* elemsum should be one (sum of concentrations of constituent elements) since material is normalized */
+    }
+
     for(size_t i = 0; i < sm->n_ranges; i++) {
         const sample_range *r = &sm->ranges[i];
         if(sm->type == SAMPLE_MODEL_LAYERED || sm->type == SAMPLE_MODEL_POINT_BY_POINT_CUMULATIVE) {
@@ -781,12 +801,13 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
                 return NULL;
             }
         } else {
-            sm->materials[sm->n_ranges] = jibal_material_create(jibal->elements, (*argv)[0]);
-            if(!sm->materials[sm->n_ranges]) {
+            jibal_material *mat = jibal_material_create(jibal->elements, (*argv)[0]);
+            if(!mat) {
                 DEBUGMSG("Material from formula \"%s\" was NOT created. Finishing after %zu ranges and %zu materials.", (*argv)[0], sm->n_ranges, sm->n_materials);
                 break;
             }
             DEBUGMSG("Material from formula \"%s\" was created, there are now %zu ranges", (*argv)[0], sm->n_ranges);
+            sm->materials[sm->n_ranges] = mat;
             range = &sm->ranges[sm->n_ranges];
             if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_LAYER_THICKNESS, (*argv)[1], &range->x) < 0) {
                 sample_model_free(sm);

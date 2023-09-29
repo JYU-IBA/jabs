@@ -94,8 +94,7 @@ int script_prepare_sim_or_fit(script_session *s) {
     sample_print(fit->sim->sample, TRUE, MSG_VERBOSE);
 
     if(assign_stopping(fit->jibal->gsto, fit->sim)) {
-        jabs_message(MSG_ERROR,
-                     "Could not assign stopping or straggling. Failure. Provide more data, check that JIBAL Z2_max is sufficiently large (currently %i) or disable unwanted reactions (e.g. ERD).\n",
+        jabs_message(MSG_ERROR, "Could not assign stopping or straggling. Failure. Provide more data, check that JIBAL Z2_max is sufficiently large (currently %i) or disable unwanted reactions (e.g. ERD).\n",
                      s->jibal->config->Z_max);
         return -1;
     }
@@ -1543,11 +1542,9 @@ script_command_status script_load_sample(script_session *s, int argc, char *cons
         jabs_message(MSG_INFO, "Sample load from \"%s\" failed.\n", argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
-    sample_model_free(fit->sm);
-    fit->sm = sm;
-    if(s->fit->sim->n_reactions > 0) {
-        jabs_message(MSG_WARNING, "Reactions were reset automatically, since the sample was changed.\n");
-        sim_reactions_free(fit->sim);
+    if(fit_data_set_sample_model(fit, sm)) {
+        jabs_message(MSG_WARNING, "Setting sample fails due to sample model sanity check.\n");
+        return SCRIPT_COMMAND_FAILURE;
     }
     return 1;
 }
@@ -2136,15 +2133,16 @@ script_command_status script_set_sample(script_session *s, int argc, char *const
     const int argc_orig = argc;
     sample_model *sm_new = sample_model_from_argv(fit->jibal, &argc, &argv);
     if(!sm_new) {
-        jabs_message(MSG_WARNING, "Setting sample fails.\n");
+        jabs_message(MSG_WARNING, "Setting sample fails due to parsing error.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     int argc_consumed = argc_orig - argc;
-    sample_model_free(fit->sm);
-    fit->sm = sm_new;
+    if(fit_data_set_sample_model(fit, sm_new)) {
+        jabs_message(MSG_WARNING, "Setting sample fails due to sample model sanity check.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
     if(s->fit->sim->n_reactions > 0) {
         jabs_message(MSG_WARNING, "Reactions were reset automatically, since the sample was changed.\n");
-        sim_reactions_free(fit->sim);
     }
     return argc_consumed;
 }

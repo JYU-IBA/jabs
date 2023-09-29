@@ -23,6 +23,10 @@ if(WIN32)
     find_library(GETOPT_LIBRARY getopt)
 endif()
 
+if(APPLE)
+    include(../rpathmagic.cmake) # Maybe a temporary fix to some library issues
+endif ()
+
 add_executable(jabs
         main.c
         sample.c brick.c ion.c simulation.c reaction.c options.c
@@ -39,6 +43,7 @@ add_executable(jabs
 
 target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
 
+
 target_link_libraries(jabs
     PRIVATE jibal
     PRIVATE GSL::gsl
@@ -50,7 +55,6 @@ target_link_libraries(jabs
 if(OpenMP_C_FOUND)
     target_link_libraries(jabs PUBLIC OpenMP::OpenMP_C)
 endif()
-
 
 install(TARGETS jabs RUNTIME DESTINATION bin)
 

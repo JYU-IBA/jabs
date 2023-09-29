@@ -137,6 +137,7 @@ void fit_data_fdd_free(fit_data *fit);
 void fit_data_exp_alloc(fit_data *fit);
 void fit_data_exp_free(fit_data *fit);
 int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename);
+int fit_data_set_sample_model(fit_data *fit, sample_model *sm_new); /* Sets sample model of the fit (copies pointer), freeing the old model. Resets reactions. */
 jabs_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det);
 void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *s, const detector *det, const jabs_histogram *exp, const sim_workspace *ws); /* Makes deep copies of histograms */
 int fit_data_spectra_alloc(fit_data *fit);

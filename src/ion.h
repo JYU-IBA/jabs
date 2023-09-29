@@ -17,6 +17,7 @@ typedef struct jabs_ion_gsto {
     double emax;
     const jibal_isotope *incident;
     int refcount;
+    int Z2_max; /* Copy of gsto->Z2_max */
 } jabs_ion_gsto;
 
 typedef struct ion {

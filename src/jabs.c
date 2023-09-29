@@ -351,8 +351,8 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         if(b_prev) {
             d_diff = depth_diff(d_before, d_after);
             if(d_diff == 0) { /* Zero thickness brick, so no energy change either */
-                E_deriv = b_prev->deriv * 1.5; /* TODO: Can't calculate, assume. The 1.5 is a safety factor. TODO: may lead to exponential growth...  */
-                DEBUGVERBOSEMSG("Taking previous E_deriv and multiplying, got %g.", E_deriv);
+                E_deriv = 10.0; /* Can't calculate derivative, so we assume it is large */
+                DEBUGVERBOSEMSG("Zero thickness brick, setting derivative to %g.", E_deriv);
                 sigma_conc = 0.0;
             } else {
                 sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
@@ -369,7 +369,11 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             double stop_exiting = stop_sample(&ws->stop, &sim_r->p, sample, d_after, b->E_r) * sim_r->p.inverse_cosine_theta;
             double K = reaction_product_energy(sim_r->r, sim_r->theta, b->E_0) / b->E_0;
             DEBUGVERBOSEMSG("Calculating E_deriv = (%g * (%g eV/tfu) - (%g eV/tfu)) / (%g eV/tfu)", K, stop_incident / C_EV_TFU, stop_exiting / C_EV_TFU, stop_incident / C_EV_TFU);
-            E_deriv = fabs((K * stop_incident - stop_exiting ) / (stop_incident)); /* TODO: NaN if reaction is not possible */
+            if(stop_incident < 0.001  * C_EV_TFU) {
+                E_deriv = 10.0; /* Reasonable default if there is no stopping? */
+            } else {
+                E_deriv = fabs((K * stop_incident - stop_exiting) / (stop_incident)); /* TODO: NaN if reaction is not possible or if there is no stopping */
+            }
         }
         DEBUGVERBOSEMSG("E_deriv before imposing min/max clamping was %g.", E_deriv);
         E_deriv = GSL_MAX_DBL(E_deriv, ENERGY_DERIVATIVE_MIN);
@@ -490,7 +494,7 @@ int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) { /* Ass
     int Z1 = sim->beam_isotope->Z;
     DEBUGMSG("Assigning stopping in Z2 = %i.", Z2);
     if(assign_stopping_Z1_Z2(gsto, Z1, Z2)) {
-        jabs_message(MSG_ERROR, "Can not assign stopping or straggling for beam.");
+        jabs_message(MSG_ERROR, "Can not assign stopping or straggling (beam Z1 = %i). Z2 = %i.\n", Z1, Z2);
         fail = TRUE;
     }
     for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {

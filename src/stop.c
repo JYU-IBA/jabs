@@ -142,10 +142,12 @@ double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sam
         if(c < CONC_TOLERANCE)
             continue;
         int Z2 = target->Z;
+        assert(Z2 <= incident->ion_gsto->Z2_max);
         if(Z2 != Z2_old) { /* This saves some computing time, but for electronic stopping we could just sum all isotopic concentrations (and note that those stay constant while we are doing stopping calculations) */
             if(stop->type == GSTO_STO_TOT) {
                 file = incident->ion_gsto->gsto_data[Z2].stopfile;
                 data = incident->ion_gsto->gsto_data[Z2].stopdata;
+                assert(file);
                 if(file->stounit == GSTO_STO_UNIT_EV15CM2) {
                     unit_factor = C_EV_TFU;
                 } else {
