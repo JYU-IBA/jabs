@@ -1,0 +1,7 @@
+set ion 4He
+set energy 2.5MeV
+set det theta 160deg slope 1keV offset 0
+set sample Au 1000tfu Al 10tfu
+sim
+roi [1100:1300]
+test roi [1100:1300] 1554 1e-2
