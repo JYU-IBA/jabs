@@ -19,6 +19,7 @@
 #include "options.h"
 #include "geostragg.h"
 #include "idfparse.h"
+#include "jabs_debug.h"
 #include "simulation2idf.h"
 
 
@@ -86,7 +87,7 @@ xmlNodePtr simulation2idf_notes() {
 
 xmlNodePtr simulation2idf_attributes(const char *filename) {
     xmlNodePtr attributes = xmlNewNode(NULL, BAD_CAST "attributes");
-    xmlNewChild(attributes, NULL, BAD_CAST "idfversion", BAD_CAST "1.01");
+    xmlNewChild(attributes, NULL, BAD_CAST "idfversion", BAD_CAST "1.02");
     /* xmlNewChild(attributes, NULL, BAD_CAST "filename", BAD_CAST filename); */
     return attributes;
 }
@@ -151,9 +152,13 @@ xmlNodePtr simulation2idf_spectra(const struct fit_data *fit) {
         xmlAddChild(spectrum, simulation2idf_calibrations(fit->sim, det));
         xmlAddChild(spectrum, simulation2idf_reactions(fit->sim, det));
         if(i_det < fit->n_det_spectra) {
-            xmlNodePtr data = simulation2idf_data(&fit->spectra[i_det]);
+            xmlNodePtr data = simulation2idf_data(result_spectra_experimental_histo(&(fit->spectra[i_det])));
             if(data) {
                 xmlAddChild(spectrum, data);
+            }
+            xmlNodePtr process = simulation2idf_process(fit->sim, &fit->spectra[i_det]);
+            if(process) {
+                xmlAddChild(spectrum, process);
             }
         }
         xmlAddChild(spectra, spectrum);
@@ -312,16 +317,32 @@ xmlNodePtr simulation2idf_reactions(const simulation *sim, const detector *det) 
     return reactions;
 }
 
-xmlNodePtr simulation2idf_data(const result_spectra *spectra) { /* Experimental data */
-    const jabs_histogram *exp = result_spectra_experimental_histo(spectra);
+xmlNodePtr simulation2idf_data(const jabs_histogram *h) {
+    if(!h) {
+        return NULL;
+    }
     xmlNodePtr data = xmlNewNode(NULL, BAD_CAST "data");
     xmlNewChild(data, NULL, BAD_CAST "datamode", BAD_CAST "simple");
     xmlNewChild(data, NULL, BAD_CAST "channelmode", BAD_CAST "left");
-    xmlNodePtr simpledata = simulation2idf_simpledata(exp);
+    xmlNodePtr simpledata = simulation2idf_simpledata(h);
     if(simpledata) { /* Note that if there is no experimental spectrum, exp is NULL, simpledata becomes NULL and no <simpledata> is added at all! (We could make an all-zero spectrum if we wanted to) */
         xmlAddChild(data, simpledata);
     }
     return data;
+}
+
+xmlNodePtr simulation2idf_process(const simulation *sim, const result_spectra *spectrum) {
+    xmlNodePtr process = xmlNewNode(NULL, BAD_CAST "process");
+    xmlNodePtr simulations = xmlNewChild(process, NULL, BAD_CAST "simulations", NULL);
+    xmlNodePtr simulation = xmlNewChild(simulations, NULL, BAD_CAST "simulation", NULL);
+    xmlNewChild(simulation, NULL, BAD_CAST "simulationtype", BAD_CAST "total");
+    xmlNewChild(simulation, NULL, BAD_CAST "datamode", BAD_CAST "simple");
+    xmlNewChild(simulation, NULL, BAD_CAST "channelmode", BAD_CAST "left");
+    xmlNodePtr simpledata = simulation2idf_simpledata(result_spectra_simulated_histo(spectrum));
+    if(simpledata) {
+        xmlAddChild(simulation, simpledata);
+    }
+    return process;
 }
 
 
@@ -337,11 +358,18 @@ xmlNodePtr simulation2idf_simpledata(const jabs_histogram *h) {
     xmlNewChild(yaxis, NULL, BAD_CAST "axisname", BAD_CAST "yield");
     xmlNewChild(yaxis, NULL, BAD_CAST "axisunit", BAD_CAST "counts");
 
-    size_t l_max = 16; /* Max 16 chars per data point. This should be generous. If it is not enough, the output will be truncated. */
+    int prec = 10; /* Precision we ask */
+    size_t l_max = prec + 10; /* In addition to "prec" digits we needs space for leading sign, decimal separator, 'e', sign of exponent, and for the exponent (max 4 digits), and a space. This is nine characters. I probably forgot something, so ten it is.  We use the same math for channel numbers, because we are lazy. */
     size_t x_alloc = l_max * h->n;
     size_t y_alloc = l_max * h->n;
     char *x_data_orig = calloc(x_alloc, sizeof(char));
     char *y_data_orig = calloc(y_alloc, sizeof(char));
+    if(!x_data_orig || !y_data_orig) {
+        free(x_data_orig);
+        free(y_data_orig);
+        return NULL;
+    }
+    DEBUGMSG("IDF simpledata output, space for %zu and %zu characters for x and y, respectively based on %zu bins.", x_alloc, y_alloc, h->n);
     char *x_data = x_data_orig;
     char *y_data = y_data_orig;
     char *x_data_last = x_data_orig + x_alloc - 1;
@@ -353,7 +381,7 @@ xmlNodePtr simulation2idf_simpledata(const jabs_histogram *h) {
             break;
         }
         x_data += l;
-        l = snprintf(y_data, y_data_last - y_data , "%g ", i < h->n ? h->bin[i] : 0.0);
+        l = snprintf(y_data, y_data_last - y_data , "%.*g ", prec, i < h->n ? h->bin[i] : 0.0);
         if(l < 0) {
             /* TODO: error handling */
             break;
