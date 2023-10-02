@@ -2,6 +2,13 @@ set ion 4He
 set alpha 30deg
 set det theta 160deg aperture rect width 8mm height 8mm
 set det calib linear slope 2keV offset 10keV
+
+#set det calibration Li linear slope 3keV
+
+#set det type tof slope 1keV offset 0keV theta 40.6deg
+#set det resolution 250ps foil C 150tfu length 623mm
+#set det distance 95cm aperture rectangle width 14mm height 14mm solid 0.2msr
+
 set sample FeNiCo 1000tfu rough 100tfu Si 10000tfu
 load exp "strange_data.dat"
 sim
