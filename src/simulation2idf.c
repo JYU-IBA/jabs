@@ -16,6 +16,7 @@
 #endif
 #include <stdio.h>
 #include <string.h>
+#include "defaults.h"
 #include "options.h"
 #include "geostragg.h"
 #include "idfparse.h"
@@ -126,9 +127,13 @@ xmlNodePtr simulation2idf_structure(const sample_model *sm) {
             }
             xmlNodePtr layerelements = xmlNewChild(layer, NULL, BAD_CAST "layerelements", NULL);
             for(size_t j = 0; j < sm->n_materials; j++) {
+                double conc = *sample_model_conc_bin(sm, i, j);
+                if(conc == 0.0) {
+                    continue;
+                }
                 xmlNodePtr layerelement = xmlNewNode(NULL, BAD_CAST "layerelement");
                 xmlNewChild(layerelement, NULL, BAD_CAST "name", BAD_CAST sm->materials[j]->name);
-                xmlNodePtr concentration = idf_new_node_units(BAD_CAST "concentration", BAD_CAST IDF_UNIT_FRACTION, NULL, *sample_model_conc_bin(sm, i, j));
+                xmlNodePtr concentration = idf_new_node_units(BAD_CAST "concentration", BAD_CAST IDF_UNIT_FRACTION, NULL, conc);
                 xmlAddChild(layerelement, concentration);
                 xmlAddChild(layerelements, layerelement);
             }
@@ -149,7 +154,7 @@ xmlNodePtr simulation2idf_spectra(const struct fit_data *fit) {
         xmlAddChild(spectrum, simulation2idf_beam(fit->sim));
         xmlAddChild(spectrum, simulation2idf_geometry(fit->sim, det));
         xmlAddChild(spectrum, simulation2idf_detection(fit->sim, det));
-        xmlAddChild(spectrum, simulation2idf_calibrations(fit->sim, det));
+        xmlAddChild(spectrum, simulation2idf_calibrations(fit->jibal->elements, fit->sim, det));
         xmlAddChild(spectrum, simulation2idf_reactions(fit->sim, det));
         if(i_det < fit->n_det_spectra) {
             xmlNodePtr data = simulation2idf_data(result_spectra_experimental_histo(&(fit->spectra[i_det])));
@@ -208,8 +213,18 @@ xmlNodePtr simulation2idf_detection(const simulation *sim, const detector *det) 
     xmlNodePtr detection = xmlNewNode(NULL, BAD_CAST "detection");
     xmlNodePtr detector = xmlNewChild(detection, NULL, BAD_CAST "detector", NULL);
     char *detectortype = NULL;
-    if(det->type == DETECTOR_ENERGY) {
-        detectortype = "SSB";
+    switch(det->type) {
+        case DETECTOR_ENERGY:
+            detectortype = "SSB";
+            break;
+        case DETECTOR_TOF:
+            detectortype = "ToF";
+            break;
+        case DETECTOR_ELECTROSTATIC:
+            detectortype = "ElSpec";
+            break;
+        default:
+            break;
     }
     if(detectortype) {
         xmlAddChild(detector, idf_new_node_printf(BAD_CAST "detectortype", "%s", detectortype));
@@ -218,29 +233,68 @@ xmlNodePtr simulation2idf_detection(const simulation *sim, const detector *det) 
     if(det->aperture) {
         xmlAddChild(detector, simulation2idf_aperture("detectorshape", det->aperture));
     }
+    if(det->type == DETECTOR_TOF) {
+        xmlNodePtr tof = xmlNewChild(detector, NULL, BAD_CAST "tof", NULL);
+        xmlAddChild(tof, idf_new_node_units(BAD_CAST "toflength", BAD_CAST IDF_UNIT_MM, NULL, det->length));
+        xmlAddChild(tof, idf_new_node_units(BAD_CAST "toftimeresolution", BAD_CAST IDF_UNIT_NS, BAD_CAST IDF_MODE_FWHM, sqrt(det->calibration->resolution_variance)));
+    }
+    if(det->distance > 0.0) {
+        xmlAddChild(detector, idf_new_node_units(BAD_CAST "distancedetectortosample", BAD_CAST IDF_UNIT_MM, NULL, det->distance));
+    }
     return detection;
 }
 
-xmlNodePtr simulation2idf_calibrations(const simulation *sim, const detector *det) {
+xmlNodePtr simulation2idf_calibrations(const jibal_element *elements, const simulation *sim, const detector *det) {
     xmlNodePtr calibrations = xmlNewNode(NULL, BAD_CAST "calibrations");
     xmlNodePtr detectorresolutions = xmlNewChild(calibrations, NULL, BAD_CAST "detectorresolutions", NULL);
-    xmlNodePtr resolutionparameters = xmlNewChild(detectorresolutions, NULL, BAD_CAST "resolutionparameters", NULL);
-    if(det->type == DETECTOR_ENERGY) {
-        xmlAddChild(resolutionparameters, idf_new_node_units(BAD_CAST "resolutionparameter", BAD_CAST IDF_UNIT_KEV, BAD_CAST IDF_MODE_FWHM, sqrt(det->calibration->resolution_variance)));
-        xmlNodePtr energycalibrations = xmlNewChild(calibrations, NULL, BAD_CAST "energycalibrations", NULL);
-        xmlNodePtr energycalibration = xmlNewChild(energycalibrations, NULL, BAD_CAST "energycalibration", NULL);
-        xmlNewChild(energycalibration, NULL, BAD_CAST "calibrationmode", BAD_CAST "energy");
-        xmlNodePtr calibrationparameters = xmlNewChild(energycalibration, NULL, BAD_CAST "calibrationparameters", NULL);
-        if(det->calibration->type == CALIBRATION_LINEAR || det->calibration->type == CALIBRATION_POLY) {
-            xmlAddChild(calibrationparameters, idf_new_node_units(BAD_CAST "calibrationparameter", BAD_CAST IDF_UNIT_KEV, NULL, calibration_get_param(det->calibration, CALIBRATION_PARAM_OFFSET)));
-            xmlAddChild(calibrationparameters, idf_new_node_units(BAD_CAST "calibrationparameter", BAD_CAST IDF_UNIT_KEVCH, NULL, calibration_get_param(det->calibration, CALIBRATION_PARAM_SLOPE)));
-            if(calibration_get_number_of_params(det->calibration) > 2) {
-                xmlAddChild(calibrationparameters, idf_new_node_units(BAD_CAST "calibrationparameter", BAD_CAST IDF_UNIT_KEVCH2, NULL, calibration_get_param(det->calibration, CALIBRATION_PARAM_QUAD)));
-            }
-            /* TODO: higher degree polynomials could be supported, but then some solution for the units "channel^n" needs to be figured out */
+    xmlNodePtr detectorresolution = simulation2idf_detectorresolution(det, det->calibration, NULL);
+    xmlNodePtr energycalibrations = xmlNewChild(calibrations, NULL, BAD_CAST "energycalibrations", NULL);
+    xmlAddChild(energycalibrations, simulation2idf_energycalibration(det, det->calibration, NULL));
+    for(int Z = 0; Z <= det->cal_Z_max; Z++) {
+        const calibration *cal = detector_get_calibration(det, Z);
+        if(cal == det->calibration) {
+            continue;
         }
+        const char *ion_name = jibal_element_name(elements, Z);
+        xmlAddChild(detectorresolutions, simulation2idf_detectorresolution(det, cal, ion_name));
+        xmlAddChild(energycalibrations, simulation2idf_energycalibration(det, cal, ion_name));
     }
     return calibrations;
+}
+
+xmlNodePtr simulation2idf_detectorresolution(const detector *det, const calibration *cal, const char  *ion_name) {
+    xmlNodePtr detectorresolution = xmlNewNode(NULL, BAD_CAST "detectorresolution");
+    if(ion_name) {
+        xmlNewChild(detectorresolution, NULL, BAD_CAST "resolutionion", BAD_CAST ion_name); /* This can be either ion or isotope name, (e.g. "He" or "4He"). If NULL, we omit this field (default resolution). This is not exactly correct way to do it with NDF if multiple species are detected. */
+    }
+    xmlNodePtr resolutionparameters = xmlNewChild(detectorresolution, NULL, BAD_CAST "resolutionparameters", NULL);
+    double resolution;
+    if(det->type ==  DETECTOR_ENERGY) {
+        resolution = cal->resolution;
+    } else {
+        resolution = DETECTOR_RESOLUTION_DEFAULT; /* TODO: SIMNRA saves energy resolution even for ToF detector. We can't. Save default. */
+    }
+    resolution /=  C_FWHM;
+    xmlAddChild(resolutionparameters, idf_new_node_units(BAD_CAST "resolutionparameter", BAD_CAST IDF_UNIT_KEV, BAD_CAST IDF_MODE_FWHM, resolution));
+    return detectorresolution;
+}
+
+xmlNodePtr simulation2idf_energycalibration(const detector *det, const calibration *cal, const char *ion_name) {
+    xmlNodePtr energycalibration = xmlNewNode(NULL, BAD_CAST "energycalibration");
+    if(ion_name) {
+        xmlNewChild(energycalibration, NULL, BAD_CAST "calibrationion", BAD_CAST ion_name); /* This can be either ion or isotope name, (e.g. "He" or "4He"). If NULL, we omit this field (default calibration). This is not exactly correct way to do it with NDF if multiple species are detected. */
+    }
+    xmlNewChild(energycalibration, NULL, BAD_CAST "calibrationmode", BAD_CAST "energy");
+    xmlNodePtr calibrationparameters = xmlNewChild(energycalibration, NULL, BAD_CAST "calibrationparameters", NULL);
+    if(cal->type == CALIBRATION_LINEAR || cal->type == CALIBRATION_POLY) {
+        xmlAddChild(calibrationparameters, idf_new_node_units(BAD_CAST "calibrationparameter", BAD_CAST IDF_UNIT_KEV, NULL, calibration_get_param(cal, CALIBRATION_PARAM_OFFSET)));
+        xmlAddChild(calibrationparameters, idf_new_node_units(BAD_CAST "calibrationparameter", BAD_CAST IDF_UNIT_KEVCH, NULL, calibration_get_param(cal, CALIBRATION_PARAM_SLOPE)));
+        if(calibration_get_number_of_params(cal) > 2) {
+            xmlAddChild(calibrationparameters, idf_new_node_units(BAD_CAST "calibrationparameter", BAD_CAST IDF_UNIT_KEVCH2, NULL, calibration_get_param(cal, CALIBRATION_PARAM_QUAD)));
+        }
+        /* TODO: higher degree polynomials could be supported, but then some solution for the units "channel^n" needs to be figured out */
+    }
+    return energycalibration;
 }
 
 xmlNodePtr simulation2idf_aperture(const char *name, const aperture *aperture) {
