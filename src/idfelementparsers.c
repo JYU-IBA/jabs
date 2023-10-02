@@ -348,6 +348,14 @@ idf_error idf_detectorshape_or_spot(idf_parser *idf, xmlNode *node, const char *
         if(l1 > 0.0 && l2 > 0.0) {
             idf_output_printf(idf, "%s rectangle width %gmm height %gmm\n", prefix, l1 / C_MM, l2 / C_MM);
         }
+    } else if(idf_stringneq(shape, "ellip", 4)) {
+        if(l1 > 0.0 && l2 > 0.0) {
+            idf_output_printf(idf, "%s ellipse width %gmm height %gmm\n", prefix, l1 / C_MM, l2 / C_MM);
+        }
+    } else if(idf_stringneq(shape, "squ", 4)) {
+        if(l1 > 0.0) {
+            idf_output_printf(idf, "%s square width %gmm\n", prefix, l1 / C_MM);
+        }
     }
     free(shape);
     return IDF2JBS_SUCCESS;

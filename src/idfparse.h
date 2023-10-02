@@ -39,25 +39,47 @@ typedef struct idf_unit {
     double factor;
 } idf_unit;
 
+#define IDF_MODE_FWHM "FWHM"
+
+#define IDF_UNIT_FRACTION "fraction"
+#define IDF_UNIT_DEGREE "degree"
+#define IDF_UNIT_RADIAN "radian"
+#define IDF_UNIT_TFU "1e15at/cm2"
+#define IDF_UNIT_PARTICLES "#particles"
+#define IDF_UNIT_AMU "amu"
+#define IDF_UNIT_KEV "keV"
+#define IDF_UNIT_KEVCH "keV/channel"
+#define IDF_UNIT_KEVCH2 "keV/channel^2"
+#define IDF_UNIT_MEV "MeV"
+#define IDF_UNIT_M "m"
+#define IDF_UNIT_CM "cm"
+#define IDF_UNIT_MM "mm"
+#define IDF_UNIT_US "us"
+#define IDF_UNIT_NS "ns"
+#define IDF_UNIT_PS "ps"
+#define IDF_UNIT_MSR "msr"
+#define IDF_UNIT_SR "sr"
+
+
 static const idf_unit idf_units[] = {
-        {"fraction", 1.0},
-        {"degree", C_DEG},
-        {"radian", 1.0},
-        {"1e15at/cm2", C_TFU},
-        {"#particles", 1.0},
-        {"amu", C_U},
-        {"keV", C_KEV},
-        {"keV/channel", C_KEV},
-        {"keV/channel^2", C_KEV},
-        {"MeV", C_MEV},
-        {"m",  1.0},
-        {"cm", C_CM},
-        {"mm", C_MM},
-        {"us", C_US},
-        {"ns", C_NS},
-        {"ps", C_PS},
-        {"msr", C_MSR},
-        {"sr", 1.0},
+        {IDF_UNIT_FRACTION, 1.0},
+        {IDF_UNIT_DEGREE, C_DEG},
+        {IDF_UNIT_RADIAN, 1.0},
+        {IDF_UNIT_TFU, C_TFU},
+        {IDF_UNIT_PARTICLES, 1.0},
+        {IDF_UNIT_AMU, C_U},
+        {IDF_UNIT_KEV, C_KEV},
+        {IDF_UNIT_KEVCH, C_KEV},
+        {IDF_UNIT_KEVCH2, C_KEV},
+        {IDF_UNIT_MEV, C_MEV},
+        {IDF_UNIT_M,  1.0},
+        {IDF_UNIT_CM, C_CM},
+        {IDF_UNIT_MM, C_MM},
+        {IDF_UNIT_US, C_US},
+        {IDF_UNIT_NS, C_NS},
+        {IDF_UNIT_PS, C_PS},
+        {IDF_UNIT_MSR, C_MSR},
+        {IDF_UNIT_SR, 1.0},
         {0, 0}};
 
 typedef struct idf_parser {
@@ -83,8 +105,8 @@ char *idf_node_content_to_str(const xmlNode *node); /* will always return a char
 const xmlChar *idf_xmlstr(const char *s);
 double idf_node_content_to_double(const xmlNode *node); /* performs unit conversion */
 int idf_node_content_to_boolean(const xmlNode *node);
-double idf_unit_string_to_SI(xmlChar *unit);
-double idf_unit_mode(xmlChar *mode); /* FWHM etc */
+double idf_unit_string_to_SI(const xmlChar *unit);
+double idf_unit_mode(const xmlChar *mode); /* FWHM etc */
 int idf_stringeq(const void *a, const void *b);
 int idf_stringneq(const void *a, const void *b, size_t n);
 idf_error idf_write_simple_data_to_file(const char *filename, const char *x, const char *y);
@@ -100,4 +122,6 @@ char *idf_sim_name(const idf_parser *idf, size_t i_spectrum);
 char *idf_spectrum_out_name(const idf_parser *idf, size_t i_spectrum);
 const char *idf_boolean_to_str(int boolean); /* "true", "false", "unset" trinary */
 const char *idf_error_code_to_str(idf_error idferr);
+xmlNodePtr idf_new_node_printf(const xmlChar *name, const char * restrict format, ...);
+xmlNodePtr idf_new_node_units(const xmlChar *name, const xmlChar *unit, const xmlChar *mode, double value);
 #endif // IDFPARSER_H
