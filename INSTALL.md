@@ -1,6 +1,6 @@
 # Binary distribution
 
-Standalone Windows and macOS disk images (dmg) are found in GitHub and [http://users.jyu.fi/~jaakjuli/jabs/binaries/](elsewhere).
+Standalone Windows and macOS disk images (dmg) are found in [GitHub releases](https://github.com/JYU-IBA/jabs/releases).
 
 # Compiling JaBS from sources
 

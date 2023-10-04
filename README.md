@@ -72,15 +72,15 @@ The scripting language is not a programming language, there is no flow control, 
  - Testing of areal sum (counts) and residuals. Some test cases are run by the developer to check sanity and accuracy of simulations for every new release.
  - Higher accuracy mode using adaptive integration for more accurate handling of sharp peaks in cross sections (resonances) and accurate weighting of cross sections by (Gaussian) straggling.
  - Conversion tool from IDF to JaBS script (partial support)
+ - Export of simulations to IDF (partial support)
  - Simulation of large angle plural scattering (dual scattering model), with the assumption that first scattering is RBS (not ERD).
  - Multiprocessor support when simulating multiple detectors and when fitting multiple parameters
- - 
+
 ### Not implemented, but planned or being worked on
  - Support for more input and output data formats (CSV, ...)
  - Multiple scattering (small angle)
  - Simulation of pile-up and dead time
  - Simulation of time-of-flight spectra
- - Publication quality plotting
 
 ### Distant future, if ever
  - Advanced fitting algorithms
@@ -90,7 +90,7 @@ The scripting language is not a programming language, there is no flow control, 
 ### Known issues
  - Saving a detector to a file is not supported. Calibrations can be saved as a script.
  - Ad-hoc channeling correction is the same for all detectors
- - Import of IDF is partial at best and exporting is not implemented
+ - Import and export of IDF files produce intended results, since the IDF support is only partial. Use caution and common sense.
 
 ## Fitting
 
