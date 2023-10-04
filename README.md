@@ -21,6 +21,8 @@ Simulates and fits RBS, EBS, ERD and NRA spectra rapidly.
 
 Please see additional notes regarding copyrights of included open source code at the end of this document.
 
+Additional information and resources might be available on [JaBS home page](http://users.jyu.fi/~jaakjuli/jabs/).
+
 ## Binary packages
 Some ready-to-use binary packages for each [release](https://github.com/JYU-IBA/jabs/releases) for Windows and macOS may be available. The Windows distribution includes two executables: `jabs.exe` (command line) and `qjabs.exe` (graphical interface). The macOS binary is a regular application bundle. All necessary data files (stopping etc.) are included in these distributions.
 
@@ -29,6 +31,8 @@ See instructions below on how to compile JaBS from sources. Supported platforms 
 ## Getting started
 
 One [example](example/) showing basic use is provided, along with more complex [test-cases](example/tests/). Try running `help` and `help commands` in the interactive mode. XML files in IDF format created by other programs can be imported.
+
+See the [getting started](https://users.jyu.fi/~jaakjuli/jabs/jabs_getting_started.pdf) document.
 
 ## Installation from sources
 
