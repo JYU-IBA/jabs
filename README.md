@@ -32,7 +32,7 @@ See instructions below on how to compile JaBS from sources. Supported platforms 
 
 One [example](example/) showing basic use is provided, along with more complex [test-cases](example/tests/). Try running `help` and `help commands` in the interactive mode. XML files in IDF format created by other programs can be imported.
 
-See the [getting started](https://users.jyu.fi/~jaakjuli/jabs/jabs_getting_started.pdf) document.
+See the [getting started](http://users.jyu.fi/~jaakjuli/jabs/jabs_getting_started.pdf) document.
 
 ## Installation from sources
 
