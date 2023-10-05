@@ -70,7 +70,6 @@ int simulation2idf(const struct fit_data *fit, const char *filename) {
     fprintf(f, "%s", (char *) xmlbuff);
     fclose(f);
     xmlFreeDoc(doc);
-    jabs_message(MSG_WARNING, "Saving simulations to IDF files support is incomplete, output file was created but it might not work as intended.");
     return EXIT_SUCCESS;
 }
 
@@ -144,7 +143,7 @@ xmlNodePtr simulation2idf_structure(const sample_model *sm) {
 }
 
 xmlNodePtr simulation2idf_spectra(const struct fit_data *fit) {
-    if(!fit || !fit->sim) {
+    if(!fit || !fit->sim || !fit->sim->beam_isotope) {
         return NULL;
     }
     xmlNodePtr spectra = xmlNewNode(NULL, BAD_CAST "spectra");
@@ -173,9 +172,9 @@ xmlNodePtr simulation2idf_spectra(const struct fit_data *fit) {
 
 xmlNodePtr simulation2idf_beam(const simulation *sim) {
     xmlNodePtr beam = xmlNewNode(NULL, BAD_CAST "beam");
-    xmlAddChild(beam, idf_new_node_printf(BAD_CAST "beamparticle", "%s", sim->ion.isotope->name));
-    xmlAddChild(beam, idf_new_node_printf(BAD_CAST "beamZ", "%i", sim->ion.Z));
-    xmlAddChild(beam, idf_new_node_units(BAD_CAST "beammass", BAD_CAST IDF_UNIT_AMU, NULL, sim->ion.isotope->mass));
+    xmlAddChild(beam, idf_new_node_printf(BAD_CAST "beamparticle", "%s", sim->beam_isotope->name));
+    xmlAddChild(beam, idf_new_node_printf(BAD_CAST "beamZ", "%i", sim->beam_isotope->Z));
+    xmlAddChild(beam, idf_new_node_units(BAD_CAST "beammass", BAD_CAST IDF_UNIT_AMU, NULL, sim->beam_isotope->mass));
     xmlAddChild(beam, idf_new_node_units(BAD_CAST "beamenergy", BAD_CAST IDF_UNIT_KEV, NULL, sim->beam_E));
     xmlAddChild(beam, idf_new_node_units(BAD_CAST "beamenergyspread", BAD_CAST IDF_UNIT_KEV, BAD_CAST IDF_MODE_FWHM, sim->beam_E_broad));
     xmlAddChild(beam, idf_new_node_units(BAD_CAST "beamfluence", BAD_CAST IDF_UNIT_PARTICLES, NULL, sim->fluence));
