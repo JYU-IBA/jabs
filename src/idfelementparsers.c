@@ -144,6 +144,7 @@ idf_error idf_parse_energycalibrations(idf_parser *idf, xmlNode *energycalibrati
         for(int i = 0; i < n_params; i++) {
             idf_output_printf(idf, " %gkeV", params[i] / C_KEV);
         }
+        idf_output_printf(idf, "\n");
     }
     return IDF2JBS_SUCCESS;
 }
