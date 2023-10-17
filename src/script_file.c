@@ -60,25 +60,7 @@ void script_file_close(script_file *sfile) {
     free(sfile);
 }
 
-ssize_t script_file_getline(script_file *sfile) {
-#ifdef _READLINE
-    rl_completer_quote_characters = "\"";
-    char *line = NULL;
-    size_t line_size = 0;
-    while(line_size == 0) {
-        line = readline(PROMPT);
-        if(line) {
-            line_size = strlen(line);
-        } else {
-            line_size = 0;
-        }
-    }
-    add_history(line);
-    free(sfile->line);
-    sfile->line = line;
-    sfile->line_size = line_size;
-    return sfile->line_size;
-#else
+ssize_t script_file_getline_no_rl(script_file *sfile) {
     while(1) {
         if(sfile->interactive) {
             fputs(PROMPT, stderr);
@@ -97,5 +79,33 @@ ssize_t script_file_getline(script_file *sfile) {
         }
         return n;
     }
+}
+
+ssize_t script_file_getline(script_file *sfile) {
+#ifdef _READLINE
+    if(!sfile->interactive) {
+       return script_file_getline_no_rl(sfile);
+    }
+    rl_completer_quote_characters = "\"";
+    char *line = NULL;
+    size_t line_size = 0;
+    while(line_size == 0) {
+        line = readline(PROMPT);
+        if(line) {
+            line_size = strlen(line);
+        } else {
+            line_size = 0;
+        }
+        if(jabs_line_is_comment(sfile->line)) {
+            continue;
+        }
+    }
+    add_history(line);
+    free(sfile->line);
+    sfile->line = line;
+    sfile->line_size = line_size;
+    return sfile->line_size;
+#else
+    return script_file_getline_no_rl(sfile);
 #endif
 }
