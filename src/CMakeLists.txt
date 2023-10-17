@@ -13,9 +13,11 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_C_STANDARD 99)
 
 configure_file(version.h.in version.h @ONLY)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
 find_package(GSL 2.6 REQUIRED)
 find_package(Jibal 0.3.10 REQUIRED)
 find_package(LibXml2 REQUIRED)
+find_package(Readline)
 find_package(OpenMP)
 
 if(WIN32)
@@ -54,6 +56,11 @@ target_link_libraries(jabs
 
 if(OpenMP_C_FOUND)
     target_link_libraries(jabs PUBLIC OpenMP::OpenMP_C)
+endif()
+
+if(READLINE_FOUND)
+    target_link_libraries(jabs PUBLIC readline)
+    add_compile_definitions(_READLINE)
 endif()
 
 install(TARGETS jabs RUNTIME DESTINATION bin)

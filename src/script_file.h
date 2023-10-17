@@ -19,4 +19,4 @@
 script_file *script_file_open(const char *filename);
 void script_file_close(script_file *sfile);
 
-ssize_t script_file_getline(script_file *sfile);
+ssize_t script_file_getline(const script_session *s, script_file *sfile);

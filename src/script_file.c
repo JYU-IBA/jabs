@@ -21,8 +21,14 @@
 #include <unistd.h>
 #endif
 #include "jabs_debug.h"
+#include "script_command.h"
 #include "script_file.h"
 #include "generic.h"
+
+#ifdef _READLINE
+#include <readline/readline.h>
+#include <readline/history.h>
+#endif
 
 script_file *script_file_open(const char *filename) {
     script_file *sfile = malloc(sizeof(script_file));
@@ -54,8 +60,29 @@ void script_file_close(script_file *sfile) {
     free(sfile);
 }
 
-ssize_t script_file_getline(script_file *sfile) {
+ssize_t script_file_getline(const script_session *s, script_file *sfile) {
+#ifdef _READLINE
+    rl_completer_quote_characters = "\"'";
+    char *line = NULL;
+    size_t line_size = 0;
+    while(line_size == 0) {
+        line = readline(PROMPT);
+        if(line) {
+            line_size = strlen(line);
+        } else {
+            line_size = 0;
+        }
+    }
+    add_history(line);
+    free(sfile->line);
+    sfile->line = line;
+    sfile->line_size = line_size;
+    return sfile->line_size;
+#else
     while(1) {
+        if(sfile->interactive) {
+            fputs(PROMPT, stderr);
+        }
         ssize_t n = getline(&sfile->line, &sfile->line_size, sfile->f);
         if(n <= 0) {
             return n;
@@ -65,6 +92,10 @@ ssize_t script_file_getline(script_file *sfile) {
             continue;
         }
         jabs_strip_newline(sfile->line);
+        if(!sfile->interactive) {
+            jabs_message(MSG_INFO, "%s:%zu jabs> %s\n", sfile->filename, sfile->lineno, sfile->line);
+        }
         return n;
     }
+#endif
 }
