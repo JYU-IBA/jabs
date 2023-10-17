@@ -37,7 +37,7 @@ int script_process(script_session *s) {
             }
             continue;
         }
-        if(script_file_getline(s, sfile) > 0) {
+        if(script_file_getline(sfile) > 0) {
             status = script_execute_command(s, sfile->line);
             if(!interactive && status != SCRIPT_COMMAND_SUCCESS) {
                 jabs_message(MSG_ERROR, "Error %i (%s) on line %zu in file \"%s\". Aborting.\n", status,

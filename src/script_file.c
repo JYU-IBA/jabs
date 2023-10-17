@@ -60,9 +60,9 @@ void script_file_close(script_file *sfile) {
     free(sfile);
 }
 
-ssize_t script_file_getline(const script_session *s, script_file *sfile) {
+ssize_t script_file_getline(script_file *sfile) {
 #ifdef _READLINE
-    rl_completer_quote_characters = "\"'";
+    rl_completer_quote_characters = "\"";
     char *line = NULL;
     size_t line_size = 0;
     while(line_size == 0) {
