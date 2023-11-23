@@ -108,7 +108,7 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
             jabs_message(MSG_ERROR, "No detectors.\n");
             return EXIT_FAILURE;
         }
-    } else if(isdigit(*s)) {
+    } else if(isdigit(*s)) { /* Starts with a digit, could be a number */
         size_t number = strtoul(s, &end, 10);
         if(*end == '\0') { /* Entire string was valid */
             *i_det = number - 1;
@@ -119,8 +119,10 @@ int script_get_detector_number(const simulation *sim, int allow_empty, int * con
             }
             found = TRUE;
         } else {
+#if 0 /* We can't assume that something beginning with a digit is always a detector number */
             jabs_message(MSG_ERROR, "I thought %s could be a detector number (maybe %zu?) but it is garbage instead. \n", s, number);
             return EXIT_FAILURE;
+#endif
         }
     } else {
         for(size_t i = 0; i < sim->n_det; i++) {
