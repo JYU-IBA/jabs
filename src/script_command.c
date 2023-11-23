@@ -401,7 +401,6 @@ script_command_status script_roi(script_session *s, int argc, char *const *argv)
         roi r = {.i_det = i_det};
         if(fit_set_roi_from_string(&r, argv[0])) {
             return SCRIPT_COMMAND_FAILURE;
-            break;
         }
         fit_data_roi_print(s->fit, &r);
         argc--;

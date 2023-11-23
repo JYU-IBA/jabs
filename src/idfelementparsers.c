@@ -169,6 +169,7 @@ idf_error idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum) {
     idf_parse_geometry(idf, idf_findnode(spectrum, "geometry"));
     idf_parse_calibrations(idf, idf_findnode(spectrum, "calibrations"));
     idf_parse_detector(idf, idf_findnode(spectrum, "detection/detector"));
+    idf_parse_detector_foil(idf, idf_findnode(spectrum, "detection/stoppingfoil"));
     /* TODO: parse reactions */
     idf_parse_data(idf, idf_findnode(spectrum, "data"));
 
@@ -328,6 +329,17 @@ idf_error idf_parse_detector(idf_parser *idf, xmlNode *detector) {
 
 idf_error idf_parse_detectorshape(idf_parser *idf, xmlNode *detectorshape) {
     return idf_detectorshape_or_spot(idf, detectorshape, "set det aperture");
+}
+
+idf_error idf_parse_detector_foil(idf_parser *idf, xmlNode *stoppingfoil) {
+    if(!stoppingfoil) {
+        return IDF2JBS_FAILURE;
+    }
+    idf_output_printf(idf, "set det foil ");
+    xmlNode *foillayers = idf_findnode(stoppingfoil, "foillayers");
+    idf_foreach(idf, foillayers, "layer", idf_parse_layer);
+    idf_output_printf(idf, "\n");
+    return IDF2JBS_SUCCESS;
 }
 
 idf_error idf_parse_spot(idf_parser *idf, xmlNode *spot) {

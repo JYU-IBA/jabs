@@ -114,32 +114,40 @@ xmlNodePtr simulation2idf_structure(const sample_model *sm) {
     if(sm->type == SAMPLE_MODEL_LAYERED) {
         xmlNodePtr layeredstructure = xmlNewChild(structure, NULL, BAD_CAST "layeredstructure", NULL);
         xmlAddChild(layeredstructure, idf_new_node_printf(BAD_CAST "nlayers", "%zu", sm->n_ranges));
-        xmlNodePtr layers = xmlNewChild(layeredstructure, NULL, BAD_CAST "layers", NULL);
-        for(size_t i = 0; i < sm->n_ranges; i++) {
-            const sample_range *r = &sm->ranges[i];
-            xmlNodePtr layer = xmlNewChild(layers, NULL, BAD_CAST "layer", NULL);
-            xmlNodePtr layerthickness = idf_new_node_units(BAD_CAST "layerthickness", BAD_CAST IDF_UNIT_TFU, NULL, r->x);
-            xmlAddChild(layer, layerthickness);
-            if(r->rough.model == ROUGHNESS_GAMMA && r->rough.x > 0.0) {
-                xmlNodePtr layeruniformity = idf_new_node_units(BAD_CAST "layeruniformity", BAD_CAST IDF_UNIT_TFU, BAD_CAST "FWHM", r->rough.x);
-                xmlAddChild(layer, layeruniformity);
-            }
-            xmlNodePtr layerelements = xmlNewChild(layer, NULL, BAD_CAST "layerelements", NULL);
-            for(size_t j = 0; j < sm->n_materials; j++) {
-                double conc = *sample_model_conc_bin(sm, i, j);
-                if(conc == 0.0) {
-                    continue;
-                }
-                xmlNodePtr layerelement = xmlNewNode(NULL, BAD_CAST "layerelement");
-                xmlNewChild(layerelement, NULL, BAD_CAST "name", BAD_CAST sm->materials[j]->name);
-                xmlNodePtr concentration = idf_new_node_units(BAD_CAST "concentration", BAD_CAST IDF_UNIT_FRACTION, NULL, conc);
-                xmlAddChild(layerelement, concentration);
-                xmlAddChild(layerelements, layerelement);
-            }
+        xmlNodePtr layers = simulation2idf_layers(sm);
+        if(layers) {
+            xmlAddChild(layeredstructure, layers);
         }
     }
     /* TODO: support point-by-point profiles using IDF "pointbypointstructure" */
     return structure;
+}
+
+xmlNodePtr simulation2idf_layers(const sample_model *sm) {
+    xmlNodePtr layers = xmlNewNode(NULL, BAD_CAST "layers");
+    for(size_t i = 0; i < sm->n_ranges; i++) {
+        const sample_range *r = &sm->ranges[i];
+        xmlNodePtr layer = xmlNewChild(layers, NULL, BAD_CAST "layer", NULL);
+        xmlNodePtr layerthickness = idf_new_node_units(BAD_CAST "layerthickness", BAD_CAST IDF_UNIT_TFU, NULL, r->x);
+        xmlAddChild(layer, layerthickness);
+        if(r->rough.model == ROUGHNESS_GAMMA && r->rough.x > 0.0) {
+            xmlNodePtr layeruniformity = idf_new_node_units(BAD_CAST "layeruniformity", BAD_CAST IDF_UNIT_TFU, BAD_CAST "FWHM", r->rough.x);
+            xmlAddChild(layer, layeruniformity);
+        }
+        xmlNodePtr layerelements = xmlNewChild(layer, NULL, BAD_CAST "layerelements", NULL);
+        for(size_t j = 0; j < sm->n_materials; j++) {
+            double conc = *sample_model_conc_bin(sm, i, j);
+            if(conc == 0.0) {
+                continue;
+            }
+            xmlNodePtr layerelement = xmlNewNode(NULL, BAD_CAST "layerelement");
+            xmlNewChild(layerelement, NULL, BAD_CAST "name", BAD_CAST sm->materials[j]->name);
+            xmlNodePtr concentration = idf_new_node_units(BAD_CAST "concentration", BAD_CAST IDF_UNIT_FRACTION, NULL, conc);
+            xmlAddChild(layerelement, concentration);
+            xmlAddChild(layerelements, layerelement);
+        }
+    }
+    return layers;
 }
 
 xmlNodePtr simulation2idf_spectra(const struct fit_data *fit) {
@@ -239,6 +247,12 @@ xmlNodePtr simulation2idf_detection(const simulation *sim, const detector *det) 
     }
     if(det->distance > 0.0) {
         xmlAddChild(detector, idf_new_node_units(BAD_CAST "distancedetectortosample", BAD_CAST IDF_UNIT_MM, NULL, det->distance));
+    }
+    if(det->foil_sm) {
+        xmlNodePtr stoppingfoil = xmlNewChild(detection, NULL, BAD_CAST "stoppingfoil", NULL);
+        xmlNodePtr foillayers = xmlNewChild(stoppingfoil, NULL, BAD_CAST "foillayers", NULL);
+        xmlAddChild(foillayers, simulation2idf_layers(det->foil_sm));
+        xmlAddChild(detection, stoppingfoil);
     }
     return detection;
 }
