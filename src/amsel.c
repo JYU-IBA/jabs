@@ -173,12 +173,14 @@ int amsel_calc(const jibal *jibal, const amsel_table *t, double depth, double ph
     }
     double angle = 2.0 * sqrt(angle_sum); /* FWHM */
     double angle_chord = 2.0 * sqrt(angle_chord_sum);  /* FWHM */
-    double dt = thickness * angle_chord * tan(phi);
+    double dt = thickness * angle_chord * tan(phi); /* TODO: gives zero with phi = 0, in other words no energy difference if ion perpendicular to sample */
     fprintf(stderr, "trajectory length difference %g tfu\n", dt / C_TFU);
+    double dt_alternative = depth / cos(phi + angle_chord) - thickness; /* d(t) - t = ... from Eq. (85) before approximation */
     double stop = jibal_stop(jibal->gsto, incident, layer->material, E_deep);
     fprintf(stderr, "stopping force at depth = %g eV/tfu\n", stop / C_EV_TFU);
     double dE = dt * stop;
-    fprintf(stdout, "%12.3lf %12.3lf %12.3lf %12.3lf %12.3lf\n", depth / C_TFU, thickness / C_TFU, angle / C_DEG, angle_chord / C_DEG, dE / C_KEV);
+    double dE_alternative = dt_alternative * stop;
+    fprintf(stdout, "%12.3lf %12.3lf %12.3lf %12.3lf %12.3lf %12.3lf\n", depth / C_TFU, thickness / C_TFU, angle / C_DEG, angle_chord / C_DEG, dE / C_KEV,  dE_alternative / C_KEV);
     jibal_layer_free(layer);
     return 0;
 }
