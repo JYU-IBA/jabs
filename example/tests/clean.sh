@@ -4,3 +4,4 @@ rm *_out.*
 rm *_exp.dat
 rm *_sim.dat
 rm tests.log
+rm bricks_*.dat

@@ -94,6 +94,7 @@ set(PROJECT_SOURCES
         ../src/histogram.c
         ../src/gsl_inline.c
         ../src/scatint.c
+        ../src/simulation2idf.c
         "$<$<BOOL:${PLUGINS}>:plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui

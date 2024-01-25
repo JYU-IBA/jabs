@@ -18,7 +18,6 @@ void aperture_free(aperture *a) {
 aperture *aperture_default() {
     aperture *a = malloc(sizeof(aperture));
     a->type = APERTURE_NONE;
-    a->diameter = 0.0;
     a->width = 0.0;
     a->height = 0.0;
     return a;
@@ -36,10 +35,10 @@ aperture *aperture_clone(const aperture *a_orig) {
 double aperture_shape_parameter(const aperture *a) {
     static const double shape_circle = 0.5 * C_FWHM/2.0;
     static const double shape_rect = 0.5 * C_FWHM/1.7320508075688772;
-    if(a->type == APERTURE_CIRCLE) {
+    if(a->type == APERTURE_CIRCLE || a->type == APERTURE_ELLIPSE) {
         return shape_circle;
     }
-    if(a->type == APERTURE_RECTANGLE) {
+    if(a->type == APERTURE_SQUARE || a->type == APERTURE_RECTANGLE) {
         return shape_rect;
     }
     return 0.0;
@@ -49,17 +48,11 @@ double aperture_width_shape_product(const aperture *a, const char direction) {
     if(!a)
         return 0.0;
     double shape = aperture_shape_parameter(a);
-    if(a->type == APERTURE_CIRCLE) {
-        return shape * a->diameter;
+    if(direction == 'x') {
+        return shape * a->width;
     }
-    if(a->type == APERTURE_RECTANGLE) {
-        if(direction == 'x') {
-            return shape * a->width;
-        }
-        if(direction == 'y') {
-            return shape * a->height;
-        }
-        return 0.0;
+    if(direction == 'y') {
+        return shape * a->height;
     }
     return 0.0;
 }
@@ -73,7 +66,7 @@ aperture *aperture_set_from_argv(const jibal *jibal, aperture *a, int * const ar
     }
     char *str = (*argv[0]);
     size_t len = strlen(str);
-    for(const jibal_option *o = aperture_option; o->s; o++) { /* look for a matching aperture_option keyword (circle, rectangle) */
+    for(const jibal_option *o = aperture_option; o->s; o++) { /* look for a matching aperture_option keyword (circle, rectangle, ...) */
         if(strncmp(o->s, str, len) == 0) {
             (*argv)++;
             (*argc)--;
@@ -85,18 +78,19 @@ aperture *aperture_set_from_argv(const jibal *jibal, aperture *a, int * const ar
         str = (*argv)[0];
         if((*argc) >= 2) {
             double *val = NULL;
-            if(a->type == APERTURE_RECTANGLE && strcmp(str, "width") == 0) {
+            if(strcmp(str, "width") == 0) {
                 val = &(a->width);
-            } else if(a->type == APERTURE_RECTANGLE && strcmp(str, "height") == 0) {
+            } else if(strcmp(str, "height") == 0) {
                 val = &(a->height);
             } else if(a->type == APERTURE_CIRCLE && strncmp(str, "dia", 3) == 0) { /* Diameter can be abbreviated */
-                val = &(a->diameter);
+                val = &(a->width); /* Diameter is just width. Height is also set later. */
             }
             if(val) {
                 if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_DISTANCE, (*argv)[1], val) < 0) {
                     aperture_free(a);
                     return NULL;
                 }
+
                 (*argc) -= 2;
                 (*argv) += 2;
                 continue;
@@ -104,6 +98,9 @@ aperture *aperture_set_from_argv(const jibal *jibal, aperture *a, int * const ar
         }
         DEBUGMSG("Aperture parsing ends, starting from str = %s. %i remain.", str, *argc);
         break;
+    }
+    if(a->type == APERTURE_CIRCLE || a->type == APERTURE_SQUARE) { /* One parameter only, override the second one */
+        a->height = a->width;
     }
     return a; /* Does not guarantee the aperture makes sense, unparsed arguments may remain! */
 }
@@ -128,10 +125,15 @@ char *aperture_to_string(const aperture *a) {
         case APERTURE_NONE:
             break;
         case APERTURE_CIRCLE:
-            asprintf_append(&out, " diameter %gmm", a->diameter/C_MM);
+            asprintf_append(&out, " diameter %gmm", a->width/C_MM);
             break;
+        case APERTURE_ELLIPSE:
+            /* falls through */
         case APERTURE_RECTANGLE:
             asprintf_append(&out, " width %gmm height %gmm", a->width/C_MM, a->height/C_MM);
+            break;
+        case APERTURE_SQUARE:
+            asprintf_append(&out, " width %gmm", a->width/C_MM);
             break;
     }
     return out;

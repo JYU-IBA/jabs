@@ -24,7 +24,6 @@
 int script_process(script_session *s) {
     if(!s)
         return SCRIPT_COMMAND_FAILURE;
-    static const char *prompt = PROMPT;
     script_command_status status = SCRIPT_COMMAND_SUCCESS;
     while(s->file_depth > 0) {
         script_file *sfile = s->files[s->file_depth - 1];
@@ -38,13 +37,7 @@ int script_process(script_session *s) {
             }
             continue;
         }
-        if(interactive) {
-            fputs(prompt, stderr);
-        }
         if(script_file_getline(sfile) > 0) {
-            if(!interactive) {
-                jabs_message(MSG_INFO, "%s:%zu jabs> %s\n", sfile->filename, sfile->lineno, sfile->line);
-            }
             status = script_execute_command(s, sfile->line);
             if(!interactive && status != SCRIPT_COMMAND_SUCCESS) {
                 jabs_message(MSG_ERROR, "Error %i (%s) on line %zu in file \"%s\". Aborting.\n", status,

@@ -21,14 +21,18 @@ Simulates and fits RBS, EBS, ERD and NRA spectra rapidly.
 
 Please see additional notes regarding copyrights of included open source code at the end of this document.
 
+Additional information and resources might be available on [JaBS home page](http://users.jyu.fi/~jaakjuli/jabs/).
+
 ## Binary packages
-Some ready-to-use [binary packages](http://users.jyu.fi/~jaakjuli/jabs/binaries/) for Windows and macOS may be available. The Windows distribution includes two executables: `jabs.exe` (command line) and `qjabs.exe` (graphical interface). The macOS binary is a regular application bundle. All necessary data files (stopping etc.) are included in these distributions.
+Some ready-to-use binary packages for each [release](https://github.com/JYU-IBA/jabs/releases) for Windows and macOS may be available. The Windows distribution includes two executables: `jabs.exe` (command line) and `qjabs.exe` (graphical interface). The macOS binary is a regular application bundle. All necessary data files (stopping etc.) are included in these distributions.
 
 See instructions below on how to compile JaBS from sources. Supported platforms are Windows, macOS and Linux.
 
 ## Getting started
 
 One [example](example/) showing basic use is provided, along with more complex [test-cases](example/tests/). Try running `help` and `help commands` in the interactive mode. XML files in IDF format created by other programs can be imported.
+
+See the [getting started](http://users.jyu.fi/~jaakjuli/jabs/jabs_getting_started.pdf) document.
 
 ## Installation from sources
 
@@ -72,15 +76,15 @@ The scripting language is not a programming language, there is no flow control, 
  - Testing of areal sum (counts) and residuals. Some test cases are run by the developer to check sanity and accuracy of simulations for every new release.
  - Higher accuracy mode using adaptive integration for more accurate handling of sharp peaks in cross sections (resonances) and accurate weighting of cross sections by (Gaussian) straggling.
  - Conversion tool from IDF to JaBS script (partial support)
+ - Export of simulations to IDF (partial support)
  - Simulation of large angle plural scattering (dual scattering model), with the assumption that first scattering is RBS (not ERD).
  - Multiprocessor support when simulating multiple detectors and when fitting multiple parameters
- - 
+
 ### Not implemented, but planned or being worked on
  - Support for more input and output data formats (CSV, ...)
  - Multiple scattering (small angle)
  - Simulation of pile-up and dead time
  - Simulation of time-of-flight spectra
- - Publication quality plotting
 
 ### Distant future, if ever
  - Advanced fitting algorithms
@@ -90,7 +94,7 @@ The scripting language is not a programming language, there is no flow control, 
 ### Known issues
  - Saving a detector to a file is not supported. Calibrations can be saved as a script.
  - Ad-hoc channeling correction is the same for all detectors
- - Import of IDF is partial at best and exporting is not implemented
+ - Import and export of IDF files produce intended results, since the IDF support is only partial. Use caution and common sense.
 
 ## Fitting
 

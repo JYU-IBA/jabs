@@ -33,7 +33,7 @@ typedef struct simulation {
     detector **det; /* Array of n_det detector pointers */
     size_t n_det;
     sample *sample;
-    double fluence;
+    double fluence; /* Number of incident particles */
     double sample_theta; /* Polar angle. Kind of. Zero is sample perpendicular to beam. */
     double sample_phi; /* Typically one uses a zero here, unless doing channeling stuff. Note that this is an azimuthal angle. */
     const jibal_isotope *beam_isotope;

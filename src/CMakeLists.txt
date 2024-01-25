@@ -13,15 +13,21 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_C_STANDARD 99)
 
 configure_file(version.h.in version.h @ONLY)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
 find_package(GSL 2.6 REQUIRED)
 find_package(Jibal 0.3.10 REQUIRED)
 find_package(LibXml2 REQUIRED)
+find_package(Readline)
 find_package(OpenMP)
 
 if(WIN32)
     find_path(GETOPT_INCLUDE_DIR getopt.h)
     find_library(GETOPT_LIBRARY getopt)
 endif()
+
+if(APPLE)
+    include(../rpathmagic.cmake) # Maybe a temporary fix to some library issues
+endif ()
 
 add_executable(jabs
         main.c
@@ -32,7 +38,7 @@ add_executable(jabs
         calibration.c prob_dist.c idf2jbs.c idfelementparsers.c
         idfparse.c nuclear_stopping.c stop.c des.c
         simulation_workspace.c sim_reaction.c sim_calc_params.c
-        histogram.c gsl_inline.c scatint.c
+        histogram.c gsl_inline.c scatint.c simulation2idf.c
         "$<$<BOOL:${JABS_PLUGINS}>:plugin.c>"
         "$<$<BOOL:${WIN32}>:win_compat.c>"
         )
@@ -41,6 +47,7 @@ add_executable(amsel amsel.c)
 target_link_libraries(amsel PRIVATE jibal)
 
 target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
+
 
 target_link_libraries(jabs
     PRIVATE jibal
@@ -55,6 +62,10 @@ if(OpenMP_C_FOUND)
     target_link_libraries(jabs PUBLIC OpenMP::OpenMP_C)
 endif()
 
+if(READLINE_FOUND)
+    target_link_libraries(jabs PUBLIC readline)
+    add_compile_definitions(_READLINE)
+endif()
 
 install(TARGETS jabs RUNTIME DESTINATION bin)
 

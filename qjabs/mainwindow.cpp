@@ -824,9 +824,12 @@ void MainWindow::updateDetectorList()
         ui->actionPrevious_detector->setVisible(false);
         return;
     }
-    ui->detectorFrame->setVisible(session->fit->sim->n_det > 1);
-    ui->actionPrevious_detector->setVisible(session->fit->sim->n_det > 1);
-    ui->actionNext_detector->setVisible(session->fit->sim->n_det > 1);
+    bool multiple_detectors = (session->fit->sim->n_det > 1);
+    ui->detectorFrame->setVisible(multiple_detectors);
+    ui->actionPrevious_detector->setVisible(multiple_detectors);
+    ui->actionNext_detector->setVisible(multiple_detectors);
+    ui->menuDetector->setEnabled(multiple_detectors);
+
     int old_i_det = ui->comboBox->currentIndex();
     ui->comboBox->clear();
     for(size_t i_det = 0; i_det < session->fit->sim->n_det; i_det++) {

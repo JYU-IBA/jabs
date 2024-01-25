@@ -144,6 +144,7 @@ idf_error idf_parse_energycalibrations(idf_parser *idf, xmlNode *energycalibrati
         for(int i = 0; i < n_params; i++) {
             idf_output_printf(idf, " %gkeV", params[i] / C_KEV);
         }
+        idf_output_printf(idf, "\n");
     }
     return IDF2JBS_SUCCESS;
 }
@@ -168,6 +169,7 @@ idf_error idf_parse_spectrum(idf_parser *idf, xmlNode *spectrum) {
     idf_parse_geometry(idf, idf_findnode(spectrum, "geometry"));
     idf_parse_calibrations(idf, idf_findnode(spectrum, "calibrations"));
     idf_parse_detector(idf, idf_findnode(spectrum, "detection/detector"));
+    idf_parse_detector_foil(idf, idf_findnode(spectrum, "detection/stoppingfoil"));
     /* TODO: parse reactions */
     idf_parse_data(idf, idf_findnode(spectrum, "data"));
 
@@ -329,6 +331,17 @@ idf_error idf_parse_detectorshape(idf_parser *idf, xmlNode *detectorshape) {
     return idf_detectorshape_or_spot(idf, detectorshape, "set det aperture");
 }
 
+idf_error idf_parse_detector_foil(idf_parser *idf, xmlNode *stoppingfoil) {
+    if(!stoppingfoil) {
+        return IDF2JBS_FAILURE;
+    }
+    idf_output_printf(idf, "set det foil ");
+    xmlNode *foillayers = idf_findnode(stoppingfoil, "foillayers");
+    idf_foreach(idf, foillayers, "layer", idf_parse_layer);
+    idf_output_printf(idf, "\n");
+    return IDF2JBS_SUCCESS;
+}
+
 idf_error idf_parse_spot(idf_parser *idf, xmlNode *spot) {
     return idf_detectorshape_or_spot(idf, spot, "set aperture");
 }
@@ -347,6 +360,14 @@ idf_error idf_detectorshape_or_spot(idf_parser *idf, xmlNode *node, const char *
     } else if(idf_stringneq(shape, "rect", 4)) {
         if(l1 > 0.0 && l2 > 0.0) {
             idf_output_printf(idf, "%s rectangle width %gmm height %gmm\n", prefix, l1 / C_MM, l2 / C_MM);
+        }
+    } else if(idf_stringneq(shape, "ellip", 4)) {
+        if(l1 > 0.0 && l2 > 0.0) {
+            idf_output_printf(idf, "%s ellipse width %gmm height %gmm\n", prefix, l1 / C_MM, l2 / C_MM);
+        }
+    } else if(idf_stringneq(shape, "squ", 4)) {
+        if(l1 > 0.0) {
+            idf_output_printf(idf, "%s square width %gmm\n", prefix, l1 / C_MM);
         }
     }
     free(shape);

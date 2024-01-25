@@ -128,6 +128,9 @@ jabs_histogram *spectrum_read(const char *filename, size_t skip, size_t channels
             continue;
         }
         jabs_strip_newline(line);
+        if(*line == '\0') {  /* Skip empty lines */
+            continue;
+        }
         char *line_split = line;
         char *col_str;
         size_t n = 0; /* Number of columns on this row */

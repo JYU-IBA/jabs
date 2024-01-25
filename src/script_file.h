@@ -19,4 +19,5 @@
 script_file *script_file_open(const char *filename);
 void script_file_close(script_file *sfile);
 
+ssize_t script_file_getline_no_rl(script_file *sfile); /* Implementation that does not use readline. */
 ssize_t script_file_getline(script_file *sfile);

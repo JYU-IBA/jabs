@@ -181,9 +181,9 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
     double emin = sim_r->emin_incident * 0.9; /* Safety factor included, note that screening table is *just* a screening table, cross section below sim_r->r->E_min should be zero, but screening is not! */
     double emax = sim_r->emax_incident * 1.1;
     sim_r->cs_estep = (emax - emin)/(n - 1);
-    DEBUGMSG("Computing screening, reaction %s, from %g keV to %g keV with %zu steps of %g keV", sim_r->r->name, emin/ C_KEV, emax / C_KEV, n, sim_r->cs_estep / C_KEV);
+    DEBUGMSG("Computing screening, reaction %s, from %g keV to %g keV with %zu steps of %g keV", sim_r->r->name, emin / C_KEV, emax / C_KEV, n, sim_r->cs_estep / C_KEV);
     for(size_t i = 0; i < n; i++) {
-        double E = sim_r->emin_incident + (sim_r->cs_estep) * i;
+        double E = emin + (sim_r->cs_estep) * i;
         const double E_cm = sim_r->E_cm_ratio * E;
         double sigma_r = sim_r->cs_constant / pow2(E_cm) ;
         struct reaction_point *rp = &sim_r->cs_table[i];

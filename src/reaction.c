@@ -42,7 +42,7 @@ void reactions_print(reaction * const * reactions, size_t n_reactions) {
             jabs_message(MSG_INFO, ", E = [%.6g MeV, %.6g MeV]", r->E_min / C_MEV, r->E_max / C_MEV);
         }
         if(r->Q != 0.0) {
-            jabs_message(MSG_INFO, ", Q = %g MeV ", r->Q / C_KEV);
+            jabs_message(MSG_INFO, ", Q = %g MeV ", r->Q / C_MEV);
         }
         if(r->type == REACTION_FILE) {
             jabs_message(MSG_INFO, ", Theta = %g deg,  Data from file \"%s\".\n", r->theta/C_DEG, r->filename);
