@@ -2549,6 +2549,7 @@ script_command_status script_load_reaction_plugin(script_session *s, int argc, c
     r->E_max = pr->E_max;
     r->filename = strdup(plugin->filename);
     r->Q = pr->Q;
+    reaction_generate_name(r);
     sim_reactions_add_reaction(fit->sim, r, FALSE);
     return argc_orig; /* TODO: always consumes all arguments */
 }

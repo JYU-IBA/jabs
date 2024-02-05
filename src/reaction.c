@@ -347,6 +347,15 @@ const char *jabs_reaction_cs_to_string(jabs_reaction_cs cs) {
 }
 
 int reaction_generate_name(reaction *r) {
+    if(r->name) {
+        free(r->name);
+        r->name = NULL;
+    }
+    if(r->product == NULL || r->residual == NULL) {
+        DEBUGSTR("Could not generate reaction name because product or residual are undefined (this is ok if reaction is from a plugin).");
+        r->name = NULL;
+        return 0;
+    }
     int len = asprintf(&(r->name), "%-4s %s(%s,%s)%s", reaction_type_to_string(r->type), r->target->name, r->incident->name, r->product->name, r->residual->name);
     if(len < 0) {
         DEBUGSTR("Could not generate reaction name.");
