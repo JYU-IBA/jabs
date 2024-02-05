@@ -200,6 +200,9 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
 des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, const sim_calc_params *scp, const sample *sample, const ion *incident, depth depth_start, double emin) {
     ion ion = *incident;
     des_table *dt = des_table_init(DES_TABLE_INITIAL_ALLOC);
+    if(!dt) {
+        return NULL;
+    }
     size_t i = 0;
     depth d_before;
     depth d_after = depth_start;
@@ -241,6 +244,7 @@ des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, con
         des_table_rebuild_index(dt);
         return dt;
     } else {
+        DEBUGSTR("DES table unused, freeing.");
         des_table_free(dt);
         return NULL;
     }
