@@ -190,7 +190,7 @@ void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *s
         n_max = 0;
     }
     ws->n_channels = n_max;
-    DEBUGMSG("Number of channels in workspace set to %zu\n", ws->n_channels);
+    DEBUGMSG("Number of channels in workspace set to %zu", ws->n_channels);
 }
 
 void sim_workspace_calculate_sum_spectra(sim_workspace *ws) {

@@ -209,7 +209,7 @@ des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, con
             ion.theta / C_DEG, ion.inverse_cosine_theta);
     if(incident->ion_gsto->emin < emin) {
         emin = incident->ion_gsto->emin;
-        DEBUGMSG("DES table emin set from ion emin = %g keV\n", emin / C_KEV);
+        DEBUGMSG("DES table emin set from ion emin = %g keV", emin / C_KEV);
     }
     do {
         if(i == dt->n) {

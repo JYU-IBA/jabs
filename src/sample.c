@@ -1055,7 +1055,7 @@ double sample_isotope_max_depth(const sample *sample, size_t i_isotope) {
             break;
         }
     }
-    DEBUGMSG("Isotope %zu max depth %g tfu.\n", i_isotope, out / C_TFU);
+    DEBUGMSG("Isotope %zu max depth %g tfu.", i_isotope, out / C_TFU);
     return out;
 }
 

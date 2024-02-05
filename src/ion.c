@@ -104,7 +104,7 @@ jabs_ion_gsto *ion_gsto_new(const jibal_isotope *incident, const jibal_gsto *gst
     if(incident->Z == 0) { /* Leave everything empty for neutrons */
         return ig;
     }
-    DEBUGMSG("New gsto data for incident %s. Z2 max is %i\n", incident->name, gsto->Z2_max);
+    DEBUGMSG("New gsto data for incident %s. Z2 max is %i", incident->name, gsto->Z2_max);
     for(int Z2 = 1; Z2 <= gsto->Z2_max; Z2++) {
         jabs_ion_gsto_data *gd = &ig->gsto_data[Z2];
         gd->stopfile = jibal_gsto_get_assigned_file(gsto, GSTO_STO_ELE, incident->Z, Z2);
