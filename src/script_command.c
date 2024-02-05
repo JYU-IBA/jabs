@@ -262,14 +262,13 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
 }
 
 script_command_status script_save_simulation(script_session *s, int argc, char *const *argv) {
-    size_t i_det = 0;
     struct fit_data *fit = s->fit;
     const int argc_orig = argc;
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Usage: save simulation <file>\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(simulation2idf(s->fit, argv[0])) {
+    if(simulation2idf(fit, argv[0])) {
         jabs_message(MSG_ERROR, "Could not save simulation to file %s.", argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }

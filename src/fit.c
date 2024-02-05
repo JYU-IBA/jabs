@@ -783,7 +783,7 @@ size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_d
     return sum;
 }
 
-struct fit_stats fit_stats_init() {
+struct fit_stats fit_stats_init(void) {
     struct fit_stats s;
     s.n_evals = 0;
     s.n_evals_iter = 0;

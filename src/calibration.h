@@ -59,10 +59,10 @@ typedef struct calibration_params_poly {
     double *a; /* Array, size n+1, polynomial is f(x) = a[0] + a[1] * x + a[2] * x^2 + ... + a[n] * x^n */
 } calibration_params_poly;
 
-calibration *calibration_init();
+calibration *calibration_init(void);
 void calibration_free(calibration *c);
 calibration *calibration_clone(const calibration *c_orig);
-calibration *calibration_init_linear();
+calibration *calibration_init_linear(void);
 calibration *calibration_init_poly(size_t n); /* n is the degree of the polynomial */
 double calibration_linear(const void *params, size_t x);
 double calibration_poly(const void *params, size_t x);

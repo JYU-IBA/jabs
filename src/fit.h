@@ -145,7 +145,7 @@ void fit_data_spectra_free(fit_data *fit);
 int fit_data_add_det(struct fit_data *fit, detector *det);
 fit_data_det *fit_data_fdd(const fit_data *fit, size_t i_det);
 size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);
-struct fit_stats fit_stats_init();
+struct fit_stats fit_stats_init(void);
 int fit(fit_data *fit);
 void fit_covar_print(const gsl_matrix *covar, jabs_msg_level msg_level);
 int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x); /* Updates values in fit params as they are varied by the fit algorithm. */

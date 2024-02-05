@@ -73,7 +73,7 @@ int simulation2idf(const struct fit_data *fit, const char *filename) {
     return EXIT_SUCCESS;
 }
 
-xmlNodePtr simulation2idf_notes() {
+xmlNodePtr simulation2idf_notes(void) {
     xmlNodePtr notes = xmlNewNode(NULL, BAD_CAST "notes");
     xmlNodePtr note = xmlNewChild(notes, NULL, BAD_CAST "note", NULL);
 
@@ -160,7 +160,7 @@ xmlNodePtr simulation2idf_spectra(const struct fit_data *fit) {
         xmlNodePtr spectrum = xmlNewNode(NULL, BAD_CAST "spectrum");
         xmlAddChild(spectrum, simulation2idf_beam(fit->sim));
         xmlAddChild(spectrum, simulation2idf_geometry(fit->sim, det));
-        xmlAddChild(spectrum, simulation2idf_detection(fit->sim, det));
+        xmlAddChild(spectrum, simulation2idf_detection(det));
         xmlAddChild(spectrum, simulation2idf_calibrations(fit->jibal->elements, fit->sim, det));
         xmlAddChild(spectrum, simulation2idf_reactions(fit->sim, det));
         if(i_det < fit->n_det_spectra) {
@@ -216,7 +216,7 @@ xmlNodePtr simulation2idf_geometry(const simulation *sim, const detector *det) {
     return geometry;
 }
 
-xmlNodePtr simulation2idf_detection(const simulation *sim, const detector *det) {
+xmlNodePtr simulation2idf_detection(const detector *det) {
     xmlNodePtr detection = xmlNewNode(NULL, BAD_CAST "detection");
     xmlNodePtr detector = xmlNewChild(detection, NULL, BAD_CAST "detector", NULL);
     char *detectortype = NULL;
@@ -260,7 +260,6 @@ xmlNodePtr simulation2idf_detection(const simulation *sim, const detector *det) 
 xmlNodePtr simulation2idf_calibrations(const jibal_element *elements, const simulation *sim, const detector *det) {
     xmlNodePtr calibrations = xmlNewNode(NULL, BAD_CAST "calibrations");
     xmlNodePtr detectorresolutions = xmlNewChild(calibrations, NULL, BAD_CAST "detectorresolutions", NULL);
-    xmlNodePtr detectorresolution = simulation2idf_detectorresolution(det, det->calibration, NULL);
     xmlNodePtr energycalibrations = xmlNewChild(calibrations, NULL, BAD_CAST "energycalibrations", NULL);
     xmlAddChild(energycalibrations, simulation2idf_energycalibration(det, det->calibration, NULL));
     for(int Z = 0; Z <= det->cal_Z_max; Z++) {

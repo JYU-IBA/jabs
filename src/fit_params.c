@@ -10,7 +10,7 @@
 #include "jibal_generic.h"
 
 
-fit_params *fit_params_new() {
+fit_params *fit_params_new(void) {
     fit_params *p = malloc(sizeof(fit_params));
     p->n = 0;
     p->n_active = 0;

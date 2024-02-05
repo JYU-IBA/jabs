@@ -25,11 +25,11 @@ typedef struct {
 #include "simulation.h"
 
 void read_options(cmdline_options *cmd_opt, int *argc, char *const **argv);
-cmdline_options *cmdline_options_init();
+cmdline_options *cmdline_options_init(void);
 void cmdline_options_free(cmdline_options *cmd_opt);
-const char *jabs_version(); /* Returns "git describe" given version, fallback to jabs_version_simple() */
-const char *jabs_version_simple(); /* Returns directly the CMake project version */
-void usage();
+const char *jabs_version(void); /* Returns "git describe" given version, fallback to jabs_version_simple() */
+const char *jabs_version_simple(void); /* Returns directly the CMake project version */
+void usage(void);
 void greeting(int interactive);
 
 #endif // JABS_OPTIONS_H

@@ -22,7 +22,7 @@ typedef struct fit_params {
     fit_variable *vars; /* Note that this is NOT an array of pointers. It has n elements. */
 } fit_params;
 
-fit_params *fit_params_new();
+fit_params *fit_params_new(void);
 void fit_params_free(fit_params *p);
 int fit_params_add_parameter(fit_params *p, fit_variable_type type, double *value, const char *name, const char *unit, double unit_factor, size_t i_det);  /* Pointer to parameter to be fitted (value) is accessed during fitting (read, write). No guarantees that it stays accessible after the fit is over and user decides to change something! */
 int fit_params_update(fit_params *p);

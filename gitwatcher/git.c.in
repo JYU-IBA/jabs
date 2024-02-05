@@ -8,27 +8,27 @@
 #define FALSE 0
 #endif
 
-int git_populated() {
+int git_populated(void) {
     return @GIT_RETRIEVED_STATE@;
 }
 
-int git_dirty() {
+int git_dirty(void) {
     return @GIT_IS_DIRTY@;
 }
 
-const char *git_commit_sha1() {
+const char *git_commit_sha1(void) {
     return "@GIT_HEAD_SHA1@";
 }
 
-const char *git_commit_date() {
+const char *git_commit_date(void) {
     return "@GIT_COMMIT_DATE_ISO8601@";
 }
 
-const char *git_describe() {
+const char *git_describe(void) {
     return "@GIT_DESCRIBE@";
 }
 
-const char *git_branch() {
+const char *git_branch(void) {
     return "@GIT_BRANCH@";
 }
 

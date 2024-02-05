@@ -18,9 +18,9 @@
 #include "generic.h"
 
 jabs_plugin *jabs_plugin_open(const char *filename) {
-    jabs_plugin_type (*typef)();
-    const char *(*namef)();
-    const char *(*versionf)();
+    jabs_plugin_type (*typef)(void);
+    const char *(*namef)(void);
+    const char *(*versionf)(void);
     if(!filename) {
         return NULL;
     }
@@ -34,9 +34,9 @@ jabs_plugin *jabs_plugin_open(const char *filename) {
     }
     plugin->handle = handle;
     plugin->filename = strdup(filename);
-    namef = (const char *(*)()) dlsym(handle, "name");
-    versionf = (const char *(*)()) dlsym(handle, "version");
-    typef = (jabs_plugin_type (*)()) dlsym(handle, "type");
+    namef = (const char *(*)(void)) dlsym(handle, "name");
+    versionf = (const char *(*)(void)) dlsym(handle, "version");
+    typef = (jabs_plugin_type (*)(void)) dlsym(handle, "type");
     if(!namef || !versionf || !typef) {
         DEBUGSTR("Plugin does not have name or version symbol.");
         jabs_plugin_close(plugin);

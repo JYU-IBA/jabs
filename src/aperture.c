@@ -15,7 +15,7 @@ void aperture_free(aperture *a) {
     free(a);
 }
 
-aperture *aperture_default() {
+aperture *aperture_default(void) {
     aperture *a = malloc(sizeof(aperture));
     a->type = APERTURE_NONE;
     a->width = 0.0;

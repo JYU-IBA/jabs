@@ -12,7 +12,7 @@
 
 extern inline double calibration_eval(const calibration *c, size_t ch);
 
-calibration *calibration_init() {
+calibration *calibration_init(void) {
     calibration *c = calloc(1, sizeof(calibration));
     if(!c)
         return NULL;
@@ -53,7 +53,7 @@ void calibration_free(calibration *c) {
     free(c);
 }
 
-calibration *calibration_init_linear() {
+calibration *calibration_init_linear(void) {
     calibration *c = calibration_init();
     if(!c)
         return NULL;
