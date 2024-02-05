@@ -101,12 +101,19 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
         k3 = stop_sample(stop, incident, sample, halfdepth, E - (h / 2.0) * k2);
         k4 = stop_sample(stop, incident, sample, fulldepth, E - h * k3);
         stopping = (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0;
+#ifdef DEBUG
+        if(stopping <= 0.0) {
+            DEBUGMSG("Stopping is negative: RK4 (k1 = %g, k2 = %g, k3 = %g, k4 = %g) eV/tfu\n",
+                     k1 / C_EV_TFU, k2 / C_EV_TFU, k3 / C_EV_TFU, k4 / C_EV_TFU);
+        }
+#endif
     } else {
+
         stopping = k1;
     }
 #ifdef DEBUG
     if(stopping <= 0.0) {
-        DEBUGMSG("Stopping is %g eV/tfu at E = %g keV\n", stopping / C_EV_TFU, E / C_KEV);
+        DEBUGMSG("Stopping is %g eV/tfu at E = %g keV, k1 = %g eV/tfu, h = %g tfu, step = %g keV\n", stopping / C_EV_TFU, E / C_KEV, k1 / C_EV_TFU, h / C_TFU, step / C_KEV);
     }
     assert(stopping > 0.0);
 #endif
@@ -165,7 +172,16 @@ double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sam
             lo = jibal_gsto_em_to_index(file, em);
             hi = lo + 1;
         }
-        double S = unit_factor * jibal_linear_interpolation(file->em[lo], file->em[hi], data[lo], data[hi], em); /* TODO: check boundaries (low energy should be ok, but high maybe not) */
+        double S = unit_factor;
+        if(em < file->em[0]) {
+            DEBUGMSG("Energy %g keV/u below GSTO file minimum %g keV/u, returning value corresponding to minimum", em / (C_KEV / C_U), file->em[0]);
+            S *= data[0];
+        } else if(em > file->em[file->xpoints - 1]) {
+            DEBUGMSG("Energy %g keV/u anove GSTO file maximum %g keV/u, returning value corresponding to maximum", em / (C_KEV / C_U), file->em[file->xpoints - 1] / (C_KEV / C_U));
+            S *= data[file->xpoints - 1];
+        } else {
+            S *= jibal_linear_interpolation(file->em[lo], file->em[hi], data[lo], data[hi], em);
+        }
 
         if(stop->type == GSTO_STO_TOT) {
             S += ion_nuclear_stop(incident, target, stop->nuclear_stopping_accurate);
