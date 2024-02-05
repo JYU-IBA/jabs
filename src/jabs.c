@@ -514,8 +514,11 @@ int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) { /* Ass
 }
 
 int assign_stopping_Z1_Z2(jibal_gsto *gsto, int Z1, int Z2) {
-    if(Z1 < 1 || Z2 < 1) {
-        jabs_message(MSG_WARNING, "Assigning stopping for Z1 = %i in Z2 = %i is not possible.\n");
+    if(Z1 < 1 || Z2 < 1) { /* Not a proper ion, stopping can't be assigned */
+        DEBUGMSG("Assigning stopping Z1 = %i, Z2 = %i is a potential issue.", Z1, Z2);
+        if(Z1 != 0) { /* Neutrons are a possible legitimate reaction product, don't warn */
+            jabs_message(MSG_WARNING, "Assigning stopping for Z1 = %i in Z2 = %i is not possible.\n", Z1, Z2);
+        }
         return EXIT_SUCCESS; /* Skips, doesn't fail */
     }
     if(!jibal_gsto_auto_assign(gsto, Z1, Z2)) {
