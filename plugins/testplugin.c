@@ -3,15 +3,15 @@
 #include "testplugin.h"
 #include "testplugin_version.h"
 
-const char *name() {
+const char *name(void) {
     return "JaBS test plugin";
 }
 
-const char *version() {
+const char *version(void) {
     return testplugin_VERSION;
 }
 
-jabs_plugin_type type() {
+jabs_plugin_type type(void) {
     return JABS_PLUGIN_CS;
 }
 

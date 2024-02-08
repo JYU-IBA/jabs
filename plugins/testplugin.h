@@ -15,9 +15,9 @@
 #define JABS_TESTPLUGIN_H
 #include "../src/plugin_interface.h"
 
-const char *name();
-const char *version();
-jabs_plugin_type type();
+const char *name(void);
+const char *version(void);
+jabs_plugin_type type(void);
 jabs_plugin_reaction *reaction_init(const jibal_isotope *isotopes, const jibal_isotope *incident, const jibal_isotope *target, int *argc, char * const **argv);
 void reaction_free(jabs_plugin_reaction *r);
 double testplugin_cs(const struct jabs_plugin_reaction *r, double theta, double E);
