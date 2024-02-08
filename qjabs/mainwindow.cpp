@@ -831,7 +831,7 @@ void MainWindow::updateDetectorList()
     ui->menuDetector->setEnabled(multiple_detectors);
     int new_index = ui->comboBox->currentIndex() < session->fit->sim->n_det ? ui->comboBox->currentIndex() : 0;
     ui->comboBox->blockSignals(true);
-#if QT_FIXES_THEIR_COMBOBOX_BUG
+#ifndef Q_OS_MACOS
         ui->comboBox->clear();
 #else // Clearing a combobox causes issues on macOS in Qt 6.6. This still works.
     for (int i = ui->comboBox->count() - 1; i > 0; i--) {
