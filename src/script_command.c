@@ -206,6 +206,33 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
     return argc_orig - argc;
 }
 
+script_command_status script_simulate_sphere(script_session *s, int argc, char *const *argv) {
+    const int argc_orig = argc;
+    (void) argv;
+    struct fit_data *fit = s->fit;
+    if(argc > 1) {
+        /* TODO? */
+    }
+    if(script_prepare_sim_or_fit(s)) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    sim_calc_params_print(fit->sim->params, MSG_VERBOSE);
+    jabs_message(MSG_IMPORTANT, "Simulation (sphere) begins...\n");
+    for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
+        detector *det = fit->sim->det[i_det];
+        sim_workspace *ws = sim_workspace_init(s->jibal, fit->sim, det);
+        if(simulate_sphere(ws, det)) {
+            jabs_message(MSG_ERROR, "Simulation failed.\n");
+            sim_workspace_free(ws);
+            return SCRIPT_COMMAND_FAILURE;
+        }
+        fit_data_spectra_copy_to_spectra_from_ws(&fit->spectra[i_det], det, s->fit->exp[i_det], ws);
+        sim_workspace_free(ws);
+    }
+    script_finish_sim_or_fit(s);
+    return argc_orig - argc;
+}
+
 script_command_status script_fit(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit_data = s->fit;
     const char *fit_usage = "Usage: fit [fitvar1,fitvar2,...]\nSee 'show fit variables' for a list of possible fit variables.\n";
@@ -1420,8 +1447,9 @@ script_command *script_commands_create(struct script_session *s) {
     c = script_command_new("roi", "Show information from a region of interest.", 0, 0, script_roi);
     script_command_list_add_command(&head, c);
 
-    c = script_command_new("simulate", "Run a simulation.", 0, 0, script_simulate);
-    script_command_list_add_command(&head, c);
+    script_command *c_simulate = script_command_new("simulate", "Run a simulation.", 0, 0, script_simulate);
+    script_command_list_add_command(&c_simulate->subcommands, script_command_new("sphere", "Simulate over a sphere", 0, 0, &script_simulate_sphere));
+    script_command_list_add_command(&head, c_simulate);
 
     script_command *c_split = script_command_new("split", "Split something.", 0, 0, NULL);
     script_command *c_split_sample = script_command_new("sample", "Split something sample related.", 0, 0, NULL);

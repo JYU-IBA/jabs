@@ -798,3 +798,40 @@ int simulate_with_ds(sim_workspace *ws) {
     sim_workspace_calculate_sum_spectra(ws);
     return EXIT_SUCCESS;
 }
+
+int simulate_sphere(sim_workspace *ws, detector *det) {
+    if(!ws) {
+        jabs_message(MSG_ERROR, "Congratulations, you've found a bug in %s:%i.\n", __FILE__, __LINE__);
+        return EXIT_FAILURE;
+    }
+    detector_update(det);
+    detector det_orig = *det;
+    const double fluence = ws->fluence;
+    ion_set_angle(&ws->ion, 0.0, 0.0);
+    int steps_polar = 128;
+    int steps_azi = 1;
+    const double polar_min = 0.0 * C_DEG;
+    const double polar_max = 180.0 * C_DEG;
+    double polar_step = (polar_max - polar_min) / (steps_polar * 1.0);
+    double azi_step = C_2PI / (steps_azi * 1.0);
+    double solid_sum = 0.0;
+    jabs_message(MSG_VERBOSE, "Polar angle from %g deg to %g deg. Fluence %g. Det solid = %g (=1)\n", polar_min, polar_max, fluence, ws->det->solid);
+    jabs_message(MSG_VERBOSE, "Number of polar steps = %i\nNumber of azimuthal steps = %i\nPolar step = %g deg\nAzimuthal step = %g deg\n", steps_polar, steps_azi, polar_step / C_DEG, azi_step / C_DEG);
+    for(int i_polar = 0; i_polar < steps_polar; i_polar++) {
+        double polar = polar_step/2.0 + i_polar * polar_step;
+        for(int i_azi = 0; i_azi < steps_azi; i_azi++) {
+            double azi = azi_step * i_azi;
+            double solid = sin(polar) * 1.0 * polar_step * azi_step;
+            solid_sum += solid;
+            det->theta = polar;
+            det->phi = azi;
+            det->solid = solid;
+            int n_ok = simulate(&ws->ion, depth_seek(ws->sample, 0.0 * C_TFU), ws, ws->sample);
+            jabs_message(MSG_VERBOSE, "Integrate (%i, %i) polar = %g deg, azi = %g deg, solid = %.3lf msr (sum %.3lf sr), n_ok = %i\n", i_polar, i_azi, polar / C_DEG, azi / C_DEG, solid / C_MSR, solid_sum, n_ok);
+        }
+    }
+    jabs_message(MSG_VERBOSE, "\nSimulation complete, solid_sum/4pi = %.5lf.\n", solid_sum / (C_PI * 4.0));
+    sim_workspace_calculate_sum_spectra(ws);
+    *det = det_orig; /* Restore solid angle etc */
+    return EXIT_SUCCESS;
+}

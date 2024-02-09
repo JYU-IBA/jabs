@@ -36,4 +36,5 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
 double cross_section_straggling(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, const prob_dist *pd, double E, double S);
 double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S);
 double cross_section_straggling_adaptive(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, double E, double S);
+int simulate_sphere(sim_workspace *ws, detector *det);
 #endif // JABS_JABS_H
