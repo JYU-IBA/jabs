@@ -166,7 +166,9 @@ void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_lev
     }
     jabs_message(msg_level, "stopping RK4 = %s\n", params->rk4?"true":"false");
     jabs_message(msg_level, "accurate nuclear stopping = %s\n", params->nuclear_stopping_accurate?"true":"false");
-    jabs_message(msg_level, "maximum number of bricks = %zu\n", params->n_bricks_max);
+    if(params->n_bricks_max) {
+        jabs_message(msg_level, "maximum number of bricks = %zu\n", params->n_bricks_max);
+    }
     jabs_message(msg_level, "geometric broadening = %s\n", params->geostragg?"true":"false");
     jabs_message(msg_level, "brick width = %g times detector and straggling sum sigma\n", params->brick_width_sigmas);
     jabs_message(msg_level, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");

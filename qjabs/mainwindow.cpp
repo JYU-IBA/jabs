@@ -235,7 +235,7 @@ int MainWindow::initSession()
 {
     QString config_filename_str = settings.value("jibalConfigurationFile").toString();
     if(config_filename_str.isEmpty()) {
-#if defined(Q_OS_OSX)
+#if defined(Q_OS_MACOS)
     config_filename_str = QApplication::applicationDirPath() + "/../Resources/jibal.conf";
 #elif defined(Q_OS_WIN)
     config_filename_str = QApplication::applicationDirPath() + "\\jibal.conf";
@@ -440,7 +440,7 @@ void MainWindow::on_action_Run_triggered()
     }
     closeFitDialog();
     enableRun(true);
-    plotSession(/*error */);
+    plotSession();
     QString message;
     if(error) {
         message = QString("Error on line %1. Run aborted.").arg(lineno);
@@ -829,14 +829,21 @@ void MainWindow::updateDetectorList()
     ui->actionPrevious_detector->setVisible(multiple_detectors);
     ui->actionNext_detector->setVisible(multiple_detectors);
     ui->menuDetector->setEnabled(multiple_detectors);
-
-    int old_i_det = ui->comboBox->currentIndex();
-    ui->comboBox->clear();
+    int new_index = ui->comboBox->currentIndex() < session->fit->sim->n_det ? ui->comboBox->currentIndex() : 0;
+    ui->comboBox->blockSignals(true);
+#ifndef Q_OS_MACOS
+        ui->comboBox->clear();
+#else // Clearing a combobox causes issues on macOS in Qt 6.6. This still works.
+    for (int i = ui->comboBox->count() - 1; i > 0; i--) {
+        ui->comboBox->removeItem(i);
+    }
+#endif
     for(size_t i_det = 0; i_det < session->fit->sim->n_det; i_det++) {
         ui->comboBox->addItem(QString(session->fit->sim->det[i_det]->name));
     }
-    ui->comboBox->setCurrentIndex(old_i_det < session->fit->sim->n_det ? old_i_det : 0);
-
+    ui->comboBox->update();
+    ui->comboBox->setCurrentIndex(new_index);
+    ui->comboBox->blockSignals(false);
 }
 
 

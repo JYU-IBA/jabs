@@ -262,7 +262,8 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
     const des *des_min = des_table_min_energy_bin(dt);
     int product_and_incident_go_in_different_directions = (incident->inverse_cosine_theta * sim_r->p.inverse_cosine_theta < 0.0); /* false when transmission, true usually. */
     /* When the above is true, we can safely assume that once reaction product energy goes below some energy, we can stop calculating. */
-    for(size_t i_brick = 0; i_brick < sim_r->n_bricks; i_brick++) {
+    size_t i_brick = 0;
+    for(i_brick = 0; i_brick < sim_r->n_bricks; i_brick++) {
         assert(ion1.S >= 0.0);
         skipped = FALSE;
 #ifdef DEBUG_VERBOSE
@@ -272,7 +273,7 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         b = &sim_r->bricks[i_brick];
         b->valid = TRUE; /* Will be invalidated if necessary */
         d_before = d_after;
-        DEBUGVERBOSEMSG("E = %g keV (incident)", ion1.E / C_KEV);
+        DEBUGVERBOSEMSG("E = %g keV (incident), i_brick = %zu", ion1.E / C_KEV, i_brick);
         if(ion1.E < des_min->E) {
             DEBUGMSG("E = %g keV (incident) is below %g keV. Changing energy.", ion1.E / C_KEV, des_min->E / C_KEV);
             des_set_ion(des_min, &ion1);
@@ -396,22 +397,18 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
                 );
         assert(!isnan(ion1.E));
         if(ion1.E < sim_r->emin_incident) {
-            sim_r->last_brick = i_brick;
             DEBUGMSG("E = %g keV sufficiently below reaction emin_incident %g keV.", b->E / C_KEV, sim_r->emin_incident / C_KEV);
             break;
         }
         if(ion1.inverse_cosine_theta > 0.0 && d_after.x >= sim_r->max_depth) {
-            sim_r->last_brick = i_brick;
             DEBUGMSG("Max depth of %g tfu reached (d_after.x is %g).", sim_r->max_depth / C_TFU,  d_after.x / C_TFU);
             break;
         }
         if(ion1.inverse_cosine_theta < 0.0 && d_after.x < DEPTH_TOLERANCE) {
-            sim_r->last_brick = i_brick;
             DEBUGMSG("Surface reached, d_after.x = %g tfu.", d_after.x);
             break;
         }
         if(last) {
-            sim_r->last_brick = i_brick;
             DEBUGMSG("Last brick (earlier decision, because des_min = %g keV or because reaction product stopped in the sample or detector foil).", des_min->E / C_KEV);
             break;
         }
@@ -423,7 +420,12 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             ion1.E += E_change;
         }
     }
-    assert(sim_r->last_brick < sim_r->n_bricks);
+    if(i_brick == sim_r->n_bricks) {
+        DEBUGMSG("Maybe not enough bricks (%zu)!", sim_r->n_bricks);
+        sim_r->last_brick = i_brick - 1; /* For loop adds +1 if it runs through completely */
+    } else {
+        sim_r->last_brick = i_brick; /* There was a break before the for loop completed */
+    }
     return EXIT_SUCCESS;
 }
 
@@ -439,7 +441,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
         jabs_message(MSG_ERROR, "DES table computation failed.\n");
         return -1;
     }
-#ifdef DEBUG_VERBOSE
+#ifdef DEBUG
     des_table_print(stderr, dt);
 #endif
     int error = FALSE;
@@ -456,6 +458,9 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
             break;
         }
         DEBUGMSG("Finished. sim_r->last_brick = %zu (%zu/%zu). depth = %g tfu", sim_r->last_brick, sim_r->last_brick + 1, sim_r->n_bricks, sim_r->bricks[sim_r->last_brick].d.x / C_TFU);
+        if(sim_r->last_brick + 1 == sim_r->n_bricks) {
+            jabs_message(MSG_WARNING, "Reaction %s may have produced incomplete results. Use set bricks_n to increase number of bricks from current setting (%zu)", reaction_name(sim_r->r), sim_r->n_bricks);
+        }
     }
     des_table_free(dt);
     if(error) {
@@ -482,6 +487,7 @@ int simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim_
     sim_r->max_depth = sample_isotope_max_depth(sample, sim_r->i_isotope);
     sim_reaction_reset_bricks(sim_r);
     if(sim_r->i_isotope >= sample->n_isotopes) { /* No target isotope for reaction. */
+        DEBUGMSG("No target isotope (%zu) for reaction", sim_r->i_isotope);
         sim_r->stop = TRUE;
     }
     DEBUGMSG("Simulation reaction %s initialized. Max depth %g tfu. i_isotope=%zu, stop = %i.",
@@ -514,8 +520,11 @@ int assign_stopping_Z2(jibal_gsto *gsto, const simulation *sim, int Z2) { /* Ass
 }
 
 int assign_stopping_Z1_Z2(jibal_gsto *gsto, int Z1, int Z2) {
-    if(Z1 < 1 || Z2 < 1) {
-        jabs_message(MSG_WARNING, "Assigning stopping for Z1 = %i in Z2 = %i is not possible.\n");
+    if(Z1 < 1 || Z2 < 1) { /* Not a proper ion, stopping can't be assigned */
+        DEBUGMSG("Assigning stopping Z1 = %i, Z2 = %i is a potential issue.", Z1, Z2);
+        if(Z1 != 0) { /* Neutrons are a possible legitimate reaction product, don't warn */
+            jabs_message(MSG_WARNING, "Assigning stopping for Z1 = %i in Z2 = %i is not possible.\n", Z1, Z2);
+        }
         return EXIT_SUCCESS; /* Skips, doesn't fail */
     }
     if(!jibal_gsto_auto_assign(gsto, Z1, Z2)) {

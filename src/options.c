@@ -26,18 +26,18 @@
 
 #define USAGE_STRING "Usage: jabs [OPTION [<argument>]] [OPTION2 ...] ... [<FILE> [<FILE2>] ...] | \n\nRun without arguments or \"-i\" to use JaBS interactively.\n\nExample: jabs example.jbs\n"
 
-const char *jabs_version() {
+const char *jabs_version(void) {
     if(git_populated()) {
         return git_describe();
     }
     return jabs_version_simple();
 }
 
-const char *jabs_version_simple() {
+const char *jabs_version_simple(void) {
     return jabs_VERSION;
 }
 
-void usage() {
+void usage(void) {
     fprintf(stderr, USAGE_STRING);
 }
 
@@ -115,7 +115,7 @@ void read_options(cmdline_options *cmd_opt, int *argc, char *const **argv) {
     *argv += optind;
 }
 
-cmdline_options *cmdline_options_init() {
+cmdline_options *cmdline_options_init(void) {
     cmdline_options *cmd_opt = malloc(sizeof(cmdline_options));
     memset(cmd_opt, 0, sizeof(cmdline_options)); /* Everything not listed below are zero or NULL by default */
     cmd_opt->verbose = JABS_DEFAULT_VERBOSITY;

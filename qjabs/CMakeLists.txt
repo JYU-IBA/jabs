@@ -54,6 +54,15 @@ if(WIN32)
     find_library(GETOPT_LIBRARY getopt)
 endif()
 
+option(JABS_PLUGINS "Support for plugins" OFF)
+if(JABS_PLUGINS)
+    if (MSVC)
+        #No Windows support in the first phase
+    else()
+        add_compile_options(-DJABS_PLUGINS)
+    endif()
+endif()
+
 set(PROJECT_SOURCES
         ../src/sample.c
         ../src/brick.c
@@ -95,7 +104,7 @@ set(PROJECT_SOURCES
         ../src/gsl_inline.c
         ../src/scatint.c
         ../src/simulation2idf.c
-        "$<$<BOOL:${PLUGINS}>:plugin.c>"
+        "$<$<BOOL:${JABS_PLUGINS}>:../src/plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui
        fitdialog.cpp fitdialog.h fitdialog.ui

@@ -309,7 +309,7 @@ int jabs_unit_sanity_check(double value, int type) {
 }
 
 
-double jabs_clock() {
+double jabs_clock(void) {
 #ifdef _OPENMP
     return omp_get_wtime();
 #else

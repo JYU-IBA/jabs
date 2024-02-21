@@ -12,7 +12,7 @@
 
 extern inline double calibration_eval(const calibration *c, size_t ch);
 
-calibration *calibration_init() {
+calibration *calibration_init(void) {
     calibration *c = calloc(1, sizeof(calibration));
     if(!c)
         return NULL;
@@ -53,13 +53,17 @@ void calibration_free(calibration *c) {
     free(c);
 }
 
-calibration *calibration_init_linear() {
+calibration *calibration_init_linear(void) {
     calibration *c = calibration_init();
     if(!c)
         return NULL;
     c->f = calibration_linear;
     c->type = CALIBRATION_LINEAR;
     calibration_params_linear *p = calloc(1, sizeof(calibration_params_linear));
+    if(!p) {
+        free(c);
+        return NULL;
+    }
     c->params = p;
     c->resolution = 0.0;
     c->resolution_variance = 0.0;
@@ -86,7 +90,7 @@ double calibration_linear(const void *params, size_t ch) {
 
 double calibration_poly(const void *params, size_t x) {
     calibration_params_poly *p = (calibration_params_poly *)params;
-    double mul = x;
+    double mul = (double)x;
     double sum = p->a[0];
     for(size_t i = 1; i <= p->n; i++) {
         sum += mul * p->a[i];

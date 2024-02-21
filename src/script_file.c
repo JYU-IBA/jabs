@@ -94,8 +94,12 @@ ssize_t script_file_getline(script_file *sfile) {
         if(line) {
             line_size = strlen(line);
         } else {
-            line_size = 0;
+            free(sfile->line);
+            sfile->line = NULL;
+            sfile->line_size = 0;
+            return -1;
         }
+        sfile->lineno++;
         if(jabs_line_is_comment(sfile->line)) {
             continue;
         }

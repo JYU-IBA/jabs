@@ -620,9 +620,7 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
                 r->rough.model = ROUGHNESS_NONE;
                 roughness_reset(&r->rough);
                 sm->n_ranges++;
-#ifdef DEBUG
-                fprintf(stderr, "Sample from file: NEW POINT, n = %zu, n_ranges = %zu, n_materials=%zu\n", n, sm->n_ranges, sm->n_materials);
-#endif
+                DEBUGMSG("Sample from file: NEW POINT, n = %zu, n_ranges = %zu, n_materials=%zu", n, sm->n_ranges, sm->n_materials);
                 i_material = 0;
                 /* TODO: invalidate layer if not loaded properly */
             }
@@ -658,6 +656,9 @@ sample_model *sample_model_from_file(const jibal *jibal, const char *filename) {
         headers = 0;
     }
     free(line);
+    fclose(in);
+    jabs_message(MSG_VERBOSE, "Read %zu lines from \"%s\": got %zu ranges.\n", lineno, filename, sm->n_ranges);
+
     for(size_t i_range = 0; i_range < sm->n_ranges; i_range++) { /* Set defaults (roughness model) for roughness. */
         sample_range *r = &sm->ranges[i_range];
         if(r->rough.x > ROUGH_TOLERANCE) {
@@ -1055,7 +1056,7 @@ double sample_isotope_max_depth(const sample *sample, size_t i_isotope) {
             break;
         }
     }
-    DEBUGMSG("Isotope %zu max depth %g tfu.\n", i_isotope, out / C_TFU);
+    DEBUGMSG("Isotope %zu max depth %g tfu.", i_isotope, out / C_TFU);
     return out;
 }
 
