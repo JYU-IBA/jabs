@@ -60,6 +60,7 @@ typedef struct detector {
 calibration *detector_get_calibration(const detector *det, int Z); /* Returns Z specific calibration (if it exists) det->calibration otherwise. */
 inline double detector_calibrated(const detector *det, int Z, size_t ch) {return calibration_eval(detector_get_calibration(det, Z), ch*det->compress);}
 int detector_set_calibration_Z(const jibal_config *jibal_config, detector *det, calibration *cal, int Z); /* Sets Z specific calibration, (re)allocates space for det->calibration_Z if required. */
+int detector_calibration_Z_allocate(detector *det, int Z_max);
 const char *detector_type_name(const detector *det);
 int detector_sanity_check(const detector *det, size_t n_channels);
 detector *detector_default(detector *det); /* if det is NULL, this returns pointer to a newly allocated det */

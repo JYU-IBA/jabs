@@ -44,16 +44,9 @@ int detector_set_calibration_Z(const jibal_config *jibal_config, detector *det, 
         return EXIT_FAILURE;
     }
     if(Z > det->cal_Z_max) {
-        det->calibration_Z = realloc(det->calibration_Z, sizeof(calibration *) * (Z+1)); /* Allocate more space */
-        if(!det->calibration_Z) {
-            det->cal_Z_max = 0;
+        if(detector_calibration_Z_allocate(det, Z)) {
             return EXIT_FAILURE;
         }
-        for(int i = (int) det->cal_Z_max + 1; i <= Z; i++) { /* Initialize */
-            det->calibration_Z[i] = NULL;
-        }
-        det->cal_Z_max = Z;
-        DEBUGMSG("More space allocated for detector = %p calibrations. Z_max = %i.", (void *) det, det->cal_Z_max);
     }
     calibration_free(det->calibration_Z[Z]);
     det->calibration_Z[Z] = cal;
@@ -61,8 +54,21 @@ int detector_set_calibration_Z(const jibal_config *jibal_config, detector *det, 
     return EXIT_SUCCESS;
 }
 
-
-
+int detector_calibration_Z_allocate(detector *det, int Z_max) {
+    calibration **calib_old = det->calibration_Z;
+    assert(det->cal_Z_max > 0 || det->calibration_Z  == NULL);
+    det->calibration_Z = realloc(calib_old, sizeof(calibration *) * (Z_max + 1));
+    if(!det->calibration_Z) {
+        DEBUGSTR("Allocation failure for det->calibration_Z.");
+        return -1;
+    }
+    for(int i = (int) det->cal_Z_max + 1; i <= Z_max; i++) { /* Growth, initialize to NULL */
+        det->calibration_Z[i] = NULL;
+    }
+    det->cal_Z_max = Z_max;
+    DEBUGMSG("More space allocated for detector = %p calibrations. Z_max = %i.", (void *) det, det->cal_Z_max);
+    return 0;
+}
 
 const char *detector_type_name(const detector *det) {
     return detector_option[det->type].s;
@@ -136,13 +142,17 @@ void detector_free(detector *det) {
 }
 
 void detector_calibrations_free(detector *det) {
-    calibration_free(det->calibration);
     if(det->calibration_Z) {
         for(int Z = 0;  Z <= det->cal_Z_max; Z++) {
-            calibration_free(det->calibration_Z[Z]);
+            if(det->calibration_Z[Z] != det->calibration) {
+                calibration_free(det->calibration_Z[Z]);
+            }
         }
         free(det->calibration_Z);
+        det->calibration_Z = NULL;
     }
+    calibration_free(det->calibration);
+    det->calibration = NULL;
     det->cal_Z_max = -1;
 }
 
@@ -291,7 +301,7 @@ void detector_update(detector *det) {
     }
     det->calibration->resolution_variance = pow2(det->calibration->resolution/C_FWHM);
     DEBUGMSG("Updating detector, resolution = %g keV FWHM, variance = %g", det->calibration->resolution/C_KEV, det->calibration->resolution_variance);
-    for(int Z = 1; Z  <= (int)det->cal_Z_max; Z++) {
+    for(int Z = 0; Z  <= (int)det->cal_Z_max; Z++) {
         calibration *c = det->calibration_Z[Z];
         if(!c || c == det->calibration) {
             continue;
@@ -368,8 +378,17 @@ detector *detector_clone(const detector *det_orig) {
     det->name = strdup_non_null(det_orig->name);
     det->calibration = calibration_clone(det_orig->calibration);
     if(det->calibration_Z) {
+        det->calibration_Z = NULL;
+        det->cal_Z_max = -1;
+        if(detector_calibration_Z_allocate(det, det_orig->cal_Z_max)) {
+            return NULL;
+        }
         for(int Z = 0;  Z <= det->cal_Z_max; Z++) {
-            det->calibration_Z[Z] = calibration_clone(det_orig->calibration_Z[Z]);
+            if(det_orig->calibration_Z[Z] == det_orig->calibration) {
+                det->calibration_Z[Z] = det->calibration;
+            } else {
+                det->calibration_Z[Z] = calibration_clone(det_orig->calibration_Z[Z]);
+            }
         }
     }
     det->aperture = aperture_clone(det_orig->aperture);
