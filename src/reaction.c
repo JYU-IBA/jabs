@@ -44,7 +44,10 @@ void reactions_print(reaction * const * reactions, size_t n_reactions) {
             jabs_message(MSG_INFO, ", E = [%.6g MeV, %.6g MeV]", r->E_min / C_MEV, r->E_max / C_MEV);
         }
         if(r->Q != 0.0) {
-            jabs_message(MSG_INFO, ", Q = %g MeV ", r->Q / C_MEV);
+            jabs_message(MSG_INFO, ", Q = %g MeV", r->Q / C_MEV);
+        }
+        if(r->yield != 1.0) {
+            jabs_message(MSG_INFO, ", yield = %g", r->yield);
         }
         if(r->type == REACTION_FILE) {
             jabs_message(MSG_INFO, ", Theta = %g deg,  Data from file \"%s\".\n", r->theta/C_DEG, r->filename);
@@ -119,6 +122,7 @@ reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *targ
     r->E_min = E_MIN;
     r->E_max = E_MAX;
     r->Q = 0.0;
+    r->yield = 1.0;
     switch(type) {
         case REACTION_ERD:
             r->product = target;
@@ -154,29 +158,37 @@ reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incid
     reaction *r = reaction_make(incident, target, type, JABS_CS_NONE); /* Warning: JABS_CS_NONE used here, something sane must be supplied after this somewhere! */
     (*argc) -= 2;
     (*argv) += 2;
+    if(reaction_modifiers_from_argv(jibal, r, argc, argv)) {
+        reaction_free(r);
+        return NULL;
+    }
+    return r;
+}
+
+int reaction_modifiers_from_argv(const jibal *jibal, reaction *r, int *argc, char * const **argv) {
     while ((*argc) >= 2) {
         if(strcmp((*argv)[0], "max") == 0) {
             if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_ENERGY, (*argv)[1], &r->E_max) < 0) {
-                reaction_free(r);
-                return NULL;
+                return -1;
             }
         } else if(strcmp((*argv)[0], "min") == 0) {
             if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_ENERGY, (*argv)[1], &r->E_min) < 0) {
-                reaction_free(r);
-                return NULL;
+                return -1;
             }
         } else if(strcmp((*argv)[0], "cs") == 0) {
             r->cs = jibal_option_get_value(jabs_cs_types, (*argv)[1]);
             if(r->cs == 0) {
                 jabs_message(MSG_ERROR, "Cross section type \"%s\" not recognized.\n", (*argv)[1]);
                 reaction_free(r);
-                return NULL;
+                return -1;
             }
+        } else if(strcmp((*argv)[0], "yield") == 0) {
+            r->yield = strtod((*argv)[1], NULL);
         }
         (*argc) -= 2;
         (*argv) += 2;
     }
-    return r;
+    return 0;
 }
 
 void reaction_free(reaction *r) {
@@ -253,6 +265,7 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
 
     reaction *r = calloc(1, sizeof(reaction));
     r->cs = JABS_CS_NONE;
+    r->yield = 1.0;
     r->type = REACTION_FILE;
 #ifdef R33_IGNORE_REACTION_STRING
     r->incident = nuclei[0];

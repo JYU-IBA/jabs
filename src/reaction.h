@@ -69,6 +69,7 @@ typedef struct reaction {
     const jibal_isotope *product;
     const jibal_isotope *residual; /* Typically the "heavy" reaction product (of limited interest) */
     jabs_reaction_cs cs; /* Cross section model to use (e.g. screening corrections) */
+    double yield; /* Ad-hoc scaling of cross sections, 1.0 by default */
     char *filename; /* for REACTION_FILE and REACTION_PLUGIN */
 #ifdef JABS_PLUGINS
     jabs_plugin *plugin; /* for REACTION_PLUGIN */
@@ -88,6 +89,7 @@ typedef struct reaction {
 void reactions_print(reaction * const *reactions, size_t n_reactions);
 reaction *reaction_make(const jibal_isotope *incident, const jibal_isotope *target, reaction_type type, jabs_reaction_cs cs);
 reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incident, int *argc, char * const **argv);
+int reaction_modifiers_from_argv(const jibal *jibal, reaction *r, int *argc, char * const **argv);
 const char *reaction_name(const reaction *r);
 const char *reaction_type_to_string(reaction_type type);
 reaction_type reaction_type_from_string(const char *s);

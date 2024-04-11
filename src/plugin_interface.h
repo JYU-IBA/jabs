@@ -30,6 +30,7 @@ typedef struct jabs_plugin_reaction {
     double E_min;
     double E_max;
     double Q;
+    double yield;
     void *reaction_data; /* Pointer for the plugin to store reaction specific data in. */
 } jabs_plugin_reaction;
 #endif //JABS_PLUGIN_INTERFACE_H

@@ -1213,6 +1213,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_set->subcommands, script_command_new("charge", "Set charge.", 0, 1, &script_set_charge)); /* Fluence is fundamental, this is for convenience */
     script_command_list_add_command(&c_set->subcommands, script_command_new("verbosity", "Set verbosity.", 0, 1, &script_set_verbosity));
 
+
     script_command *c_channeling = script_command_new("channeling", "Set channeling yield correction (i.e. last layer yield).", 0, 0, NULL);
     script_command_list_add_command(&c_channeling->subcommands, script_command_new("yield", "Set channeling yield (constant).", 0, 0, &script_set_channeling_yield));
     script_command_list_add_command(&c_channeling->subcommands, script_command_new("slope", "Set channeling yield (depth) slope.", 0, 0, &script_set_channeling_slope));
@@ -1601,6 +1602,7 @@ script_command_status script_load_reference(script_session *s, int argc, char *c
 
 script_command_status script_load_reaction(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
+    const int argc_orig = argc;
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Usage: load reaction <file>\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -1608,11 +1610,33 @@ script_command_status script_load_reaction(script_session *s, int argc, char *co
     if(strcmp(argv[0], "plugin") == 0) {
         return 0;
     }
-    if(sim_reactions_add_r33(fit->sim, fit->jibal->isotopes, argv[0])) {
+    const char *filename = argv[0];
+    argc--;
+    argv++;
+    r33_file *rfile = r33_file_read(filename);
+    if(!rfile) {
+        jabs_message(MSG_ERROR, "Could not load R33 from file \"%s\".\n", filename);
         return SCRIPT_COMMAND_FAILURE;
-    } else {
-        return 1;
     }
+    reaction *r = r33_file_to_reaction(s->jibal->isotopes, rfile);
+    r33_file_free(rfile);
+    if(!r) {
+        jabs_message(MSG_ERROR, "Could not convert R33 file to a reaction!\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    jabs_message(MSG_INFO, "File: %s has a reaction with %s -> %s, product %s, theta %g deg\n",
+                 filename, r->incident->name, r->target->name, r->product->name, r->theta / C_DEG);
+    if(reaction_modifiers_from_argv(s->jibal, r, &argc, &argv)) {
+        reaction_free(r);
+        jabs_message(MSG_ERROR, "Could not parse reaction modifiers.");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(sim_reactions_add_reaction(fit->sim, r, FALSE)) {
+        reaction_free(r);
+        jabs_message(MSG_ERROR, "Could not parse reaction modifiers.");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    return argc_orig - argc; /* Number of arguments */
 }
 
 script_command_status script_load_roughness(script_session *s, int argc, char *const *argv) {
@@ -2217,6 +2241,24 @@ script_command_status script_set_verbosity(struct script_session *s, int argc, c
     return 1;
 }
 
+script_command_status script_set_reaction_yield(struct script_session *s, int argc, char * const *argv) {
+    (void) s;
+    if(argc < 1) { /* argc_min set elsewhere, this is redundant, no error reporting */
+        return EXIT_FAILURE;
+    }
+    size_t tmp = jabs_message_verbosity;
+    if(jabs_str_to_size_t(argv[0], &tmp) < 0) {
+        return EXIT_FAILURE;
+    }
+    if(tmp > MSG_ERROR) {
+        jabs_message(MSG_ERROR, "The verbosity level %zu is too high, maximum is %zu.\n", tmp, MSG_ERROR);
+        return EXIT_FAILURE;
+    }
+    jabs_message_verbosity = tmp;
+    jabs_message(MSG_INFO, "Verbosity level set to \"%s\".\n", jabs_message_level_str(jabs_message_verbosity));
+    return 1;
+}
+
 script_command_status script_test_reference(struct script_session *s, int argc, char *const *argv) {
     const struct fit_data *fit = s->fit;
     const int argc_orig = argc;
@@ -2548,6 +2590,7 @@ script_command_status script_load_reaction_plugin(script_session *s, int argc, c
     r->E_max = pr->E_max;
     r->filename = strdup(plugin->filename);
     r->Q = pr->Q;
+    r->yield = pr->yield;
     reaction_generate_name(r);
     sim_reactions_add_reaction(fit->sim, r, FALSE);
     return argc_orig; /* TODO: always consumes all arguments */

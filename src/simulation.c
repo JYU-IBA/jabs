@@ -124,24 +124,6 @@ int sim_reactions_remove_reaction(simulation *sim, size_t i) {
     return EXIT_SUCCESS;
 }
 
-int sim_reactions_add_r33(simulation *sim, const jibal_isotope *isotopes, const char *filename) {
-    r33_file *rfile = r33_file_read(filename);
-    if(!rfile) {
-        jabs_message(MSG_ERROR, "Could not load R33 from file \"%s\".\n", filename);
-        return EXIT_FAILURE;
-    }
-    reaction *r = r33_file_to_reaction(isotopes, rfile);
-    r33_file_free(rfile);
-    if(!r) {
-        jabs_message(MSG_ERROR, "Could not convert R33 file to a reaction!\n");
-        return EXIT_FAILURE;
-    }
-    jabs_message(MSG_INFO, "File: %s has a reaction with %s -> %s, product %s, theta %g deg\n",
-                 filename, r->incident->name, r->target->name, r->product->name, r->theta / C_DEG);
-    sim_reactions_add_reaction(sim, r, FALSE);
-    return EXIT_SUCCESS;
-}
-
 int sim_reactions_add_auto(simulation *sim, const sample_model *sm, reaction_type type, jabs_reaction_cs cs, int silent) { /* Note that sim->ion needs to be set! */
     if(!sim || !sim->beam_isotope || !sm) {
         return -1;

@@ -29,6 +29,11 @@ if(APPLE)
     include(../rpathmagic.cmake) # Maybe a temporary fix to some library issues
 endif ()
 
+if(UNIX)
+    set(JABS_PLUGINS TRUE)
+    add_compile_definitions(JABS_PLUGINS)
+endif ()
+
 add_executable(jabs
         main.c
         sample.c brick.c ion.c simulation.c reaction.c options.c
