@@ -352,7 +352,7 @@ void SpectrumPlot::updateVerticalRange(bool force)
     double ymax = getVerticalMaximum();
     ymax *= (legendOutside || !legend->visible()) ? 1.01 : 1.1; /* leave more room at the top when legend is inside */
     if(logscale) {
-        ymin = 0.5;
+        ymin = 0.1;
         ymax = pow(10, ceil(log10(ymax))); /* lowest power of ten larger than actual maximum, .e.g     100000 for 12345 */
     } else {
         ymin = 0.0;
