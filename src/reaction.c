@@ -36,7 +36,9 @@ void reactions_print(reaction * const * reactions, size_t n_reactions) {
         }
         jabs_message(MSG_INFO, "%3zu: %s", i + 1, reaction_name(r));
 #ifdef DEBUG
-        jabs_message(MSG_INFO, " Reaction product stopping emin %g keV ", r->ion_gsto->emin / C_KEV); /* This is only valid after sim has been prepared */
+        if(r->ion_gsto) {
+            jabs_message(MSG_INFO, " Reaction product stopping emin %g keV ", r->ion_gsto->emin / C_KEV); /* This is only valid after sim has been prepared */
+        }
 #endif
         if(r->E_min > E_MIN || r->E_max < E_MAX) {
             jabs_message(MSG_INFO, ", E = [%.6g MeV, %.6g MeV]", r->E_min / C_MEV, r->E_max / C_MEV);
