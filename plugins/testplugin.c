@@ -27,6 +27,7 @@ jabs_plugin_reaction *reaction_init(const jibal_isotope *isotopes, const jibal_i
     r->cs = testplugin_cs;
     r->E_min = 0.0;
     r->E_max = 1000.0 * C_MEV;
+    r->yield = 1.0;
     return r;
 }
 

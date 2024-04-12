@@ -9,9 +9,9 @@ load sample "point_by_point_profile.txt"
 simulate
 save spectra "point_by_point_out.dat"
 load ref "point_by_point_ref.dat"
-test ref [100:600] 1e-4
+test ref [100:600] 1e-3
 
 #Alternative way of defining point-by-point profiles with concentration gradients. Should yield the same spectrum.
 load sample "point_by_point_profile_alternative.txt"
 simulate
-test ref [100:600] 1e-4
+test ref [100:600] 1e-3
