@@ -400,8 +400,11 @@ xmlNodePtr idf_new_node_printf(const xmlChar *name, const char * restrict format
     va_list argp;
     va_start(argp, format);
     char *s;
-    vasprintf(&s, format, argp);
+    int len = vasprintf(&s, format, argp);
     va_end(argp);
+    if(len < 0) {
+        return NULL;
+    }
     xmlNodePtr n = xmlNewNode(NULL, BAD_CAST name);
     if(s) {
         xmlNodeSetContent(n, BAD_CAST s);
@@ -421,7 +424,11 @@ xmlNodePtr idf_new_node_units(const xmlChar *name, const xmlChar *unit, const xm
         xmlSetProp(n, BAD_CAST "mode", mode);
     }
     char *out;
-    asprintf(&out, "%g", value);
+    int len = asprintf(&out, "%g", value);
+    if(len < 0) {
+        xmlFreeNode(n);
+        return NULL;
+    }
     if(out) {
         xmlNodeSetContent(n, BAD_CAST out);
     }
