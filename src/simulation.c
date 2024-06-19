@@ -292,15 +292,15 @@ void sim_print(const simulation *sim, jabs_msg_level msg_level) {
         }
         jabs_message(msg_level, "  angle from horizontal = %.3lf deg\n", detector_angle(det, 'x') / C_DEG);
         jabs_message(msg_level, "  angle from vertical = %.3lf deg\n", detector_angle(det, 'y') / C_DEG);
-        jabs_message(msg_level, "  solid angle (given, used) = %.4lf msr\n", i, det->solid / C_MSR);
+        jabs_message(msg_level, "  solid angle (given, used) = %.4lf msr\n", det->solid / C_MSR);
         if(det->distance > 1.0 * C_MM) {
-            jabs_message(msg_level, "  solid angle (calculated, not used) = %.4lf msr\n", i, detector_solid_angle_calc(det) / C_MSR);
-            jabs_message(msg_level, "  distance = %.3lf mm\n", i, det->distance / C_MM);
+            jabs_message(msg_level, "  solid angle (calculated, not used) = %.4lf msr\n", detector_solid_angle_calc(det) / C_MSR);
+            jabs_message(msg_level, "  distance = %.3lf mm\n", det->distance / C_MM);
             rot_vect v = rot_vect_from_angles(det->theta, det->phi);
             double r = det->distance;
             jabs_message(msg_level, "  coordinates = (%.3lf, %.3lf, %.3lf) mm\n", v.x * r / C_MM, v.y * r / C_MM, v.z * r / C_MM);
         }
-        jabs_message(msg_level, "  particle solid angle product = %e sr\n", i, sim->fluence * det->solid);
+        jabs_message(msg_level, "  particle solid angle product = %e sr\n", sim->fluence * det->solid);
     }
     jabs_message(msg_level, "n_reactions = %zu\n", sim->n_reactions);
     jabs_message(msg_level, "fluence = %e (%.5lf p-uC)\n", sim->fluence, sim->fluence * C_E * 1.0e6);
