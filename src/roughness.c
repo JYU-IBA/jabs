@@ -29,28 +29,29 @@ double thickness_gamma_pdf(double x, double thickness, double sigma) {
 }
 
 thick_prob_dist *thickness_probability_table_gamma(double thickness, double sigma, size_t n) {
-    if(thickness < 0.0) {
-        thickness = 0.0;
+    if(thickness < ROUGH_TOLERANCE) { /* Zero thickness would lead to division by zero. */
+        thickness = thickness < 0.0 ? 0.0 : thickness;
+        n = 1; /* n == 1 handled separately below, corresponds to zero roughness */
+    } else if(sigma < ROUGH_TOLERANCE) { /* Special case for (near) zero sigma, reduce n to 1 */
+        n = 1; /* n == 1 handled separately below, corresponds to zero roughness */
     }
-    if(sigma < 0.01 * C_TFU) { /* Special case for (near) zero sigma, reduce n to 1 */
-        sigma = 0.0;
-        n = 1;
-    }
-
-    double low = thickness - sigma*4.0;
-    double high = thickness + sigma*4.0;
-    if(low < 0.0) {
-        low = 0.0;
-    }
-    double step = (high-low)/(n*1.0);
     thick_prob_dist *tpd = thickness_probability_table_new(n);
-    double sum = 0.0;
-    double areal_sum = 0.0;
     if(n == 1) {
         tpd->p[0].prob = 1.0;
         tpd->p[0].x = thickness;
         return tpd;
     }
+
+    double low = thickness - sigma * GAMMA_ROUGHNESS_SIGMAS;
+    double high = thickness + sigma * GAMMA_ROUGHNESS_SIGMAS;
+    if(low < 0.0) {
+        low = 0.0;
+    }
+    double step = (high-low)/(n*1.0);
+
+    double sum = 0.0;
+    double areal_sum = 0.0;
+
     for(size_t i = 0; i < n; i++) {
         thick_prob *p = &tpd->p[i];
         double x_low = low + i*step;
