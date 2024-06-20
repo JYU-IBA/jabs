@@ -129,6 +129,7 @@ private:
     QString filename;
     QString filebasename;
     QString originalPath;
+    QString filedirpath;
     bool needsSaving;
     bool firstRun;
     QString aboutString;

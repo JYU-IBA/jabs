@@ -399,6 +399,9 @@ void MainWindow::on_action_Run_triggered()
         ui->msgTextBrowser->clear();
         script_reset(session, 0, NULL);
     }
+    if(!filedirpath.isEmpty()) {
+        QDir::setCurrent(filedirpath);
+    }
     QString text = ui->editor->toPlainText();
     QTextStream stream = QTextStream(&text, QIODevice::ReadOnly);
     size_t lineno = 0;
@@ -604,8 +607,9 @@ void MainWindow::setFilename(const QString &filename)
     QFile file(filename);
     QFileInfo fi(file);
     MainWindow::filebasename = fi.baseName();
+    filedirpath = fi.absoluteDir().path();
     setWindowFilePath(fi.absoluteFilePath());
-    if(!QDir::setCurrent(fi.absolutePath())) {
+    if(!QDir::setCurrent(filedirpath)) {
         qDebug() << "Can't set the current working directory!";
     }
     QStringList files = settings.value("recentFileList").toStringList();
@@ -628,6 +632,7 @@ void MainWindow::on_action_New_File_triggered()
     resetAll();
     plotSession(); /* Will hide plot */
     filename.clear();
+    filedirpath.clear();
     filebasename.clear();
     QDir::setCurrent(originalPath);
     setNeedsSaving(false);
