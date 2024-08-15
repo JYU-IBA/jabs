@@ -21,6 +21,8 @@
 #include <unistd.h>
 #endif
 #include <jibal_generic.h>
+#include <jibal_defaults.h>
+#include <gsl/gsl_version.h>
 #include "jabs_debug.h"
 #include "message.h"
 #include "sample.h"
@@ -2519,6 +2521,10 @@ script_command_status script_help_version(script_session *s, int argc, char *con
 #ifdef _OPENMP
     jabs_message(MSG_INFO,  "OpenMP: %d\n", _OPENMP);
 #endif
+    jabs_message(MSG_INFO, "GSL: %s (compile time: %s)\n", gsl_version, GSL_VERSION);
+    jabs_message(MSG_INFO, "JIBAL: %s (compile time: %s)\n", jibal_version(), JIBAL_VERSION);
+    jabs_message(MSG_INFO, "libxml2 compile time: %s\n", LIBXML_DOTTED_VERSION);
+    LIBXML_TEST_VERSION
     return SCRIPT_COMMAND_SUCCESS;
 }
 
