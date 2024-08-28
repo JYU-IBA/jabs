@@ -491,16 +491,21 @@ script_command_status script_set_var(struct script_session *s, jibal_config_var 
                 found++;
             }
         }
+        if(found == 1) {
+            *((int *)var->variable) = value; /* Exactly one hit, assign. */
+            return 1;
+        }
         if(found > 1) {
             jabs_message(MSG_ERROR, "Value \"%s\" is ambiguous (%i matches).\n", argv[0], found);
-            return SCRIPT_COMMAND_FAILURE;
-        }
-        if(found == 0) {
+        } else if(found == 0) {
             jabs_message(MSG_ERROR, "Value \"%s\" doesn't match with any known option.\n", argv[0]);
-            return SCRIPT_COMMAND_FAILURE;
         }
-        *((int *)var->variable) = value; /* Exactly one hit, assign. */
-        return 1;
+        jabs_message(MSG_ERROR, "Valid options are:\n");
+        for(const jibal_option *o = var->option_list; o->s; o++) {
+            jabs_message(MSG_ERROR, " %s", o->s);
+        }
+        jabs_message(MSG_ERROR, "\n");
+        return SCRIPT_COMMAND_FAILURE;
     }
     jibal_config_var_set(s->jibal->units, var, argv[0], NULL);
     return 1; /* Number of arguments */
