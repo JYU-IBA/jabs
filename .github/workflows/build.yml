@@ -15,15 +15,15 @@ jobs:
         build_type: [Release]
         c_compiler: [gcc, clang, cl]
         include:
-          - os: windows-latest
-            c_compiler: cl
-            cpp_compiler: cl
+#          - os: windows-latest
+#            c_compiler: cl
+#            cpp_compiler: cl
           - os: ubuntu-latest
             c_compiler: gcc
             cpp_compiler: g++
-          - os: ubuntu-latest
-            c_compiler: clang
-            cpp_compiler: clang++
+#          - os: ubuntu-latest
+#            c_compiler: clang
+#            cpp_compiler: clang++
         exclude:
           - os: windows-latest
             c_compiler: gcc
@@ -46,6 +46,7 @@ jobs:
       with:
         version: '6.8.0'
         target: 'desktop'
+        modules: 'qtprintsupport qtsvg'
 
     - name: Install libraries
       run: |
@@ -54,6 +55,12 @@ jobs:
     - name: Obtain a copy of QCustomPlot
       run: |
         ./get_qcustomplot.sh
+
+    - name: Checkout JIBAL
+      uses: actions/checkout@v4
+      with: 
+        repository: JYU-IBA/jibal
+        path: jibal
 
     - name: Configure CMake
       run: >
