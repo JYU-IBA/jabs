@@ -325,7 +325,9 @@ int sim_workspace_print_bricks(const sim_workspace *ws, const char *filename) {
     fprintf(f, "#When convoluting, JaBS convolutes a the brick (a box from low energy to high energy edge with area of Q counts) by a gaussian with varying sigma (different S(sum) for either edge)\n");
     fprintf(f, "#\"sigma * conc\" is the concentration of the target isotope multiplied by the (straggling weighted) cross section, in mb/sr. This is representative of the entire brick.\n");
     fprintf(f, "#\"Q\" is the number of counts in the brick. It is the sigma*conc product multiplied by effective thickness of the brick (thick/cos(a)), number of incident particles and solid angle.\n");
+    fprintf(f, "#dE(det) is the change of E(det) in the brick, i.e. width of brick in energy");
     fprintf(f, "#\"dE(det)/dE_0\" is the (estimate of) derivative dE(det)/dE_0. This is used to figure out the length of energy steps (incident energy, E_0) to take to get comfortable brick spacing.\n");
+    fprintf(f, "#depth_reso = (thick/dE(det)) * S(sum), in FWHM tfu, i.e. estimate of depth resolution\n");
     fprintf(f, "#Thanks for reading! If you have any questions, please email Jaakko...\n\n");
     for(size_t i = 0; i < ws->n_reactions; i++) {
         const sim_reaction *r = ws->reactions[i];

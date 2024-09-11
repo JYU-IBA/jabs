@@ -347,40 +347,45 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
 
         double E_deriv;
         double sigma_conc;
-        double d_diff;
 
         if(b_prev) {
-            d_diff = depth_diff(d_before, d_after);
+            double d_diff = depth_diff(d_before, d_after);
             if(d_diff == 0) { /* Zero thickness brick, so no energy change either */
+                b->dE = 0.0;
+                b->thick = 0.0;
                 E_deriv = 10.0; /* Can't calculate derivative, so we assume it is large */
+                b->effective_stopping = 1e12; /* Can't calculate due to zero thickness, so assume it's large */
                 DEBUGVERBOSEMSG("Zero thickness brick, setting derivative to %g.", E_deriv);
                 sigma_conc = 0.0;
             } else {
+                b->thick = d_diff;
                 sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
                 assert(b_prev->E_0 > b->E_0);
                 double E0_diff = b_prev->E_0 - b->E_0;
-                double E_diff = b_prev->E - b->E;
-                E_deriv = fabs(E_diff / E0_diff); /* how many keVs does the reaction product energy change for each keV of incident ion1 energy change */
+                b->dE = b_prev->E - b->E;
+                E_deriv = fabs(b->dE / E0_diff); /* how many keVs does the reaction product energy change for each keV of incident ion1 energy change */
                 assert(E_deriv > 0.0);
             }
+            b->effective_stopping = b->dE / b->thick; /* Effective stopping from detector point-of-view, reciprocal is used in depth resolution calculation */
         } else { /* First brick */
             sigma_conc = 0.0;
-            d_diff = 0.0;
+            b->dE = 0.0;
+            b->thick = 0.0;
             double stop_incident = stop_sample(&ws->stop, &ion1, sample, d_after, b->E_0) * ion1.inverse_cosine_theta;
             double stop_exiting = stop_sample(&ws->stop, &sim_r->p, sample, d_after, b->E_r) * sim_r->p.inverse_cosine_theta;
             double K = reaction_product_energy(sim_r->r, sim_r->theta, b->E_0) / b->E_0;
+            b->effective_stopping = K * stop_incident - stop_exiting;
             DEBUGVERBOSEMSG("Calculating E_deriv = (%g * (%g eV/tfu) - (%g eV/tfu)) / (%g eV/tfu)", K, stop_incident / C_EV_TFU, stop_exiting / C_EV_TFU, stop_incident / C_EV_TFU);
             if(stop_incident < 0.001  * C_EV_TFU) {
                 E_deriv = 10.0; /* Reasonable default if there is no stopping? */
             } else {
-                E_deriv = fabs((K * stop_incident - stop_exiting) / (stop_incident)); /* TODO: NaN if reaction is not possible or if there is no stopping */
+                E_deriv = fabs(b->effective_stopping / (stop_incident));
             }
         }
         DEBUGVERBOSEMSG("E_deriv before imposing min/max clamping was %g.", E_deriv);
         E_deriv = GSL_MAX_DBL(E_deriv, ENERGY_DERIVATIVE_MIN);
         E_deriv = GSL_MIN_DBL(E_deriv, ENERGY_DERIVATIVE_MAX);
         b->deriv = E_deriv;
-        b->thick = d_diff;
         b->sc = sigma_conc;
         b->Q = ion1.inverse_cosine_theta * sigma_conc * b->thick;
         DEBUGVERBOSEMSG("%s %s %3zu %3zu:%10.3lf %3zu:%10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3e %8.3lf %2i",
