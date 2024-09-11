@@ -73,10 +73,10 @@ jobs:
         -S ${{ github.workspace }}/jibal
 
     - name: Build JIBAL
-      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+      run: cmake --build ${{ github.workspace }}/build_jibal --config ${{ matrix.build_type }}
       
     - name: Install JIBAL
-      run: cmake --install ${{ steps.strings.outputs.build-output-dir }}
+      run: sudo cmake --install ${{ github.workspace }}_build_jibal --prefix ${{ github.workspace }}/install
 
     - name: Configure CMake
       run: >
@@ -84,11 +84,14 @@ jobs:
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
         -S ${{ github.workspace }}/qjabs
 
     - name: Build
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
+    - name: Install
+      run: sudo cmake --install ${{ steps.strings.outputs.build-output-dir }} --prefix ${{ github.workspace }}/install
 #    - name: Test
 #      working-directory: ${{ steps.strings.outputs.build-output-dir }}
 #      run: ctest --build-config ${{ matrix.build_type }}
