@@ -13,7 +13,8 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         build_type: [Release]
-        c_compiler: [gcc, clang, cl]
+#        c_compiler: [gcc, clang, cl]
+        c_compiler: [gcc]
         include:
 #          - os: windows-latest
 #            c_compiler: cl
@@ -31,6 +32,8 @@ jobs:
             c_compiler: clang
           - os: ubuntu-latest
             c_compiler: cl
+          - os: ubuntu-latest
+            c_compiler: clang
 
     steps:
     - uses: actions/checkout@v4
@@ -46,11 +49,10 @@ jobs:
       with:
         version: '6.8.0'
         target: 'desktop'
-        modules: 'qtprintsupport qtsvg'
 
     - name: Install libraries
       run: |
-        sudo apt-get install -y libgsl27 libgsl-dev libxml2 libxml2-dev
+        sudo apt-get install -y libgsl27 libgsl-dev libxml2 libxml2-dev cups
 
     - name: Obtain a copy of QCustomPlot
       run: |
