@@ -30,7 +30,7 @@ static const jibal_option calibration_option[] = {
         {JIBAL_OPTION_STR_NONE, CALIBRATION_NONE},
         {"arbitrary", CALIBRATION_ARB}, /* Not implemented */
         {"linear", CALIBRATION_LINEAR},
-        {"polynomial", CALIBRATION_POLY},
+        {"poly", CALIBRATION_POLY},
         {NULL, 0}
 };
 

@@ -1232,11 +1232,11 @@ script_command *script_commands_create(struct script_session *s) {
     script_command *c_calibration = script_command_new("calibration", "Set calibration.", 0, 0, &script_set_detector_calibration);
     c_calibration->f_val = &script_set_detector_calibration_val;
     script_command_list_add_command(&c_detector->subcommands, c_calibration);
-    script_command_list_add_command(&c_calibration->subcommands, script_command_new("linear", "Set the calibration to be linear (default).", 'L', 0, NULL));
+    script_command_list_add_command(&c_calibration->subcommands, script_command_new(calibration_option[CALIBRATION_LINEAR].s, "Set the calibration to be linear (default).", 'L', 0, NULL));
     script_command_list_add_command(&c_calibration->subcommands, script_command_new("slope", "Set the slope of a linear calibration.", 's', 0, NULL));
     script_command_list_add_command(&c_calibration->subcommands, script_command_new("offset", "Set the offset of a linear calibration.", 'o', 0, NULL));
     script_command_list_add_command(&c_calibration->subcommands, script_command_new("resolution", "Set the resolution.", 'r', 0, NULL));
-    script_command_list_add_command(&c_calibration->subcommands, script_command_new("poly", "Set the calibration to be a polynomial.", 0, 0, &script_set_detector_calibration_poly));
+    script_command_list_add_command(&c_calibration->subcommands, script_command_new(calibration_option[CALIBRATION_POLY].s, "Set the calibration to be a polynomial.", 0, 0, &script_set_detector_calibration_poly));
 
     script_command_list_add_command(&c_detector->subcommands, script_command_new("column", "Set column number (for data input).", 'c', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("channels", "Set number of channels.", 'h', 0, NULL));

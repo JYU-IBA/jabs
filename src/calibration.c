@@ -260,6 +260,7 @@ char *calibration_to_string(const calibration *c) { /* Note that this does not i
             );
             break;
         case CALIBRATION_POLY:
+            asprintf_append(&out, " %zu", calibration_get_number_of_params(c) - 1);
             for(size_t i = 0; i < calibration_get_number_of_params(c); i++) {
                 asprintf_append(&out, " %g%s", calibration_get_param(c, i)/C_KEV, "keV");
             }
