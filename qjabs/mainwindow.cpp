@@ -8,8 +8,8 @@
 #include "script.h"
 #include "script_session.h"
 #include "script_command.h"
-extern "C" {
 #include "idf2jbs.h"
+extern "C" {
 int fit_iter_callback(fit_stats stats);
 }
 
