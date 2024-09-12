@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,6 +17,10 @@
 #define IDFPARSER_H
 #include <libxml/tree.h>
 #include <jibal_units.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define IDF_BUF_MSG_MAX (1024) /* Maximum length of input string to idf_output_printf. Longer strings will be truncated. */
 #define IDF_BUF_SIZE_INITIAL (8*IDF_BUF_MSG_MAX)
@@ -124,4 +128,7 @@ const char *idf_boolean_to_str(int boolean); /* "true", "false", "unset" trinary
 const char *idf_error_code_to_str(idf_error idferr);
 xmlNodePtr idf_new_node_printf(const xmlChar *name, const char *format, ...);
 xmlNodePtr idf_new_node_units(const xmlChar *name, const xmlChar *unit, const xmlChar *mode, double value);
+#ifdef __cplusplus
+}
+#endif
 #endif // IDFPARSER_H

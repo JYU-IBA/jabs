@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -15,6 +15,11 @@
 #define JABS_MESSAGE_H
 
 #include <stdio.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 typedef enum jabs_msg_level {
     MSG_DEBUG = 0,
@@ -32,4 +37,7 @@ extern jabs_msg_level jabs_message_verbosity;
 void jabs_message_printf(jabs_msg_level level, FILE *f, const char *format, ...);
 void jabs_message(jabs_msg_level level, const char *format, ...);
 const char *jabs_message_level_str(jabs_msg_level level);
-#endif // _JABS_MESSAGE_H_
+#ifdef __cplusplus
+}
+#endif
+#endif // JABS_MESSAGE_H

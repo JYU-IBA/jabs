@@ -1,3 +1,16 @@
+/*
+
+    Jaakko's Backscattering Simulator (JaBS)
+    Copyright (C) 2021 - 2024 Jaakko Julin
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    See LICENSE.txt for the full license.
+
+ */
 #ifndef JABS_BRICK_H
 #define JABS_BRICK_H
 
@@ -5,7 +18,9 @@
 #include "sample.h"
 #include "detector.h"
 #include "histogram.h"
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 typedef struct {
     int valid;
     depth d; /* Depth from sample surface */
@@ -30,4 +45,7 @@ typedef struct {
 
 void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, brick *bricks, size_t last_brick); /* Sums up all the contributions to sigma (including detector resolution) */
 void bricks_convolute(jabs_histogram *h, const calibration *c, const brick *bricks, size_t last_brick, double scale, double sigmas_cutoff, double emin, int accurate);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_BRICK_H

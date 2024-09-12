@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,6 +14,10 @@
 #ifndef JABS_PLUGIN_INTERFACE_H
 #define JABS_PLUGIN_INTERFACE_H
 #include <jibal_masses.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef enum jabs_plugin_type {
     JABS_PLUGIN_NONE = 0,
@@ -33,4 +37,7 @@ typedef struct jabs_plugin_reaction {
     double yield;
     void *reaction_data; /* Pointer for the plugin to store reaction specific data in. */
 } jabs_plugin_reaction;
+#ifdef __cplusplus
+}
+#endif
 #endif //JABS_PLUGIN_INTERFACE_H

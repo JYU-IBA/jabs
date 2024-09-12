@@ -15,12 +15,13 @@
 #ifndef JABS_DETECTOR_H
 #define JABS_DETECTOR_H
 #include <ctype.h>
-#include <jibal_units.h>
 #include <jibal_masses.h>
 #include "sample.h"
 #include "aperture.h"
-#include "rotate.h"
 #include "calibration.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef enum {
     DETECTOR_NONE = 0,
@@ -80,4 +81,7 @@ double detector_param_unit_factor(const detector *det);
 int detector_set_name(detector *det, const char *name);
 const char *detector_name(const detector *det);
 detector *detector_clone(const detector *det_orig);
+#ifdef __cplusplus
+}
+#endif
 #endif //JABS_DETECTOR_H

@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,7 +14,9 @@
 #ifndef JABS_OPTIONS_H
 #define JABS_OPTIONS_H
 
-#include <jibal.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     int verbose;
@@ -31,5 +33,7 @@ const char *jabs_version(void); /* Returns "git describe" given version, fallbac
 const char *jabs_version_simple(void); /* Returns directly the CMake project version */
 void usage(void);
 void greeting(int interactive);
-
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_OPTIONS_H

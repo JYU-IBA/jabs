@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -13,8 +13,14 @@
  */
 #ifndef JABS_DEFAULTS_H
 #define JABS_DEFAULTS_H
-#define COPYRIGHT_STRING "\n    This program is free software; you can redistribute it and/or modify \n    it under the terms of the GNU General Public License as published by\n    the Free Software Foundation; either version 2 of the License, or\n    (at your option) any later version.\n\n    See LICENSE.txt for the full license.\n\n"
+
 #include <jibal_units.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define COPYRIGHT_STRING "\n    This program is free software; you can redistribute it and/or modify \n    it under the terms of the GNU General Public License as published by\n    the Free Software Foundation; either version 2 of the License, or\n    (at your option) any later version.\n\n    See LICENSE.txt for the full license.\n\n"
 
 #define SCRIPT_FILES_NESTED_MAX 8 /* How deep (number of levels) scripts can be nested, i.e. script file loads a script file loads a script file... */
 #define SCRIPT_COMMANDS_NESTED_MAX 8 /* How deep (number of levels) script commands can be nested, i.e. script command has a subcommand, which has a subcommand... */
@@ -86,4 +92,7 @@
 #define CS_STRAGG_STEP_FUDGE_FACTOR_DEFAULT (2.0)
 #define SCREENING_TABLE_ELEMENTS (101)
 #define REACTION_FILE_ANGLE_TOLERANCE_DEFAULT (1.0 * C_DEG)
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_DEFAULTS_H

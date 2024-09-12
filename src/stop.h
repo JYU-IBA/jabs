@@ -17,6 +17,11 @@
 #include "ion.h"
 #include "sample.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 typedef struct jabs_stop {
     jibal_gsto *gsto;
     gsto_stopping_type type;
@@ -37,4 +42,7 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
 double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sample, depth depth, double E);
 double stop_step_calc(const jabs_stop_step_params *params, const ion *ion);
 int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, depth depth_start, const sample *sample);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_STOP_H

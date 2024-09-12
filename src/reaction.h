@@ -23,6 +23,11 @@
 #include "plugin.h"
 #include "sim_calc_params.h"
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum {
     REACTION_NONE = 0,
     REACTION_RBS = 1,
@@ -102,4 +107,7 @@ double reaction_product_energy(const reaction *r, double theta, double E); /* Hi
 const char *jabs_reaction_cs_to_string(jabs_reaction_cs cs);
 int reaction_generate_name(reaction *r); /* Used internally, don't call. */
 jabs_reaction_cs jabs_reaction_cs_from_jibal_cs(jibal_cross_section_type jcs);
+#ifdef __cplusplus
+}
+#endif
 #endif //JABS_REACTION_H

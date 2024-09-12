@@ -20,6 +20,10 @@
 #include <stdio.h>
 #include <jibal_units.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define JABS_MAX(a,b) ((a) > (b) ? (a) : (b))
 #define JABS_MIN(a,b) ((a) < (b) ? (a) : (b))
 
@@ -41,4 +45,7 @@ int jabs_unit_convert(const jibal_units *units, char type, const char *str, doub
 int jabs_unit_sanity_check(double value, int type); /* returns 1 if no issue was found, returns 0 and prints a warning via jabs_message() if value is suspicious, and returns -1 for really crazy stuff */
 int jabs_str_to_size_t(const char *str, size_t *out);
 double jabs_clock(void);
+#ifdef __cplusplus
+}
+#endif
 #endif //JABS_GENERIC_H

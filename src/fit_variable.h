@@ -15,6 +15,9 @@
 #ifndef JABS_FIT_VARIABLE_H
 #define JABS_FIT_VARIABLE_H
 #include <stdlib.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef enum fit_variable_type {
     FIT_VARIABLE_NONE = 0,
@@ -40,5 +43,7 @@ typedef struct fit_variable {
     size_t i_v; /* Index in fit */
     size_t i_det; /* For detector parameters, [0,sim->n_det). Set to sim->n_det or higher to mean all workspaces. */
 } fit_variable;
-
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_FIT_VARIABLE_H

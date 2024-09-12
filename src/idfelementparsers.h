@@ -1,6 +1,24 @@
+/*
+
+    Jaakko's Backscattering Simulator (JaBS)
+    Copyright (C) 2021 - 2024 Jaakko Julin
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    See LICENSE.txt for the full license.
+
+    */
+
 #ifndef IDFELEMENTPARSERS_H
 #define IDFELEMENTPARSERS_H
 #include "idfparse.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define CALIB_PARAMS_MAX (10)
 
@@ -26,4 +44,7 @@ idf_error idf_parse_process(idf_parser *idf, xmlNode *process);
 idf_error idf_parse_physicsdefaults(idf_parser *idf, xmlNode *physicsdefaults);
 idf_error idf_parse_simulations(idf_parser *idf, xmlNode *simulations);
 idf_error idf_parse_simulation(idf_parser *idf, xmlNode *simulation);
+#ifdef __cplusplus
+}
+#endif
 #endif //IDFELEMENTPARSERS_H

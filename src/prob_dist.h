@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2022 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -15,8 +15,11 @@
 #define JABS_PROB_DIST_H
 
 #include <stdlib.h>
-#include <stdint.h>
-#include <math.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 typedef struct {
     double x;
@@ -32,4 +35,7 @@ typedef struct {
 prob_dist *prob_dist_alloc(size_t n);
 void prob_dist_free(prob_dist *pd);
 prob_dist *prob_dist_gaussian(size_t n);
+#ifdef __cplusplus
+}
+#endif
 #endif //JABS_PROB_DIST_H

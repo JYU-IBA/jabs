@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021-2022 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,6 +17,10 @@
 #include "reaction.h"
 #include "ion.h"
 #include "brick.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct sim_reaction {
     const reaction *r;
@@ -65,4 +69,7 @@ double sim_reaction_andersen(const sim_reaction *sim_r, double E_cm);
 double sim_reaction_lecuyer(const sim_reaction *sim_r, double E_cm);
 void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *incident);
 void sim_reaction_print_bricks(FILE *f, const sim_reaction *r, double psr);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_SIM_REACTION_H

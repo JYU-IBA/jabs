@@ -17,6 +17,10 @@
 #include <dlfcn.h> /* TODO: Windows? */
 #include "plugin_interface.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct jabs_plugin {
     void *handle;
     char *filename;
@@ -33,5 +37,8 @@ const char *jabs_plugin_type_string(jabs_plugin_type type);
 
 jabs_plugin_reaction *jabs_plugin_reaction_init(const jabs_plugin *plugin, const jibal_isotope *isotopes, const jibal_isotope *incident, const jibal_isotope *target, int *argc, char * const **argv);
 void jabs_plugin_reaction_free(const jabs_plugin *plugin, jabs_plugin_reaction *reaction);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_PLUGINS
 #endif //JABS_PLUGIN_H

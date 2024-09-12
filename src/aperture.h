@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021-2022 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,7 +17,9 @@
 
 #include <jibal.h>
 
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 typedef enum {
     APERTURE_NONE = 0,
     APERTURE_CIRCLE = 1,
@@ -49,4 +51,7 @@ double aperture_width_shape_product(const aperture *a, char direction);
 aperture *aperture_set_from_argv(const jibal *jibal, aperture *a, int * const argc, char * const ** const argv);
 aperture *aperture_from_string(const jibal *jibal, const char *str);
 char *aperture_to_string(const aperture *a);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_APERTURE_H

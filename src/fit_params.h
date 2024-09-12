@@ -16,6 +16,10 @@
 #define JABS_PARAMS_H
 #include "fit_variable.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct fit_params {
     size_t n; /* Number of function parameters */
     size_t n_active; /* Recalculated by fit_params_update(), same as fdf->p in multifit_nlinear */
@@ -34,4 +38,7 @@ void fit_parameters_update_changed(const fit_params *fit_params); /* Checks if v
 int fit_params_enable_using_string(fit_params *params, const char *fit_vars);
 fit_variable *fit_params_find_active(const fit_params *params, size_t i_v); /* Find active fit parameter with matching index number i_v as set by fit_params_update() */
 const char *fit_variable_type_str(const fit_variable *var);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_PARAMS_H

@@ -18,6 +18,10 @@
 #include "stop.h"
 #include "sim_reaction.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     char direction;
     double theta;
@@ -48,5 +52,8 @@ double exit_angle_delta(double sample_theta, double sample_phi, const detector *
 geostragg_vars geostragg_vars_calculate(const ion *incident, double sample_theta, double sample_phi, const detector *det, const aperture *beam_aperture, int geostragg_enabled, int beta_manual_enabled);
 double geostragg(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, const sample *sample, const sim_reaction *r, const geostragg_vars_dir *gd, depth d, double E_0);
 double beta_deriv(double sample_theta, double sample_phi, const detector *det, char direction);
-double exit_angle(double sample_theta, double sample_phi, double det_theta, double det_phi);
+    double exit_angle(double sample_theta, double sample_phi, double det_theta, double det_phi);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_GEOSTRAGG_H

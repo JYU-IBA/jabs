@@ -17,6 +17,7 @@
 #include "jabs.h"
 #include "message.h"
 #include "geostragg.h"
+#include "rotate.h"
 
 
 double scattering_angle(const ion *incident, double sample_theta, double sample_phi, const detector *det) { /* Calculate scattering angle necessary for ion (in sample coordinate system) to hit detector */

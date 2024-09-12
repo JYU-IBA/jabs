@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,7 +14,6 @@
 #ifndef JABS_SIMULATION_H
 #define JABS_SIMULATION_H
 
-#include <gsl/gsl_integration.h>
 #include <jibal.h>
 #include <time.h>
 
@@ -26,6 +25,10 @@
 #include "prob_dist.h"
 #include "stop.h"
 #include "sim_calc_params.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct simulation {
     reaction **reactions;
@@ -50,7 +53,6 @@ typedef struct simulation {
     ion ion; /* This ion is not to be used in calculations, it is simply copied to ws->ion. We do store the nuclear stopping (ion->nucl_stop) here too. */
 } simulation;
 
-#include "sample.h"
 simulation *sim_init(jibal *jibal);
 void sim_free(simulation *sim);
 jabs_reaction_cs sim_cs(const simulation *sim, reaction_type type);
@@ -71,4 +73,7 @@ double sim_exit_angle(const simulation *sim, const detector *det);
 int sim_do_we_need_erd(const simulation *sim);
 int sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto);
 int sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_SIMULATION_H
