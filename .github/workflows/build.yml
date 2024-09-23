@@ -61,7 +61,7 @@ jobs:
       if: matrix.os == 'macos-latest'
       run: |
         echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.bashrc
-        source .bashrc
+        source ~/.bashrc
         sudo brew install gsl libxml2 libomp
 
     - name: Obtain a copy of QCustomPlot
