@@ -55,17 +55,12 @@ jobs:
     - name: Install libraries and dependencies (ubuntu)
       if: matrix.os == 'ubuntu-latest'
       run: |
-        sudo apt-get install -y libgsl27 libgsl-dev libxml2 libxml2-dev cups libcups2
-
-    - name: Set up Homebrew (macos)
-      id: set-up-homebrew
-      if: matrix.os == 'macos-latest'
-      uses: Homebrew/actions/setup-homebrew@master
+        apt-get install -y libgsl27 libgsl-dev libxml2 libxml2-dev cups libcups2
 
     - name: Install libraries and dependencies using Homebrew (macos)
       if: matrix.os == 'macos-latest'
       run: |
-        sudo brew install gsl libxml2 libomp
+        brew install gsl libxml2 libomp
 
     - name: Obtain a copy of QCustomPlot
       run: |
@@ -89,7 +84,7 @@ jobs:
       run: cmake --build ${{ github.workspace }}/build_jibal --config ${{ matrix.build_type }}
       
     - name: Install JIBAL
-      run: sudo cmake --install ${{ github.workspace }}/build_jibal --prefix ${{ github.workspace }}/install
+      run: cmake --install ${{ github.workspace }}/build_jibal --prefix ${{ github.workspace }}/install
 
     - name: Configure CMake
       run: >
@@ -104,7 +99,7 @@ jobs:
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
     - name: Install
-      run: sudo cmake --install ${{ steps.strings.outputs.build-output-dir }} --prefix ${{ github.workspace }}/install
+      run: cmake --install ${{ steps.strings.outputs.build-output-dir }} --prefix ${{ github.workspace }}/install
 #    - name: Test
 #      working-directory: ${{ steps.strings.outputs.build-output-dir }}
 #      run: ctest --build-config ${{ matrix.build_type }}
@@ -112,5 +107,5 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: artifact-${{ matrix.platform }}
+        name: artifact-${{matrix.os}}
         path: ${{ github.workspace }}/install
