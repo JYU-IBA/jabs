@@ -60,8 +60,8 @@ jobs:
     - name: Install libraries and dependencies using Homebrew (macos)
       if: matrix.os == 'macos-latest'
       run: |
-        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.bashrc
-        source ~/.bashrc
+        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+        eval "$(/opt/homebrew/bin/brew shellenv)"
         sudo brew install gsl libxml2 libomp
 
     - name: Obtain a copy of QCustomPlot
