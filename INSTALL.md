@@ -6,7 +6,7 @@ Standalone Windows and macOS disk images (dmg) are found in [GitHub releases](ht
 
 JaBS uses a standard CMake build system. See instructions on [running CMake](https://cmake.org/runningcmake/) or follow instructions below.
 
-Run script `get_qcustomplot.sh` or download [QCustomPlot](https://www.qcustomplot.com/index.php/download) source code manually. The cpp and h files must be placed in qjabs directory.
+Run script `get_external_files.sh` or download [QCustomPlot](https://www.qcustomplot.com/index.php/download) source code manually. The cpp and h files must be placed in qjabs directory.
 
 ## Microsoft Windows 10:
 

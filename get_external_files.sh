@@ -1,12 +1,14 @@
 #!/bin/bash
-qcustomplot_version="2.1.1"
-release_url="https://www.qcustomplot.com/release/${qcustomplot_version}/";
 for file in QCustomPlot.tar.gz; do
     shafile="${file}.sha256"
-    url="${release_url}${file}"
-    echo "Downloading $file using curl from $url"
-    curl "$url" -o "$file"
-    if echo "$(cat $shafile)  QCustomPlot.tar.gz" | shasum -a 256 --check --status; then
+    url="$(head -n 1 "$shafile")"
+    if [ -f "${file}" ]; then
+        echo "File $file already exists, not downloading."
+    else
+        echo "Downloading $file using curl from $url"
+        curl "$url" -o "$file"
+    fi
+    if echo "$(tail -n 1 $shafile)  $file" | shasum -a 256 --check --status; then
         echo "$file passes SHA sum check."
         if [[ "$file" == "QCustomPlot.tar.gz" ]]; then
             tar -xf "$file"
