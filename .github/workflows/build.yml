@@ -114,8 +114,5 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: arti
-
-    # A file, directory or wildcard pattern that describes what to upload
-    # Required.
-    path: ${{ github.workspace }}/install
+        name: artifact-${{ matrix.platform }}
+        path: ${{ github.workspace }}/install
