@@ -57,14 +57,12 @@ jobs:
       run: |
         sudo apt-get install -y libgsl27 libgsl-dev libxml2 libxml2-dev cups libcups2
 
-
     - name: Set up Homebrew (macos)
       id: set-up-homebrew
       if: matrix.os == 'macos-latest'
       uses: Homebrew/actions/setup-homebrew@master
 
-    - name: Set up Homebrew (macos)
-      id: set-up-homebrew
+    - name: Install libraries and dependencies using Homebrew (macos)
       if: matrix.os == 'macos-latest'
       run: |
         sudo brew install gsl libxml2 libomp
