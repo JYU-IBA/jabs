@@ -11,10 +11,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [macos-latest, ubuntu-latest]
         build_type: [Release]
 #        c_compiler: [gcc, clang, cl]
-        c_compiler: [gcc]
+        c_compiler: [gcc, clang]
         include:
 #          - os: windows-latest
 #            c_compiler: cl
@@ -22,9 +22,9 @@ jobs:
           - os: ubuntu-latest
             c_compiler: gcc
             cpp_compiler: g++
-#          - os: ubuntu-latest
-#            c_compiler: clang
-#            cpp_compiler: clang++
+          - os: macos-latest
+            c_compiler: clang
+            cpp_compiler: clang++
         exclude:
           - os: windows-latest
             c_compiler: gcc
@@ -34,6 +34,8 @@ jobs:
             c_compiler: cl
           - os: ubuntu-latest
             c_compiler: clang
+          - os: macos-latest
+            c_compiler: gcc
 
     steps:
     - uses: actions/checkout@v4
@@ -50,9 +52,22 @@ jobs:
         version: '6.7.2'
         target: 'desktop'
 
-    - name: Install libraries
+    - name: Install libraries and dependencies (ubuntu)
+      if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get install -y libgsl27 libgsl-dev libxml2 libxml2-dev cups libcups2
+
+
+    - name: Set up Homebrew (macos)
+      id: set-up-homebrew
+      if: matrix.os == 'macos-latest'
+      uses: Homebrew/actions/setup-homebrew@master
+
+    - name: Set up Homebrew (macos)
+      id: set-up-homebrew
+      if: matrix.os == 'macos-latest'
+      run: |
+        sudo brew install gsl libxml2 libomp
 
     - name: Obtain a copy of QCustomPlot
       run: |
@@ -95,3 +110,12 @@ jobs:
 #    - name: Test
 #      working-directory: ${{ steps.strings.outputs.build-output-dir }}
 #      run: ctest --build-config ${{ matrix.build_type }}
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: arti
+
+    # A file, directory or wildcard pattern that describes what to upload
+    # Required.
+    path: ${{ github.workspace }}/install
