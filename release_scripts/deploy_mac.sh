@@ -43,7 +43,7 @@ echo "srim2013,srim2013.ele
 yang,yang.stg
 chu,chu.stg
 bohr,bohr.stg
-" > "qjabs.app/Contents/Resources/files.txt"
+" > "${install_dir}/qjabs.app/Contents/Resources/files.txt"
 cp "$jibal_data_dir"/*.ele "${install_dir}/qjabs.app/Contents/Resources/"
 cp "$jibal_data_dir"/*.stg "${install_dir}/qjabs.app/Contents/Resources/"
 cd "$install_dir"
