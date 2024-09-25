@@ -32,7 +32,7 @@ tar zxvf jibal_data.tar.gz -C "${jibal_data_dir}"
 
 read version < version.txt
 arch=$(uname -m)
-
+echo "Arch $arch"
 echo "datadir = .
 masses_file = masses.dat
 abundances_file = abundances.dat
@@ -40,7 +40,6 @@ files_file = files.txt
 assignments_file = assignments.txt
 " > "${install_dir}/qjabs.app/Contents/Resources/jibal.conf"
 cp "${install_dir}/share/jibal/masses.dat" "${install_dir}/share/jibal/abundances.dat" "${install_dir}/qjabs.app/Contents/Resources/"
-
 echo "srim2013,srim2013.ele
 yang,yang.stg
 chu,chu.stg
@@ -50,5 +49,6 @@ cp "$jibal_data_dir"/*.ele "${install_dir}/qjabs.app/Contents/Resources/"
 cp "$jibal_data_dir"/*.stg "${install_dir}/qjabs.app/Contents/Resources/"
 cd "$install_dir"
 mv qjabs.app JaBS.app
-macdeployqt JaBS.app -dmg
+echo "Running macdeployqt"
+macdeployqt6 JaBS.app -dmg -no-strip -libpath="${install_dir}/lib"
 mv JaBS.dmg "JaBS $version macOS $arch.dmg"
