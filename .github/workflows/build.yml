@@ -84,7 +84,7 @@ jobs:
       run: cmake --build ${{ github.workspace }}/build_jibal --config ${{ matrix.build_type }}
       
     - name: Install JIBAL
-      run: sudo cmake --install ${{ github.workspace }}/build_jibal --prefix ${{ github.workspace }}/install
+      run: cmake --install ${{ github.workspace }}/build_jibal --prefix ${{ github.workspace }}/install
 
     - name: Configure
       run: >
@@ -99,7 +99,7 @@ jobs:
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
     - name: Install
-      run: sudo cmake --install ${{ steps.strings.outputs.build-output-dir }} --prefix ${{ github.workspace }}/install
+      run: cmake --install ${{ steps.strings.outputs.build-output-dir }} --prefix ${{ github.workspace }}/install
 #    - name: Test
 #      working-directory: ${{ steps.strings.outputs.build-output-dir }}
 #      run: ctest --build-config ${{ matrix.build_type }}
