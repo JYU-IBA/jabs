@@ -62,9 +62,9 @@ jobs:
       run: |
         sudo brew install gsl libxml2 libomp
 
-    - name: Obtain a copy of QCustomPlot
+    - name: Obtain files from outside the repository
       run: |
-        ./get_qcustomplot.sh
+        ./get_external_files.sh
 
     - name: Checkout JIBAL
       uses: actions/checkout@v4
