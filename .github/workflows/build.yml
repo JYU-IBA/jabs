@@ -61,6 +61,7 @@ jobs:
       if: matrix.os == 'macos-latest'
       run: |
         brew install gsl libxml2 libomp
+        echo "OpenMP_ROOT=\"/opt/homebrew/opt/libomp/\"" >> "$GITHUB_ENV"
 
     - name: Obtain files from outside the repository
       run: |
