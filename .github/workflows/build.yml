@@ -60,7 +60,7 @@ jobs:
     - name: Install libraries and dependencies using Homebrew (macos)
       if: matrix.os == 'macos-latest'
       run: |
-        sudo brew install gsl libxml2 libomp
+        brew install gsl libxml2 libomp
 
     - name: Obtain files from outside the repository
       run: |
