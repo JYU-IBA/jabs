@@ -36,7 +36,7 @@ masses_file = masses.dat
 abundances_file = abundances.dat
 files_file = files.txt
 assignments_file = assignments.txt
-" > "qjabs.app/Contents/Resources/jibal.conf"
+" > "${install_dir}/qjabs.app/Contents/Resources/jibal.conf"
 cp "${install_dir}/share/jibal/masses.dat" "${install_dir}/share/jibal/abundances.dat" "${install_dir}/qjabs.app/Contents/Resources/"
 
 echo "srim2013,srim2013.ele
