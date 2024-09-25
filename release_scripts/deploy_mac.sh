@@ -10,6 +10,8 @@ if [ ! -d "${install_dir}" ]; then
     exit 1;
 fi
 
+export PATH="$PATH:${install_dir}/bin"
+
 if [ -f "${jibal_data_file}" ]; then
     echo "JIBAL data file exists."
 else
