@@ -86,7 +86,7 @@ jobs:
     - name: Install JIBAL
       run: sudo cmake --install ${{ github.workspace }}/build_jibal --prefix ${{ github.workspace }}/install
 
-    - name: Configure CMake
+    - name: Configure
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
@@ -103,6 +103,12 @@ jobs:
 #    - name: Test
 #      working-directory: ${{ steps.strings.outputs.build-output-dir }}
 #      run: ctest --build-config ${{ matrix.build_type }}
+
+    - name: Deploy Qt app (macos)
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd release_scripts
+        ./deploy_mac.sh
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
