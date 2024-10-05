@@ -117,11 +117,6 @@ set(PROJECT_SOURCES
        icons.qrc
 )
 
-set(MACOSX_BUNDLE_ICON_FILE icon.icns)
-set(app_icon_macos "${CMAKE_CURRENT_SOURCE_DIR}/icons/icon.icns")
-set_source_files_properties(${app_icon_macos} PROPERTIES
-       MACOSX_PACKAGE_LOCATION "Resources")
-
 if (WIN32)
    set(app_icon_resource_windows "${CMAKE_CURRENT_SOURCE_DIR}/icon.rc")
    qt_add_executable(qjabs
@@ -130,10 +125,19 @@ if (WIN32)
 	${app_icon_resource_windows}
     )
 elseif(APPLE)
-   qt_add_executable(qjabs
-    MACOSX_BUNDLE
+    set(MACOSX_BUNDLE_ICON_FILE icon.icns)
+    set(app_icon_macos "${CMAKE_CURRENT_SOURCE_DIR}/icons/icon.icns")
+    set_source_files_properties(${app_icon_macos} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+    qt_add_executable(qjabs MACOSX_BUNDLE
     ${PROJECT_SOURCES}
     ${app_icon_macos}
+    )
+    set_target_properties(qjabs PROPERTIES
+        MACOSX_BUNDLE_BUNDLE_NAME JaBS
+        MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+        MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+        MACOSX_BUNDLE_LONG_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}
+        MACOSX_BUNDLE_ICON_FILE icon.icns
     )
 else()
     qt_add_executable(qjabs
@@ -162,13 +166,6 @@ target_link_libraries(qjabs
 if(OpenMP_C_FOUND)
     target_link_libraries(qjabs PUBLIC OpenMP::OpenMP_C)
 endif()
-
-set_target_properties(qjabs PROPERTIES
-    MACOSX_BUNDLE_BUNDLE_NAME JaBS
-    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
-    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-    MACOSX_BUNDLE_ICON_FILE icon.icns
-)
 
 install(TARGETS qjabs
     BUNDLE DESTINATION .
