@@ -85,31 +85,30 @@ jobs:
       run: cmake --build ${{ github.workspace }}/build_jibal --config ${{ matrix.build_type }}
       
     - name: Install JIBAL
-      run: cmake --install ${{ github.workspace }}/build_jibal --prefix ${{ github.workspace }}/install
+      run: | 
+        cmake --install ${{ github.workspace }}/build_jibal --prefix ${{ github.workspace }}/install
+        sudo cmake --install ${{ github.workspace }}/build_jibal
 
     - name: Configure
       run: >
-        cmake -B ${{ steps.strings.outputs.build-output-dir }}
+        cmake -B ${{ github.workspace }}/build_qjabs
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-        -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
         -S ${{ github.workspace }}/qjabs
 
     - name: Build
-      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+      run: cmake --build ${{ github.workspace }}/build_qjabs --config ${{ matrix.build_type }}
 
     - name: Install
-      run: cmake --install ${{ steps.strings.outputs.build-output-dir }} --prefix ${{ github.workspace }}/install
-#    - name: Test
-#      working-directory: ${{ steps.strings.outputs.build-output-dir }}
-#      run: ctest --build-config ${{ matrix.build_type }}
+      run: cmake --install ${{ github.workspace }}/build_qjabs --prefix ${{ github.workspace }}/install
 
     - name: Deploy Qt app (macos)
       if: matrix.os == 'macos-latest'
       run: |
         cd release_scripts
         ./deploy_mac.sh
+        cp build_qjabs/*.dmg install
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
