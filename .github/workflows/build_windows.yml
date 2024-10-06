@@ -1,0 +1,41 @@
+name: CMake on a single platform
+
+on:
+  [workflow_call, workflow_dispatch]
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.7.2'
+        target: 'desktop'
+
+    - name: vcpkg build
+      uses: johnwason/vcpkg-action@v6
+      id: vcpkg
+      with:
+        pkgs: gsl getopt libxml2
+        triplet: x64-windows-release
+        token: ${{ github.token }}
+        github-binarycache: true
+
+    - name: Configure QJaBS
+      run: cmake ${{ steps.vcpkg.outputs.vcpkg-cmake-config }} -B ${{github.workspace}}/build_qjabs -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Build QJaBS
+      run: cmake --build ${{github.workspace}}/build_qjabs --config ${{env.BUILD_TYPE}}
+
+    - name: Install QJaBS
+      run: cmake --install ${{github.workspace}}/build_qjabs --prefix  ${{github.workspace}}/install
+
+    - name: Deploy
+      run: %QT_ROOT_DIR%\bin\windeployqt.exe ${{github.workspace}}\build_qjabs\Release\qjabs.exe
+
