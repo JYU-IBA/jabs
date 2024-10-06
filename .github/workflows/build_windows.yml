@@ -31,7 +31,7 @@ jobs:
     - name: Obtain files from outside the repository
       shell: cmd
       run: |
-        cd ${{runner.workspace}}
+        cd ${{runner.workspace}}\jabs
         .\get_external_files.bat
 
     - name: Checkout JIBAL
