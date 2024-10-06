@@ -28,15 +28,30 @@ jobs:
         token: ${{ github.token }}
         github-binarycache: true
 
+    - name: Checkout JIBAL
+      uses: actions/checkout@v4
+      with: 
+        repository: JYU-IBA/jibal
+        path: jibal
+
+    - name: Configure JIBAL
+      run: cmake ${{ steps.vcpkg.outputs.vcpkg-cmake-config }} -B ${{github.workspace}}\build_jibal -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -S ${{github.workspace}}\jibal
+
+    - name: Build JIBAL
+      run: cmake --build ${{ github.workspace }}\build_jibal --config ${{ env.build_type }}
+
+    - name: Install JIBAL
+      run: cmake --install ${{ github.workspace }}\build_jibal --prefix ${{ github.workspace }}\install
+
     - name: Configure QJaBS
-      run: cmake ${{ steps.vcpkg.outputs.vcpkg-cmake-config }} -B ${{github.workspace}}/build_qjabs -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+      run: cmake ${{ steps.vcpkg.outputs.vcpkg-cmake-config }} -DCMAKE_PREFIX_PATH="${{github.workspace}}\install" -B ${{github.workspace}}\build_qjabs -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -S ${{github.workspace}}\qjabs
 
     - name: Build QJaBS
-      run: cmake --build ${{github.workspace}}/build_qjabs --config ${{env.BUILD_TYPE}}
+      run: cmake --build ${{github.workspace}}\build_qjabs --config ${{env.BUILD_TYPE}}
 
     - name: Install QJaBS
-      run: cmake --install ${{github.workspace}}/build_qjabs --prefix ${{github.workspace}}/install
+      run: cmake --install ${{github.workspace}}\build_qjabs --prefix ${{github.workspace}}\install
 
     - name: Deploy
-      run: ${QT_ROOT_DIR}/bin/windeployqt ${{github.workspace}}/build_qjabs/Release/qjabs.exe
+      run: ${QT_ROOT_DIR}/bin/windeployqt ${{github.workspace}}\build_qjabs\${{ env.build_type }}\qjabs.exe
 
