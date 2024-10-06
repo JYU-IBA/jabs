@@ -1,4 +1,4 @@
-name: CMake on multiple platforms
+name: CMake on macOS and Linux
 
 on:
   [workflow_call, workflow_dispatch]
