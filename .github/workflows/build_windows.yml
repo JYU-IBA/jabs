@@ -29,6 +29,7 @@ jobs:
         github-binarycache: true
 
     - name: Obtain files from outside the repository
+      shell: cmd
       run: |
         cd ${{runner.workspace}}
         .\get_external_files.bat
