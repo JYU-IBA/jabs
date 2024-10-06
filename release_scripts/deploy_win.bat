@@ -1,12 +1,13 @@
 REM This is mostly for deploying a Windows build on GitHub
 cd ..
-set JIBAL_DIR=.\install
+set INSTALL_DIR=.\install
 set BUILD_DIR=.\build_qjabs\Release
 
 curl "http://users.jyu.fi/~jaakjuli/jibal/data/data.tar.gz" -o jibal_data.tar.gz
 mkdir "%BUILD_DIR%\JIBAL_data"
 tar -zxvf jibal_data.tar.gz -C "%BUILD_DIR%\JIBAL_data"
-copy "%JIBAL_DIR%\bin\*.dll" "%BUILD_DIR%"
+copy "%INSTALL_DIR%\bin\*.dll" "%BUILD_DIR%"
+copy "%INSTALL_DIR%\bin\*.exe" "%BUILD_DIR%"
 del "%BUILD_DIR%\jibal.conf"
 ( 
   echo datadir = JIBAL_data
@@ -16,7 +17,7 @@ del "%BUILD_DIR%\jibal.conf"
   echo assignments_file = JIBAL_data\assignments.txt
 ) > "%BUILD_DIR%\jibal.conf"
 mkdir "%BUILD_DIR%\JIBAL_data"
-copy "%JIBAL_DIR%\share\jibal\*.dat" Release\JIBAL_data
+copy "%INSTALL_DIR%\share\jibal\*.dat" Release\JIBAL_data
 mkdir "%BUILD_DIR%\example"
 copy example\experimental.dat "%BUILD_DIR%\example"
 copy example\sample.txt "%BUILD_DIR%\example"
