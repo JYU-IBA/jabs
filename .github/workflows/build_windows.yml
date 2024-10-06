@@ -28,6 +28,9 @@ jobs:
         token: ${{ github.token }}
         github-binarycache: true
 
+    - name: Obtain files from outside the repository
+      run: get_external_files.bat
+
     - name: Checkout JIBAL
       uses: actions/checkout@v4
       with: 
