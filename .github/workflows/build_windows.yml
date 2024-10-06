@@ -55,17 +55,18 @@ jobs:
     - name: Build QJaBS
       run: cmake --build ${{github.workspace}}\build_qjabs --config ${{env.BUILD_TYPE}}
 
-    - name: Install QJaBS
-      run: cmake --install ${{github.workspace}}\build_qjabs --prefix ${{github.workspace}}\install
-
-    - name: Deploy
+    - name: Deploy Qt
       run: ${{env.QT_ROOT_DIR}}\bin\windeployqt ${{github.workspace}}\build_qjabs\${{ env.build_type }}\qjabs.exe
+    - name: Run deploy script
+      shell: cmd
+      run: |
+        cd ${{runner.workspace}}\jabs\release_scripts
+        .\deploy_win.bat
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: artifact-windows
         path: |
-            ${{ github.workspace }}/install
             ${{ github.workspace }}/build_qjabs/${{ env.build_type }}
 
