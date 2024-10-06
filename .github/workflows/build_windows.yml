@@ -49,6 +49,15 @@ jobs:
     - name: Install JIBAL
       run: cmake --install ${{ github.workspace }}\build_jibal --prefix ${{ github.workspace }}\install
 
+    - name: Configure JaBS
+      run: cmake -DCMAKE_PREFIX_PATH="${{github.workspace}}\install" -B ${{github.workspace}}\build_jabs -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -S ${{github.workspace}}
+
+    - name: Build JaBS
+      run: cmake --build ${{github.workspace}}\build_jabs --config ${{env.BUILD_TYPE}}
+
+    - name: Install JaBS
+      run: cmake --install ${{ github.workspace }}\build_jabs --prefix ${{ github.workspace }}\install
+
     - name: Configure QJaBS
       run: cmake ${{ steps.vcpkg.outputs.vcpkg-cmake-config }} -DCMAKE_PREFIX_PATH="${{github.workspace}}\install" -B ${{github.workspace}}\build_qjabs -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -S ${{github.workspace}}\qjabs
 
