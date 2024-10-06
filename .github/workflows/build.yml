@@ -108,7 +108,7 @@ jobs:
       run: |
         cd release_scripts
         ./deploy_mac.sh
-        cp build_qjabs/*.dmg install
+        cp ${{ github.workspace }}/build_qjabs/JaBS*.dmg ${{ github.workspace }}/install
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
