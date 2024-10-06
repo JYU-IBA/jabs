@@ -59,5 +59,10 @@ jobs:
       run: cmake --install ${{github.workspace}}\build_qjabs --prefix ${{github.workspace}}\install
 
     - name: Deploy
-      run: ${QT_ROOT_DIR}/bin/windeployqt ${{github.workspace}}\build_qjabs\${{ env.build_type }}\qjabs.exe
+      run: ${env.QT_ROOT_DIR}\bin\windeployqt ${{github.workspace}}\build_qjabs\${{ env.build_type }}\qjabs.exe
 
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: artifact-windows
+        path: ${{ github.workspace }}/install
