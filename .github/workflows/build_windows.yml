@@ -65,4 +65,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: artifact-windows
-        path: ${{ github.workspace }}/install
+        path: |
+            ${{ github.workspace }}/install
+            ${{ github.workspace }}/build_qjabs/${{ env.build_type }}
+
