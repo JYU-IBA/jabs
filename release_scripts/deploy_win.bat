@@ -17,7 +17,7 @@ del "%BUILD_DIR%\jibal.conf"
   echo assignments_file = JIBAL_data\assignments.txt
 ) > "%BUILD_DIR%\jibal.conf"
 mkdir "%BUILD_DIR%\JIBAL_data"
-copy "%INSTALL_DIR%\share\jibal\*.dat" Release\JIBAL_data
+copy "%INSTALL_DIR%\share\jibal\*.dat" "%BUILD_DIR%\JIBAL_data"
 mkdir "%BUILD_DIR%\example"
 copy example\experimental.dat "%BUILD_DIR%\example"
 copy example\sample.txt "%BUILD_DIR%\example"
