@@ -1,7 +1,8 @@
-name: CMake on a single platform
+name: CMake on Windows
 
 on:
   [workflow_call, workflow_dispatch]
+
 env:
   BUILD_TYPE: Release
 
@@ -34,8 +35,8 @@ jobs:
       run: cmake --build ${{github.workspace}}/build_qjabs --config ${{env.BUILD_TYPE}}
 
     - name: Install QJaBS
-      run: cmake --install ${{github.workspace}}/build_qjabs --prefix  ${{github.workspace}}/install
+      run: cmake --install ${{github.workspace}}/build_qjabs --prefix ${{github.workspace}}/install
 
     - name: Deploy
-      run: %QT_ROOT_DIR%\bin\windeployqt.exe ${{github.workspace}}\build_qjabs\Release\qjabs.exe
+      run: ${QT_ROOT_DIR}/bin/windeployqt ${{github.workspace}}/build_qjabs/Release/qjabs.exe
 
