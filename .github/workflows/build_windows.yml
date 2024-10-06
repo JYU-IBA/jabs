@@ -50,7 +50,7 @@ jobs:
       run: cmake --install ${{ github.workspace }}\build_jibal --prefix ${{ github.workspace }}\install
 
     - name: Configure JaBS
-      run: cmake -DCMAKE_PREFIX_PATH="${{github.workspace}}\install" -B ${{github.workspace}}\build_jabs -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -S ${{github.workspace}}
+      run: cmake ${{ steps.vcpkg.outputs.vcpkg-cmake-config }} -DCMAKE_PREFIX_PATH="${{github.workspace}}\install" -B ${{github.workspace}}\build_jabs -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -S ${{github.workspace}}
 
     - name: Build JaBS
       run: cmake --build ${{github.workspace}}\build_jabs --config ${{env.BUILD_TYPE}}
