@@ -55,7 +55,7 @@ jobs:
     - name: Install libraries and dependencies (ubuntu)
       if: matrix.os == 'ubuntu-latest'
       run: |
-        sudo apt-get install -y libgsl27 libgsl-dev libxml2 libxml2-dev cups libcups2
+        sudo apt-get install -y libgsl27 libgsl-dev libxml2 libxml2-dev cups libcups2 libreadline-dev
 
     - name: Install libraries and dependencies using Homebrew (macos)
       if: matrix.os == 'macos-latest'
