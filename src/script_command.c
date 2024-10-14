@@ -2506,11 +2506,12 @@ script_command_status script_help_version(script_session *s, int argc, char *con
     (void) argc;
     (void) argv;
     (void) s;
-    jabs_message(MSG_INFO, "JaBS version %s.\n", jabs_version());
     if(git_populated()) {
+        jabs_message(MSG_INFO, "JaBS version %s (git: %s).\n", jabs_version_simple(), jabs_version());
         jabs_message(MSG_INFO, "This version of JaBS is compiled from a git repository (branch %s%s).\n", git_branch(), git_dirty() ? ", dirty" : "");
         jabs_message(MSG_INFO, "Git commit %s dated %s.\n", git_commit_sha1(), git_commit_date());
     }
+    jabs_message(MSG_INFO, "JaBS version %s (not from git repository).\n", jabs_version());
 #ifdef __DATE__
     jabs_message(MSG_INFO,  "Compiled on %s\n", __DATE__);
 #endif

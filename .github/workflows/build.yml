@@ -1,0 +1,117 @@
+name: CMake on macOS and Linux
+
+on:
+  [workflow_call, workflow_dispatch]
+
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        build_type: [Release]
+#        c_compiler: [gcc, clang, cl]
+        c_compiler: [gcc, clang]
+        include:
+#          - os: windows-latest
+#            c_compiler: cl
+#            cpp_compiler: cl
+          - os: ubuntu-latest
+            c_compiler: gcc
+            cpp_compiler: g++
+          - os: macos-latest
+            c_compiler: clang
+            cpp_compiler: clang++
+        exclude:
+          - os: windows-latest
+            c_compiler: gcc
+          - os: windows-latest
+            c_compiler: clang
+          - os: ubuntu-latest
+            c_compiler: cl
+          - os: ubuntu-latest
+            c_compiler: clang
+          - os: macos-latest
+            c_compiler: gcc
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set reusable strings
+      id: strings
+      shell: bash
+      run: |
+        echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.7.2'
+        target: 'desktop'
+
+    - name: Install libraries and dependencies (ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get install -y libgsl27 libgsl-dev libxml2 libxml2-dev cups libcups2 libreadline-dev
+
+    - name: Install libraries and dependencies using Homebrew (macos)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install gsl libxml2 libomp
+        echo "OpenMP_ROOT=\"/opt/homebrew/opt/libomp/\"" >> "$GITHUB_ENV"
+
+    - name: Obtain files from outside the repository
+      run: |
+        ./get_external_files.sh
+
+    - name: Checkout JIBAL
+      uses: actions/checkout@v4
+      with: 
+        repository: JYU-IBA/jibal
+        path: jibal
+
+    - name: Configure JIBAL
+      run: >
+        cmake -B ${{ github.workspace }}/build_jibal
+        -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+        -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        -S ${{ github.workspace }}/jibal
+
+    - name: Build JIBAL
+      run: cmake --build ${{ github.workspace }}/build_jibal --config ${{ matrix.build_type }}
+      
+    - name: Install JIBAL
+      run: | 
+        cmake --install ${{ github.workspace }}/build_jibal --prefix ${{ github.workspace }}/install
+        sudo cmake --install ${{ github.workspace }}/build_jibal
+
+    - name: Configure
+      run: >
+        cmake -B ${{ github.workspace }}/build_qjabs
+        -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+        -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        -S ${{ github.workspace }}/qjabs
+
+    - name: Build
+      run: cmake --build ${{ github.workspace }}/build_qjabs --config ${{ matrix.build_type }}
+
+    - name: Install
+      run: cmake --install ${{ github.workspace }}/build_qjabs --prefix ${{ github.workspace }}/install
+
+    - name: Deploy Qt app (macos)
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd release_scripts
+        ./deploy_mac.sh
+        cp ${{ github.workspace }}/build_qjabs/JaBS*.dmg ${{ github.workspace }}/install
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: artifact-${{matrix.os}}
+        path: ${{ github.workspace }}/install

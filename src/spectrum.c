@@ -14,6 +14,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include <gsl/gsl_minmax.h>
 #include "jabs_debug.h"
 #include "generic.h"
 #include "spectrum.h"

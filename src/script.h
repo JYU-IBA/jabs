@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021-2022 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,5 +16,11 @@
 #define JABS_SCRIPT_H
 
 #include "script_generic.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 int script_process(script_session *s);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_SCRIPT_H

@@ -31,6 +31,10 @@
 #include "spectrum.h"
 #include "histogram.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define FIT_SUCCESS_CHISQ (2)
 #define FIT_SUCCESS_DELTA (1)
 #define FIT_SUCCESS (0)
@@ -161,4 +165,7 @@ int fit_set_roi_from_string(roi *r, const char *str); /* Parses only low and hig
 double fit_emin(struct fit_data *fit, size_t i_det); /* Returns lowest energy of fit ranges for detector i_det. Detectors, calibrations and fit ranges must be set before calling. */
 const char *fit_error_str(int error);
 int fit_range_compare(const void *a, const void *b);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_FIT_H

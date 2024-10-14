@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,6 +16,10 @@
 #include "stop.h"
 #include "prob_dist.h"
 #include "message.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct sim_calc_params {
     int ds; /* Dual scattering true/false */
@@ -59,5 +63,7 @@ void sim_calc_params_copy(const sim_calc_params *p_src, sim_calc_params *p_dst);
 void sim_calc_params_update(sim_calc_params *p); /* Computes variables that can be computed from other variables */
 void sim_calc_params_ds(sim_calc_params *p, int ds); /* if ds is TRUE, set DS parameters, otherwise no action is taken */
 void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_level);
-
+#ifdef __cplusplus
+}
+#endif
 #endif //JABS_SIM_CALC_PARAMS_H

@@ -19,6 +19,10 @@
 #include "simulation.h"
 #include "histogram.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define RESULT_SPECTRA_EXPERIMENTAL (0)
 #define RESULT_SPECTRA_SIMULATED (1)
 #define RESULT_SPECTRA_N_FIXED (2)
@@ -49,4 +53,7 @@ jabs_histogram *result_spectra_experimental_histo(const result_spectra *spectra)
 
 jabs_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_max, size_t column, size_t compress);
 jabs_histogram *spectrum_read_detector(const char *filename, const detector *det);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_SPECTRUM_H

@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include <gsl/gsl_integration.h>
 #include "simulation.h"
 #include "defaults.h"
 #include "rotate.h"

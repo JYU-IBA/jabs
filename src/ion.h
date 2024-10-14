@@ -1,9 +1,27 @@
+/*
+
+    Jaakko's Backscattering Simulator (JaBS)
+    Copyright (C) 2021 - 2024 Jaakko Julin
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    See LICENSE.txt for the full license.
+
+    Some parts of this source file under different license, see below!
+
+ */
 #ifndef JABS_ION_H
 #define JABS_ION_H
 #include <jibal_masses.h>
 #include <jibal_gsto.h>
 #include "nuclear_stopping.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 typedef struct jabs_gsto_assignment {
         const gsto_file_t *stopfile;
         const double *stopdata;
@@ -46,4 +64,7 @@ void ion_print(FILE *f, const ion *ion);
 jabs_ion_gsto *ion_gsto_new(const jibal_isotope *incident, const jibal_gsto *gsto);
 jabs_ion_gsto *ion_gsto_shared(jabs_ion_gsto *ion_gsto);
 void ion_gsto_free(jabs_ion_gsto *ion_gsto);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_ION_H

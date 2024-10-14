@@ -1,10 +1,31 @@
+/*
+
+    Jaakko's Backscattering Simulator (JaBS)
+    Copyright (C) 2021 - 2024 Jaakko Julin
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    See LICENSE.txt for the full license.
+
+ */
+#ifndef JABS_SCATINT_H
+#define JABS_SCATINT_H
+
+#include <gsl/gsl_integration.h>
+#include "reaction.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define IMPACT_MIN (1e-9) /* In units of screening length. Apsis can not be below this! */
 #define IMPACT_MAX (100.0)
 #define INTEGRATION_WORKSPACE_N (20000)
 #define INTEGRATION_ACCURACY (1e-7)
 #define IMPACT_FACTOR_ACCURACY (1e-9)
 
-#include "reaction.h"
 
 typedef enum potential_type {
     POTENTIAL_NONE = 0,
@@ -77,3 +98,7 @@ const char *scatint_reaction_name(reaction_type rt);
 int scatint_has_solution(scatint_params *p);
 double inverse_kinematics_erd_scale(double theta_cm, double theta_lab, double phi_lab);
 double sigma_lab_to_cm(double theta_cm, double m12);
+#ifdef __cplusplus
+}
+#endif
+#endif

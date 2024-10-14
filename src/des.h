@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,6 +17,10 @@
 #include "ion.h"
 #include "stop.h"
 #include "simulation.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     depth d; /* Depth */
@@ -43,4 +47,7 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
 inline const des *des_table_min_energy_bin(const des_table *dt) {return &(dt->t[dt->n - 1]);}
 void des_set_ion(const des *des, ion *ion);
 depth des_next_range(const des_table *dt, ion *incident, depth d); /* Returns the next depth of next range (w.r.t. ion direction of travel, deeper or closer to surface) and sets ion energy and straggling */
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_DES_H

@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -13,9 +13,15 @@
  */
 #ifndef JABS_SIMULATION_WORKSPACE_H
 #define JABS_SIMULATION_WORKSPACE_H
+#include <gsl/gsl_integration.h>
 #include "simulation.h"
 #include "sim_reaction.h"
 #include "spectrum.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 typedef struct sim_workspace {
     double fluence; /* With DS can be different from sim->fluence, otherwise the same */
@@ -51,4 +57,7 @@ size_t sim_workspace_histograms_calculate(sim_workspace *ws);
 void sim_workspace_histograms_scale(sim_workspace *ws, double scale);
 int sim_workspace_print_spectra(const result_spectra *spectra, const char *filename);
 int sim_workspace_print_bricks(const sim_workspace *ws, const char *filename);
+#ifdef __cplusplus
+}
+#endif
 #endif //JABS_SIMULATION_WORKSPACE_H

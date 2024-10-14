@@ -11,6 +11,7 @@
 #include "defaults.h"
 #include "detector.h"
 #include "message.h"
+#include "rotate.h"
 #include "win_compat.h"
 
 extern inline double detector_calibrated(const detector *det, int Z, size_t ch);

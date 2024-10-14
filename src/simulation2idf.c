@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,6 +16,7 @@
 #endif
 #include <stdio.h>
 #include <string.h>
+#include <libxml/parser.h>
 #include "defaults.h"
 #include "options.h"
 #include "geostragg.h"

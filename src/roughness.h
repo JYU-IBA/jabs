@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,6 +14,10 @@
 
 #ifndef JABS_ROUGHNESS_H
 #define JABS_ROUGHNESS_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     double x;
@@ -63,4 +67,7 @@ roughness_file *roughness_file_read(const char *filename);
 roughness_file *roughness_file_copy(const roughness_file *rf);
 void roughness_file_free(roughness_file *rf);
 double thickness_gamma_pdf(double x, double thickness, double sigma);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_ROUGHNESS_H

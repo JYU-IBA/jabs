@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -15,6 +15,10 @@
 #define JABS_NUCLEAR_STOPPING_H
 #include <stdlib.h>
 #include <jibal_masses.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     double k;
@@ -34,4 +38,7 @@ typedef struct {
 nuclear_stopping *nuclear_stopping_new(const jibal_isotope *incident, const jibal_isotope *isotopes);
 nuclear_stopping *nuclear_stopping_shared_copy(nuclear_stopping *ns);
 void nuclear_stopping_free(nuclear_stopping *ns);
+#ifdef __cplusplus
+}
+#endif
 #endif //JABS_NUCLEAR_STOPPING_H

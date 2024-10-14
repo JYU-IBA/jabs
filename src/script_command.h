@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,6 +17,10 @@
 #define JABS_SCRIPT_COMMAND_H
 
 #include "script_generic.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 const char *script_command_status_to_string(script_command_status status);
 
@@ -115,4 +119,7 @@ script_command_status script_cwd(struct script_session *s, int argc, char * cons
 script_command_status script_cd(struct script_session *s, int argc, char * const *argv);
 script_command_status script_idf2jbs(struct script_session *s, int argc, char * const *argv);
 script_command_status script_kinematics(struct script_session *s, int argc, char * const *argv);
+#ifdef __cplusplus
+}
+#endif
 #endif //JABS_SCRIPT_COMMAND_H

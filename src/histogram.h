@@ -1,27 +1,22 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
     See LICENSE.txt for the full license.
 
  */
 #ifndef JABS_HISTOGRAM_H
 #define JABS_HISTOGRAM_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     size_t n;
@@ -42,5 +37,7 @@ int jabs_histogram_fprintf(FILE *stream, const jabs_histogram *h, const char *ra
 int jabs_histogram_compare(const jabs_histogram *h1, const jabs_histogram *h2, size_t low, size_t high, double *out);
 double jabs_histogram_roi(const jabs_histogram *h, size_t low, size_t high); /* low and high are both inclusive channel numbers*/
 size_t jabs_histogram_channels_in_range(const jabs_histogram *h, size_t low, size_t high);
-
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_HISTOGRAM_H

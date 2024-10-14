@@ -22,6 +22,11 @@
 #include "roughness.h"
 #include "message.h"
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct sample_range {
     double x;
     roughness rough;
@@ -113,4 +118,7 @@ void sample_sort_isotopes(sample *sample); /* Sort isotopes. Note that you can s
 void sample_sort_and_remove_duplicate_isotopes(sample *s);
 int isotope_compar(const void *, const void *); /* compares jibal_isotopes */
 void sample_range_copy(sample_range *dst, const sample_range *src);
+#ifdef __cplusplus
+}
+#endif
 #endif /* JABS_SAMPLE_H */

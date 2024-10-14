@@ -1,7 +1,7 @@
 /*
 
     Jaakko's Backscattering Simulator (JaBS)
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -24,6 +24,10 @@
 #include "stop.h"
 #include "des.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int simulate(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample);
 int simulate_reaction(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r);
 int simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim_calc_params *params, const geostragg_vars *g, double emin, double emin_incident, double emax_incident);
@@ -36,4 +40,7 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
 double cross_section_straggling(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, const prob_dist *pd, double E, double S);
 double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S);
 double cross_section_straggling_adaptive(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, double E, double S);
+#ifdef __cplusplus
+}
+#endif
 #endif // JABS_JABS_H
