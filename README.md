@@ -4,7 +4,7 @@
 
 Simulates and fits RBS, EBS, ERD and NRA spectra rapidly.
     
-    Copyright (C) 2021 - 2023 Jaakko Julin
+    Copyright (C) 2021 - 2024 Jaakko Julin
     
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -112,7 +112,6 @@ Use `show fit variables` to see a list of variables that can be fitted. This lis
 
 This repository contains following open source software, or parts of them:
  * Code derived from GSL (GNU Scientific Library) examples, e.g. in [fit.c](src/fit.c). Used under the terms of GPL v3.
- * QCustomPlot [qcustomplot.cpp](qjabs/qcustomplot.cpp) and [qcustomplot.h](qjabs/qcustomplot.h), Copyright (C) 2011-2021 Emanuel Eichhammer. Used under the terms of GPL v3.
  * Coordinate rotate routine from MCERD [rotate.c](src/rotate.c). Copyright Kai Arstila. Used under the terms of GPL v2.
  * Some routines from NetBSD, Copyright (c) 2011 The NetBSD Foundation, Inc. See [win_compat.c](src/win_compat.c) for the full copyright notice.
  * Qt Toolkit examples used under terms of the BSD license.
@@ -120,5 +119,6 @@ This repository contains following open source software, or parts of them:
  * Version tracking from Git, [cmake-git-version-tracking](https://github.com/andrew-hardin/cmake-git-version-tracking) Copyright (c) 2020 Andrew Harding. Used under the terms of [MIT License](https://raw.githubusercontent.com/andrew-hardin/cmake-git-version-tracking/master/LICENSE).
 
 Binary distributions contain following open source software:
-* [Qt6](https://www.qt.io/) GUI is distributed under the provisions of [LGPL version 3](https://doc.qt.io/qt-6/lgpl.html). Qt Toolkit is Copyright (C) 2018 The Qt Company Ltd. and other contributors.
+ * [Qt6](https://www.qt.io/) GUI is distributed under the provisions of [LGPL version 3](https://doc.qt.io/qt-6/lgpl.html). Qt Toolkit is Copyright (C) 2018 The Qt Company Ltd. and other contributors.
  * [libxml2](https://gitlab.gnome.org/GNOME/libxml2) library, used under the terms of [MIT License](https://www.opensource.org/licenses/mit-license.html). Copyright (C) 1998-2012 Daniel Veillard. 
+ * QCustomPlot [qcustomplot.cpp](qjabs/qcustomplot.cpp) and [qcustomplot.h](qjabs/qcustomplot.h), Copyright (C) 2011-2021 Emanuel Eichhammer. Used under the terms of GPL v3.

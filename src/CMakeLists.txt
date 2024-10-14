@@ -1,6 +1,6 @@
 #
 #    Jaakko's Backscattering Simulator (JaBS)
-#    Copyright (C) 2021 - 2023 Jaakko Julin
+#    Copyright (C) 2021 - 2024 Jaakko Julin
 #
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@ set(CMAKE_C_STANDARD 99)
 configure_file(version.h.in version.h @ONLY)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
 find_package(GSL 2.6 REQUIRED)
-find_package(Jibal 0.3.10 REQUIRED)
+find_package(Jibal 0.3.12 REQUIRED)
 find_package(LibXml2 REQUIRED)
 find_package(Readline)
 find_package(OpenMP)
