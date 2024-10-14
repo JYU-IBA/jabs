@@ -9,7 +9,7 @@ if [ ! -d "$jibal_src_dir" ]; then
     exit 1
 fi
 mkdir -p "$builddir";
-if ! cmake -S "$jibal_src_dir" -B "$builddir" -DCMAKE_BUILD_TYPE=Release then
+if ! cmake -S "$jibal_src_dir" -B "$builddir" -DCMAKE_BUILD_TYPE=Release; then
     echo "Could not configure using CMake"
     exit 1;
 fi
@@ -19,7 +19,7 @@ if ! cmake --build "$builddir" --config Release; then
     exit 1;
 fi
 
-if ! sudo cmake --install "$builddir" then
+if ! sudo cmake --install "$builddir"; then
     echo "Could not install."
     exit 1;
 fi
