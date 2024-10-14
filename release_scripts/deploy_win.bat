@@ -1,4 +1,6 @@
 REM This is mostly for deploying a Windows build on GitHub
+REM Directories relative to one directory up (root of jabs repository)
+REM This will assume you have run CMake install with --prefix=.\install (for JIBAL, JaBS and QJaBS) AND that qjabs has been built in .\build_qjabs\ build directory (as a Release build)
 cd ..
 set INSTALL_DIR=.\install
 set BUILD_DIR=.\build_qjabs\Release
