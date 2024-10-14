@@ -121,4 +121,4 @@ This repository contains following open source software, or parts of them:
 Binary distributions contain following open source software:
  * [Qt6](https://www.qt.io/) GUI is distributed under the provisions of [LGPL version 3](https://doc.qt.io/qt-6/lgpl.html). Qt Toolkit is Copyright (C) 2018 The Qt Company Ltd. and other contributors.
  * [libxml2](https://gitlab.gnome.org/GNOME/libxml2) library, used under the terms of [MIT License](https://www.opensource.org/licenses/mit-license.html). Copyright (C) 1998-2012 Daniel Veillard. 
- * QCustomPlot [qcustomplot.cpp](qjabs/qcustomplot.cpp) and [qcustomplot.h](qjabs/qcustomplot.h), Copyright (C) 2011-2021 Emanuel Eichhammer. Used under the terms of GPL v3.
+ * [QCustomPlot](https://www.qcustomplot.com/), Copyright (C) 2011-2021 Emanuel Eichhammer. Used under the terms of GPL v3.
