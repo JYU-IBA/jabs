@@ -1814,7 +1814,7 @@ script_command_status script_show_sample_profile(struct script_session *s, int a
 script_command_status script_show_simulation(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
-    sim_print(s->fit->sim, MSG_VERBOSE);
+    sim_print(s->fit->sim, MSG_INFO);
     return 0;
 }
 
@@ -2510,8 +2510,9 @@ script_command_status script_help_version(script_session *s, int argc, char *con
         jabs_message(MSG_INFO, "JaBS version %s (git: %s).\n", jabs_version_simple(), jabs_version());
         jabs_message(MSG_INFO, "This version of JaBS is compiled from a git repository (branch %s%s).\n", git_branch(), git_dirty() ? ", dirty" : "");
         jabs_message(MSG_INFO, "Git commit %s dated %s.\n", git_commit_sha1(), git_commit_date());
+    } else {
+        jabs_message(MSG_INFO, "JaBS version %s (not from git repository).\n", jabs_version());
     }
-    jabs_message(MSG_INFO, "JaBS version %s (not from git repository).\n", jabs_version());
 #ifdef __DATE__
     jabs_message(MSG_INFO,  "Compiled on %s\n", __DATE__);
 #endif

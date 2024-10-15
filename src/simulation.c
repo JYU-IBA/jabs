@@ -260,6 +260,7 @@ int sim_det_set(simulation *sim, detector *det, size_t i_det) {
 
 void sim_print(const simulation *sim, jabs_msg_level msg_level) {
     if(!sim) {
+        jabs_message(msg_level, "No simulation.\n");
         return;
     }
     if(sim->beam_isotope) {

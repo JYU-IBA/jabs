@@ -22,7 +22,7 @@ MainWindow::MainWindow(QWidget *parent)
     aboutString = QString("JaBS version ") + jabs_version() + "\n\n"
                        + "Using JIBAL version "+ jibal_version() + ", compiled using version " + JIBAL_VERSION + "\n\n"
                        + "Using Qt version " + qVersion() + ", compiled using version " + QT_VERSION_STR + "\n\n"
-                       + "Copyright 2021 - 2023 Jaakko Julin <jaakko.julin@jyu.fi>\n";
+                       + "Copyright 2021 - 2024 Jaakko Julin <jaakko.julin@jyu.fi>\n";
     ui->setupUi(this);
     QIcon icon(":/icons/jabs.svg");
     QApplication::setWindowIcon(icon);
