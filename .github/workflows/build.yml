@@ -39,12 +39,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-
-    - name: Set reusable strings
-      id: strings
-      shell: bash
-      run: |
-        echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+      path: jabs
 
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
@@ -89,18 +84,18 @@ jobs:
         cmake --install ${{ github.workspace }}/build_jibal --prefix ${{ github.workspace }}/install
         sudo cmake --install ${{ github.workspace }}/build_jibal
 
-    - name: Configure
+    - name: Configure QJaBS
       run: >
         cmake -B ${{ github.workspace }}/build_qjabs
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-        -S ${{ github.workspace }}/qjabs
+        -S ${{ github.workspace }}/jabs/qjabs
 
-    - name: Build
+    - name: Build QJaBS
       run: cmake --build ${{ github.workspace }}/build_qjabs --config ${{ matrix.build_type }}
 
-    - name: Install
+    - name: Install QJaBS
       run: cmake --install ${{ github.workspace }}/build_qjabs --prefix ${{ github.workspace }}/install
 
     - name: Deploy Qt app (macos)
