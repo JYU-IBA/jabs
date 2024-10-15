@@ -1,7 +1,7 @@
 #!/bin/bash
-cd ..
+cd .. #Everything relative to root of repository
 jibal_src_dir="../jibal"
-builddir="build_jibal"
+builddir="../build_jibal"
 if [ ! -d "$jibal_src_dir" ]; then
     echo "Tried to find JIBAL source code from directory $jibal_src_dir (relative to $(pwd))"
     echo "Perhaps run this in the parent directory (of $(pwd)): "

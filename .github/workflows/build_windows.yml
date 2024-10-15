@@ -33,7 +33,7 @@ jobs:
     - name: Obtain files from outside the repository
       shell: cmd
       run: |
-        cd ${{runner.workspace}}\jabs
+        cd ${{ github.workspace }}\jabs
         .\get_external_files.bat
 
     - name: Checkout JIBAL
@@ -71,7 +71,7 @@ jobs:
     - name: Run deploy script
       shell: cmd
       run: |
-        cd ${{runner.workspace}}\jabs\release_scripts
+        cd ${{ github.workspace }}\jabs\release_scripts
         .\deploy_win.bat
 
     - name: Upload artifact

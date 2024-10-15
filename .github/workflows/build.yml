@@ -102,7 +102,7 @@ jobs:
     - name: Deploy Qt app (macos)
       if: matrix.os == 'macos-latest'
       run: |
-        cd release_scripts
+        cd ${{ github.workspace }}/jabs/release_scripts
         ./deploy_mac.sh
         cp ${{ github.workspace }}/build_qjabs/JaBS*.dmg ${{ github.workspace }}/install
 

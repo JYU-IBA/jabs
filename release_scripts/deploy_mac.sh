@@ -2,7 +2,7 @@
 cd .. #Everything relative to one directory up
 #This script assumes you have installed JIBAL somewhere (so that CMake can find it and jibaltool can be run)
 #Try running build_jibal.sh and build_qjabs.sh first
-builddir="build_qjabs"
+builddir="../build_qjabs"
 if ! jibaltool status; then echo
     "Install JIBAL first. CMake should be able to find it and I need to run jibaltool."
     "Check or run build_jibal.sh"

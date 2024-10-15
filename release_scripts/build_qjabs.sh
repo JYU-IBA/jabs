@@ -1,6 +1,6 @@
 #!/bin/bash
 cd ..
-builddir="build_qjabs"
+builddir="../build_qjabs"
 mkdir -p "$builddir"
 if ! cmake --fresh -S qjabs -B "$builddir" -DCMAKE_BUILD_TYPE=Release; then
     echo "Could not configure using CMake"
