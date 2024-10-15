@@ -61,6 +61,7 @@ jobs:
 
     - name: Obtain files from outside the repository
       run: |
+        cd ${{ github.workspace }}/jabs/
         ./get_external_files.sh
 
     - name: Checkout JIBAL
