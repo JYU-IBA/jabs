@@ -9,7 +9,7 @@ JaBS uses a standard CMake build system. See instructions on [running CMake](htt
 JaBS depends on [GSL](https://www.gnu.org/software/gsl/), [JIBAL](https://github.com/JYU-IBA/jibal), [libxml2](https://gitlab.gnome.org/GNOME/libxml2/-/wikis/home), and the GUI (QJaBS)
  depends additionally on [Qt 6](https://www.qt.io/) and [QCustomPlot](https://www.qcustomplot.com/).
 
-Preferred compiler on Windows is MSVC 2019 (for Qt compatibility), Clang on macOS and GCC on Linux.
+Preferred compiler on Windows is MSVC 2022 (for Qt compatibility), Clang on macOS and GCC on Linux.
 
 Creating binary distributions may be challenging, see [GitHub workflows](.github/workflows). The Windows binary distribution is created with this workflow.
 
