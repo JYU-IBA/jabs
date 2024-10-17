@@ -232,6 +232,19 @@ void MainWindow::closeFitDialog()
 
 int MainWindow::initSession()
 {
+    QString license_filename_str;
+#if defined(Q_OS_MACOS)
+    license_filename_str = QApplication::applicationDirPath() + "/../Resources/LICENSE.txt";
+#elif defined(Q_OS_WIN)
+    license_filename_str = QApplication::applicationDirPath() + "\\LICENSE.txt";
+#elif defined(Q_OS_LINUX)
+    license_filename_str = "/usr/share/common-licenses/GPL-2";
+#endif
+    if(!license_filename_str.isEmpty() && QFile::exists(license_filename_str)) {
+            ui->msgTextBrowser->insertHtml(QString("<p>%1</p>\n").arg(MainWindow::makeFileLink(license_filename_str, "License file")));
+            ui->msgTextBrowser->insertPlainText("\n\n");
+    }
+
     QString config_filename_str = settings.value("jibalConfigurationFile").toString();
     if(config_filename_str.isEmpty()) {
 #if defined(Q_OS_MACOS)
@@ -248,12 +261,12 @@ int MainWindow::initSession()
     }
     if(config_filename_str.isEmpty() || !QFile::exists(config_filename_str) ) {
          jibal = jibal_init(NULL);
-         ui->msgTextBrowser->insertHtml(QString("JIBAL configuration file (determined by JIBAL): %1\n\n").arg(MainWindow::makeFileLink(jibal_config_filename(jibal))));
+         ui->msgTextBrowser->insertHtml(QString("<p>JIBAL configuration file as determined by JIBAL: %1</p>\n\n").arg(MainWindow::makeFileLink(jibal_config_filename(jibal))));
     } else {
-        ui->msgTextBrowser->insertHtml(QString("<p>JIBAL configuration file (determined by JaBS): %1</p>\n").arg(MainWindow::makeFileLink(config_filename_str)));
-        ui->msgTextBrowser->insertPlainText("\n");
+        ui->msgTextBrowser->insertHtml(QString("<p>JIBAL configuration file as determined by JaBS: %1</p>\n").arg(MainWindow::makeFileLink(config_filename_str)));
         jibal = jibal_init(qPrintable(config_filename_str));
     }
+    ui->msgTextBrowser->insertPlainText("\n");
     if(!jibal) {
         QMessageBox::critical(this, "Error", "Could not initialize JIBAL (a NULL pointer was returned).\n");
         return -1;
@@ -292,12 +305,15 @@ int MainWindow::closeSession()
     return 0;
 }
 
-QString MainWindow::makeFileLink(const QString &filename)
+QString MainWindow::makeFileLink(const QString &filename, const QString &linkname)
 {
-    if(filename.isEmpty()) {
+    if(filename.isEmpty() && linkname.isEmpty()) {
         return QString("(no filename)");
     }
-    return QString("<a href=\"%1\">%2</a>").arg(QUrl::fromLocalFile(filename).toString(), filename.toHtmlEscaped());
+    if(filename.isEmpty()) {
+        return QString(linkname.toHtmlEscaped() + " (no filename)"); // This should not hopefully never be seen by the user
+    }
+    return QString("<a href=\"%1\">%2</a>").arg(QUrl::fromLocalFile(filename).toString(), linkname.isEmpty() ? filename.toHtmlEscaped() : linkname.toHtmlEscaped());
 }
 
 void MainWindow::readSettings()

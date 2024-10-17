@@ -100,7 +100,6 @@ private slots:
 
     void on_comboBox_currentIndexChanged(int index);
 
-
     void on_actionNext_detector_triggered();
 
     void on_actionPrevious_detector_triggered();
@@ -116,7 +115,7 @@ private:
     void closeFitDialog();
     int initSession();
     int closeSession();
-    static QString makeFileLink(const QString &filename);
+    static QString makeFileLink(const QString &filename, const QString &linkname = "");
     void setNeedsSaving(bool value);
     void showInitialMessages();
 

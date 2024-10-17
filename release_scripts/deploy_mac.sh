@@ -3,6 +3,7 @@ cd .. #Everything relative to one directory up
 #This script assumes you have installed JIBAL somewhere (so that CMake can find it and jibaltool can be run)
 #Try running build_jibal.sh and build_qjabs.sh first
 builddir="../build_qjabs"
+resources="${builddir}/qjabs.app/Contents/Resources/"
 if ! jibaltool status; then echo
     "Install JIBAL first. CMake should be able to find it and I need to run jibaltool."
     "Check or run build_jibal.sh"
@@ -49,15 +50,16 @@ masses_file = masses.dat
 abundances_file = abundances.dat
 files_file = files.txt
 assignments_file = assignments.txt
-" > "${builddir}/qjabs.app/Contents/Resources/jibal.conf"
-cp "${jibal_datadir}/masses.dat" "${jibal_datadir}/abundances.dat" "${builddir}/qjabs.app/Contents/Resources/"
+" > "${resources}/jibal.conf"
+cp "${jibal_datadir}/masses.dat" "${jibal_datadir}/abundances.dat" "${resources}"
 echo "srim2013,srim2013.ele
 yang,yang.stg
 chu,chu.stg
 bohr,bohr.stg
-" > "${builddir}/qjabs.app/Contents/Resources/files.txt"
-cp "$jibal_gsto_data_dir"/*.ele "${builddir}/qjabs.app/Contents/Resources/"
-cp "$jibal_gsto_data_dir"/*.stg "${builddir}/qjabs.app/Contents/Resources/"
+" > "${resources}/files.txt"
+cp "$jibal_gsto_data_dir"/*.ele "${resources}"
+cp "$jibal_gsto_data_dir"/*.stg "${resources}"
+cp "LICENSE.txt" "${resources}"
 cd "$builddir"
 echo "Operating in $pwd"
 #mv qjabs.app JaBS.app
