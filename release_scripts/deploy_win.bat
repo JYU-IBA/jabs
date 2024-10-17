@@ -36,6 +36,7 @@ copy README.md "%BUILD_DIR%"
 copy CITATION.cff "%BUILD_DIR%"
 copy version.txt "%BUILD_DIR%"
 (
-  echo "Windows release compiled %date% %time%"
+  echo Windows release compiled %date% %time% by %COMPUTERNAME%
 ) > "%BUILD_DIR%/release.txt"
-git describe --tags >> "%BUILD_DIR%/release.txt"
+ver >> "%BUILD_DIR%/release.txt"
+git describe --tags --dirty --broken --long --always >> "%BUILD_DIR%/release.txt"
