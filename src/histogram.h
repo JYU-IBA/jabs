@@ -18,6 +18,8 @@
 extern "C" {
 #endif
 
+#include <stdlib.h>
+
 typedef struct {
     size_t n;
     double *range;

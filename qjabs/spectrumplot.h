@@ -5,6 +5,7 @@
 #include <QVector>
 #include <QClipboard>
 #include "qcustomplot.h"
+#include "histogram.h"
 
 
 class SpectrumPlot : public QCustomPlot
@@ -12,7 +13,9 @@ class SpectrumPlot : public QCustomPlot
     Q_OBJECT
 public:
     explicit SpectrumPlot(QWidget *parent=nullptr);
-    void drawDataToChart(const QString &name, double *range, double *bin, int n, const QColor &color);
+    QCPGraph *addGraphHisto(const QString &name, const QColor &color);
+    void drawDataToGraph(QCPGraph *g, const jabs_histogram *h, bool endzero = true, bool left = true);
+    void drawFilledDataToGraphs(const QString &name, const jabs_histogram *h_low, const jabs_histogram *h_high, const QColor &color);
     void setGraphVisibility(QCPGraph *graph, bool visible);
     void clearAll();
     void updateVerticalRange(bool force = false);

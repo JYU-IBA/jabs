@@ -60,7 +60,7 @@ int result_spectrum_copy(result_spectrum *dest, const result_spectrum *src) {
     return EXIT_SUCCESS;
 }
 
-int result_spectrum_set(result_spectrum *dest, const jabs_histogram *h, const char *name, const jibal_isotope *target_isotope, reaction_type type) {
+int result_spectrum_set(result_spectrum *dest, const jabs_histogram *h, const char *name, const jibal_isotope *target_isotope, const reaction_type type) {
     dest->histo = h ? jabs_histogram_clone(h) : NULL;
     dest->name = name ? strdup(name) : NULL;
     dest->target_isotope = target_isotope;
@@ -95,6 +95,14 @@ jabs_histogram *result_spectra_simulated_histo(const result_spectra *spectra) {
 
 jabs_histogram *result_spectra_experimental_histo(const result_spectra *spectra) {
     return result_spectrum_histo(spectra, RESULT_SPECTRA_EXPERIMENTAL);
+}
+
+jabs_histogram *result_spectra_uncertainty_histo_negative(const result_spectra *spectra) {
+    return result_spectrum_histo(spectra, RESULT_SPECTRA_UNCERTAINTY_NEGATIVE);
+}
+
+jabs_histogram *result_spectra_uncertainty_histo_positive(const result_spectra *spectra) {
+    return result_spectrum_histo(spectra, RESULT_SPECTRA_UNCERTAINTY_POSITIVE);
 }
 
 jabs_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_max, size_t column, size_t compress) {

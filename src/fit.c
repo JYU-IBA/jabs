@@ -710,7 +710,7 @@ jabs_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det) {
 }
 
 void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *spectra, const detector *det, const jabs_histogram *exp, const sim_workspace *ws) {
-    spectra->n_spectra = ws->n_reactions + RESULT_SPECTRA_N_FIXED; /* Simulated, experimental + reaction spectra */
+    spectra->n_spectra = ws->n_reactions + RESULT_SPECTRA_N_FIXED; /* Simulated, experimental, confidence limits (2) + reaction spectra */
     spectra->s = calloc(spectra->n_spectra, sizeof(result_spectrum));
     result_spectrum_set(&spectra->s[RESULT_SPECTRA_SIMULATED], ws->histo_sum, "Simulated", NULL, REACTION_NONE);
     result_spectrum_set(&spectra->s[RESULT_SPECTRA_EXPERIMENTAL], exp, "Experimental", NULL, REACTION_NONE);
@@ -937,8 +937,8 @@ void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspac
 }
 
 
-void fit_covar_print(const gsl_matrix *covar, jabs_msg_level msg_level) {
-    jabs_message(msg_level, "\nCorrelation coefficients matrix:\n       | ");
+void fit_correlation_print(const gsl_matrix *covar, jabs_msg_level msg_level) {
+    jabs_message(msg_level, "\nCorrelation coefficients (sigma_ij/(sigma_i*sigma_j)) matrix:\n       | ");
     for(size_t i = 0; i < covar->size1; i++) {
         jabs_message(msg_level, " %4zu  ", i + 1);
     }
@@ -952,10 +952,13 @@ void fit_covar_print(const gsl_matrix *covar, jabs_msg_level msg_level) {
     }
 }
 
-int fit_uncertainty_print(const fit_data *fit, const gsl_matrix *J, const gsl_matrix *covar, const gsl_vector *f, const gsl_vector *w, const char *filename) {
-    FILE *f_errvec = fopen(filename, "w");
-    if(!f_errvec) {
-        return EXIT_FAILURE;
+int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_matrix *covar, const gsl_vector *f, const gsl_vector *w, const char *filename) {
+    FILE *f_errvec = NULL;
+    if(filename) {
+        f_errvec = fopen(filename, "w");
+        if(!f_errvec) {
+            return EXIT_FAILURE;
+        }
     }
     gsl_matrix *JC = gsl_matrix_alloc(J->size1, covar->size2); /* Product of J*C */
     gsl_matrix *JCJT = gsl_matrix_alloc(J->size1, J->size1); /* Product J*C*JT */
@@ -963,37 +966,84 @@ int fit_uncertainty_print(const fit_data *fit, const gsl_matrix *J, const gsl_ma
     gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, JC, J, 0.0, JCJT);
     gsl_vector_view err_vec = gsl_matrix_diagonal(JCJT);
     size_t i_vec = 0;
+    jabs_histogram **h_minus = calloc(fit->n_det_spectra, sizeof(jabs_histogram *));
+    jabs_histogram **h_plus = calloc(fit->n_det_spectra, sizeof(jabs_histogram *));
+    for(size_t i_det = 0; i_det < fit->n_det_spectra; i_det++) {
+        for(size_t i_roi = 0; i_roi < fit->n_fit_ranges; i_roi++) {
+            const roi *roi = &fit->fit_ranges[i_roi];
+            const result_spectra *s = &(fit->spectra[roi->i_det]);
+            const jabs_histogram *sim = result_spectra_simulated_histo(s);
+            if(roi->i_det == i_det) {
+                h_minus[i_det] = jabs_histogram_alloc(sim->n);
+                h_plus[i_det] = jabs_histogram_alloc(sim->n);
+                DEBUGMSG("Allocated uncertainty histograms for detector %zu/%zu, they have %zu channels. Pointers %p and %p.", i_det, fit->n_det_spectra, sim->n, (void *)h_minus[i_det], (void *)h_plus[i_det]);
+                break; /* Only once per detector */
+            }
+        }
+    }
     for(size_t i_roi = 0; i_roi < fit->n_fit_ranges; i_roi++) {
         const roi *roi = &fit->fit_ranges[i_roi];
         const result_spectra *s = &(fit->spectra[roi->i_det]);
+        const jabs_histogram *sim = result_spectra_simulated_histo(s);
+        const jabs_histogram *exp = result_spectra_experimental_histo(s);
+        const jabs_histogram *h_uncertainty_low = h_minus[roi->i_det];
+        const jabs_histogram *h_uncertainty_high = h_plus[roi->i_det];
+
         for(size_t ch = roi->low; ch <= roi->high; ch++) {
-            double sim_counts = jabs_histogram_get(result_spectra_simulated_histo(s), ch);
-            double exp_counts = jabs_histogram_get(result_spectra_experimental_histo(s), ch);
-            double residuals_weighted = gsl_vector_get(f, i_vec);  /* Residuals (with weights sqrt(W)) */
-            double residuals_unweighted = exp_counts - sim_counts;
+            double sim_counts = jabs_histogram_get(sim, ch);
+            double exp_counts = jabs_histogram_get(exp, ch);
+
             double weight = gsl_vector_get(w, i_vec); /* Fit weight (1/variance, i.e. 1 / N_exp in bin) */
-            double err = gsl_vector_get(&err_vec.vector, i_vec); /* Something(J x C x J^T diagonal), should be standard error of the fit, i.e. how much do the (statistical) errors in parameters propagated to this particular bin give us uncertainty. This is probably variance. */
-            double error_fit_final = 2.0 * sqrt(err) * sqrt(sim_counts); /* TODO: sqrt(sim_counts)? */
-            double error_prediction_final = 2.0 * sqrt(err + weight) * sqrt(sim_counts);
+            double err = gsl_vector_get(&err_vec.vector, i_vec); /* Something(J * C * J^T diagonal), should be standard error of the fit, i.e. how much do the (statistical) errors in parameters propagated to this particular bin give us uncertainty. This is probably variance. */
+            double error_fit_final = 2.0 * sqrt(err) * sqrt(sim_counts); /* 2 sigma, TODO: sqrt(sim_counts)? Why? Looks ok... */
+            double error_prediction_final = 2.0 * sqrt(err + weight) * sqrt(sim_counts); /*  2 sigma, "asymptotic standard prediction error", "reflects the standard error of the fit as well as the measurement error." */
             double error_positive = sim_counts + error_prediction_final;
             double error_negative = sim_counts - error_prediction_final;
             if(error_negative < 0.0) {
                 error_negative = 0.0;
             }
-            fprintf(f_errvec, "%3zu %3zu %4zu %12g %12g %12g %12g %12g %12g %12g %12g %12g %12g\n",
-                    i_vec, i_roi, ch,
-                    sim_counts, exp_counts,
-                    residuals_unweighted, residuals_weighted,
-                    weight,
-                    err, error_fit_final,
-                    error_prediction_final,
-                    error_negative, error_positive);
+            h_uncertainty_high->bin[ch] = error_positive;
+            h_uncertainty_low->bin[ch] = error_negative;
+            if(f_errvec) {
+                double residuals_weighted = gsl_vector_get(f, i_vec);  /* Residuals (with weights sqrt(W)) */
+                double residuals_unweighted = exp_counts - sim_counts;
+                fprintf(f_errvec, "%3zu %3zu %4zu %12g %12g %12g %12g %12g %12g %12g %12g %12g %12g\n",
+                        i_vec, i_roi, ch,
+                        sim_counts, exp_counts,
+                        residuals_unweighted, residuals_weighted,
+                        weight,
+                        err, error_fit_final,
+                        error_prediction_final,
+                        error_negative, error_positive);
+            }
             i_vec++;
         }
     }
-    fclose(f_errvec);
+    if(f_errvec) {
+        fclose(f_errvec);
+    }
     gsl_matrix_free(JCJT);
     gsl_matrix_free(JC);
+    for(size_t i_det = 0; i_det < fit->n_det_spectra; i_det++) {
+        result_spectra *spectra = &fit->spectra[i_det];
+        const detector *det = sim_det(fit->sim, i_det);
+        fprintf(stderr, "Starting with %zu/%zu (%s)\n", i_det, fit->n_det_spectra, det->name);
+        if(h_minus[i_det]) {
+            fprintf(stderr, "Minus ok, %zu channels.\n", h_plus[i_det]->n);
+            calibration_apply_to_histogram(det->calibration, h_minus[i_det]);
+            result_spectrum_set(&spectra->s[RESULT_SPECTRA_UNCERTAINTY_NEGATIVE], h_minus[i_det], "Confidence limit (-)", NULL, REACTION_NONE);
+            jabs_histogram_free(h_minus[i_det]);
+        }
+        if(h_plus[i_det]) {
+            fprintf(stderr, "Plus ok, %zu channels.\n", h_plus[i_det]->n);
+            calibration_apply_to_histogram(det->calibration, h_plus[i_det]);
+            result_spectrum_set(&spectra->s[RESULT_SPECTRA_UNCERTAINTY_POSITIVE], h_plus[i_det], "Confidence limit (+)", NULL, REACTION_NONE);
+            jabs_histogram_free(h_plus[i_det]);
+        }
+        fprintf(stderr, "Over\n");
+    }
+    free(h_minus);
+    free(h_plus);
     return EXIT_SUCCESS;
 }
 
@@ -1165,11 +1215,14 @@ int fit(fit_data *fit) {
         }
         fit_parameters_update_changed(fit_params); /* sample_model_renormalize() can and will change concentration values, this will recompute error (assuming relative error stays the same) */
         fit_params_print_final(fit_params);
-        fit_covar_print(fit->covar, MSG_VERBOSE);
+        fit_correlation_print(fit->covar, MSG_VERBOSE);
         fit_data_print(fit, MSG_VERBOSE);
 #ifdef DEBUG
-        fit_uncertainty_print(fit, J, fit->covar, f, &wts.vector, "errors.dat");
+        const char *f_uncertainty = "errors.dat";
+#else
+        const char *f_uncertainty = NULL;
 #endif
+        fit_uncertainty_spectra(fit, J, fit->covar, f, &wts.vector, f_uncertainty);
     }
     gsl_multifit_nlinear_free(w);
     gsl_vector_free(fit->f_iter);

@@ -25,7 +25,9 @@ extern "C" {
 
 #define RESULT_SPECTRA_EXPERIMENTAL (0)
 #define RESULT_SPECTRA_SIMULATED (1)
-#define RESULT_SPECTRA_N_FIXED (2)
+#define RESULT_SPECTRA_UNCERTAINTY_NEGATIVE (2) /* Simulated spectrum minus uncertainty (fit error?) */
+#define RESULT_SPECTRA_UNCERTAINTY_POSITIVE (3) /* Simulated spectrum plus uncertainty (fit error?) */
+#define RESULT_SPECTRA_N_FIXED (4)
 #define RESULT_SPECTRA_REACTION_SPECTRUM(x) ((x) + RESULT_SPECTRA_N_FIXED)
 
 typedef struct {
@@ -36,8 +38,8 @@ typedef struct {
 } result_spectrum;
 
 typedef struct result_spectra {
-    result_spectrum *s;
-    size_t n_spectra;
+    result_spectrum *s; /* Use macros to determine index (see above), starts with experimental and simulated spectra, then there are others, total n_spectra (below) */
+    size_t n_spectra; /*  RESULT_SPECTRA_N_FIXED + number of reaction spectra */
 } result_spectra;
 
 result_spectra *result_spectra_alloc(size_t n);
@@ -50,6 +52,8 @@ jabs_histogram *result_spectrum_histo(const result_spectra *spectra, size_t i_sp
 jabs_histogram *result_spectra_reaction_histo(const result_spectra *spectra, size_t i_reaction);
 jabs_histogram *result_spectra_simulated_histo(const result_spectra *spectra);
 jabs_histogram *result_spectra_experimental_histo(const result_spectra *spectra);
+jabs_histogram *result_spectra_uncertainty_histo_negative(const result_spectra *spectra);
+jabs_histogram *result_spectra_uncertainty_histo_positive(const result_spectra *spectra);
 
 jabs_histogram *spectrum_read(const char *filename, size_t skip, size_t channels_max, size_t column, size_t compress);
 jabs_histogram *spectrum_read_detector(const char *filename, const detector *det);

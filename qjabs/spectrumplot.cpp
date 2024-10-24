@@ -50,8 +50,7 @@ SpectrumPlot::SpectrumPlot(QWidget *parent) : QCustomPlot(parent) {
     connect(this->selectionRect(), &QCPSelectionRect::accepted, this, &SpectrumPlot::selectionAccepted);
 }
 
-void SpectrumPlot::drawDataToChart(const QString &name, double *range, double *bin, int n, const QColor &color)
-{
+QCPGraph *SpectrumPlot::addGraphHisto(const QString &name, const QColor &color) {
     addGraph();
     //graph()->setSelectable(QCP::SelectionType::stDataRange);
     graph()->setLineStyle(QCPGraph::lsStepLeft); /*  GSL histograms store the left edge of bin */
@@ -61,30 +60,56 @@ void SpectrumPlot::drawDataToChart(const QString &name, double *range, double *b
     graphPen.setWidth(2);
     graph()->selectionDecorator()->setPen(graphPen);
     graph()->setName(name);
+    return graph();
+}
+
+void SpectrumPlot::drawDataToGraph(QCPGraph *g, const jabs_histogram *h, bool endzero, bool left) {
+    if(!h) {
+        return;
+    }
     double maxy = 0.0;
     int max_i = 0;
-    for(int i = 0; i < n; ++i) {
-        if(bin[i] > maxy) {
-            maxy = bin[i];
+    for(int i = 0; i < h->n; ++i) {
+        if(h->bin[i] > maxy) {
+            maxy = h->bin[i];
         }
-        if(bin[i] > 0.0) {
+        if(h->bin[i] > 0.0) {
             max_i = i;
         }
+        double x;
         if(energyAxis) {
-            graph()->addData(range[i] / C_KEV, bin[i]);
+            if(left) {
+                x = h->range[i] / C_KEV;
+            } else {
+                x = (h->range[i] + h->range[i+1])/2.0/C_KEV;
+            }
         } else {
-            graph()->addData(i, bin[i]);
+            if(left) {
+                x = 1.0 * i;
+            } else {
+                x = 1.0 * i + 0.5;
+            }
         }
+        g->addData(x, h->bin[i]);
+
     }
     double xmax_new;
     max_i++; /* We want to see the right-hand edge of the highest bin, too.*/
     if(energyAxis) {
-        xmax_new = range[max_i] / C_KEV; /* There are n+1 ranges, so this is always safe, even with max_i++. */
+        if(left) {
+            xmax_new = h->range[max_i] / C_KEV; /* There are n+1 ranges, so this is always safe, even with max_i++. */
+        } else {
+            xmax_new = (h->range[max_i] +  (h->range[max_i]-(h->range[max_i - 1]))/2.0);
+        }
     } else {
         xmax_new = max_i;
+        if(left) {
+            xmax_new += 0.5;
+        }
     }
-    graph()->addData(xmax_new, 0.0); /* Add an extra point (zero) */
-
+    if(endzero) {
+        graph()->addData(xmax_new, 0.0); /* Add an extra point (zero) */
+    }
     if(xmax_new > xmax) { /* Only increase, since multiple spectra are plotted. clearAll() has reset xmax. */
         xmax = xmax_new;
     }
@@ -94,6 +119,31 @@ void SpectrumPlot::drawDataToChart(const QString &name, double *range, double *b
     }
     setVisible(true);
 }
+
+void SpectrumPlot::drawFilledDataToGraphs(const QString &name, const jabs_histogram *h_low, const jabs_histogram *h_high, const QColor &color) {
+    if(!h_low || !h_high) {
+        qDebug() << "Got null for uncertainties.";
+        return;
+    }
+    addGraph();
+    QCPGraph *graph_low = graph();
+    addGraph();
+    QCPGraph *graph_high = graph();
+    graph_low->setLayer("background");
+    graph_high->setLayer("background");
+    graph_low->setLineStyle(QCPGraph::lsLine);
+    graph_high->setLineStyle(QCPGraph::lsLine);
+    graph_low->removeFromLegend();
+    graph_low->setVisible(false);
+    graph_high->setChannelFillGraph(graph_low);
+    graph_high->setBrush(color);
+    graph_high->setPen(color);
+    graph_high->setVisible(true);
+    graph_high->setName(name);
+    drawDataToGraph(graph_low, h_low, false, false);
+    drawDataToGraph(graph_high, h_high, false, false);
+}
+
 
 void SpectrumPlot::clearAll()
 {

@@ -38,6 +38,7 @@ public:
 
 signals:
     void runFinished();
+    void sendMessage(jabs_msg_level level, QString msg);
 
 public slots:
     void openFile(const QString &filename);
@@ -46,6 +47,8 @@ public slots:
     void scrollMsgBoxToBottom();
 
 private slots:
+    void receiveMessage(jabs_msg_level level, QString msg);
+
     void on_actionPreferences_triggered();
 
     void plotDialogClosed();

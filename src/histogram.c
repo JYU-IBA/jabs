@@ -10,6 +10,9 @@ jabs_histogram *jabs_histogram_clone(const jabs_histogram *h_orig) {
         return NULL;
     }
     jabs_histogram *h = malloc(sizeof(jabs_histogram));
+    if(!h) {
+        return NULL;
+    }
     size_t n = h_orig->n;
     h->n = n;
     size_t range_bytes = (n + 1) * sizeof(double);
@@ -17,6 +20,7 @@ jabs_histogram *jabs_histogram_clone(const jabs_histogram *h_orig) {
     h->range = malloc(range_bytes);
     h->bin =  malloc(bin_bytes);
     if(!h->range || !h->bin) {
+        free(h);
         return NULL;
     }
     memcpy(h->range, h_orig->range, range_bytes);

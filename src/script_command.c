@@ -1351,7 +1351,7 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_show->subcommands, c_fit);
     script_command_list_add_command(&c_fit->subcommands, script_command_new("variables", "Show possible fit variables.", 0, 0, &script_show_fit_variables));
     script_command_list_add_command(&c_fit->subcommands, script_command_new("ranges", "Show fit ranges.", 0, 0, &script_show_fit_ranges));
-    script_command_list_add_command(&c_fit->subcommands, script_command_new("covar", "Show fit covariances.", 0, 0, &script_show_fit_covar));
+    script_command_list_add_command(&c_fit->subcommands, script_command_new("correlation", "Show fit parameter correlations.", 0, 0, &script_show_fit_correlation));
 
     script_command_list_add_command(&c_show->subcommands, script_command_new("reactions", "Show reactions.", 0, 0, &script_show_reactions));
 
@@ -1882,10 +1882,10 @@ script_command_status script_show_fit_ranges(script_session *s, int argc, char *
     return 0;
 }
 
-script_command_status script_show_fit_covar(script_session *s, int argc, char *const *argv) {
+script_command_status script_show_fit_correlation(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
-    fit_covar_print(s->fit->covar, MSG_INFO);
+    fit_correlation_print(s->fit->covar, MSG_INFO);
     return 0;
 }
 
@@ -2514,6 +2514,9 @@ script_command_status script_help_version(script_session *s, int argc, char *con
     (void) argc;
     (void) argv;
     (void) s;
+#ifdef DEBUG
+    jabs_message(MSG_INFO, "This is a DEBUG build!\n");
+#endif
     if(git_populated()) {
         jabs_message(MSG_INFO, "JaBS version %s (git: %s).\n", jabs_version_simple(), jabs_version());
         jabs_message(MSG_INFO, "This version of JaBS is compiled from a git repository (branch %s%s).\n", git_branch(), git_dirty() ? ", dirty" : "");

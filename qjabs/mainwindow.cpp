@@ -31,6 +31,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->detectorFrame->setVisible(false); /* Will be made visible if necessary */
     setWindowIcon(icon);
     ui->msgTextBrowser->setOpenLinks(false); /* We use the connection below to handle links */
+    connect(this, &MainWindow::sendMessage, this, &MainWindow::receiveMessage);
     connect(ui->msgTextBrowser, &QTextBrowser::anchorClicked, this, &MainWindow::openLink);
     //connect(this, &MainWindow::runFinished, this, &MainWindow::scrollMsgBoxToBottom);
     originalPath = QDir::currentPath();
@@ -86,24 +87,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::addMessage(jabs_msg_level level, const char *msg)
 {
-    ui->msgTextBrowser->moveCursor(QTextCursor::End);
-    switch(level) {
-    case MSG_ERROR:
-        ui->msgTextBrowser->setTextColor(Qt::red);
-        break;
-    case MSG_WARNING:
-        ui->msgTextBrowser->setTextColor(Qt::darkYellow);
-        warningCounter++;
-        break;
-    case MSG_DEBUG:
-        ui->msgTextBrowser->setTextColor(Qt::gray);
-        break;
-    default:
-        ui->msgTextBrowser->setTextColor(messageColor);
-        break;
-    }
-    ui->msgTextBrowser->insertPlainText(msg);
-    //repaint();
+    emit sendMessage(level, QString(msg));
 }
 
 MainWindow::~MainWindow()
@@ -383,6 +367,27 @@ void MainWindow::scrollMsgBoxToBottom()
     //ui->msgTextBrowser->verticalScrollBar()->setValue(ui->msgTextBrowser->verticalScrollBar()->maximum());
 }
 
+void MainWindow::receiveMessage(jabs_msg_level level, QString msg)
+{
+    ui->msgTextBrowser->moveCursor(QTextCursor::End);
+    switch(level) {
+    case MSG_ERROR:
+        ui->msgTextBrowser->setTextColor(Qt::red);
+        break;
+    case MSG_WARNING:
+        ui->msgTextBrowser->setTextColor(Qt::darkYellow);
+        warningCounter++;
+        break;
+    case MSG_DEBUG:
+        ui->msgTextBrowser->setTextColor(Qt::gray);
+        break;
+    default:
+        ui->msgTextBrowser->setTextColor(messageColor);
+        break;
+    }
+    ui->msgTextBrowser->insertPlainText(msg);
+}
+
 int MainWindow::fitCallback(fit_stats stats)
 {
     if(!fitDialog) {
@@ -441,7 +446,7 @@ void MainWindow::on_action_Run_triggered()
             } else {
                 statusBar()->showMessage(QString("Running."));
             }
-            repaint();
+            //repaint();
             QCoreApplication::processEvents();
         }
         if(runLine(line) < 0) {
@@ -486,7 +491,8 @@ void MainWindow::plotSpectrum(size_t i_det)
     }
     const jabs_histogram *ref_histo = session->fit->ref;
     if(ref_histo) {
-        ui->widget->drawDataToChart("Reference", ref_histo->range, ref_histo->bin, ref_histo->n, QColor("Gray"));
+        QCPGraph *g = ui->widget->addGraphHisto("Reference", QColor("Gray"));
+        ui->widget->drawDataToGraph(g, ref_histo);
     }
     result_spectra *spectra = &session->fit->spectra[i_det];
     if(spectra) {
@@ -494,6 +500,9 @@ void MainWindow::plotSpectrum(size_t i_det)
         jabs_histogram *histo = NULL;
         int colorindex = 0;
         for(int i = 0; i < n_spectra; ++i) {
+            if(i == RESULT_SPECTRA_UNCERTAINTY_NEGATIVE || i == RESULT_SPECTRA_UNCERTAINTY_POSITIVE) {
+                continue;
+            }
             const result_spectrum *s = &spectra->s[i];
             if(!s || !s->histo || !s->histo->n) {
                 continue;
@@ -548,17 +557,27 @@ void MainWindow::plotSpectrum(size_t i_det)
                 case RESULT_SPECTRA_EXPERIMENTAL:
                     color = QColor("Black");
                     break;
+                case RESULT_SPECTRA_UNCERTAINTY_NEGATIVE:
+                    break;
+                case RESULT_SPECTRA_UNCERTAINTY_POSITIVE:
+                    break;
                 default:
                     color = SpectrumPlot::getColor(colorindex);
                     colorindex++;
                     break;
                 }
-                ui->widget->drawDataToChart(name, histo->range, histo->bin, histo->n, color);
-                ui->widget->setGraphVisibility(ui->widget->graph(), false);
+                QCPGraph *g = ui->widget->addGraphHisto(name, color);
+                ui->widget->drawDataToGraph(g, histo);
+                ui->widget->setGraphVisibility(g, false);
                 jabs_histogram_free(histo);
                 histo = NULL;
             }
         }
+    }
+
+    if(spectra->n_spectra > RESULT_SPECTRA_UNCERTAINTY_POSITIVE) {
+        qDebug() << "Trying to plot uncertainties.";
+        ui->widget->drawFilledDataToGraphs("Confidence limit", result_spectra_uncertainty_histo_negative(spectra), result_spectra_uncertainty_histo_positive(spectra), QColor(0, 0, 0, 50));
     }
     if(ui->widget->graphCount() == 0) {
         ui->widget->setVisible(false);
@@ -574,6 +593,7 @@ void MainWindow::plotSpectrum(size_t i_det)
         ui->widget->setGraphVisibility(ui->widget->graph(i), visibleGraphs.contains(name));
 
     }
+    qDebug() << "Going strong still";
     ui->widget->updateVerticalRange();
     ui->widget->replot();
 }
