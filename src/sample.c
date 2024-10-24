@@ -770,6 +770,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
         }
         if(range && (strcmp((*argv)[0], "rough") == 0 || strcmp((*argv)[0], "gamma") == 0)) {
             if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_LAYER_THICKNESS, (*argv)[1], &range->rough.x) < 0) {
+                jabs_message(MSG_WARNING, "Unit conversion or parsing of thickness (roughness) from \"%s\" failed.\n", (*argv)[1]);
                 sample_model_free(sm);
                 return NULL;
             } else {
@@ -798,12 +799,14 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             range->stragg = strtod((*argv)[1], NULL);
         } else if(range && strcmp((*argv)[0], "density") == 0) {
             if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_DENSITY, (*argv)[1], &range->density) < 0) {
+                jabs_message(MSG_WARNING, "Unit conversion or parsing of density from \"%s\" failed.\n", (*argv)[1]);
                 sample_model_free(sm);
                 return NULL;
             }
         } else {
             jibal_material *mat = jibal_material_create(jibal->elements, (*argv)[0]);
             if(!mat) {
+                jabs_message(MSG_WARNING, "Could not parse a valid material from string \"%s\".\n", (*argv)[0]);
                 DEBUGMSG("Material from formula \"%s\" was NOT created. Finishing after %zu ranges and %zu materials.", (*argv)[0], sm->n_ranges, sm->n_materials);
                 break;
             }
@@ -811,6 +814,7 @@ sample_model *sample_model_from_argv(const jibal *jibal, int * const argc, char 
             sm->materials[sm->n_ranges] = mat;
             range = &sm->ranges[sm->n_ranges];
             if(jabs_unit_convert(jibal->units, JIBAL_UNIT_TYPE_LAYER_THICKNESS, (*argv)[1], &range->x) < 0) {
+                jabs_message(MSG_WARNING, "Unit conversion or parsing of thickness from \"%s\" failed.\n", (*argv)[1]);
                 sample_model_free(sm);
                 return NULL;
             }
