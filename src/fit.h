@@ -14,10 +14,11 @@
 
 #ifndef JABS_FIT_H
 #define JABS_FIT_H
-
+#include <gsl/gsl_vector.h>
+#include <gsl/gsl_matrix.h>
 #include <gsl/gsl_multifit.h>
 #include <gsl/gsl_multifit_nlinear.h>
-#include <gsl/gsl_vector.h>
+
 #include <jibal.h>
 
 #include "simulation.h"
@@ -121,6 +122,7 @@ typedef struct fit_data {
     gsl_vector *f_iter;
     double h_df;
     jacobian_space *jspace;
+    gsl_matrix *covar; /* Covariance matrix */
 } fit_data;
 
 void fit_data_det_residual_vector_set(const fit_data_det *fdd, const jabs_histogram *histo_sum, gsl_vector *f);

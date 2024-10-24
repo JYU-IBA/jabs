@@ -93,6 +93,7 @@ script_command_status script_show_detector(struct script_session *s, int argc, c
 script_command_status script_show_fit(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_fit_variables(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_fit_ranges(struct script_session *s, int argc, char * const *argv);
+script_command_status script_show_fit_covar(script_session *s, int argc, char *const *argv);
 script_command_status script_show_reactions(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_sample(struct script_session *s, int argc, char * const *argv);
 script_command_status script_show_sample_profile(struct script_session *s, int argc, char * const *argv);

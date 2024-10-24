@@ -410,6 +410,10 @@ void fit_data_reset(fit_data *fit) {
     fit_data_fit_ranges_free(fit);
     fit_params_free(fit->fit_params);
     fit->fit_params = NULL;
+    if(fit->covar) {
+        gsl_matrix_free(fit->covar);
+        fit->covar = NULL;
+    }
     fit_data_spectra_free(fit);
 }
 
@@ -1077,7 +1081,7 @@ int fit(fit_data *fit) {
     }
     assert(i_w == fdf->n);
     fit->f_iter = gsl_vector_alloc(fdf->n);
-    gsl_matrix *covar = gsl_matrix_alloc(fit_params->n_active, fit_params->n_active);
+    fit->covar = gsl_matrix_alloc(fit_params->n_active, fit_params->n_active);
     gsl_vector *x = gsl_vector_alloc(fit_params->n_active);
 
     for(size_t i = 0; i < fit_params->n; i++) { /* Update all (including inactives) and set the (active) variable for each Jacobian parameter workspace */
@@ -1149,27 +1153,26 @@ int fit(fit_data *fit) {
     } else { /* Do final calculations when fit was successful */
         /* compute covariance of best fit parameters */
         J = gsl_multifit_nlinear_jac(w);
-        gsl_multifit_nlinear_covar(J, 0.0, covar);
+        gsl_multifit_nlinear_covar(J, 0.0, fit->covar);
 
         /* compute final cost */
         gsl_blas_ddot(f, f, &fit->stats.chisq);
         fit->stats.chisq_dof = fit->stats.chisq / fit->dof;
 
-        fit_parameters_update(fit_params, w, covar, fit->stats.chisq_dof);
+        fit_parameters_update(fit_params, w, fit->covar, fit->stats.chisq_dof);
         if(sample_model_renormalize(fit->sm)) {
             jabs_message(MSG_WARNING, "Could not renormalize concentrations of sample model after the fit.\n");
         }
         fit_parameters_update_changed(fit_params); /* sample_model_renormalize() can and will change concentration values, this will recompute error (assuming relative error stays the same) */
         fit_params_print_final(fit_params);
-        fit_covar_print(covar, MSG_VERBOSE);
+        fit_covar_print(fit->covar, MSG_VERBOSE);
         fit_data_print(fit, MSG_VERBOSE);
 #ifdef DEBUG
-        fit_uncertainty_print(fit, J, covar, f, &wts.vector, "errors.dat");
+        fit_uncertainty_print(fit, J, fit->covar, f, &wts.vector, "errors.dat");
 #endif
     }
     gsl_multifit_nlinear_free(w);
     gsl_vector_free(fit->f_iter);
-    gsl_matrix_free(covar);
     gsl_vector_free(x);
     free(weights);
     free(fdf);
