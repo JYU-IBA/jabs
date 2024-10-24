@@ -47,16 +47,17 @@ void PlotDialog::readSettings()
     }
     ui->showlegendCheckBox->setChecked(settings.value("showLegend", QVariant(true)).toBool());
     ui->legendOutsideCheckBox->setChecked(settings.value("legendOutside", QVariant(false)).toBool());
+    ui->confidencelimitsCheckBox->setChecked(settings.value("confidenceLimits", QVariant(false)).toBool());
 }
 
 void PlotDialog::saveSettings()
 {
-    qDebug() << "Saving settings";
     settings.setValue("plotWhileFitting", ui->plotWhileFittingCheckBox->isChecked());
     settings.setValue("showIsotopes", ui->isotopesCheckBox->isChecked());
     settings.setValue("plotIsotopesZ", ui->comboBox->currentData().toInt());
     settings.setValue("showLegend", ui->showlegendCheckBox->isChecked());
     settings.setValue("legendOutside", ui->legendOutsideCheckBox->isChecked());
+    settings.setValue("confidenceLimits", ui->confidencelimitsCheckBox->isChecked());
     emit settingsSaved();
 }
 

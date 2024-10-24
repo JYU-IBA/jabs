@@ -122,7 +122,6 @@ void SpectrumPlot::drawDataToGraph(QCPGraph *g, const jabs_histogram *h, bool en
 
 void SpectrumPlot::drawFilledDataToGraphs(const QString &name, const jabs_histogram *h_low, const jabs_histogram *h_high, const QColor &color) {
     if(!h_low || !h_high) {
-        qDebug() << "Got null for uncertainties.";
         return;
     }
     addGraph();

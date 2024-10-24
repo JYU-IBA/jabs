@@ -132,6 +132,7 @@ void MainWindow::readPlotSettings()
     ui->widget->setLegendVisible(settings.value("showLegend", QVariant(true)).toBool());
     ui->widget->setLegendOutside(settings.value("legendOutside", QVariant(false)).toBool());
     ui->widget->setEnergyAxis(settings.value("energyAxis", QVariant(false)).toBool());
+    confidenceLimits = settings.value("confidenceLimits", QVariant(false)).toBool();
     plotSession();
 }
 
@@ -496,13 +497,23 @@ void MainWindow::plotSpectrum(size_t i_det)
     }
     result_spectra *spectra = &session->fit->spectra[i_det];
     if(spectra) {
+        if(spectra->n_spectra > RESULT_SPECTRA_SIMULATED) {
+            QCPGraph *g = ui->widget->addGraphHisto("Simulated", QColor("blue"));
+            ui->widget->drawDataToGraph(g, result_spectra_simulated_histo(spectra));
+            ui->widget->setGraphVisibility(g, false);
+        }
+        if(spectra->n_spectra > RESULT_SPECTRA_EXPERIMENTAL) {
+            QCPGraph *g = ui->widget->addGraphHisto("Experimental", QColor("black"));
+            ui->widget->drawDataToGraph(g, result_spectra_experimental_histo(spectra));
+            ui->widget->setGraphVisibility(g, false);
+        }
+        if(confidenceLimits && spectra->n_spectra > RESULT_SPECTRA_UNCERTAINTY_POSITIVE) {
+            ui->widget->drawFilledDataToGraphs("Confidence limit", result_spectra_uncertainty_histo_negative(spectra), result_spectra_uncertainty_histo_positive(spectra), QColor(0, 0, 0, 50));
+        }
         size_t n_spectra = spectra->n_spectra;
         jabs_histogram *histo = NULL;
         int colorindex = 0;
-        for(int i = 0; i < n_spectra; ++i) {
-            if(i == RESULT_SPECTRA_UNCERTAINTY_NEGATIVE || i == RESULT_SPECTRA_UNCERTAINTY_POSITIVE) {
-                continue;
-            }
+        for(int i = RESULT_SPECTRA_N_FIXED; i < n_spectra; ++i) {
             const result_spectrum *s = &spectra->s[i];
             if(!s || !s->histo || !s->histo->n) {
                 continue;
@@ -549,23 +560,8 @@ void MainWindow::plotSpectrum(size_t i_det)
                         name.append(jibal_element_name(jibal->elements, Z_this));
                     }
                 }
-                QColor color;
-                switch(i) {
-                case RESULT_SPECTRA_SIMULATED:
-                    color = QColor("Blue");
-                    break;
-                case RESULT_SPECTRA_EXPERIMENTAL:
-                    color = QColor("Black");
-                    break;
-                case RESULT_SPECTRA_UNCERTAINTY_NEGATIVE:
-                    break;
-                case RESULT_SPECTRA_UNCERTAINTY_POSITIVE:
-                    break;
-                default:
-                    color = SpectrumPlot::getColor(colorindex);
-                    colorindex++;
-                    break;
-                }
+                QColor color = SpectrumPlot::getColor(colorindex);
+                colorindex++;
                 QCPGraph *g = ui->widget->addGraphHisto(name, color);
                 ui->widget->drawDataToGraph(g, histo);
                 ui->widget->setGraphVisibility(g, false);
@@ -575,10 +571,7 @@ void MainWindow::plotSpectrum(size_t i_det)
         }
     }
 
-    if(spectra->n_spectra > RESULT_SPECTRA_UNCERTAINTY_POSITIVE) {
-        qDebug() << "Trying to plot uncertainties.";
-        ui->widget->drawFilledDataToGraphs("Confidence limit", result_spectra_uncertainty_histo_negative(spectra), result_spectra_uncertainty_histo_positive(spectra), QColor(0, 0, 0, 50));
-    }
+
     if(ui->widget->graphCount() == 0) {
         ui->widget->setVisible(false);
         return;
@@ -587,13 +580,15 @@ void MainWindow::plotSpectrum(size_t i_det)
     if(ui->widget->visibleGraphs().isEmpty()) {
         visibleGraphs.append("Simulated");
         visibleGraphs.append("Experimental");
+        if(confidenceLimits) {
+            visibleGraphs.append("Confidence limit");
+        }
     }
     for(int i = 0; i < ui->widget->graphCount(); ++i) {
         QString name = ui->widget->graph(i)->name();
         ui->widget->setGraphVisibility(ui->widget->graph(i), visibleGraphs.contains(name));
 
     }
-    qDebug() << "Going strong still";
     ui->widget->updateVerticalRange();
     ui->widget->replot();
 }

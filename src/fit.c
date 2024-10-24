@@ -1027,20 +1027,16 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
     for(size_t i_det = 0; i_det < fit->n_det_spectra; i_det++) {
         result_spectra *spectra = &fit->spectra[i_det];
         const detector *det = sim_det(fit->sim, i_det);
-        fprintf(stderr, "Starting with %zu/%zu (%s)\n", i_det, fit->n_det_spectra, det->name);
         if(h_minus[i_det]) {
-            fprintf(stderr, "Minus ok, %zu channels.\n", h_plus[i_det]->n);
             calibration_apply_to_histogram(det->calibration, h_minus[i_det]);
             result_spectrum_set(&spectra->s[RESULT_SPECTRA_UNCERTAINTY_NEGATIVE], h_minus[i_det], "Confidence limit (-)", NULL, REACTION_NONE);
             jabs_histogram_free(h_minus[i_det]);
         }
         if(h_plus[i_det]) {
-            fprintf(stderr, "Plus ok, %zu channels.\n", h_plus[i_det]->n);
             calibration_apply_to_histogram(det->calibration, h_plus[i_det]);
             result_spectrum_set(&spectra->s[RESULT_SPECTRA_UNCERTAINTY_POSITIVE], h_plus[i_det], "Confidence limit (+)", NULL, REACTION_NONE);
             jabs_histogram_free(h_plus[i_det]);
         }
-        fprintf(stderr, "Over\n");
     }
     free(h_minus);
     free(h_plus);

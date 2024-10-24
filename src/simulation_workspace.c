@@ -252,7 +252,7 @@ void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
 }
 
 
-int sim_workspace_print_spectra(const result_spectra *spectra, const char *filename) {
+int sim_workspace_print_spectra(const result_spectra *spectra, const char *filename, int cl) {
     char sep = ' ';
     if(!spectra || spectra->n_spectra == 0) {
         jabs_message(MSG_ERROR, "No spectra!\n");
@@ -273,6 +273,9 @@ int sim_workspace_print_spectra(const result_spectra *spectra, const char *filen
             sep = ','; /* and set the separator! */
             fprintf(f, "\"Channel\",\"Energy (keV)\"");
             for(size_t i_spectrum = 0; i_spectrum < spectra->n_spectra; i_spectrum++) {
+                if(!cl && (i_spectrum == RESULT_SPECTRA_UNCERTAINTY_NEGATIVE || i_spectrum == RESULT_SPECTRA_UNCERTAINTY_POSITIVE)) { /* Don't output confidence limits if cl is false */
+                    continue;
+                }
                 fprintf(f, ",\"%s\"", spectra->s[i_spectrum].name);
             }
             fprintf(f, "\n");
@@ -290,6 +293,9 @@ int sim_workspace_print_spectra(const result_spectra *spectra, const char *filen
     for(size_t ch = 0; ch < n_ch; ch++) {
         fprintf(f, "%zu%c%.3lf", ch, sep, range[ch] / C_KEV); /* Channel, energy. TODO: Z-specific calibration can have different energy (e.g. for a particular reaction). */
         for(size_t j = 0; j < spectra->n_spectra; j++) {
+            if(!cl && (j == RESULT_SPECTRA_UNCERTAINTY_NEGATIVE || j == RESULT_SPECTRA_UNCERTAINTY_POSITIVE)) { /* Don't output confidence limits if cl is false */
+                continue;
+            }
             jabs_histogram *h = spectra->s[j].histo;
             if(!h || ch >= h->n) {
                 fprintf(f, "%c0", sep);

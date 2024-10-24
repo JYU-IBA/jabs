@@ -139,6 +139,7 @@ private:
     QAction *recentFileActs; /* array */
     bool showIsotopes;
     int plotIsotopesZ;
+    bool confidenceLimits;
     QSettings settings;
     QStringList visibleGraphs;
     int warningCounter;

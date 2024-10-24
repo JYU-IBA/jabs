@@ -55,7 +55,7 @@ void sim_workspace_calculate_sum_spectra(sim_workspace *ws);
 void sim_workspace_histograms_reset(sim_workspace *ws);
 size_t sim_workspace_histograms_calculate(sim_workspace *ws);
 void sim_workspace_histograms_scale(sim_workspace *ws, double scale);
-int sim_workspace_print_spectra(const result_spectra *spectra, const char *filename);
+int sim_workspace_print_spectra(const result_spectra *spectra, const char *filename, int cl);
 int sim_workspace_print_bricks(const sim_workspace *ws, const char *filename);
 #ifdef __cplusplus
 }
