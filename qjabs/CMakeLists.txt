@@ -165,6 +165,9 @@ target_link_libraries(qjabs
 
 if(OpenMP_C_FOUND)
     target_link_libraries(qjabs PUBLIC OpenMP::OpenMP_C)
+    if (MSVC)
+        add_compile_options(/openmp)
+    endif ()
 endif()
 
 install(TARGETS qjabs
