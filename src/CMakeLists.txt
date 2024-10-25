@@ -61,9 +61,6 @@ target_link_libraries(jabs
 
 if(OpenMP_C_FOUND)
     target_link_libraries(jabs PUBLIC OpenMP::OpenMP_C)
-    if (MSVC)
-        add_compile_options(/openmp)
-    endif ()
 endif()
 
 if(READLINE_FOUND)
