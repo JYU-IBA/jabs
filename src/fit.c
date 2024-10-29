@@ -989,7 +989,7 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
         const jabs_histogram *h_uncertainty_low = h_minus[roi->i_det];
         const jabs_histogram *h_uncertainty_high = h_plus[roi->i_det];
 
-        for(size_t ch = roi->low; ch <= roi->high; ch++) {
+        for(size_t ch = roi->low; ch <= roi->high && ch < sim->n && ch < exp->n; ch++) {
             double sim_counts = jabs_histogram_get(sim, ch);
             double exp_counts = jabs_histogram_get(exp, ch);
 
