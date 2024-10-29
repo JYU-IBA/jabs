@@ -2,12 +2,12 @@
 set ion 4He
 set energy "3.035 MeV"
 set energy_broad "0 keV"
-set emin "150 keV"
-set fluence 5.4e12
-set det theta "160 deg" solid 70msr calib slope 2.00keV offset 10keV reso 20keV
+set emin 100keV
+set fluence 5.0e12
+set det theta "160 deg" solid 70msr calib slope 2.01keV offset 10keV reso 20keV
 set det foil Si 150tfu
 set alpha "0 deg"
-set sample Au 32.5tfu rough 30tfu SiO2 6680tfu Si 20000tfu yield 0.96
+set sample Au 40tfu rough 30tfu n_rough 20 SiO2 6000tfu Si 20000tfu yield 0.96
 load exp "rbs_114.dat"
 #Adding reactions is optional. If no reactions are specified, RBS and ERD reactions are added automatically. Reactions that are not possible are not calculated!
 add reactions RBS
@@ -22,12 +22,21 @@ load reaction "sigmacalc_16O_alpha_alpha_16O_160deg.r33"
 #Accurate mode employs adaptive integration to achieve higher accuracy when cross sections have structure and when weighting of cross sections by straggling is important. Some other approximations are also neglected. Disadvantage: it's slow. Uncomment next line to enable.
 #set sim accurate
 
-simulate
+#Improved accuracy may also be achieved without adaptive integration, this simply tunes many parameters to be quite conservative. Might be about twice as slow as defaults (so still fast enough).
+#set sim improved
+
+
+#Uncomment the following two lines just to simulate (exit does not exit from GUI)
+#simulate
+#exit
+
+#Add two ROIs
 add fit range [250:950] [1370:1420]
 
-#We skip the fast fit phase, since the lower accuracy simulation is counterproductive */
+#We skip the fast fit phase, since the lower accuracy simulation is counterproductive. 
 set fit slow
 
 fit *calib*,fluence,energy,yield3,thick1,rough1,thick2
 save spectra "non_rutherford_out.csv"
 show fit
+#show fit correlation
