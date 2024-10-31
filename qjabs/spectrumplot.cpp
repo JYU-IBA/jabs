@@ -131,6 +131,8 @@ void SpectrumPlot::drawFilledDataToGraphs(const QString &name, const jabs_histog
     graph_low->setLayer("background");
     graph_high->setLayer("background");
     graph_low->setLineStyle(QCPGraph::lsLine);
+    graph_low->setBrush(color);
+    graph_low->setPen(color);
     graph_high->setLineStyle(QCPGraph::lsLine);
     graph_low->removeFromLegend();
     graph_low->setVisible(false);
