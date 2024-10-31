@@ -991,12 +991,9 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
         const jabs_histogram *exp = result_spectra_experimental_histo(s);
         const jabs_histogram *h_uncertainty_low = h_minus[roi->i_det];
         const jabs_histogram *h_uncertainty_high = h_plus[roi->i_det];
-        if(!exp || !sim) {
-            continue;
-        }
         for(size_t ch = roi->low; ch <= roi->high; ch++) {
-            double sim_counts = jabs_histogram_get(sim, ch);
-            double exp_counts = jabs_histogram_get(exp, ch);
+            double sim_counts = sim ? jabs_histogram_get(sim, ch) : 0.0;
+            double exp_counts = exp ? jabs_histogram_get(exp, ch) : 0.0;
 
             double weight = gsl_vector_get(w, i_vec); /* Fit weight (1/variance, i.e. 1 / N_exp in bin) */
             double err = gsl_vector_get(&err_vec.vector, i_vec); /* Something(J * C * J^T diagonal), should be standard error of the fit, i.e. how much do the (statistical) errors in parameters propagated to this particular bin give us uncertainty. This is probably variance. */
@@ -1007,7 +1004,7 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
             if(error_negative < 0.0) {
                 error_negative = 0.0;
             }
-            if(ch < sim->n) {
+            if(sim && ch < sim->n) {
                 h_uncertainty_high->bin[ch] = error_positive;
                 h_uncertainty_low->bin[ch] = error_negative;
             }
