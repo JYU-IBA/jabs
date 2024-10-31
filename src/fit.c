@@ -962,7 +962,7 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
     }
     gsl_matrix *JC = gsl_matrix_alloc(J->size1, covar->size2); /* Product of J*C */
     gsl_matrix *JCJT = gsl_matrix_alloc(J->size1, J->size1); /* Product J*C*JT */
-    gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, J, covar, 0.0, JC);
+    gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, J, covar, 0.0, JC); /* TODO: we can probably optimize these matrix multiplications, since eventually we are only interested about the diagonal */
     gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, JC, J, 0.0, JCJT);
     gsl_vector_view err_vec = gsl_matrix_diagonal(JCJT);
     size_t i_vec = 0;
@@ -971,8 +971,11 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
     for(size_t i_det = 0; i_det < fit->n_det_spectra; i_det++) {
         for(size_t i_roi = 0; i_roi < fit->n_fit_ranges; i_roi++) {
             const roi *roi = &fit->fit_ranges[i_roi];
-            const result_spectra *s = &(fit->spectra[roi->i_det]);
+            const result_spectra *s = &(fit->spectra[i_det]);
             const jabs_histogram *sim = result_spectra_simulated_histo(s);
+            if(!sim) {
+                continue;
+            }
             if(roi->i_det == i_det) {
                 h_minus[i_det] = jabs_histogram_alloc(sim->n);
                 h_plus[i_det] = jabs_histogram_alloc(sim->n);
@@ -988,8 +991,10 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
         const jabs_histogram *exp = result_spectra_experimental_histo(s);
         const jabs_histogram *h_uncertainty_low = h_minus[roi->i_det];
         const jabs_histogram *h_uncertainty_high = h_plus[roi->i_det];
-
-        for(size_t ch = roi->low; ch <= roi->high && ch < sim->n && ch < exp->n; ch++) {
+        if(!exp || !sim) {
+            continue;
+        }
+        for(size_t ch = roi->low; ch <= roi->high; ch++) {
             double sim_counts = jabs_histogram_get(sim, ch);
             double exp_counts = jabs_histogram_get(exp, ch);
 
@@ -1002,8 +1007,10 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
             if(error_negative < 0.0) {
                 error_negative = 0.0;
             }
-            h_uncertainty_high->bin[ch] = error_positive;
-            h_uncertainty_low->bin[ch] = error_negative;
+            if(ch < sim->n) {
+                h_uncertainty_high->bin[ch] = error_positive;
+                h_uncertainty_low->bin[ch] = error_negative;
+            }
             if(f_errvec) {
                 double residuals_weighted = gsl_vector_get(f, i_vec);  /* Residuals (with weights sqrt(W)) */
                 double residuals_unweighted = exp_counts - sim_counts;
@@ -1027,6 +1034,7 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
     for(size_t i_det = 0; i_det < fit->n_det_spectra; i_det++) {
         result_spectra *spectra = &fit->spectra[i_det];
         const detector *det = sim_det(fit->sim, i_det);
+        jabs_message(MSG_INFO, "Shit %zu.", i_det);
         if(h_minus[i_det]) {
             calibration_apply_to_histogram(det->calibration, h_minus[i_det]);
             result_spectrum_set(&spectra->s[RESULT_SPECTRA_UNCERTAINTY_NEGATIVE], h_minus[i_det], "Confidence limit (-)", NULL, REACTION_NONE);
