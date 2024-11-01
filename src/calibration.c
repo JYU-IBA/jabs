@@ -18,6 +18,9 @@ calibration *calibration_init(void) {
         return NULL;
     c->f = calibration_none;
     c->type = CALIBRATION_NONE;
+    c->resolution = 0.0;
+    c->resolution_variance = 0.0;
+    c->resolution_slope = 0.0;
     return c;
 }
 
@@ -65,8 +68,6 @@ calibration *calibration_init_linear(void) {
         return NULL;
     }
     c->params = p;
-    c->resolution = 0.0;
-    c->resolution_variance = 0.0;
     return c;
 }
 
@@ -143,10 +144,14 @@ size_t calibration_inverse(const calibration *cal, double E, size_t ch_max) {
         return 0;
     }
 }
-int calibration_set_param(calibration *c, int i, double value) {
+int calibration_set_param(calibration *c, const int i, const double value) {
     if(!c || !c->params)
         return EXIT_FAILURE;
     if(i < 0) {
+        if(i == CALIBRATION_PARAM_RESOLUTION_SLOPE) {
+            c->resolution_slope = value;
+            return EXIT_SUCCESS;
+        }
         if(i == CALIBRATION_PARAM_RESOLUTION) {
             c->resolution = value;
             return EXIT_SUCCESS;
@@ -203,6 +208,9 @@ size_t calibration_get_number_of_params(const calibration *c) { /* Number does n
 double *calibration_get_param_ref(calibration *c, int i) {
     if(!c || !c->params)
         return NULL;
+    if(i == CALIBRATION_PARAM_RESOLUTION_SLOPE) {
+        return &(c->resolution_slope);
+    }
     if(i == CALIBRATION_PARAM_RESOLUTION) {
         return &(c->resolution);
     }
@@ -235,7 +243,7 @@ int calibration_copy_params(calibration *dst, const calibration *src) {
     size_t n_dst = calibration_get_number_of_params(dst);
     size_t n_src = calibration_get_number_of_params(src);
     size_t n = n_dst < n_src ? n_dst : n_src;
-    for(int i = CALIBRATION_PARAM_RESOLUTION; i < (int)n; i++) { /* Loop includes resolution. Note that the parameters are copied over as-is. This works with linear and poly, but maybe not with others. */
+    for(int i = CALIBRATION_PARAM_RESOLUTION_SLOPE; i < (int)n; i++) { /* Loop includes resolution parameters. Note that the parameters are copied over as-is. This works with linear and poly, but maybe not with others. */
         calibration_set_param(dst, i , calibration_get_param(src, i));
     }
     return EXIT_SUCCESS;
@@ -275,6 +283,9 @@ char *calibration_param_name(calibration_type type, calibration_param_type i) {
     (void) type; /* We could use the calibration type to give different names for different parameters */
     char *s = NULL;
     switch(i) {
+        case CALIBRATION_PARAM_RESOLUTION_SLOPE:
+            s = "rslope";
+        break;
         case CALIBRATION_PARAM_RESOLUTION:
             s = "resolution";
             break;

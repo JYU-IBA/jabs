@@ -84,6 +84,10 @@ int detector_sanity_check(const detector *det, size_t n_channels) {
         jabs_message(MSG_ERROR, "Warning: detector resolution (%g) is negative or not finite.\n", det->calibration->resolution);
         return -1;
     }
+    if(det->calibration->resolution_slope < 0.0) {
+        jabs_message(MSG_ERROR, "Resolution slope is negative (%g), usually it should be positive\n", det->calibration->resolution_slope);
+        return -1;
+    }
     if(calibration_is_monotonically_increasing(det->calibration, n_channels) == FALSE) {
         jabs_message(MSG_ERROR, "Warning: detector default calibration is not monotonically increasing! (is slope, %g keV/ch, negative? are %zu channels too much?)\n", calibration_get_param(det->calibration, CALIBRATION_PARAM_SLOPE) / C_KEV, n_channels);
         return -1;
@@ -128,6 +132,7 @@ detector *detector_default(detector *det) {
     det->calibration_Z = NULL;
     calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, ENERGY_SLOPE_DEFAULT);
     calibration_set_param(det->calibration, CALIBRATION_PARAM_RESOLUTION, DETECTOR_RESOLUTION_DEFAULT);
+    calibration_set_param(det->calibration, CALIBRATION_PARAM_RESOLUTION_SLOPE, 0.0);
     return det;
 }
 
@@ -277,7 +282,7 @@ double detector_resolution(const detector *det, const jibal_isotope *isotope, do
         case DETECTOR_NONE:
             return 0.0;
         case DETECTOR_ENERGY:
-            return c->resolution_variance;
+            return c->resolution_variance + c->resolution_slope * E;
         case DETECTOR_TOF:
             return c->resolution_variance * pow3(2*E)/(pow2(det->length)*isotope->mass);
         case DETECTOR_ELECTROSTATIC:
@@ -293,6 +298,12 @@ char *detector_resolution_to_string(const detector *det, int Z) {
     if(asprintf(&out, "%.4g%s", resolution/detector_param_unit_factor(det), detector_param_unit(det)) < 0) {
         return NULL;
     }
+    double resolution_slope = calibration_get_param(c, CALIBRATION_PARAM_RESOLUTION_SLOPE);
+    if(resolution_slope > 0.0) {
+        if(asprintf_append(&out, " rslope %.4g%s", resolution_slope/detector_param_unit_factor(det), detector_param_unit(det)) < 0) {
+            return NULL;
+        }
+    }
     return out;
 }
 
@@ -301,7 +312,7 @@ void detector_update(detector *det) {
         return;
     }
     det->calibration->resolution_variance = pow2(det->calibration->resolution/C_FWHM);
-    DEBUGMSG("Updating detector, resolution = %g keV FWHM, variance = %g", det->calibration->resolution/C_KEV, det->calibration->resolution_variance);
+    DEBUGMSG("Updating detector, resolution = %g keV FWHM, variance = %g, slope = %g keV", det->calibration->resolution/C_KEV, det->calibration->resolution_variance, det->calibration->resolution_slope);
     for(int Z = 0; Z  <= (int)det->cal_Z_max; Z++) {
         calibration *c = det->calibration_Z[Z];
         if(!c || c == det->calibration) {

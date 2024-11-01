@@ -37,6 +37,7 @@ static const jibal_option calibration_option[] = {
 };
 
 typedef enum calibration_param_type {
+    CALIBRATION_PARAM_RESOLUTION_SLOPE = -2,
     CALIBRATION_PARAM_RESOLUTION = -1,
     CALIBRATION_PARAM_OFFSET = 0,
     CALIBRATION_PARAM_SLOPE = 1,
@@ -49,6 +50,7 @@ typedef struct calibration {
     void *params;
     double resolution; /* Stored as FWHM in relevant SI units. Note that can be e.g. energy or time depending on detector type. */
     double resolution_variance; /* Calculated based on "resolution" before needed by detector_update(). */
+    double resolution_slope; /* resolution (variance) = resolution_variance + resolution_slope * E, so resolution_slope should be in units of energy (could be e.g. product of Fano factor and W-value) */
 } calibration;
 
 typedef struct calibration_params_linear {
