@@ -1,3 +1,4 @@
 *.user
 qcustomplot.cpp
 qcustomplot.h
+.idea/
