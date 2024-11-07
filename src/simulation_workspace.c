@@ -100,7 +100,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     }
 
     if(detector_sanity_check(det, ws->n_channels)) {
-        jabs_message(MSG_ERROR, "Detector %zu failed sanity check!", det->name);
+        jabs_message(MSG_ERROR, "Detector \"%s\" failed sanity check!\n", det->name);
         free(ws);
         return NULL;
     }
