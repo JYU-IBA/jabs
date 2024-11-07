@@ -146,18 +146,41 @@ reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incid
         return NULL;
     }
     reaction_type type = reaction_type_from_string((*argv)[0]);
-    const jibal_isotope *target = jibal_isotope_find(jibal->isotopes, (*argv)[1], 0, 0);
+    (*argc) -= 1;
+    (*argv) += 1;
     if(type == REACTION_NONE) {
         jabs_message(MSG_ERROR, "This is not a valid reaction type: \"%s\".\n", (*argv)[0]);
         return NULL;
     }
-    if(!target) {
-        jabs_message(MSG_ERROR, "This is not a valid isotope: \"%s\".\n", (*argv)[1]);
+    reaction *r = NULL;
+    if(type == REACTION_FILE) {
+        const char *filename = (*argv)[0];
+        r33_file *rfile = r33_file_read(filename);
+        if(!rfile) {
+            jabs_message(MSG_ERROR, "Could not load R33 from file \"%s\".\n", filename);
+            return NULL;
+        }
+        r = r33_file_to_reaction(jibal->isotopes, rfile);
+        r33_file_free(rfile);
+        (*argc) -= 1;
+        (*argv) += 1;
+    } else if(type == REACTION_RBS || type ==REACTION_RBS_ALT || type == REACTION_ERD) {
+        const jibal_isotope *target = jibal_isotope_find(jibal->isotopes, (*argv)[0], 0, 0);
+
+        if(!target) {
+            jabs_message(MSG_ERROR, "This is not a valid isotope: \"%s\".\n", (*argv)[1]);
+            return NULL;
+        }
+        r = reaction_make(incident, target, type, JABS_CS_NONE); /* Warning: JABS_CS_NONE used here, something sane must be supplied after this somewhere! */
+        (*argc) -= 1;
+        (*argv) += 1;
+    }
+
+    if(!r) {
+        jabs_message(MSG_ERROR, "Could not make a reaction.\n");
         return NULL;
     }
-    reaction *r = reaction_make(incident, target, type, JABS_CS_NONE); /* Warning: JABS_CS_NONE used here, something sane must be supplied after this somewhere! */
-    (*argc) -= 2;
-    (*argv) += 2;
+
     if(reaction_modifiers_from_argv(jibal, r, argc, argv)) {
         reaction_free(r);
         return NULL;

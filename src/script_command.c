@@ -2712,7 +2712,6 @@ script_command_status script_kinematics(struct script_session *s, int argc, char
     jabs_message(MSG_INFO, "Detector name | theta |  product |   energy | channel | cross section\n");
     jabs_message(MSG_INFO, "              |   deg |          |      keV |         |         mb/sr\n");
     for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
-
         const detector *det = sim->det[i_det];
         if(reaction_is_possible(r, sim->params, det->theta)) {
             sim_reaction *sim_r = calloc(1, sizeof(sim_reaction)); /* We skip initializing the complete reaction, just use parts of it */

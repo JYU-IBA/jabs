@@ -145,10 +145,9 @@ int sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_c
 
 int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
     jabs_reaction_cs cs = sim_r->r->cs;
-    size_t n;
     sim_reaction_reset_screening_table(sim_r);
     scatint_params *sp = NULL;
-    n = SCREENING_TABLE_ELEMENTS; /* TODO: make more clever */
+    size_t n = SCREENING_TABLE_SIZE; /* TODO: make more clever */
     potential_type pt = POTENTIAL_NONE;
     switch(cs) { /* Set potential type for those cross sections that use scatint (= numerical scattering integral solver). If analytical solution is used (e.g. Andersen), keep as POTENTIAL_NONE */
         case JABS_CS_ANDERSEN:
