@@ -564,7 +564,7 @@ fit_params *fit_params_all(fit_data *fit) {
             size_t n = calibration_get_number_of_params(c);
             for(int i = CALIBRATION_PARAM_RESOLUTION_SLOPE; i < (int) n; i++) {
                 if(i < 0 && calibration_get_param(c, i) == 0.0) {
-                    DEBUGMSG("Fit variable %i omitted, since it is zero.\n");
+                    DEBUGMSG("Fit variable %i omitted, since it is zero.\n", i);
                     continue;
                 }
                 char *calib_param_name = calibration_param_name(c->type, i);
