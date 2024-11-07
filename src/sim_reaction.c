@@ -336,18 +336,14 @@ void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *inci
         assert(incident->E > 1.0 * C_EV && incident->E < 1000.0 * C_MEV);
         r->p.E = incident->E * r->K;
         r->p.S = incident->S * pow2(r->K);
-#ifdef DEBUG_VERBOSE
-        fprintf(stderr, "Product energy %g keV, eloss straggling %g keV FWHM. Calculated using K = %g\n", r->p.E/C_KEV, C_FWHM * sqrt(r->p.S) / C_KEV, r->K);
-#endif
+        DEBUGVERBOSEMSG("Product energy %g keV, eloss straggling %g keV FWHM. Calculated using K = %g\n", r->p.E/C_KEV, C_FWHM * sqrt(r->p.S) / C_KEV, r->K);
         return;
     }
     r->p.E = reaction_product_energy(r->r, r->theta, incident->E);
-    double epsilon = 0.001*C_KEV;
-    double deriv = (reaction_product_energy(r->r, r->theta, incident->E+epsilon) - r->p.E)/(epsilon); /* TODO: this derivative could be solved analytically */
+    const double epsilon = 0.001*C_KEV;
+    double deriv = (reaction_product_energy(r->r, r->theta, incident->E+epsilon) - reaction_product_energy(r->r, r->theta, incident->E-epsilon))/(2.0 * epsilon); /* TODO: this derivative could be solved analytically */
     r->p.S = incident->S * pow2(deriv) * incident->E;
-#ifdef DEBUG_VERBOSE
-    fprintf(stderr, "deriv %g, E_out/E %g, E_out = %g keV, E = %g keV\n", deriv, r->p.E / incident->E, r->p.E/C_KEV, incident->E/C_KEV);
-#endif
+    DEBUGVERBOSEMSG("deriv %g, E_out/E %g, E_out = %g keV, E = %g keV\n", deriv, r->p.E / incident->E, r->p.E/C_KEV, incident->E/C_KEV);
 }
 
 void sim_reaction_print_bricks(FILE *f, const sim_reaction *r, double psr) {

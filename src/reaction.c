@@ -353,14 +353,19 @@ int reaction_compare(const void *a, const void *b) {
 double reaction_product_energy(const reaction *r, double theta, double E) { /* Hint: call with E == 1.0 to get kinematic factor. Note that this function does not check if reaction is possible and may return "nan". */
     const double Q = r->Q;
     if(Q == 0.0) {
-        if(r->type == REACTION_RBS || r->type == REACTION_RBS_ALT) {
-            if(r->type == REACTION_RBS_ALT) {
-                return jibal_kin_rbs(r->incident->mass, r->target->mass, theta, '-') * E;
-            } else {
+        switch (r->type) {
+            case REACTION_RBS:
                 return jibal_kin_rbs(r->incident->mass, r->target->mass, theta, '+') * E;
-            }
-        }  else if(r->type == REACTION_ERD) {
-            return jibal_kin_erd(r->incident->mass, r->target->mass, theta)*E;
+            case REACTION_RBS_ALT:
+                return jibal_kin_rbs(r->incident->mass, r->target->mass, theta, '-') * E;
+            case REACTION_ERD:
+                return jibal_kin_erd(r->incident->mass, r->target->mass, theta) * E;
+            case REACTION_NONE:
+                return 0.0;
+            case REACTION_PLUGIN: /* Should we do something here? */
+                break;
+            case REACTION_FILE: /* General case for NRA below */
+            break;
         }
     }
     const double m1 = r->incident->mass;
@@ -371,12 +376,12 @@ double reaction_product_energy(const reaction *r, double theta, double E) { /* H
     double a13 = ((m1 * m3)/((m1 + m2)*(m3 + m4))) * (E / E_total);
     double a24 = ((m2 * m4)/((m1 + m2)*(m3 + m4))) * (1 + (m1/m2) * Q / E_total);
     if(a13 > a24) {
-        double theta_max = sqrt(asin(a24/a13));
+        const double theta_max = sqrt(asin(a24/a13));
         if(theta > theta_max) {
             return 0.0;
         }
     }
-    double E_out = E_total * a13 * pow2(cos(theta) + sqrt(a24/a13 - pow2(sin(theta)))); /* Solution with '-' is ignored. */
+    const double E_out = E_total * a13 * pow2(cos(theta) + sqrt(a24/a13 - pow2(sin(theta)))); /* Solution with '-' is ignored. */
     return E_out;
 }
 
