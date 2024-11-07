@@ -1001,8 +1001,8 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
 
             double weight = gsl_vector_get(w, i_vec); /* Fit weight (1/variance, i.e. 1 / N_exp in bin) */
             double err = gsl_vector_get(&err_vec.vector, i_vec); /* Something(J * C * J^T diagonal), should be standard error of the fit, i.e. how much do the (statistical) errors in parameters propagated to this particular bin give us uncertainty. This is probably variance. */
-            double error_fit_final = 2.0 * sqrt(err) * sqrt(sim_counts); /* 2 sigma, TODO: sqrt(sim_counts)? Why? Looks ok... */
-            double error_prediction_final = 2.0 * sqrt(err + weight) * sqrt(sim_counts); /*  2 sigma, "asymptotic standard prediction error", "reflects the standard error of the fit as well as the measurement error." */
+            double error_fit_final = 1.96 * sqrt(err) * sqrt(sim_counts); /* 2 sigma, TODO: sqrt(sim_counts)? Why? Looks ok... */
+            double error_prediction_final = 1.96 * sqrt(err + weight) * sqrt(sim_counts); /*  1.96 sigma, "asymptotic standard prediction error", "reflects the standard error of the fit as well as the measurement error.", 95 % CL */
             double error_positive = sim_counts + error_prediction_final;
             double error_negative = sim_counts - error_prediction_final;
             if(error_negative < 0.0) {
@@ -1119,10 +1119,10 @@ int fit(fit_data *fit) {
         assert(range);
         jabs_histogram *exp = fit_data_exp(fit, range->i_det);
         for(size_t i = range->low; i <= range->high && i < exp->n; i++) {
-            if(exp->bin[i] > 1.0) {
-                weights[i_w] = 1.0 / (exp->bin[i]);
+            if(exp->bin[i] > 4.0) {
+                weights[i_w] = 1.0 / (exp->bin[i]); /* Weight is 1/sigma^2 */
             } else {
-                weights[i_w] = 1.0; /* TODO: ?*/
+                weights[i_w] = 1.0 / 4.0; /* sigma = 2 for N_exp <= 4 is the approximation used by SIMNRA */
             }
             i_w++;
         }
