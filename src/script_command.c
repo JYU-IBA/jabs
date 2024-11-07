@@ -188,6 +188,10 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
         detector *det = fit->sim->det[i_det];
         detector_update(det);
         sim_workspace *ws = sim_workspace_init(s->jibal, fit->sim, det);
+        if(!ws) {
+            jabs_message(MSG_ERROR, "Could not initialize workspace of detector %s.\n", det->name);
+            return SCRIPT_COMMAND_FAILURE;
+        }
         if(simulate_with_ds(ws)) {
             jabs_message(MSG_ERROR, "Simulation failed.\n");
             sim_workspace_free(ws);
@@ -612,7 +616,7 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
 
 script_command_status script_set_detector_calibration_val(struct script_session *s, int val, int argc, char *const *argv) {
     (void) argv;
-    DEBUGMSG("Active detector is %zu.", s->i_det_active);
+    DEBUGMSG("Active detector is %zu, active Z is %i.", s->i_det_active, s->Z_active);
     detector *det = sim_det(s->fit->sim, s->i_det_active);
     if(!det) {
         jabs_message(MSG_ERROR, "Detector %zu does not exist.\n", s->i_det_active);
@@ -645,6 +649,7 @@ script_command_status script_set_detector_calibration_val(struct script_session 
     if(jabs_unit_convert(s->jibal->units, JIBAL_UNIT_TYPE_ANY, argv[0], &value_dbl) < 0) {
         return SCRIPT_COMMAND_FAILURE;
     }
+    DEBUGMSG("Detector calibration val '%c' should be set to %g", val, value_dbl);
     switch(val) {
         case 's': /* slope */
             if(calibration_set_param(c, CALIBRATION_PARAM_SLOPE, value_dbl)) {
