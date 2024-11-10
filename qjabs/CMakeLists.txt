@@ -37,7 +37,9 @@ include(../gitwatcher/git_watcher_config.cmake)
 
 configure_file(version.h.in version.h @ONLY)
 
-find_package(Qt6 COMPONENTS Widgets REQUIRED PrintSupport REQUIRED Svg REQUIRED)
+find_package(Qt6 REQUIRED COMPONENTS Widgets PrintSupport Svg DBus)
+#PrintSupport is required by PDF saving in QCustomPlot
+#Without DBus support macdeployqt (as installed by homebrew) doesn't make a working executable
 
 if(${QT_VERSION_MAJOR} NOT EQUAL 6)
     message("Qt major version is ${QT_VERSION_MAJOR}. This program is only for Qt6.")
@@ -155,6 +157,7 @@ target_link_libraries(qjabs
     PRIVATE Qt6::Widgets
     PRIVATE Qt6::PrintSupport
     PRIVATE Qt6::Svg
+    PRIVATE Qt6::DBus
     PRIVATE jibal
     PRIVATE GSL::gsl
     PRIVATE LibXml2::LibXml2
