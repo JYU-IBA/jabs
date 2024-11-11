@@ -2682,6 +2682,9 @@ script_command_status script_idf2jbs(struct script_session *s, int argc, char * 
         jabs_message(MSG_ERROR, "IDF2JBS failed with error code %i (%s).\n", idferr, idf_error_code_to_str(idferr));
     }
     free(filename_out);
+    if(idferr != IDF2JBS_SUCCESS) {
+        return SCRIPT_COMMAND_FAILURE;
+    }
     argc--;
     argv++;
     return argc_orig - argc;
