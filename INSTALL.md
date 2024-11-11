@@ -85,7 +85,8 @@ tar zxvf jibal_data.tar.gz -C "$HOME/.jibal"
         $ brew tap JYU-IBA/iba
         $ brew install jabs-cli
 
-3. If you want to develop JaBS and not just use it, follow Linux instructions above, install *libxml2*, *readline* and *qt6* using Homebrew. Installing *libomp* from homebrew is also recommended to enable OpenMP parallel processing. You may need to set the *OpenMP_ROOT* environment variable to get CMake to find it on Apple silicon, like this:
+3. Stopping data is bundled with JaBS binary versions, but you need to download that separately for Homebrew installations. See [JIBAL instructions](http://users.jyu.fi/~jaakjuli/jibal/) and the end of the Linux instructions above.
+4. If you want to develop JaBS and not just use it, follow Linux instructions above, install *libxml2*, *readline* and *qt6* using Homebrew. Installing *libomp* from homebrew is also recommended to enable OpenMP parallel processing. You may need to set the *OpenMP_ROOT* environment variable to get CMake to find it on Apple silicon, like this:
 
         $ export OpenMP_ROOT="/opt/homebrew/opt/libomp/"
 

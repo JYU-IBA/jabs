@@ -24,9 +24,17 @@ Please see additional notes regarding copyrights of included open source code at
 Additional information and resources might be available on [JaBS home page](http://users.jyu.fi/~jaakjuli/jabs/).
 
 ## Binary packages
-Some ready-to-use binary packages for each [release](https://github.com/JYU-IBA/jabs/releases) for Windows and macOS may be available. The Windows distribution includes two executables: `jabs.exe` (command line) and `qjabs.exe` (graphical interface). The macOS binary is a regular application bundle. All necessary data files (stopping etc.) are included in these distributions.
+Supported platforms are Windows, macOS and Linux.
 
-See instructions below on how to compile JaBS from sources. Supported platforms are Windows, macOS and Linux.
+Some ready-to-use binary packages for each [release](https://github.com/JYU-IBA/jabs/releases) for Windows and macOS are be available.
+The Windows distribution includes two executables: `jabs.exe` (command line) and `qjabs.exe` (graphical interface).
+No installation is required and all necessary data files are included.
+
+The macOS binary is a disk image (dmg) of a regular application bundle (.app).
+All necessary data files (stopping etc.) are included in these distributions, but the command line version is not.
+You can install (compile) this with Homebrew if you want to, see see [instructions](INSTALL.md) on how to compile JaBS from sources. Since the application is from an unregistered developer, you have to follow Apple instructions on [how to open a Mac app from an unknown developer](https://support.apple.com/en-gb/guide/mac-help/mh40616/mac).
+
+JaBS is tested on Linux, but binary packages are not currently available, but you can easily install JaBS from sources or you can contact the author for binaries.
 
 ## Getting started
 
