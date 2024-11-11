@@ -47,7 +47,7 @@ void PlotDialog::readSettings()
     }
     ui->showlegendCheckBox->setChecked(settings.value("showLegend", QVariant(true)).toBool());
     ui->legendOutsideCheckBox->setChecked(settings.value("legendOutside", QVariant(false)).toBool());
-    ui->confidencelimitsCheckBox->setChecked(settings.value("confidenceLimits", QVariant(false)).toBool());
+    ui->confidencelimitsCheckBox->setChecked(settings.value("confidenceLimits", QVariant(true)).toBool());
 }
 
 void PlotDialog::saveSettings()

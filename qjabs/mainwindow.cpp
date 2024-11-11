@@ -132,7 +132,7 @@ void MainWindow::readPlotSettings()
     ui->widget->setLegendVisible(settings.value("showLegend", QVariant(true)).toBool());
     ui->widget->setLegendOutside(settings.value("legendOutside", QVariant(false)).toBool());
     ui->widget->setEnergyAxis(settings.value("energyAxis", QVariant(false)).toBool());
-    confidenceLimits = settings.value("confidenceLimits", QVariant(false)).toBool();
+    confidenceLimits = settings.value("confidenceLimits", QVariant(true)).toBool();
     plotSession();
 }
 

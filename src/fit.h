@@ -113,6 +113,7 @@ typedef struct fit_data {
     double xtol; /* Tolerance of step size */
     double chisq_tol; /* Chi squared relative change tolerance */
     double chisq_fast_tol; /* Chi squared relative change tolerance (fast phase) */
+    int cl; /* Calculate confidence limits */
     gsl_multifit_nlinear_fdf *fdf;
     size_t dof; /* Degrees of freedom (calculated) */
     struct fit_stats stats; /* Fit statistics, updated as we iterate */

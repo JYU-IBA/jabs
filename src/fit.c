@@ -356,6 +356,7 @@ void fit_data_defaults(fit_data *f) {
     f->chisq_fast_tol = FIT_FAST_CHISQ_TOL;
     f->phase_start = FIT_PHASE_FAST;
     f->phase_stop = FIT_PHASE_SLOW;
+    f->cl = FALSE;
 }
 
 int fit_data_jspace_init(fit_data *fit, size_t n_channels_in_fit) {
@@ -1221,12 +1222,14 @@ int fit(fit_data *fit) {
         fit_params_print_final(fit_params);
         fit_correlation_print(fit->covar, MSG_VERBOSE);
         fit_data_print(fit, MSG_VERBOSE);
+        if(fit->cl) { /* Calculate confidence limits */
 #ifdef DEBUG
-        const char *f_uncertainty = "errors.dat";
+            const char *f_uncertainty = "errors.dat";
 #else
-        const char *f_uncertainty = NULL;
+            const char *f_uncertainty = NULL;
 #endif
-        fit_uncertainty_spectra(fit, J, fit->covar, f, &wts.vector, f_uncertainty);
+            fit_uncertainty_spectra(fit, J, fit->covar, f, &wts.vector, f_uncertainty);
+        }
     }
     gsl_multifit_nlinear_free(w);
     gsl_vector_free(fit->f_iter);

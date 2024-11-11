@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>270</width>
+    <width>316</width>
     <height>196</height>
    </rect>
   </property>
@@ -61,7 +61,10 @@
      <item>
       <widget class="QCheckBox" name="confidencelimitsCheckBox">
        <property name="text">
-        <string>Show confidence limits (BETA)</string>
+        <string>Show confidence limits if calculated (BETA)</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
        </property>
       </widget>
      </item>

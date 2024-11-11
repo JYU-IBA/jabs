@@ -286,21 +286,15 @@ script_command_status script_save_spectra(script_session *s, int argc, char *con
     size_t i_det = 0;
     struct fit_data *fit = s->fit;
     const int argc_orig = argc;
-    int cl = FALSE;
-    if(argc && strcmp(argv[0], "cl") == 0) {
-        cl = TRUE;
-        argc--;
-        argv++;
-    }
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det) || argc < 1) {
-        jabs_message(MSG_ERROR, "Usage: save spectra {cl} {<detector>} <file>\n");
+        jabs_message(MSG_ERROR, "Usage: save spectra {<detector>} <file>\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Not enough arguments for save spectra.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(sim_workspace_print_spectra(fit->spectra, argv[0], cl)) {
+    if(sim_workspace_print_spectra(fit->spectra, argv[0], fit->cl)) {
         jabs_message(MSG_ERROR,
                      "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n",
                      i_det + 1, argv[0], fit->sim->n_det);
@@ -1313,6 +1307,7 @@ script_command *script_commands_create(struct script_session *s) {
             {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",                    0,     0,                               &fit->xtol,                                  NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",               0,     0,                               &fit->chisq_tol,                             NULL},
             {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance",          0,     0,                               &fit->chisq_fast_tol,                        NULL},
+            {JIBAL_CONFIG_VAR_BOOL,   "cl",                            0,     0,                               &fit->cl,                                    NULL},
             {JIBAL_CONFIG_VAR_SIZE,   "n_bricks_max",                  0,     0,                               &sim->params->n_bricks_max,                  NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "ds",                            0,     0,                               &sim->params->ds,                            NULL},
             {JIBAL_CONFIG_VAR_BOOL,   "rk4",                           0,     0,                               &sim->params->rk4,                           NULL},
