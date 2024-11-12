@@ -15,7 +15,8 @@ set fluence 2.0e13
 load exp "experimental.dat"
 
 #sample can be set with one command
-set sample Au 30tfu rough 20tfu n_rough 10 SiO2 6500tfu Si 20000tfu
+#This will add gamma roughness in the Au layer using 20 subspectra in simulation (default, so it could be omitted)
+set sample Au 30tfu rough 20tfu n_rough 20 SiO2 6500tfu Si 20000tfu
 #or loaded from a file (tabular data)
 #load sample "sample.txt"
 
@@ -43,5 +44,6 @@ save calibration "calibration_out.jbs"
 save sample "sample_out.txt"
 #show detector
 #show fit
+#show fit correlation
 #show sample profile
 show fit ranges
