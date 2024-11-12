@@ -129,7 +129,7 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
 
 double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sample, const depth depth, double E) {
     const double em = E * incident->mass_inverse;
-    int Z2_old = 0; /* Not valid */
+    int Z2_old = -1; /* Not valid */
     double out = 0.0;
     int lo, hi = 0;
     const gsto_file_t *file;
@@ -150,8 +150,9 @@ double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sam
             continue;
         int Z2 = target->Z;
         assert(Z2 <= incident->ion_gsto->Z2_max);
+
         if(Z2 != Z2_old) { /* This saves some computing time, but for electronic stopping we could just sum all isotopic concentrations (and note that those stay constant while we are doing stopping calculations) */
-            if(stop->type == GSTO_STO_TOT) {
+            if(stop->type == GSTO_STO_TOT || stop->type == GSTO_STO_ELE) {
                 file = incident->ion_gsto->gsto_data[Z2].stopfile;
                 data = incident->ion_gsto->gsto_data[Z2].stopdata;
                 assert(file);
@@ -172,12 +173,13 @@ double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sam
             lo = jibal_gsto_em_to_index(file, em);
             hi = lo + 1;
         }
+        Z2_old = Z2;
         double S = unit_factor;
         if(em < file->em[0]) {
             DEBUGMSG("Energy %g keV/u below GSTO file minimum %g keV/u, returning value corresponding to minimum", em / (C_KEV / C_U), file->em[0]);
             S *= data[0];
         } else if(em > file->em[file->xpoints - 1]) {
-            DEBUGMSG("Energy %g keV/u anove GSTO file maximum %g keV/u, returning value corresponding to maximum", em / (C_KEV / C_U), file->em[file->xpoints - 1] / (C_KEV / C_U));
+            DEBUGMSG("Energy %g keV/u above GSTO file maximum %g keV/u, returning value corresponding to maximum", em / (C_KEV / C_U), file->em[file->xpoints - 1] / (C_KEV / C_U));
             S *= data[file->xpoints - 1];
         } else {
             S *= jibal_linear_interpolation(file->em[lo], file->em[hi], data[lo], data[hi], em);
@@ -196,43 +198,6 @@ double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sam
             return out * sample->ranges[depth.i].stragg;
         default:
             return out;
-    }
-}
-
-double stop_sample_old(const jabs_stop *stop, const ion *incident, const sample *sample, const depth depth, double E) {
-    const double em = E * incident->mass_inverse;
-    double S1 = 0.0;
-    for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
-        double c;
-        const jibal_isotope *target = sample->isotopes[i_isotope];
-        if(sample->no_conc_gradients) {
-            c = *sample_conc_bin(sample, depth.i, i_isotope);
-        } else {
-            c = get_conc(sample, depth, i_isotope);
-        }
-        if(c < CONC_TOLERANCE)
-            continue;
-        if(stop->type == GSTO_STO_TOT) {
-            S1 += c * (
-                    jibal_gsto_get_em(stop->gsto, GSTO_STO_ELE, incident->Z, target->Z, em)
-                    #ifdef NUCLEAR_STOPPING_FROM_JIBAL
-                    + jibal_gsto_stop_nuclear_universal(E, incident->Z, incident->mass, target->Z, target->mass)
-                    #else
-                    + ion_nuclear_stop(incident, target, stop->nuclear_stopping_accurate)
-#endif
-            );
-        } else {
-            S1 += c * (jibal_gsto_get_em(stop->gsto, stop->type, incident->Z, target->Z, em));
-        }
-    }
-    switch(stop->type) {
-        case GSTO_STO_ELE:
-        case GSTO_STO_TOT:
-            return S1 * sample->ranges[depth.i].bragg;
-        case GSTO_STO_STRAGG:
-            return S1 * sample->ranges[depth.i].stragg;
-        default:
-            return S1;
     }
 }
 
