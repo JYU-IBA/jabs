@@ -1218,8 +1218,8 @@ script_command *script_commands_create(struct script_session *s) {
 
     script_command *c;
     script_command *c_help = script_command_new("help", "Help.", 0, 0, &script_help);
-    script_command_list_add_command(&c_help->subcommands, script_command_new("commands", "List of commands.", 0, 0, &script_help_commands));
-    script_command_list_add_command(&c_help->subcommands, script_command_new("version", "Help on (show) version.", 0, 0, &script_help_version));
+    script_command_list_add_command(&c_help->subcommands, script_command_new("commands", "Print a list of recognized commands with brief description.", 0, 0, &script_help_commands));
+    script_command_list_add_command(&c_help->subcommands, script_command_new("version", "Show detailed version information.", 0, 0, &script_help_version));
     script_command_list_add_command(&head, c_help);
 
 
@@ -1522,6 +1522,9 @@ void script_print_command_tree(const struct script_command *commands) {
                 jabs_message(MSG_INFO, "%s ", stack[j]->name);
             }
             jabs_message(MSG_INFO, "%s\n", c->name);
+            if(c->help_text) {
+                jabs_message(MSG_INFO, "         %s\n", c->help_text);
+            }
         } else {
 #ifdef DEBUG
             DEBUGSTR("The heck is this?");
@@ -2274,24 +2277,6 @@ script_command_status script_set_verbosity(struct script_session *s, int argc, c
     return 1;
 }
 
-script_command_status script_set_reaction_yield(struct script_session *s, int argc, char * const *argv) {
-    (void) s;
-    if(argc < 1) { /* argc_min set elsewhere, this is redundant, no error reporting */
-        return EXIT_FAILURE;
-    }
-    size_t tmp = jabs_message_verbosity;
-    if(jabs_str_to_size_t(argv[0], &tmp) < 0) {
-        return EXIT_FAILURE;
-    }
-    if(tmp > MSG_ERROR) {
-        jabs_message(MSG_ERROR, "The verbosity level %zu is too high, maximum is %zu.\n", tmp, MSG_ERROR);
-        return EXIT_FAILURE;
-    }
-    jabs_message_verbosity = tmp;
-    jabs_message(MSG_INFO, "Verbosity level set to \"%s\".\n", jabs_message_level_str(jabs_message_verbosity));
-    return 1;
-}
-
 script_command_status script_test_reference(struct script_session *s, int argc, char *const *argv) {
     const struct fit_data *fit = s->fit;
     const int argc_orig = argc;
@@ -2395,7 +2380,12 @@ script_command_status script_split_sample_elements(struct script_session *s, int
 script_command_status script_add_reaction(script_session *s, int argc, char *const *argv) {
     struct fit_data *fit = s->fit;
     if(argc < 2) {
-        jabs_message(MSG_ERROR, "Usage: add reaction <type> <isotope> {cs <cross section model>} {min <min energy>} {max <max energy}.\n Type should be one of the following: RBS RBS- ERD\n");
+        jabs_message(MSG_ERROR, "Usage: add reaction <type> <isotope> {cs <cross section model>} {min <min energy>} {max <max energy} {yield <cross section scaling factor>}.\nType should be one of the following: RBS RBS- ERD\n");
+        jabs_message(MSG_ERROR, "Alternate usage: add reaction FILE <some R33 file>\n\n");
+        jabs_message(MSG_ERROR, "Setting sample will reset reactions, so add reactions first.\n");
+        jabs_message(MSG_ERROR, "Reaction modifiers (cs, min, max, yield) are optional and can also be used with R33 files (cs is meaningless).\n");
+        jabs_message(MSG_ERROR, "Example: add reaction RBS 16O cs Andersen max 2400keV\n");
+        jabs_message(MSG_ERROR, "Example: add reaction ERD 1H\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     const int argc_orig = argc;
@@ -2407,9 +2397,17 @@ script_command_status script_add_reaction(script_session *s, int argc, char *con
     }
     if(sim_reactions_add_reaction(fit->sim, r, FALSE)) {
         return SCRIPT_COMMAND_FAILURE;
-    } else {
+    }
+    if(!fit->sm) {
+        jabs_message(MSG_WARNING, "No sample has been set. Setting sample will reset reactions.\n");
         return argc_consumed;
     }
+    sample *sample = sample_from_sample_model(fit->sm);
+    if(!sample_has_isotope(sample, r->target)) {
+        jabs_message(MSG_WARNING, "Target isotope %s does not exist in sample. Setting sample will reset reactions.\n", r->target->name);
+    }
+    sample_free(sample);
+    return argc_consumed;
 }
 
 script_command_status script_add_reactions(script_session *s, int argc, char *const *argv) {
@@ -2492,18 +2490,28 @@ script_command_status script_add_fit_range(script_session *s, int argc, char *co
 script_command_status script_help(script_session *s, int argc, char *const *argv) {
     (void) s;
     static const struct help_topic topics[] = {
-            {"help", "This is help on help.\nHelp is available on following topics:\n"},
+            {"help", "\nHelp is available also on following topics:\n"},
+            {"simulate", "\nSimulate (or \"sim\") command will run a simulation.\nYou need to set sample with \"set sample\" and override defaults (run \"show sim\" ) first and, optionally, define reactions.\nSee also \"help reactions\", \"help sample\""},
+            {"reactions", "Run \"add reaction\" without arguments to see brief help on \"add reaction\".\nYou can see added reactions with \"show reactions\".\nRBS and ERDA reactions are added automatically if no reactions are added before running a simulation/fit."},
+        {"sample", "Run \"set sample\" without arguments to see brief help on set sample. You can also \"load sample\"."},
             {NULL, NULL}
     };
+    char *topic;
     if(argc == 0) {
-        jabs_message(MSG_INFO, "Type help [topic] for information on a particular topic or \"help help\" for help on help.\n\n");
+        jabs_message(MSG_INFO, "These are possible subcommands of help:\n\n");
 
-        return SCRIPT_COMMAND_NOT_FOUND;
+        const script_command *c_help = script_command_find(s->commands, "help");
+        if(c_help) {
+            script_commands_print(c_help->subcommands);
+        }
+        topic = "help";
+    } else {
+        topic = argv[0];
     }
 
     int found = 0;
     for(const struct help_topic *t = topics; t->name != NULL; t++) {
-        if(strcmp(t->name, argv[0]) == 0) {
+        if(strcmp(t->name, topic) == 0) {
             found++;
             jabs_message(MSG_INFO, "%s", t->help_text);
             if(strcmp(t->name, "help") == 0) {
@@ -2515,17 +2523,18 @@ script_command_status script_help(script_session *s, int argc, char *const *argv
                         jabs_message(MSG_INFO, "\n");
                     }
                 }
-                jabs_message(MSG_INFO, "\nTry also \"help commands\" for a list of possible commands. Try running a command without arguments to get a brief help on usage.");
+                jabs_message(MSG_INFO, "\n\nCommands that require arguments will print brief help on usage if you run them without arguments.");
             }
             jabs_message(MSG_INFO, "\n");
             break;
         }
     }
 
-    if(!found) {
+    if(found) {
+        return argc; /* Consume all arguments */
+    } else {
         return SCRIPT_COMMAND_NOT_FOUND;
     }
-    return 1; /* TODO: this stuff only works with one argument, right? */
 }
 
 script_command_status script_help_version(script_session *s, int argc, char *const *argv) {

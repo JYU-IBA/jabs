@@ -118,6 +118,7 @@ void sample_sort_isotopes(sample *sample); /* Sort isotopes. Note that you can s
 void sample_sort_and_remove_duplicate_isotopes(sample *s);
 int isotope_compar(const void *, const void *); /* compares jibal_isotopes */
 void sample_range_copy(sample_range *dst, const sample_range *src);
+int sample_has_isotope(const sample *s, const jibal_isotope *isotope);
 #ifdef __cplusplus
 }
 #endif

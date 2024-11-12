@@ -1101,3 +1101,16 @@ void sample_range_copy(sample_range *dst, const sample_range *src) {
     }
 #endif
 }
+
+int sample_has_isotope(const sample *s, const jibal_isotope *isotope) {
+    if(!s) {
+        return FALSE;
+    }
+    for(size_t i_isotope = 0; i_isotope < s->n_isotopes; i_isotope++) {
+        const jibal_isotope *i = s->isotopes[i_isotope];
+        if(i == isotope) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}

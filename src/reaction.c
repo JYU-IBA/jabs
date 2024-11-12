@@ -168,7 +168,7 @@ reaction *reaction_make_from_argv(const jibal *jibal, const jibal_isotope *incid
         const jibal_isotope *target = jibal_isotope_find(jibal->isotopes, (*argv)[0], 0, 0);
 
         if(!target) {
-            jabs_message(MSG_ERROR, "This is not a valid isotope: \"%s\".\n", (*argv)[1]);
+            jabs_message(MSG_ERROR, "This is not a valid isotope: \"%s\".\n", (*argv)[0]);
             return NULL;
         }
         r = reaction_make(incident, target, type, JABS_CS_NONE); /* Warning: JABS_CS_NONE used here, something sane must be supplied after this somewhere! */
