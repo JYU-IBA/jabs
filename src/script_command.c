@@ -1906,6 +1906,10 @@ script_command_status script_show_fit_ranges(script_session *s, int argc, char *
 script_command_status script_show_fit_correlation(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
+    if(!s->fit->covar) {
+        jabs_message(MSG_ERROR, "No correlation coefficients to show. Maybe do a fit first?\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
     fit_correlation_print(s->fit->covar, MSG_INFO);
     return 0;
 }

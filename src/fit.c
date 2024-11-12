@@ -943,6 +943,9 @@ void fit_report_results(const fit_data *fit, const gsl_multifit_nlinear_workspac
 
 
 void fit_correlation_print(const gsl_matrix *covar, jabs_msg_level msg_level) {
+    if(!covar) {
+        return;
+    }
     jabs_message(msg_level, "\nCorrelation coefficients (sigma_ij/(sigma_i*sigma_j)) matrix:\n       | ");
     for(size_t i = 0; i < covar->size1; i++) {
         jabs_message(msg_level, " %4zu  ", i + 1);
