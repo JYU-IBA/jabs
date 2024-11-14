@@ -49,11 +49,14 @@ extern "C" {
 #define FIT_ERROR_ABORTED (-7)
 #define FIT_ERROR_INIT (-8)
 
-#define FIT_PHASE_FAST 1
-#define FIT_PHASE_SLOW 2
+typedef enum fit_phase {
+        FIT_PHASE_NONE = 0,
+        FIT_PHASE_FAST = 1,
+        FIT_PHASE_SLOW = 2
+} fit_phase;
 
 struct fit_stats {
-    int phase;
+    fit_phase phase;
     size_t n_evals;
     size_t n_evals_iter; /* Number of function evaluations per iteration */
     size_t n_spectra;
@@ -116,7 +119,7 @@ typedef struct fit_data {
     int cl; /* Calculate confidence limits */
     gsl_multifit_nlinear_fdf *fdf;
     size_t dof; /* Degrees of freedom (calculated) */
-    struct fit_stats stats; /* Fit statistics, updated as we iterate */
+    fit_stats stats; /* Fit statistics, updated as we iterate */
     int phase_start; /* Fit phase to start from (see FIT_PHASE -defines) */
     int phase_stop; /* Inclusive */
     int (*fit_iter_callback)(struct fit_stats stats);
@@ -169,6 +172,7 @@ int fit_set_roi_from_string(roi *r, const char *str); /* Parses only low and hig
 double fit_emin(struct fit_data *fit, size_t i_det); /* Returns lowest energy of fit ranges for detector i_det. Detectors, calibrations and fit ranges must be set before calling. */
 const char *fit_error_str(int error);
 int fit_range_compare(const void *a, const void *b);
+const char *fit_phase_to_str(const fit_phase phase);
 #ifdef __cplusplus
 }
 #endif

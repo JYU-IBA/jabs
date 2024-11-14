@@ -681,15 +681,16 @@ script_command_status script_set_fit_val(struct script_session *s, int val, int 
     fit_data *fit = s->fit;
 
     switch(val) {
-        case 'n': /* normal */
+        case 'd': /* double mode (fast, then slow) */
             fit->phase_start = FIT_PHASE_FAST;
             fit->phase_stop = FIT_PHASE_SLOW;
             return 0;
-        case 'f':
+        case 'f': /* fast */
             fit->phase_start = FIT_PHASE_FAST;
             fit->phase_stop = FIT_PHASE_FAST;
             return 0;
-        case 's':
+        case 'n': /* normal, same as slow (falls through) */
+        case 's': /* slow */
             fit->phase_start = FIT_PHASE_SLOW;
             fit->phase_stop = FIT_PHASE_SLOW;
             return 0;
@@ -1270,7 +1271,8 @@ script_command *script_commands_create(struct script_session *s) {
 
     script_command *c_set_fit = script_command_new("fit", "Set fit related things.", 0, 0, NULL);
     c_set_fit->f_val = &script_set_fit_val;
-    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("normal", "Normal two-phase fitting.", 'n', 0, NULL));
+    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("double", "Two-phase fitting.", 'd', 0, NULL));
+    script_command_list_add_command(&c_set_fit->subcommands, script_command_new("normal", "Normal fitting (same as slow).", 'n', 0, NULL));
     script_command_list_add_command(&c_set_fit->subcommands, script_command_new("slow", "One phase fitting (slow phase only).", 's', 0, NULL));
     script_command_list_add_command(&c_set_fit->subcommands, script_command_new("fast", "One phase fitting (fast phase only).", 'f', 0, NULL));
     script_command_list_add_command(&c_set->subcommands, c_set_fit);

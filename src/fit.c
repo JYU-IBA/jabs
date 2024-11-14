@@ -354,7 +354,7 @@ void fit_data_defaults(fit_data *f) {
     f->xtol = FIT_XTOL;
     f->chisq_tol = FIT_CHISQ_TOL;
     f->chisq_fast_tol = FIT_FAST_CHISQ_TOL;
-    f->phase_start = FIT_PHASE_FAST;
+    f->phase_start = FIT_PHASE_SLOW;
     f->phase_stop = FIT_PHASE_SLOW;
     f->cl = FALSE;
 }
@@ -1166,7 +1166,7 @@ int fit(fit_data *fit) {
             }
         }
         if(phase == FIT_PHASE_FAST) {
-            sim_calc_params_defaults_fast(fit->sim->params); /* Set current parameters to be faster in phase 0. */
+            sim_calc_params_defaults_fast(fit->sim->params); /* Set current parameters to be faster in phase 1. */
             xtol *= FIT_FAST_XTOL_MULTIPLIER;
             chisq_tol = fit->chisq_fast_tol;
         } else {
@@ -1179,7 +1179,7 @@ int fit(fit_data *fit) {
                 gsl_vector_set(x, var->i_v, *(var->value)/var->value_orig); /* We'll pass normalized values to GSL, so we are actually starting fit with always with vector full of 1.0. Next phase starts where previous ends. */
             }
         }
-        jabs_message(MSG_INFO, "\nInitializing fit phase %i. Xtol = %e, chisq_tol %e\n", phase, xtol, chisq_tol);
+        jabs_message(MSG_INFO, "\nInitializing fit phase \"%s\". Xtol = %e, chisq_tol %e\n", fit_phase_to_str(phase), xtol, chisq_tol);
         jabs_message(MSG_VERBOSE, "Simulation parameters for this phase:\n");
         sim_calc_params_print(fit->sim->params, MSG_VERBOSE);
         jabs_message(MSG_IMPORTANT, "Initializing fit...\n");
@@ -1196,10 +1196,10 @@ int fit(fit_data *fit) {
         status = jabs_gsl_multifit_nlinear_driver(fit->n_iters_max, xtol, chisq_tol, fit, w); /* Fit */
         fit->stats.error = status;
         if(status < 0) {
-            jabs_message(MSG_ERROR, "Fit aborted in phase %i, reason: %s.\n", phase, fit_error_str(fit->stats.error));
+            jabs_message(MSG_ERROR, "Fit aborted in phase \"%s\", reason: %s.\n", fit_phase_to_str(phase), fit_error_str(fit->stats.error));
             break;
         }
-        jabs_message(MSG_IMPORTANT, "Phase %i finished. Time used for actual simulation so far: %.3lf s.\n", phase, fit->stats.cputime_cumul);
+        jabs_message(MSG_IMPORTANT, "Phase \"%s\" finished. Time used for actual simulation so far: %.3lf s.\n", fit_phase_to_str(phase), fit->stats.cputime_cumul);
         fit_report_results(fit, w, fdf);
     }
 
@@ -1350,4 +1350,16 @@ int fit_range_compare(const void *a, const void *b) {
         return  1;
     }
    return 0; /* Ok, they are the same */
+}
+
+const char *fit_phase_to_str(const fit_phase phase) {
+    switch(phase) {
+        case FIT_PHASE_NONE:
+            return "none";
+        case FIT_PHASE_SLOW:
+            return "slow";
+        case FIT_PHASE_FAST:
+            return "fast";
+    }
+    return "unknown";
 }
