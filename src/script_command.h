@@ -25,7 +25,7 @@ extern "C" {
 const char *script_command_status_to_string(script_command_status status);
 
 script_command *script_command_new(const char *name, const char *help_text, int val, int argc_min, script_command_status (*f)(struct script_session *, int, char *const *)); /* Allocates new command that doesn't do anything. Can return var. */
-int script_command_set_var(script_command *c, jibal_config_var_type type, void *variable, const jibal_option *option_list, const char *unit, char unit_type);
+int script_command_set_var(script_command *c, const jibal_config_var *var);
 void script_command_free(script_command *c);
 void script_commands_free(script_command *head);
 

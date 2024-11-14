@@ -1012,16 +1012,11 @@ int script_command_set_function(script_command *c, script_command_status (*f)(st
     return EXIT_SUCCESS;
 }
 
-int script_command_set_var(script_command *c, jibal_config_var_type type, void *variable, const jibal_option *option_list, const char *unit, char unit_type) {
+int script_command_set_var(script_command *c, const jibal_config_var *var) {
     if(!c->var) {
         c->var = malloc(sizeof(jibal_config_var));
     }
-    c->var->variable = variable;
-    c->var->type = type;
-    c->var->unit = unit;
-    c->var->unit_type = unit_type;
-    c->var->name = c->name; /* The pointer is shared, so "var" doesn't get its own */
-    c->var->option_list = option_list;
+    *c->var = *var; /* Shallow copy is fine */
     c->f = NULL; /* These guys can't coexist */
     DEBUGVERBOSEMSG("Added command (variable) name %s, type %i, unit %s, unit type '%c' (%i)", c->var->name, c->var->type, c->var->unit, c->var->unit_type, c->var->unit_type);
     return EXIT_SUCCESS;
@@ -1203,7 +1198,7 @@ script_command *script_command_list_from_vars_array(const jibal_config_var *vars
             asprintf_append(&help_text, "%s.", jibal_config_var_type_name(var->type));
         }
         c  = script_command_new(var->name, help_text, 0, 0, NULL);
-        script_command_set_var(c, var->type, var->variable, var->option_list, var->unit, var->unit_type);
+        script_command_set_var(c, var);
         script_command_list_add_command(&head, c);
         free(help_text);
     }
