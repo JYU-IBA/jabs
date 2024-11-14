@@ -65,7 +65,7 @@ tar zxvf jibal_data.tar.gz -C "$HOME/.jibal"
 
 ## Microsoft Windows 10:
 
-1. Install Build tools for [Visual Studio 2019.](https://visualstudio.microsoft.com/downloads/)
+1. Install Build tools for [Visual Studio 2022.](https://visualstudio.microsoft.com/downloads/)
 2. Install Qt 6.7.2 (or maybe something later). This might be easier to do with [unofficial tools](https://github.com/miurahr/aqtinstall/).
 3. Install *gsl*, *getopt*, *libxml2* using vcpkg. Make sure your triplet is x64-windows-release.
 4. Follow steps for Linux above, but

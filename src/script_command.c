@@ -1177,36 +1177,35 @@ script_command *script_command_list_from_vars_array(const jibal_config_var *vars
         if(type != 0 && var->type != type) { /* Restrict by type */
             continue;
         }
-        script_command *c;
-        if(var->type == JIBAL_CONFIG_VAR_UNIT) {
-            char *help_text;
-            if(asprintf(&help_text, "value with unit (type '%c', e.g. %s)", var->unit_type, var->unit) < 0) {
+        script_command *c = NULL;
+        char *help_text = NULL;
+        if(var->description) {
+            asprintf_append(&help_text, "%s. ", var->description);
+        }
+        if (var->type == JIBAL_CONFIG_VAR_UNIT) {
+            if(asprintf_append(&help_text, "Type '%c', e.g. %s. ", var->unit_type, var->unit) < 0) {
                 DEBUGMSG("asprintf failed when adding command %s\n", var->name);
                 break;
             }
-
-            c  = script_command_new(var->name, help_text, 0, 0, NULL);
-            free(help_text);
         } else if(var->type == JIBAL_CONFIG_VAR_OPTION) {
             if(!var->option_list) {
                 DEBUGMSG("Option (%s) without option list!", var->name);
                 continue;
             }
-            char *help_text;
-            if(asprintf(&help_text, "one of:") < 0) {
+            if(asprintf_append(&help_text, "One of:") < 0) {
                 DEBUGMSG("asprintf failed when adding command %s\n", var->name);
                 break;
             }
             for(const jibal_option *opt = var->option_list; opt->s != NULL; opt++) {
                 asprintf_append(&help_text, " \"%s\"", opt->s);
             }
-            c  = script_command_new(var->name, help_text, 0, 0, NULL);
-            free(help_text);
         } else {
-            c = script_command_new(var->name, jibal_config_var_type_name(var->type), 0, 0, NULL);
+            asprintf_append(&help_text, "%s.", jibal_config_var_type_name(var->type));
         }
+        c  = script_command_new(var->name, help_text, 0, 0, NULL);
         script_command_set_var(c, var->type, var->variable, var->option_list, var->unit, var->unit_type);
         script_command_list_add_command(&head, c);
+        free(help_text);
     }
     return head;
 }
@@ -1295,53 +1294,53 @@ script_command *script_commands_create(struct script_session *s) {
     script_command_list_add_command(&c_set->subcommands, script_command_new("stopping", "Set (assign) stopping or straggling.", 0, 0, &script_set_stopping));
 
     const jibal_config_var vars[] = {
-            {JIBAL_CONFIG_VAR_DOUBLE, "fluence",                       0,     0,                               &sim->fluence,                               NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "energy",                        "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->beam_E,                                NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",                  "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->beam_E_broad,                          NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "emin",                          "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->emin,                                  NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "alpha",                         "deg", JIBAL_UNIT_TYPE_ANGLE,           &sim->sample_theta,                          NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "phi",                           "deg", JIBAL_UNIT_TYPE_ANGLE,           &sim->sample_phi,                            NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "erd",                           0,     0,                               &sim->erd,                                   NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "rbs",                           0,     0,                               &sim->rbs,                                   NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "maxiter",                       0,     0,                               &fit->n_iters_max,                           NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",                    0,     0,                               &fit->xtol,                                  NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",               0,     0,                               &fit->chisq_tol,                             NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance",          0,     0,                               &fit->chisq_fast_tol,                        NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "cl",                            0,     0,                               &fit->cl,                                    NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "n_bricks_max",                  0,     0,                               &sim->params->n_bricks_max,                  NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "ds",                            0,     0,                               &sim->params->ds,                            NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "rk4",                           0,     0,                               &sim->params->rk4,                           NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "brick_width_sigmas",            0,     0,                               &sim->params->brick_width_sigmas,            NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "sigmas_cutoff",                 0,     0,                               &sim->params->sigmas_cutoff,                 NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step",            "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->incident_stop_params.step,     NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "incident_stop_step_sigmas",     0,     0,                               &sim->params->incident_stop_params.sigmas,   NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_min",        "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->incident_stop_params.min,      NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_max",        "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->incident_stop_params.max,      NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step",             "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->exiting_stop_params.step,      NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "exiting_stop_step_sigmas",      0,     0,                               &sim->params->exiting_stop_params.sigmas,    NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_min",         "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->exiting_stop_params.min,       NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_max",         "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->exiting_stop_params.max,       NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "ds_incident_stop_step_factor",  0,     0,                               &sim->params->ds_incident_stop_step_factor,  NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "nuclear_stopping_accurate",     0,     0,                               &sim->params->nuclear_stopping_accurate,     NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy",          0,     0,                               &sim->params->mean_conc_and_energy,          NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "geostragg",                     0,     0,                               &sim->params->geostragg,                     NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",                   "deg", JIBAL_UNIT_TYPE_ANGLE,           &sim->params->beta_manual,                   NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "cs_n_stragg_steps",             0,     0,                               &sim->params->cs_n_stragg_steps,             NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "gaussian_accurate",             0,     0,                               &sim->params->gaussian_accurate,             NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "int_cs_max_intervals",          0,     0,                               &sim->params->int_cs_max_intervals,          NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_accuracy",               0,     0,                               &sim->params->int_cs_accuracy,               NULL},
-            {JIBAL_CONFIG_VAR_SIZE,   "int_cs_stragg_max_intervals",   0,     0,                               &sim->params->int_cs_stragg_max_intervals,   NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_stragg_accuracy",        0,     0,                               &sim->params->int_cs_stragg_accuracy,        NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "cs_adaptive",                   0,     0,                               &sim->params->cs_adaptive,                   NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "cs_energy_step_max",            "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->cs_energy_step_max,            NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "cs_depth_step_max",             "tfu", JIBAL_UNIT_TYPE_LAYER_THICKNESS, &sim->params->cs_depth_step_max,             NULL},
-            {JIBAL_CONFIG_VAR_DOUBLE, "cs_stragg_step_sigmas",         0,     0,                               &sim->params->cs_stragg_step_sigmas,         NULL},
-            {JIBAL_CONFIG_VAR_UNIT,   "reaction_file_angle_tolerance", "deg", JIBAL_UNIT_TYPE_ANGLE,           &sim->params->reaction_file_angle_tolerance, NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "bricks_skip_zero_conc_ranges",  0,     0,                               &sim->params->bricks_skip_zero_conc_ranges,  NULL},
-            {JIBAL_CONFIG_VAR_BOOL,   "screening_tables",              0,     0,                               &sim->params->screening_tables,              NULL},
-            {JIBAL_CONFIG_VAR_OPTION, "cs_rbs",                        0,     0,                               &sim->cs_rbs,                                jabs_cs_types},
-            {JIBAL_CONFIG_VAR_OPTION, "cs_erd",                        0,     0,                               &sim->cs_erd,                                jabs_cs_types},
-            {JIBAL_CONFIG_VAR_NONE, NULL,                              0,     0, NULL,                                                                      NULL}
+        {JIBAL_CONFIG_VAR_DOUBLE, "fluence",                       0,     0,                               &sim->fluence,                               NULL, "Number of ions (total dose)"},
+        {JIBAL_CONFIG_VAR_UNIT,   "energy",                        "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->beam_E,                                NULL, "Beam energy"},
+        {JIBAL_CONFIG_VAR_UNIT,   "energy_broad",                  "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->beam_E_broad,                          NULL, "Beam energy broadening (FWHM)"},
+        {JIBAL_CONFIG_VAR_UNIT,   "emin",                          "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->emin,                                  NULL, "Energy cutoff (minimum)"},
+        {JIBAL_CONFIG_VAR_UNIT,   "alpha",                         "deg", JIBAL_UNIT_TYPE_ANGLE,           &sim->sample_theta,                          NULL, "Sample tilt angle"},
+        {JIBAL_CONFIG_VAR_UNIT,   "phi",                           "deg", JIBAL_UNIT_TYPE_ANGLE,           &sim->sample_phi,                            NULL, "Sample phi"},
+        {JIBAL_CONFIG_VAR_BOOL,   "erd",                           0,     0,                               &sim->erd,                                   NULL, "Add ERD reactions by default (forward angles only)"},
+        {JIBAL_CONFIG_VAR_BOOL,   "rbs",                           0,     0,                               &sim->rbs,                                   NULL, "Add RBS reactions by default"},
+        {JIBAL_CONFIG_VAR_SIZE,   "maxiter",                       0,     0,                               &fit->n_iters_max,                           NULL, "Maximum number of iterations in the fit"},
+        {JIBAL_CONFIG_VAR_DOUBLE, "xtolerance",                    0,     0,                               &fit->xtol,                                  NULL, "Fit convergence parameter tolerance (xtol in gsl_multifit_nlinear)"},
+        {JIBAL_CONFIG_VAR_DOUBLE, "chisq_tolerance",               0,     0,                               &fit->chisq_tol,                             NULL, "Fit convergence chi squared tolerance"},
+        {JIBAL_CONFIG_VAR_DOUBLE, "chisq_fast_tolerance",          0,     0,                               &fit->chisq_fast_tol,                        NULL, "Fit convergence chi squared tolerance in fast mode"},
+        {JIBAL_CONFIG_VAR_BOOL,   "cl",                            0,     0,                               &fit->cl,                                    NULL, "Calculate confidence limits (BETA)"},
+        {JIBAL_CONFIG_VAR_SIZE,   "n_bricks_max",                  0,     0,                               &sim->params->n_bricks_max,                  NULL,  "Maximum number of bricks in the simulation"},
+        {JIBAL_CONFIG_VAR_BOOL,   "ds",                            0,     0,                               &sim->params->ds,                            NULL, "Dual scattering mode"},
+        {JIBAL_CONFIG_VAR_BOOL,   "rk4",                           0,     0,                               &sim->params->rk4,                           NULL, "RK4 in stopping calculation"},
+        {JIBAL_CONFIG_VAR_DOUBLE, "brick_width_sigmas",            0,     0,                               &sim->params->brick_width_sigmas,            NULL, "Target brick width as a number of standard deviations (resolution)"},
+        {JIBAL_CONFIG_VAR_DOUBLE, "sigmas_cutoff",                 0,     0,                               &sim->params->sigmas_cutoff,                 NULL,  "Gaussian convolution cutoff (+/- number of standard deviations)"},
+        {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step",            "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->incident_stop_params.step,     NULL, "Incident ion stop step (0 = auto)"},
+        {JIBAL_CONFIG_VAR_DOUBLE, "incident_stop_step_sigmas",     0,     0,                               &sim->params->incident_stop_params.sigmas,   NULL, "Incident ion stop step straggling sigmas"},
+        {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_min",        "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->incident_stop_params.min,      NULL, "Incident ion stop step minimum"},
+        {JIBAL_CONFIG_VAR_UNIT,   "incident_stop_step_max",        "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->incident_stop_params.max,      NULL, "Incident ion stop step maximum"},
+        {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step",             "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->exiting_stop_params.step,      NULL, "Exiting ion stop step (0 = auto)"},
+        {JIBAL_CONFIG_VAR_DOUBLE, "exiting_stop_step_sigmas",      0,     0,                               &sim->params->exiting_stop_params.sigmas,    NULL, "Exiting ion stop step straggling sigmas"},
+        {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_min",         "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->exiting_stop_params.min,       NULL,"Exiting ion stop step minimum"},
+        {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_max",         "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->exiting_stop_params.max,       NULL,"Exiting ion stop step maximum"},
+        {JIBAL_CONFIG_VAR_DOUBLE, "ds_incident_stop_step_factor",  0,     0,                               &sim->params->ds_incident_stop_step_factor,  NULL, "Dual scattering stopping step factor"},
+        {JIBAL_CONFIG_VAR_BOOL,   "nuclear_stopping_accurate",     0,     0,                               &sim->params->nuclear_stopping_accurate,     NULL, "Accurate nuclear stopping"},
+        {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy",          0,     0,                               &sim->params->mean_conc_and_energy,          NULL, "Calculate concentration and energy at mean brick width (fast but inaccurate)"},
+        {JIBAL_CONFIG_VAR_BOOL,   "geostragg",                     0,     0,                               &sim->params->geostragg,                     NULL, "Geometric straggling"},
+        {JIBAL_CONFIG_VAR_BOOL,   "beta_manual",                   0,     0,                               &sim->params->beta_manual,                   NULL, "Manual exit angle calculation override"},
+        {JIBAL_CONFIG_VAR_SIZE,   "cs_n_stragg_steps",             0,     0,                               &sim->params->cs_n_stragg_steps,             NULL, "Number of straggling steps in cross section calculation (0 = adaptive integration of straggling weighted cross sections)"},
+        {JIBAL_CONFIG_VAR_BOOL,   "gaussian_accurate",             0,     0,                               &sim->params->gaussian_accurate,             NULL, "Accurate shape of Gaussians"},
+        {JIBAL_CONFIG_VAR_SIZE,   "int_cs_max_intervals",          0,     0,                               &sim->params->int_cs_max_intervals,          NULL, "Maximum number of intervals in used by adaptive integration of cross sections"},
+        {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_accuracy",               0,     0,                               &sim->params->int_cs_accuracy,               NULL, "Accuracy of adaptive integration of cross sections"},
+        {JIBAL_CONFIG_VAR_SIZE,   "int_cs_stragg_max_intervals",   0,     0,                               &sim->params->int_cs_stragg_max_intervals,   NULL, "Maximum number of intervals in used by adaptive integration of cross sections (straggling)"},
+        {JIBAL_CONFIG_VAR_DOUBLE, "int_cs_stragg_accuracy",        0,     0,                               &sim->params->int_cs_stragg_accuracy,        NULL, "Accuracy of adaptive integration of cross sections (straggling)"},
+        {JIBAL_CONFIG_VAR_BOOL,   "cs_adaptive",                   0,     0,                               &sim->params->cs_adaptive,                   NULL, "Adaptive integration of cross sections"},
+        {JIBAL_CONFIG_VAR_UNIT,   "cs_energy_step_max",            "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->cs_energy_step_max,            NULL, "Maximum energy step in cross section calculation"},
+        {JIBAL_CONFIG_VAR_UNIT,   "cs_depth_step_max",             "tfu", JIBAL_UNIT_TYPE_LAYER_THICKNESS, &sim->params->cs_depth_step_max,             NULL, "Maximum depth step in cross section calculation"},
+        {JIBAL_CONFIG_VAR_DOUBLE, "cs_stragg_step_sigmas",         0,     0,                               &sim->params->cs_stragg_step_sigmas,         NULL, "Maximum step (in straggling standard deviations) in cross section calculation"},
+        {JIBAL_CONFIG_VAR_UNIT,   "reaction_file_angle_tolerance", "deg", JIBAL_UNIT_TYPE_ANGLE,           &sim->params->reaction_file_angle_tolerance, NULL, "Reaction file (R33) angle tolerance"},
+        {JIBAL_CONFIG_VAR_BOOL,   "bricks_skip_zero_conc_ranges",  0,     0,                               &sim->params->bricks_skip_zero_conc_ranges,  NULL, "Brick calculation skips ranges with zero concentration"},
+        {JIBAL_CONFIG_VAR_BOOL,   "screening_tables",              0,     0,                               &sim->params->screening_tables,              NULL, "Compute screening tables"},
+        {JIBAL_CONFIG_VAR_OPTION, "cs_rbs",                        0,     0,                               &sim->cs_rbs,                                jabs_cs_types, "Default model for RBS cross section"},
+        {JIBAL_CONFIG_VAR_OPTION, "cs_erd",                        0,     0,                               &sim->cs_erd,                                jabs_cs_types,  "Default model for ERD cross section"},
+        {JIBAL_CONFIG_VAR_NONE, NULL,                              0,     0, NULL,                                                                      NULL, NULL}
     };
     c = script_command_list_from_vars_array(vars, 0);
     script_command_list_add_command(&c_set->subcommands, c);
@@ -2494,10 +2493,10 @@ script_command_status script_add_fit_range(script_session *s, int argc, char *co
 script_command_status script_help(script_session *s, int argc, char *const *argv) {
     (void) s;
     static const struct help_topic topics[] = {
-            {"help", "\nHelp is available also on following topics:\n"},
-            {"simulate", "\nSimulate (or \"sim\") command will run a simulation.\nYou need to set sample with \"set sample\" and override defaults (run \"show sim\" ) first and, optionally, define reactions.\nSee also \"help reactions\", \"help sample\""},
+            {"help", "Help is available on following topics (e.g. help \"help\"):\n"},
+            {"simulate", "Simulate (or \"sim\") command will run a simulation.\nYou need to set sample with \"set sample\" and override defaults (run \"show sim\" ) first and, optionally, define reactions.\nSee also \"help reactions\", \"help sample\""},
             {"reactions", "Run \"add reaction\" without arguments to see brief help on \"add reaction\".\nYou can see added reactions with \"show reactions\".\nRBS and ERDA reactions are added automatically if no reactions are added before running a simulation/fit."},
-        {"sample", "Run \"set sample\" without arguments to see brief help on set sample. You can also \"load sample\"."},
+            {"sample", "Run \"set sample\" without arguments to see brief help on set sample. You can also \"load sample\"."},
             {NULL, NULL}
     };
     char *topic;
@@ -2508,6 +2507,7 @@ script_command_status script_help(script_session *s, int argc, char *const *argv
         if(c_help) {
             script_commands_print(c_help->subcommands);
         }
+        jabs_message(MSG_INFO, "\n");
         topic = "help";
     } else {
         topic = argv[0];
@@ -2527,7 +2527,7 @@ script_command_status script_help(script_session *s, int argc, char *const *argv
                         jabs_message(MSG_INFO, "\n");
                     }
                 }
-                jabs_message(MSG_INFO, "\n\nCommands that require arguments will print brief help on usage if you run them without arguments.");
+                jabs_message(MSG_INFO, "\n\nCommands that require arguments will print brief help on usage if you run them without arguments. You might also get brief help message if you do something wrong or issue a nonexistant (sub)command.");
             }
             jabs_message(MSG_INFO, "\n");
             break;
