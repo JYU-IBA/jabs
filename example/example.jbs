@@ -1,17 +1,20 @@
 #!/usr/bin/env jabs
 #This is a comment
-set ion 4He
+set ion 4He #4He is also known as "a"
 set energy 2027keV
-#the following three lines are equivalent
-set alpha 0
+set alpha 0 #this and the following two lines are equivalent
 set alpha 0deg
 set alpha "0 deg"
 
-#Default cross sections can be changed easily between the built-in models, see other examples on how to define reactions
+#Default cross sections can be changed easily between the built-in models, see other examples on how to define reactions using e.g. R33 files
 #set cs_rbs Rutherford
 
-#Fluence is actually total number of ions, not ions/cm2... this should not be multiplied by detector solid angle (JaBS will do that)
-set fluence 2.0e13
+#RBS (and ERD) reactions are added automatically when running a simulation or a fit, if no reactions are specified
+#load reactions RBS
+#add reaction RBS 197Au
+
+
+set fluence 2.0e13 #Fluence is actually total number of ions, not ions/cm2... this should *not* be multiplied by detector solid angle (JaBS will do that)
 load exp "experimental.dat"
 
 #sample can be set with one command
@@ -20,30 +23,31 @@ set sample Au 30tfu rough 20tfu n_rough 20 SiO2 6500tfu Si 20000tfu
 #or loaded from a file (tabular data)
 #load sample "sample.txt"
 
-#Scripts can be loaded (run). It is convenient to store detector in a separate script.
-load script "detector.jbs"
+load script "detector.jbs" #Scripts can be loaded (run). It is convenient to store detector in a separate script.
 #The following line can be uncommented after this script is run. We save the detector calibration at the end of the script.
 #load script "calibration_out.jbs"
 
+set emin 150keV #Speed up by setting the minimum energy in the simulation (optional)
+
+#show sim
+simulate #Run a simulation
+
+save spectra "simulated_out.csv" #Save spectra
+
+#fit ranges (channels) must be specified before fitting. We can define multiple ranges with one command.
 add fit range [200:449] [450:700]
 add fit range [1050:1110]
-#Iterations can be limited if there is reason to suspect it won't converge...
-set maxiter 100
-#Speed up by setting the minimum energy in the simulation
-set emin 150keV
-simulate
-save spectra "simulated_out.csv"
+#Number of iterations can be limited if there is reason to suspect the fit won't converge...
+#set maxiter 100
 
-set fit normal
-
+#Run a fit
 fit *calib*,fluence,thick1,thick2,rough1,conc2_O
 save spectra "example_out.csv"
-#detector calibration can be saved to a script file. This can be loaded back in.
-save calibration "calibration_out.jbs"
-#fitted sample can be saved (and loaded back in later!)
-save sample "sample_out.txt"
+save calibration "calibration_out.jbs" #detector calibration can be saved to a script file. This can be loaded back in.
+save sample "sample_out.txt" #fitted sample can be saved (and loaded back in later!)
 #show detector
 #show fit
 #show fit correlation
 #show sample profile
 show fit ranges
+#roi [1060:1092]
