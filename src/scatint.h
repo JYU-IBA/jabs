@@ -82,7 +82,7 @@ double potential_bohr(double x);
 double apsis_f (double x, void *p);
 int apsis(scatint_params *params);
 double scat_theta_f(double x, void *params);
-int calc_scattering_angle(struct scatint_params *params);
+int calc_scattering_angle(scatint_params *params);
 int cs(scatint_params *p);
 scatint_params *scatint_init(reaction_type rt, potential_type pt, const jibal_isotope *incident, const jibal_isotope *target);
 void scatint_params_free(scatint_params *p);

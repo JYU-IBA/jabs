@@ -175,7 +175,7 @@ void script_command_not_found(const char *cmd, const script_command *c_parent) {
 script_command_status script_simulate(script_session *s, int argc, char *const *argv) {
     const int argc_orig = argc;
     (void) argv;
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     if(argc > 1) {
         /* TODO? */
     }
@@ -213,14 +213,14 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
 }
 
 script_command_status script_fit(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit_data = s->fit;
+    fit_data *fit = s->fit;
     const char *fit_usage = "Usage: fit [fitvar1,fitvar2,...]\nSee 'show fit variables' for a list of possible fit variables.\n";
     if(argc != 1) {
         jabs_message(MSG_ERROR, fit_usage);
         return SCRIPT_COMMAND_FAILURE;
     }
 
-    fit_params *p_all = fit_params_all(fit_data);
+    fit_params *p_all = fit_params_all(fit);
     if(fit_params_enable_using_string(p_all, argv[0])) {
         jabs_message(MSG_ERROR, "Error in adding fit parameters.\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -230,45 +230,45 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
         return SCRIPT_COMMAND_FAILURE;
     }
     fit_params_print(p_all, TRUE, NULL, MSG_VERBOSE);
-    fit_params_free(fit_data->fit_params);
-    fit_data->fit_params = NULL;
-    fit_data->fit_params = p_all;
+    fit_params_free(fit->fit_params);
+    fit->fit_params = NULL;
+    fit->fit_params = p_all;
 
-    if(fit_data->fit_params->n_active == 0) {
+    if(fit->fit_params->n_active == 0) {
         jabs_message(MSG_ERROR, fit_usage);
         return SCRIPT_COMMAND_FAILURE;
     }
 
-    jabs_message(MSG_INFO, "%zu fit parameters possible, %zu active.\n", fit_data->fit_params->n, fit_data->fit_params->n_active);
-    if(!fit_data->exp) { /* TODO: not enough to check this */
+    jabs_message(MSG_INFO, "%zu fit parameters possible, %zu active.\n", fit->fit_params->n, fit->fit_params->n_active);
+    if(!fit->exp) { /* TODO: not enough to check this */
         jabs_message(MSG_ERROR, "No experimental spectrum set.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(fit_data->n_fit_ranges == 0) {
+    if(fit->n_fit_ranges == 0) {
         jabs_message(MSG_ERROR, "No fit range(s) given. Use 'add fit range'.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(script_prepare_sim_or_fit(s)) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    fit_data->fit_iter_callback = s->fit_iter_callback;
-    if(fit(fit_data) < 0) {
+    fit->fit_iter_callback = s->fit_iter_callback;
+    if(fit_do(fit) < 0) {
         return SCRIPT_COMMAND_FAILURE;
     }
     jabs_message(MSG_VERBOSE, "\nFinal profile:\n");
-    sample_print(fit_data->sim->sample, FALSE, MSG_VERBOSE);
+    sample_print(fit->sim->sample, FALSE, MSG_VERBOSE);
     jabs_message(MSG_VERBOSE, "\nFinal layer thicknesses:\n");
-    sample_print_thicknesses(NULL, fit_data->sim->sample, MSG_VERBOSE);
+    sample_print_thicknesses(NULL, fit->sim->sample, MSG_VERBOSE);
     jabs_message(MSG_VERBOSE, "\nFinal sample model:\n");
-    sample_model_print(NULL, fit_data->sm, MSG_VERBOSE);
+    sample_model_print(NULL, fit->sm, MSG_VERBOSE);
     jabs_message(MSG_INFO, "\n");
-    fit_stats_print(&fit_data->stats, MSG_INFO);
+    fit_stats_print(&fit->stats, MSG_INFO);
     script_finish_sim_or_fit(s);
     return 1;
 }
 
 script_command_status script_save_simulation(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     const int argc_orig = argc;
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Usage: save simulation <file>\n");
@@ -284,7 +284,7 @@ script_command_status script_save_simulation(script_session *s, int argc, char *
 
 script_command_status script_save_spectra(script_session *s, int argc, char *const *argv) {
     size_t i_det = 0;
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     const int argc_orig = argc;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det) || argc < 1) {
         jabs_message(MSG_ERROR, "Usage: save spectra {<detector>} <file>\n");
@@ -306,7 +306,7 @@ script_command_status script_save_spectra(script_session *s, int argc, char *con
 
 
 script_command_status script_save_sample(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit_data = s->fit;
+    fit_data *fit_data = s->fit;
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Usage: save sample <file>\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -347,7 +347,7 @@ script_command_status script_save_calibrations(script_session *s, int argc, char
 }
 
 script_command_status script_remove_reaction(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     static const char *remove_reaction_usage = "Usage: remove reaction {<number | <type> <target isotope>}\n";
     if(argc < 1) {
         jabs_message(MSG_ERROR, remove_reaction_usage);
@@ -390,7 +390,7 @@ script_command_status script_remove_reaction(script_session *s, int argc, char *
 }
 
 script_command_status script_roi(script_session *s, int argc, char *const *argv) {
-    const struct fit_data *fit = s->fit;
+    const fit_data *fit = s->fit;
     const int argc_orig = argc;
     size_t i_det = 0;
 
@@ -472,7 +472,7 @@ size_t script_command_print_possible_matches_if_ambiguous(const script_command *
     return found;
 }
 
-script_command_status script_set_var(struct script_session *s, jibal_config_var *var, int argc, char *const *argv) {
+script_command_status script_set_var(script_session *s, jibal_config_var *var, int argc, char *const *argv) {
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Not enough arguments to set variable.\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -515,7 +515,7 @@ script_command_status script_set_var(struct script_session *s, jibal_config_var 
     return 1; /* Number of arguments */
 }
 
-script_command_status script_set_detector_val(struct script_session *s, int val, int argc, char *const *argv) {
+script_command_status script_set_detector_val(script_session *s, int val, int argc, char *const *argv) {
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Not enough arguments to set detector variable.\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -608,7 +608,7 @@ script_command_status script_set_detector_val(struct script_session *s, int val,
     return 1; /* Number of arguments */
 }
 
-script_command_status script_set_detector_calibration_val(struct script_session *s, int val, int argc, char *const *argv) {
+script_command_status script_set_detector_calibration_val(script_session *s, int val, int argc, char *const *argv) {
     (void) argv;
     DEBUGMSG("Active detector is %zu, active Z is %i.", s->i_det_active, s->Z_active);
     detector *det = sim_det(s->fit->sim, s->i_det_active);
@@ -676,7 +676,7 @@ script_command_status script_set_detector_calibration_val(struct script_session 
     return SCRIPT_COMMAND_FAILURE;
 }
 
-script_command_status script_set_fit_val(struct script_session *s, int val, int argc, char *const *argv) {
+script_command_status script_set_fit_val(script_session *s, int val, int argc, char *const *argv) {
     (void) argv;
     fit_data *fit = s->fit;
 
@@ -704,7 +704,7 @@ script_command_status script_set_fit_val(struct script_session *s, int val, int 
     return SCRIPT_COMMAND_SUCCESS;
 }
 
-script_command_status script_set_simulation_val(struct script_session *s, int val, int argc, char *const *argv) {
+script_command_status script_set_simulation_val(script_session *s, int val, int argc, char *const *argv) {
     (void) argv;
     simulation *sim = s->fit->sim;
 
@@ -734,7 +734,7 @@ script_command_status script_set_simulation_val(struct script_session *s, int va
     return SCRIPT_COMMAND_SUCCESS;
 }
 
-script_command_status script_set_charge(struct script_session *s, int argc, char *const *argv) {
+script_command_status script_set_charge(script_session *s, int argc, char *const *argv) {
     (void) argc; /* argc_min set elsewhere */
     double charge;
     if(jabs_unit_convert(s->jibal->units, JIBAL_UNIT_TYPE_CHARGE, argv[0], &charge) < 0) {
@@ -743,7 +743,7 @@ script_command_status script_set_charge(struct script_session *s, int argc, char
     s->fit->sim->fluence = charge / C_E;
     return 1;
 }
-script_command_status script_show_var(struct script_session *s, jibal_config_var *var, int argc, char *const *argv) {
+script_command_status script_show_var(script_session *s, jibal_config_var *var, int argc, char *const *argv) {
     (void) argv;
     (void) argc;
     (void) s;
@@ -787,7 +787,7 @@ script_command_status script_show_var(struct script_session *s, jibal_config_var
     return 0;
 }
 
-script_command_status script_enable_var(struct script_session *s, jibal_config_var *var, int argc, char *const *argv) {
+script_command_status script_enable_var(script_session *s, jibal_config_var *var, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
     (void) s;
@@ -799,7 +799,7 @@ script_command_status script_enable_var(struct script_session *s, jibal_config_v
     return 0; /* Number of arguments */
 }
 
-script_command_status script_disable_var(struct script_session *s, jibal_config_var *var, int argc, char *const *argv) {
+script_command_status script_disable_var(script_session *s, jibal_config_var *var, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
     (void) s;
@@ -984,7 +984,7 @@ const char *script_command_status_to_string(script_command_status status) {
     return "unknown";
 }
 
-script_command *script_command_new(const char *name, const char *help_text, int val, int argc_min, script_command_status (*f)(struct script_session *, int, char *const *)) {
+script_command *script_command_new(const char *name, const char *help_text, int val, int argc_min, script_command_status (*f)(script_session *, int, char *const *)) {
     if(!name)
         return NULL;
     script_command *c = malloc(sizeof(script_command));
@@ -1002,7 +1002,7 @@ script_command *script_command_new(const char *name, const char *help_text, int 
     return c;
 }
 
-int script_command_set_function(script_command *c, script_command_status (*f)(struct script_session *, int, char *const *)) {
+int script_command_set_function(script_command *c, script_command_status (*f)(script_session *, int, char *const *)) {
     if(!c)
         return EXIT_FAILURE;
     c->f = f;
@@ -1036,11 +1036,11 @@ void script_command_free(script_command *c) {
 void script_commands_free(script_command *head) {
     if(!head)
         return;
-    struct script_command *stack[SCRIPT_COMMANDS_NESTED_MAX];
-    struct script_command *c, *c_old = NULL;
+    script_command *c = head;
+    script_command *c_old = NULL;
+    script_command *stack[SCRIPT_COMMANDS_NESTED_MAX];
     stack[0] = head;
     size_t i = 0;
-    c = stack[0];
     while(c) {
         if(c->subcommands && i < SCRIPT_COMMANDS_NESTED_MAX) { /* Go deeper, push existing pointer to stack */
             stack[i] = c;
@@ -1109,13 +1109,11 @@ script_command *script_command_list_merge_sort(script_command *head) {
         return NULL;
     script_command *a[SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE];
     memset(a, 0, sizeof(script_command *) * SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE);
-    script_command *result;
-    script_command *next;
-    result = head;
+    script_command *result = head;
     size_t i;
     DEBUGVERBOSEMSG("Sorting command list (head %p = %s)", (void *)head, head->name);
     while(result != NULL) {
-        next = result->next;
+        script_command *next = result->next;
         result->next = NULL;
 
         for(i = 0; (i < SCRIPT_COMMAND_MERGE_SORT_ARRAY_SIZE) && (a[i] != NULL); i++) {
@@ -1206,7 +1204,7 @@ script_command *script_command_list_from_vars_array(const jibal_config_var *vars
     return head;
 }
 
-script_command *script_commands_create(struct script_session *s) {
+script_command *script_commands_create(script_session *s) {
     fit_data *fit = s->fit;
     simulation *sim = fit->sim;
     script_command *head = NULL;
@@ -1463,8 +1461,8 @@ script_command *script_commands_create(struct script_session *s) {
 script_command *script_commands_sort_all(script_command *head) {
     if(!head)
         return NULL;
-    struct script_command *stack[SCRIPT_COMMANDS_NESTED_MAX];
-    struct script_command *c;
+    script_command *stack[SCRIPT_COMMANDS_NESTED_MAX];
+    script_command *c;
     head = script_command_list_merge_sort(head);
     stack[0] = head;
     size_t i = 0;
@@ -1490,25 +1488,25 @@ script_command *script_commands_sort_all(script_command *head) {
     return head;
 }
 
-void script_commands_print(const struct script_command *commands) {
+void script_commands_print(const script_command *commands) {
     if(!commands)
         return;
     size_t len_max = 0;
-    for(const struct script_command *c = commands; c; c = c->next) {
+    for(const script_command *c = commands; c; c = c->next) {
         if(!c->help_text)
             continue;
         len_max = JABS_MAX(len_max, strlen(c->name));
     }
-    for(const struct script_command *c = commands; c; c = c->next) {
+    for(const script_command *c = commands; c; c = c->next) {
         if(!c->help_text)
             continue;
         jabs_message(MSG_INFO, " %*s    %s\n", len_max, c->name, c->help_text);
     }
 }
 
-void script_print_command_tree(const struct script_command *commands) {
-    const struct script_command *stack[SCRIPT_COMMANDS_NESTED_MAX];
-    const struct script_command *c;
+void script_print_command_tree(const script_command *commands) {
+    const script_command *stack[SCRIPT_COMMANDS_NESTED_MAX];
+    const script_command *c;
     stack[0] = commands;
     size_t i = 0;
     c = stack[0];
@@ -1556,7 +1554,7 @@ script_command_status script_load_script(script_session *s, int argc, char *cons
 }
 
 script_command_status script_load_sample(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Usage: load sample [file]\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -1574,7 +1572,7 @@ script_command_status script_load_sample(script_session *s, int argc, char *cons
 }
 
 script_command_status script_load_experimental(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     const int argc_orig = argc;
     size_t i_det = 0;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
@@ -1606,7 +1604,7 @@ script_command_status script_load_experimental(script_session *s, int argc, char
 }
 
 script_command_status script_load_reference(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     const int argc_orig = argc;
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Usage: load reference <filename>\n");
@@ -1626,7 +1624,7 @@ script_command_status script_load_reference(script_session *s, int argc, char *c
 }
 
 script_command_status script_load_reaction(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     const int argc_orig = argc;
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Usage: load reaction <file>\n");
@@ -1665,7 +1663,7 @@ script_command_status script_load_reaction(script_session *s, int argc, char *co
 }
 
 script_command_status script_load_roughness(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     sample_model *sm = fit->sm;
     if(argc < 2) {
         jabs_message(MSG_ERROR, "Usage: load roughness <layer> <file>\n");
@@ -1725,7 +1723,7 @@ script_command_status script_reset_fit(script_session *s, int argc, char *const 
 script_command_status script_reset_sample(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     sample_model_free(fit->sm);
     fit->sm = NULL;
     return 0;
@@ -1757,7 +1755,7 @@ script_command_status script_reset(script_session *s, int argc, char *const *arg
     if(!s) {
         return SCRIPT_COMMAND_FAILURE;
     }
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     (void) argc; /* Unused */
     (void) argv; /* Unused */
     if(argc > 0) {
@@ -1792,7 +1790,7 @@ script_command_status script_show_sample(script_session *s, int argc, char *cons
     if(argc > 0) {
         return SCRIPT_COMMAND_NOT_FOUND;
     }
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     if(!fit->sm) {
         jabs_message(MSG_WARNING, "No sample has been set.\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -1815,10 +1813,10 @@ script_command_status script_show_sample(script_session *s, int argc, char *cons
     return 0;
 }
 
-script_command_status script_show_sample_profile(struct script_session *s, int argc, char * const *argv) {
+script_command_status script_show_sample_profile(script_session *s, int argc, char * const *argv) {
     (void) argc;
     (void) argv;
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     if(!fit->sm) {
         jabs_message(MSG_WARNING, "No sample has been set.\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -1910,9 +1908,9 @@ script_command_status script_show_fit_correlation(script_session *s, int argc, c
     return 0;
 }
 
-script_command_status script_show_aperture(struct script_session *s, int argc, char *const *argv) {
+script_command_status script_show_aperture(script_session *s, int argc, char *const *argv) {
     (void) argv;
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     const int argc_orig = argc;
     char *aperture_str = aperture_to_string(fit->sim->beam_aperture);
     jabs_message(MSG_INFO, "aperture %s\n", aperture_str);
@@ -1929,7 +1927,7 @@ script_command_status script_show_calc_params(script_session *s, int argc, char 
 
 
 script_command_status script_show_detector(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     size_t i_det = 0;
     const int argc_orig = argc;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
@@ -1963,7 +1961,7 @@ script_command_status script_show_detector(script_session *s, int argc, char *co
 script_command_status script_show_reactions(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     if(fit->sim->n_reactions == 0) {
         jabs_message(MSG_INFO, "No reactions.\n");
     }
@@ -1972,7 +1970,7 @@ script_command_status script_show_reactions(script_session *s, int argc, char *c
 }
 
 script_command_status script_set_ion(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Usage: set ion <isotope>\nExample: set ion 4He\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -2023,7 +2021,7 @@ script_command_status script_set_channeling_slope(script_session *s, int argc, c
 }
 
 script_command_status script_set_aperture(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     const int argc_orig = argc;
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Usage: set aperture <type> {width|height|diameter} ...\n");
@@ -2053,7 +2051,7 @@ script_command_status script_set_aperture(script_session *s, int argc, char *con
 }
 
 script_command_status script_set_detector(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     size_t i_det = 0;
     const int argc_orig = argc;
     if(script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det)) {
@@ -2066,7 +2064,7 @@ script_command_status script_set_detector(script_session *s, int argc, char *con
     return argc_orig - argc;
 }
 
-script_command_status script_set_detector_aperture(struct script_session *s, int argc, char *const *argv) {
+script_command_status script_set_detector_aperture(script_session *s, int argc, char *const *argv) {
     const int argc_orig = argc;
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Usage: set detector aperture <type> {width|height|diameter} ...\n");
@@ -2083,7 +2081,7 @@ script_command_status script_set_detector_aperture(struct script_session *s, int
     return argc_orig - argc;
 }
 
-script_command_status script_set_detector_calibration(struct script_session *s, int argc, char *const *argv) {
+script_command_status script_set_detector_calibration(script_session *s, int argc, char *const *argv) {
     (void) s;
     (void) argc;
     (void) argv;
@@ -2102,7 +2100,7 @@ script_command_status script_set_detector_calibration(struct script_session *s, 
     return argc_orig - argc;
 }
 
-script_command_status script_set_detector_foil(struct script_session *s, int argc, char *const *argv) {
+script_command_status script_set_detector_foil(script_session *s, int argc, char *const *argv) {
     const int argc_orig = argc;
     detector *det = sim_det(s->fit->sim, s->i_det_active);
     if(!det) {
@@ -2115,7 +2113,7 @@ script_command_status script_set_detector_foil(struct script_session *s, int arg
     return argc_orig - argc;
 }
 
-script_command_status script_set_detector_calibration_poly(struct script_session *s, int argc, char *const *argv) {
+script_command_status script_set_detector_calibration_poly(script_session *s, int argc, char *const *argv) {
     const int argc_orig = argc;
     detector *det = sim_det(s->fit->sim, s->i_det_active);
     if(!det) {
@@ -2165,7 +2163,7 @@ script_command_status script_set_detector_calibration_poly(struct script_session
     return argc_orig - argc;
 }
 
-script_command_status script_set_detector_name(struct script_session *s, int argc, char * const *argv) {
+script_command_status script_set_detector_name(script_session *s, int argc, char * const *argv) {
     detector *det = sim_det(s->fit->sim, s->i_det_active);
     if(!det) {
         jabs_message(MSG_ERROR, "No detector(s)\n");
@@ -2183,7 +2181,7 @@ script_command_status script_set_detector_name(struct script_session *s, int arg
 }
 
 script_command_status script_set_sample(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     if(argc < 2) {
         jabs_message(MSG_ERROR, "Usage: set sample {nosimplify} <sample description>\nExample: set sample TiO2 1000tfu Si 10000tfu\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -2205,7 +2203,7 @@ script_command_status script_set_sample(script_session *s, int argc, char *const
     return argc_consumed;
 }
 
-script_command_status script_set_stopping(struct script_session *s, int argc, char *const *argv) {
+script_command_status script_set_stopping(script_session *s, int argc, char *const *argv) {
     const int argc_orig = argc;
     if(argc < 3) {
         jabs_message(MSG_ERROR, "Usage: set stopping <file> <element or Z1> <element or Z2> {<element or Z2>}\n");
@@ -2259,7 +2257,7 @@ script_command_status script_set_stopping(struct script_session *s, int argc, ch
     return argc_orig - argc;
 }
 
-script_command_status script_set_verbosity(struct script_session *s, int argc, char * const *argv) {
+script_command_status script_set_verbosity(script_session *s, int argc, char * const *argv) {
     (void) s;
     if(argc < 1) { /* argc_min set elsewhere, this is redundant, no error reporting */
         return EXIT_FAILURE;
@@ -2277,8 +2275,8 @@ script_command_status script_set_verbosity(struct script_session *s, int argc, c
     return 1;
 }
 
-script_command_status script_test_reference(struct script_session *s, int argc, char *const *argv) {
-    const struct fit_data *fit = s->fit;
+script_command_status script_test_reference(script_session *s, int argc, char *const *argv) {
+    const fit_data *fit = s->fit;
     const int argc_orig = argc;
     size_t i_det = 0;
     if(!fit->ref) {
@@ -2322,8 +2320,8 @@ script_command_status script_test_reference(struct script_session *s, int argc, 
     return return_value;
 }
 
-script_command_status script_test_roi(struct script_session *s, int argc, char *const *argv) {
-    const struct fit_data *fit = s->fit;
+script_command_status script_test_roi(script_session *s, int argc, char *const *argv) {
+    const fit_data *fit = s->fit;
     const int argc_orig = argc;
     size_t i_det = 0;
     int exp = FALSE;
@@ -2367,10 +2365,10 @@ script_command_status script_test_roi(struct script_session *s, int argc, char *
     return argc_orig - argc;
 }
 
-script_command_status script_split_sample_elements(struct script_session *s, int argc, char *const *argv) {
+script_command_status script_split_sample_elements(script_session *s, int argc, char *const *argv) {
     (void) argc;
     (void) argv;
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     sample_model *sm = fit->sm;
     fit->sm = sample_model_split_elements(sm);
     sample_model_free(sm);
@@ -2378,7 +2376,7 @@ script_command_status script_split_sample_elements(struct script_session *s, int
 }
 
 script_command_status script_add_reaction(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     if(argc < 2) {
         jabs_message(MSG_ERROR, "Usage: add reaction <type> <isotope> {cs <cross section model>} {min <min energy>} {max <max energy} {yield <cross section scaling factor>}.\nType should be one of the following: RBS RBS- ERD\n");
         jabs_message(MSG_ERROR, "Alternate usage: add reaction FILE <some R33 file>\n\n");
@@ -2411,7 +2409,7 @@ script_command_status script_add_reaction(script_session *s, int argc, char *con
 }
 
 script_command_status script_add_reactions(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     if(!fit->sm) {
         jabs_message(MSG_ERROR,
                      "Cannot add reactions before sample has been set (I need to know which reactions to add!).\n");
@@ -2447,7 +2445,7 @@ script_command_status script_add_reactions(script_session *s, int argc, char *co
 script_command_status script_add_detector_default(script_session *s, int argc, char *const *argv) {
     (void) argc; /* Doesn't consume arguments */
     (void) argv;
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     if(fit_data_add_det(fit, detector_default(NULL))) {
         return SCRIPT_COMMAND_FAILURE;
     } else {
@@ -2456,7 +2454,7 @@ script_command_status script_add_detector_default(script_session *s, int argc, c
 }
 
 script_command_status script_add_fit_range(script_session *s, int argc, char *const *argv) {
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     size_t i_det = 0;
     const int argc_orig = argc;
     script_get_detector_number(fit->sim, TRUE, &argc, &argv, &i_det);
@@ -2585,7 +2583,7 @@ script_command_status script_help_commands(script_session *s, int argc, char *co
 }
 
 #ifdef JABS_PLUGINS
-script_command_status script_identify_plugin(struct script_session *s, int argc, char * const *argv) {
+script_command_status script_identify_plugin(script_session *s, int argc, char * const *argv) {
     (void) s;
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Usage: identify plugin <path>\n");
@@ -2603,7 +2601,7 @@ script_command_status script_identify_plugin(struct script_session *s, int argc,
 
 script_command_status script_load_reaction_plugin(script_session *s, int argc, char *const *argv) {
     const int argc_orig = argc;
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     if(argc < 2) {
         jabs_message(MSG_ERROR, "Usage: load reaction plugin <file> <target> ...\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -2649,7 +2647,7 @@ script_command_status script_load_reaction_plugin(script_session *s, int argc, c
 }
 #endif
 
-script_command_status script_cwd(struct script_session *s, int argc, char *const *argv) {
+script_command_status script_cwd(script_session *s, int argc, char *const *argv) {
     (void) s;
     (void) argv;
     if(argc != 0) {
@@ -2661,7 +2659,7 @@ script_command_status script_cwd(struct script_session *s, int argc, char *const
     return SCRIPT_COMMAND_SUCCESS;
 }
 
-script_command_status script_cd(struct script_session *s, int argc, char *const *argv) {
+script_command_status script_cd(script_session *s, int argc, char *const *argv) {
     (void) s;
     const int argc_orig = argc;
     if(argc < 1) {
@@ -2677,7 +2675,7 @@ script_command_status script_cd(struct script_session *s, int argc, char *const 
     return argc_orig - argc;
 }
 
-script_command_status script_idf2jbs(struct script_session *s, int argc, char * const *argv) {
+script_command_status script_idf2jbs(script_session *s, int argc, char * const *argv) {
     const int argc_orig = argc;
     (void) s;
     if(argc < 1) {
@@ -2700,9 +2698,9 @@ script_command_status script_idf2jbs(struct script_session *s, int argc, char * 
     return argc_orig - argc;
 }
 
-script_command_status script_kinematics(struct script_session *s, int argc, char * const *argv) {
+script_command_status script_kinematics(script_session *s, int argc, char * const *argv) {
     const int argc_orig = argc;
-    struct fit_data *fit = s->fit;
+    fit_data *fit = s->fit;
     const simulation *sim = s->fit->sim;
     if(argc < 1) {
         jabs_message(MSG_ERROR, "Usage: kinematics <type> <target atom>\nSyntax of \"add reaction\" is used.\n");

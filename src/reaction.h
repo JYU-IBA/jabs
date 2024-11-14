@@ -37,10 +37,10 @@ typedef enum {
     REACTION_PLUGIN = 5
 } reaction_type;
 
-struct reaction_point {
+typedef struct reaction_point {
     double E;
     double sigma;
-};
+} reaction_point;
 
 typedef enum jabs_reaction_cs {
     JABS_CS_NONE = 0,
@@ -80,7 +80,7 @@ typedef struct reaction {
     jabs_plugin *plugin; /* for REACTION_PLUGIN */
     jabs_plugin_reaction *plugin_r; /* for REACTION_PLUGIN */
 #endif
-    struct reaction_point *cs_table; /* for REACTION_FILE */
+    reaction_point *cs_table; /* for REACTION_FILE */
     size_t n_cs_table;
     double theta; /* For REACTION_FILE */
     double Q;

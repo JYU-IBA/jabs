@@ -173,7 +173,7 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
         }
         scatint_set_theta(sp, sim_r->theta);
     }
-    sim_r->cs_table = malloc(n * sizeof(struct reaction_point));
+    sim_r->cs_table = malloc(n * sizeof(reaction_point));
     if(!sim_r->cs_table) {
         return EXIT_FAILURE;
     }
@@ -186,7 +186,7 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
         double E = emin + (sim_r->cs_estep) * i;
         const double E_cm = sim_r->E_cm_ratio * E;
         double sigma_r = sim_r->cs_constant / pow2(E_cm) ;
-        struct reaction_point *rp = &sim_r->cs_table[i];
+        reaction_point *rp = &sim_r->cs_table[i];
         rp->E = E;
         switch(cs) {
             case JABS_CS_ANDERSEN:
@@ -302,7 +302,7 @@ double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E
 double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E) {
     size_t lo, mi, hi;
     const reaction *r = sim_r->r;
-    const struct reaction_point *t = r->cs_table;
+    const reaction_point *t = r->cs_table;
     hi = r->n_cs_table - 1;
     lo = 0;
     if(E < t[lo].E || E > t[hi].E) {

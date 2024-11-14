@@ -55,7 +55,7 @@ typedef enum fit_phase {
         FIT_PHASE_SLOW = 2
 } fit_phase;
 
-struct fit_stats {
+typedef struct fit_stats {
     fit_phase phase;
     size_t n_evals;
     size_t n_evals_iter; /* Number of function evaluations per iteration */
@@ -71,7 +71,7 @@ struct fit_stats {
     size_t iter;
     size_t iter_call;
     int error;
-};
+} fit_stats;
 
 typedef struct roi {
     size_t i_det; /* detector sim->det[i_det] */
@@ -122,7 +122,7 @@ typedef struct fit_data {
     fit_stats stats; /* Fit statistics, updated as we iterate */
     int phase_start; /* Fit phase to start from (see FIT_PHASE -defines) */
     int phase_stop; /* Inclusive */
-    int (*fit_iter_callback)(struct fit_stats stats);
+    int (*fit_iter_callback)(fit_stats stats);
     gsl_vector *f_iter;
     double h_df;
     jacobian_space *jspace;
@@ -138,7 +138,7 @@ void fit_data_free(fit_data *fit); /* Doesn't free everything in fit, like sm, j
 void fit_data_reset(fit_data *fit);
 void fit_data_exp_reset(fit_data *fit);
 void fit_data_print(const fit_data *fit, jabs_msg_level msg_level);
-void fit_data_roi_print(const struct fit_data *fit_data, const struct roi *roi);
+void fit_data_roi_print(const fit_data *fit, const roi *roi);
 jabs_histogram *fit_data_exp(const fit_data *fit, size_t i_det);
 jabs_histogram *fit_data_ref(const fit_data *fit_data);
 fit_params *fit_params_all(fit_data *fit);
@@ -146,30 +146,30 @@ int fit_data_fdd_init(fit_data *fit);
 void fit_data_fdd_free(fit_data *fit);
 void fit_data_exp_alloc(fit_data *fit);
 void fit_data_exp_free(fit_data *fit);
-int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename);
+int fit_data_load_exp(fit_data *fit, size_t i_det, const char *filename);
 int fit_data_set_sample_model(fit_data *fit, sample_model *sm_new); /* Sets sample model of the fit (copies pointer), freeing the old model. Resets reactions. */
 jabs_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det);
 void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *s, const detector *det, const jabs_histogram *exp, const sim_workspace *ws); /* Makes deep copies of histograms */
 int fit_data_spectra_alloc(fit_data *fit);
 void fit_data_spectra_free(fit_data *fit);
-int fit_data_add_det(struct fit_data *fit, detector *det);
+int fit_data_add_det(fit_data *fit, detector *det);
 fit_data_det *fit_data_fdd(const fit_data *fit, size_t i_det);
-size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data);
-struct fit_stats fit_stats_init(void);
-int fit(fit_data *fit);
+size_t fit_data_ranges_calculate_number_of_channels(const fit_data *fit);
+fit_stats fit_stats_init(void);
+int fit_do(fit_data *fit);
 void fit_correlation_print(const gsl_matrix *covar, jabs_msg_level msg_level);
 int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_matrix *covar, const gsl_vector *f, const gsl_vector *w, const char *filename); /* Calculates +/- uncertainty spectra and copies them to fit. If filename is not null, writes (debug) output in it. */
-int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x); /* Updates values in fit params as they are varied by the fit algorithm. */
+int fit_parameters_set_from_vector(fit_data *fit, const gsl_vector *x); /* Updates values in fit params as they are varied by the fit algorithm. */
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f);
 int fit_determine_active_detectors(fit_data *fit);
 int fit_sanity_check(const fit_data *fit);
-void fit_iter_stats_update(struct fit_data *params, const gsl_multifit_nlinear_workspace *w);
-void fit_iter_stats_print(const struct fit_stats *stats);
-void fit_stats_print(const struct fit_stats *stats, jabs_msg_level msg_level);
-int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range); /* Makes a deep copy */
-void fit_data_fit_ranges_free(struct fit_data *fit_data);
+void fit_iter_stats_update(fit_data *params, const gsl_multifit_nlinear_workspace *w);
+void fit_iter_stats_print(const fit_stats *stats);
+void fit_stats_print(const fit_stats *stats, jabs_msg_level msg_level);
+int fit_data_fit_range_add(fit_data *fit_data, const roi *range); /* Makes a deep copy */
+void fit_data_fit_ranges_free(fit_data *fit_data);
 int fit_set_roi_from_string(roi *r, const char *str); /* Parses only low and high from "[low:high]". */
-double fit_emin(struct fit_data *fit, size_t i_det); /* Returns lowest energy of fit ranges for detector i_det. Detectors, calibrations and fit ranges must be set before calling. */
+double fit_emin(fit_data *fit, size_t i_det); /* Returns lowest energy of fit ranges for detector i_det. Detectors, calibrations and fit ranges must be set before calling. */
 const char *fit_error_str(int error);
 int fit_range_compare(const void *a, const void *b);
 const char *fit_phase_to_str(const fit_phase phase);

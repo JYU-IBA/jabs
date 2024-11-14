@@ -312,9 +312,9 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     }
     /* TODO: copy and convert data (check units etc) */
     r->n_cs_table = rfile->n_data;
-    r->cs_table = calloc(r->n_cs_table, sizeof(struct reaction_point));
+    r->cs_table = calloc(r->n_cs_table, sizeof(reaction_point));
     for(size_t i = 0; i < rfile->n_data; i++) {
-        struct reaction_point *rp = &r->cs_table[i];
+        reaction_point *rp = &r->cs_table[i];
         rp->E = rfile->data[i][0] * rfile->enfactors[0] * C_KEV; /* TODO: other factors? */
         if(rfile->unit == R33_UNIT_RR) {
             rp->sigma = rfile->data[i][2] * rfile->sigfactors[0] * jibal_cross_section_rbs(r->incident, r->target, r->theta, rp->E, JIBAL_CS_RUTHERFORD);

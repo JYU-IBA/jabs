@@ -47,7 +47,7 @@ depth stop_next_crossing(const ion *incident, const sample *sample, const depth 
 
 depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, const sample *sample, depth depth_before, double step) {
     double k1, k2, k3, k4, stopping, dE, E;
-    struct depth depth_next = stop_next_crossing(incident, sample, &depth_before);
+    depth depth_next = stop_next_crossing(incident, sample, &depth_before);
     double h_max_perp = depth_next.x - depth_before.x;
 #ifdef DEBUG_STOP_STEP
     if(depth_next.i != depth_before.i) {

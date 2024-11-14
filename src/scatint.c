@@ -203,13 +203,13 @@ int apsis(scatint_params *params) {
 }
 
 double scat_theta_f(double x, void *params) {
-    struct scatint_params *p = (struct scatint_params *) params;
+     scatint_params *p = (scatint_params *) params;
     double f = sqrt(apsis_f(x, p));
     double out = 1.0/(x*x*f);
     return out;
 }
 
-int calc_scattering_angle(struct scatint_params *params) {
+int calc_scattering_angle(scatint_params *params) {
     double result, error;
     gsl_function F;
     F.function = &scat_theta_f;

@@ -76,7 +76,7 @@ int fit_detector(const jibal *jibal, const fit_data_det *fdd, const simulation *
 void fit_deriv_prepare_jspaces(const gsl_vector *x, fit_data *fit) {
     jacobian_space *space = fit->jspace;
     for(size_t j = 0; j < fit->fit_params->n_active; j++) { /* Make copies of sim (shallow) with deep copies of detector and sample. This way we can parallelize. */
-        struct jacobian_space *spc = &space[j];
+        jacobian_space *spc = &space[j];
         spc->n_spectra_calculated = 0;
         fit_variable *var = spc->var;
         double xj = gsl_vector_get(x, j);
@@ -105,7 +105,7 @@ void fit_deriv_prepare_jspaces(const gsl_vector *x, fit_data *fit) {
 void fit_deriv_cleanup_jspaces(fit_data *fit) {
     jacobian_space *space = fit->jspace;
     for(size_t j = 0; j <  fit->fit_params->n_active; j++) {
-        struct jacobian_space *spc = &space[j];
+        jacobian_space *spc = &space[j];
         fit_variable *var = spc->var;
         fit->stats.n_spectra_iter += spc->n_spectra_calculated;
         switch(var->type) {
@@ -122,7 +122,7 @@ void fit_deriv_cleanup_jspaces(fit_data *fit) {
 }
 
 int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
-    struct fit_data *fit = (struct fit_data *) params;
+    fit_data *fit = (fit_data *) params;
     assert(fit->stats.iter_call >= 1); /* This function relies on data that was computed when iter_call == 1 */
     assert(fit->fdf->p == fit->fit_params->n_active);
 
@@ -138,7 +138,7 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
 #pragma omp for schedule(dynamic)
     for(j = 0; j < n; j++) {
         //fprintf(stderr, "Thread id %i got %zu.\n", omp_get_thread_num(), j);
-        struct jacobian_space *spc = &fit->jspace[j];
+        jacobian_space *spc = &fit->jspace[j];
         fit_variable *var = spc->var;
         size_t i_start, i_stop;
         if(var->type == FIT_VARIABLE_DETECTOR) {
@@ -178,7 +178,7 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
 }
 
 int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
-    struct fit_data *fit = (struct fit_data *) params;
+    fit_data *fit = (fit_data *) params;
     fit->stats.iter_call++;
     if(fit->stats.iter_call == 1) { /* Clear stored spectra from previous iteration */
         for(size_t i = 0; i < fit->n_det_spectra; i++) {
@@ -254,7 +254,7 @@ int fit_sanity_check(const fit_data *fit) {
     return GSL_SUCCESS;
 }
 
-int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x) {
+int fit_parameters_set_from_vector(fit_data *fit, const gsl_vector *x) {
     DEBUGMSG("Fit iteration has %zu active parameters from a total of %zu possible.", fit->fit_params->n_active, fit->fit_params->n)
     for(size_t i = 0; i < fit->fit_params->n; i++) {
         fit_variable *var = &fit->fit_params->vars[i];
@@ -271,7 +271,7 @@ int fit_parameters_set_from_vector(struct fit_data *fit, const gsl_vector *x) {
     return GSL_SUCCESS;
 }
 
-void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear_workspace *w) {
+void fit_iter_stats_update(fit_data *fit_data, const gsl_multifit_nlinear_workspace *w) {
     gsl_vector *f = gsl_multifit_nlinear_residual(w);
     /* compute reciprocal condition number of J(x) */
     gsl_multifit_nlinear_rcond(&fit_data->stats.rcond, w);
@@ -283,20 +283,20 @@ void fit_iter_stats_update(struct fit_data *fit_data, const gsl_multifit_nlinear
     fit_data->stats.cputime_cumul += fit_data->stats.cputime_iter;
 }
 
-void fit_iter_stats_print(const struct fit_stats *stats) {
+void fit_iter_stats_print(const fit_stats *stats) {
     jabs_message(MSG_INFO, "%4zu | %10.2e | %14.7e | %12.7lf | %7zu | %7zu | %10.3lf | %13.1lf |\n",
                  stats->iter, 1.0 / stats->rcond, stats->norm,
                  stats->chisq_dof, stats->n_evals, stats->n_spectra,
                  stats->cputime_cumul, 1000.0 * stats->cputime_iter / stats->n_spectra_iter);
 }
 
-void fit_stats_print(const struct fit_stats *stats, jabs_msg_level msg_level) {
+void fit_stats_print(const fit_stats *stats, jabs_msg_level msg_level) {
     if(stats->chisq_dof > 0.0) {
         jabs_message(msg_level, "Final chisq/dof = %.7lf\n", stats->chisq_dof);
     }
 }
 
-int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range) { /* Makes a deep copy */
+int fit_data_fit_range_add(fit_data *fit_data, const roi *range) { /* Makes a deep copy */
     if(range->low == 0 && range->high == 0) {
         return EXIT_FAILURE;
     }
@@ -314,7 +314,7 @@ int fit_data_fit_range_add(struct fit_data *fit_data, const struct roi *range) {
     return EXIT_SUCCESS;
 }
 
-void fit_data_fit_ranges_free(struct fit_data *fit_data) {
+void fit_data_fit_ranges_free(fit_data *fit_data) {
     if(!fit_data)
         return;
     free(fit_data->fit_ranges);
@@ -341,7 +341,7 @@ void fit_data_det_residual_vector_set(const fit_data_det *fdd, const jabs_histog
     DEBUGMSG("Set %zu elements of vector from %zu ranges.", i_vec, fdd->n_ranges);
 }
 fit_data *fit_data_new(const jibal *jibal, simulation *sim) {
-    struct fit_data *fit = calloc(1, sizeof(struct fit_data));
+    fit_data *fit = calloc(1, sizeof(fit_data));
     fit->jibal = jibal;
     fit->sim = sim;
     fit_data_exp_alloc(fit);
@@ -425,20 +425,20 @@ void fit_data_exp_reset(fit_data *fit) {
     }
 }
 
-void fit_data_roi_print(const struct fit_data *fit_data, const struct roi *roi) {
-    if(!fit_data) {
+void fit_data_roi_print(const fit_data *fit, const struct roi *roi) {
+    if(!fit) {
         return;
     }
-    jabs_histogram *histo_sim = fit_data_histo_sum(fit_data, roi->i_det);
-    jabs_histogram *histo_exp = fit_data_exp(fit_data, roi->i_det);
-    jabs_histogram *histo_ref = fit_data->ref;
+    jabs_histogram *histo_sim = fit_data_histo_sum(fit, roi->i_det);
+    jabs_histogram *histo_exp = fit_data_exp(fit, roi->i_det);
+    jabs_histogram *histo_ref = fit->ref;
     size_t n_sim = jabs_histogram_channels_in_range(histo_sim, roi->low, roi->high);
     size_t n_exp = jabs_histogram_channels_in_range(histo_exp, roi->low, roi->high);
     size_t n_ref = jabs_histogram_channels_in_range(histo_ref, roi->low, roi->high);
     double sim_cts = jabs_histogram_roi(histo_sim, roi->low, roi->high);
     double exp_cts = jabs_histogram_roi(histo_exp, roi->low, roi->high);
     double ref_cts = jabs_histogram_roi(histo_ref, roi->low, roi->high);
-    const detector *det = sim_det(fit_data->sim, roi->i_det);
+    const detector *det = sim_det(fit->sim, roi->i_det);
 
     jabs_message(MSG_INFO, "          low = %12zu\n", roi->low);
     jabs_message(MSG_INFO, "         high = %12zu\n", roi->high);
@@ -677,7 +677,7 @@ void fit_data_exp_free(fit_data *fit) {
     fit->n_exp = 0;
 }
 
-int fit_data_load_exp(struct fit_data *fit, size_t i_det, const char *filename) {
+int fit_data_load_exp(fit_data *fit, size_t i_det, const char *filename) {
     jabs_histogram *h = spectrum_read_detector(filename, sim_det(fit->sim, i_det));
     if(!h) {
         jabs_message(MSG_ERROR, "Reading spectrum from file \"%s\" was not successful.\n", filename);
@@ -756,7 +756,7 @@ void fit_data_spectra_free(fit_data *fit) {
     fit->n_det_spectra = 0;
 }
 
-int fit_data_add_det(struct fit_data *fit, detector *det) {
+int fit_data_add_det(fit_data *fit, detector *det) {
     if(!fit || !det)
         return EXIT_FAILURE;
     if(sim_det_add(fit->sim, det)) {
@@ -775,11 +775,11 @@ fit_data_det *fit_data_fdd(const fit_data *fit, size_t i_det) {
 }
 
 
-size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_data) {
+size_t fit_data_ranges_calculate_number_of_channels(const fit_data *fit) {
     size_t sum = 0;
-    for(size_t i = 0; i < fit_data->n_fit_ranges; i++) {
-        roi *r = &fit_data->fit_ranges[i];
-        detector *det = sim_det(fit_data->sim, r->i_det);
+    for(size_t i = 0; i < fit->n_fit_ranges; i++) {
+        roi *r = &fit->fit_ranges[i];
+        detector *det = sim_det(fit->sim, r->i_det);
         if(!det) {
             continue;
         }
@@ -792,8 +792,8 @@ size_t fit_data_ranges_calculate_number_of_channels(const struct fit_data *fit_d
     return sum;
 }
 
-struct fit_stats fit_stats_init(void) {
-    struct fit_stats s;
+fit_stats fit_stats_init(void) {
+    fit_stats s;
     s.n_evals = 0;
     s.n_evals_iter = 0;
     s.n_spectra = 0;
@@ -869,31 +869,30 @@ int multifit_nlinear_print_jacobian(const gsl_multifit_nlinear_workspace *w, con
     return EXIT_SUCCESS;
 }
 
-int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, const double chisq_tol, struct fit_data *fit_data, gsl_multifit_nlinear_workspace *w) {
+int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, const double chisq_tol, fit_data *fit, gsl_multifit_nlinear_workspace *w) {
     int status = 0;
-    size_t iter;
     double chisq_dof_old;
     jabs_message(MSG_INFO, "iter |   cond(J)  |     |f(x)|     |   chisq/dof  |   evals | spectra | time cumul | time/spectrum |\n");
     jabs_message(MSG_INFO, "     |            |                |              |  cumul. |  cumul. |          s |            ms |\n");
-    for(iter = 0; iter <= maxiter; iter++) {
-        fit_data->stats.iter_call = 0;
-        fit_data->stats.iter = iter;
+    for(size_t iter = 0; iter <= maxiter; iter++) {
+        fit->stats.iter_call = 0;
+        fit->stats.iter = iter;
         if(iter) {
-            chisq_dof_old = fit_data->stats.chisq_dof;
-            fit_data->stats.cputime_iter = 0.0;
-            fit_data->stats.n_evals_iter = 0;
-            fit_data->stats.n_spectra_iter = 0;
+            chisq_dof_old = fit->stats.chisq_dof;
+            fit->stats.cputime_iter = 0.0;
+            fit->stats.n_evals_iter = 0;
+            fit->stats.n_spectra_iter = 0;
             status = gsl_multifit_nlinear_iterate(w);
             DEBUGMSG("Iteration status %i (%s)", status, gsl_strerror(status));
         }
-        if(fit_data->stats.error) {
-            return fit_data->stats.error;
+        if(fit->stats.error) {
+            return fit->stats.error;
         }
         if(status == GSL_ENOPROG && iter == 1) {
             return FIT_ERROR_NO_PROGRESS;
         }
-        fit_iter_stats_update(fit_data, w);
-        fit_iter_stats_print(&fit_data->stats);
+        fit_iter_stats_update(fit, w);
+        fit_iter_stats_print(&fit->stats);
 #ifdef DEBUG
         if(fit_data->stats.phase > FIT_PHASE_FAST) {
             char *jacobian_filename;
@@ -904,8 +903,8 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
             }
         }
 #endif
-        if(fit_data->fit_iter_callback) {
-            if(fit_data->fit_iter_callback(fit_data->stats)) {
+        if(fit->fit_iter_callback) {
+            if(fit->fit_iter_callback(fit->stats)) {
                 return FIT_ERROR_ABORTED;
             }
         }
@@ -916,8 +915,8 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
         if(status == GSL_SUCCESS) {
             return FIT_SUCCESS_DELTA;
         }
-        double chisq_change = 1.0 - fit_data->stats.chisq_dof / chisq_dof_old;
-        if(fit_data->stats.chisq_dof > chisq_dof_old) {
+        double chisq_change = 1.0 - fit->stats.chisq_dof / chisq_dof_old;
+        if(fit->stats.chisq_dof > chisq_dof_old) {
             jabs_message(MSG_WARNING, "Chisq increased, this probably shouldn't happen.\n");
         }
         if(chisq_change < chisq_tol) {
@@ -1055,8 +1054,8 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
     return EXIT_SUCCESS;
 }
 
-int fit(fit_data *fit) {
-    struct fit_params *fit_params = fit->fit_params;
+int fit_do(fit_data *fit) {
+    fit_params *fit_params = fit->fit_params;
     if(!fit_params || fit_params->n_active == 0) {
         jabs_message(MSG_ERROR, "No parameters to fit.\n");
         return EXIT_FAILURE;
@@ -1280,7 +1279,7 @@ int fit_set_roi_from_string(roi *r, const char *str) {
     return EXIT_SUCCESS;
 }
 
-double fit_emin(struct fit_data *fit, size_t i_det) {
+double fit_emin(fit_data *fit, size_t i_det) {
     double emin = fit->sim->beam_E;
     for(size_t i_range = 0; i_range < fit->n_fit_ranges; i_range++) {
         const roi *r = &(fit->fit_ranges[i_range]);

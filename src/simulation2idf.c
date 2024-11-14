@@ -25,7 +25,7 @@
 #include "simulation2idf.h"
 
 
-int simulation2idf(const struct fit_data *fit, const char *filename) {
+int simulation2idf(const fit_data *fit, const char *filename) {
     if(!fit->sim) {
         return EXIT_FAILURE;
     }
@@ -151,7 +151,7 @@ xmlNodePtr simulation2idf_layers(const sample_model *sm) {
     return layers;
 }
 
-xmlNodePtr simulation2idf_spectra(const struct fit_data *fit) {
+xmlNodePtr simulation2idf_spectra(const fit_data *fit) {
     if(!fit || !fit->sim || !fit->sim->beam_isotope) {
         return NULL;
     }

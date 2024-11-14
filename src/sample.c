@@ -67,7 +67,7 @@ sample *sample_alloc(size_t n_isotopes, size_t n_ranges) {
     s->n_isotopes = n_isotopes;
     s->isotopes = calloc(n_isotopes, sizeof(jibal_isotope *));
     s->cbins = calloc( n_ranges * n_isotopes, sizeof(double));
-    s->ranges = calloc(n_ranges, sizeof(struct sample_range));
+    s->ranges = calloc(n_ranges, sizeof(sample_range));
     return s;
 }
 
@@ -80,7 +80,7 @@ sample_model *sample_model_alloc(size_t n_materials, size_t n_ranges) {
     sm->n_materials = n_materials;
     sm->materials = calloc(n_materials, sizeof(jibal_material *));
     sm->cbins = calloc(n_ranges * n_materials, sizeof(double));
-    sm->ranges = calloc(n_ranges, sizeof(struct sample_range));
+    sm->ranges = calloc(n_ranges, sizeof(sample_range));
     return sm;
 }
 
@@ -340,9 +340,9 @@ sample *sample_from_sample_model(const sample_model *sm) { /* TODO: renormalize 
         fprintf(stderr, "%zu: %s  (Z = %i, A = %i)\n", i, s->isotopes[i]->name, s->isotopes[i]->Z, s->isotopes[i]->A);
     }
 #endif
-    s->ranges = calloc(s->n_ranges, sizeof(struct sample_range));
+    s->ranges = calloc(s->n_ranges, sizeof(sample_range));
     s->cbins = calloc(s->n_ranges * s->n_isotopes, sizeof(double));
-    memcpy(s->ranges, sm->ranges, sizeof (struct sample_range) * sm->n_ranges);
+    memcpy(s->ranges, sm->ranges, sizeof (sample_range) * sm->n_ranges);
     for(i = 0; i < sm->n_ranges; i++) {
         sample_range_copy(&s->ranges[i], &sm->ranges[i]);
     }
@@ -923,7 +923,7 @@ sample *sample_copy(const sample *s_in) {
         return NULL;
     s_out->no_conc_gradients = s_in->no_conc_gradients;
     memcpy(s_out->isotopes, s_in->isotopes, sizeof(jibal_isotope *) * s_out->n_isotopes);
-    memcpy(s_out->ranges, s_in->ranges, sizeof (struct sample_range) * s_out->n_ranges);
+    memcpy(s_out->ranges, s_in->ranges, sizeof (sample_range) * s_out->n_ranges);
     memcpy(s_out->cbins, s_in->cbins, sizeof (double) * s_out->n_isotopes * s_out->n_ranges);
     for(size_t i = 0; i < s_in->n_ranges; i++) {
         sample_range_copy(&s_out->ranges[i], &s_in->ranges[i]);

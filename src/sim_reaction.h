@@ -47,7 +47,7 @@ typedef struct sim_reaction {
     double emax_incident; /* Set on sim_reaction_recalculate_internal_variables(), should reflect highest usable TODO: *incident*? energy limited by "ws", reaction, stopping and ion (incident E_0) */
     double emin_product;
     double emax_product;
-    struct reaction_point *cs_table; /* precalculated screening corrections from emin to emax, n_cs_table points */
+    reaction_point *cs_table; /* precalculated screening corrections from emin to emax, n_cs_table points */
     size_t n_cs_table;
     double cs_estep; /* calculated by sim_reaction_recalculate_screening_table(), step size based on n_cs_table */
 } sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */

@@ -35,6 +35,6 @@ void reaction_free(jabs_plugin_reaction *r) {
     free(r);
 }
 
-double testplugin_cs(const struct jabs_plugin_reaction *r, double theta, double E) {
+double testplugin_cs(const jabs_plugin_reaction *r, double theta, double E) {
     return jibal_cross_section_rbs(r->incident, r->target, theta, E, JIBAL_CS_RUTHERFORD); /* just a simple test */
 }

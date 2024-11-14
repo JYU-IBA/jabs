@@ -550,7 +550,7 @@ int assign_stopping_Z1_Z2(jibal_gsto *gsto, int Z1, int Z2) {
 
 int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
     /* TODO: simplify this by finding all possible Z1, Z2 combinations, considering target elements, beam and reactions before attempting to assign stopping/straggling (GSTO) */
-    struct sample *sample = sim->sample;
+    sample *sample = sim->sample;
     if(!sample) {
         jabs_message(MSG_ERROR, "Could not assign stopping, because sample is not set!\n");
         return 1;

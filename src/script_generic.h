@@ -23,7 +23,7 @@
 extern "C" {
 #endif
 
-struct script_command;
+struct script_command; /* Declaration is required, because script_session has struct script_command pointer and script_command has script_session pointer */
 
 typedef struct script_file {
     FILE *f;
@@ -37,7 +37,7 @@ typedef struct script_file {
 typedef struct script_session {
     jibal *jibal;
     struct fit_data *fit;
-    int (*fit_iter_callback)(struct fit_stats stats);
+    int (*fit_iter_callback)(fit_stats stats);
     double start, end; /* Time */
     script_file *files[SCRIPT_FILES_NESTED_MAX];
     size_t file_depth;
@@ -57,9 +57,9 @@ typedef int script_command_status; /* Script commands should return negative on 
 
 typedef struct script_command {
     char *name;
-    script_command_status (*f)(struct script_session *, int, char * const *); /* Function to process argument vectors. Called if it is non-NULL, even if subcommands exist! Return value is important.*/
-    script_command_status (*f_var)(struct script_session *, jibal_config_var *var, int, char * const *); /* Function to process variables (from subcommands). */
-    script_command_status (*f_val)(struct script_session *, int, int, char * const *); /* Function to process vals (from subcommands). */
+    script_command_status (*f)(script_session *, int, char * const *); /* Function to process argument vectors. Called if it is non-NULL, even if subcommands exist! Return value is important.*/
+    script_command_status (*f_var)(script_session *, jibal_config_var *var, int, char * const *); /* Function to process variables (from subcommands). */
+    script_command_status (*f_val)(script_session *, int, int, char * const *); /* Function to process vals (from subcommands). */
     char *help_text; /* Short help text */
     struct script_command *subcommands;
     jibal_config_var *var;
