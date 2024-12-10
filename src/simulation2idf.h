@@ -21,17 +21,23 @@
 extern "C" {
 #endif
 
+typedef struct idf_writer {
+        xmlDocPtr doc;
+        xmlNodePtr root;
+        xmlNsPtr ns; /* IDF namespace (default) */
+        xmlNsPtr simnra; /* SIMNRA namespace. Set to NULL if SIMNRA extensions are not to be added. */
+} idf_writer;
 
-int simulation2idf(const fit_data *fit, const char *filename);
+int simulation2idf(const fit_data *fit, const char *filename, int simnra_extensions);
 xmlNodePtr simulation2idf_notes(void);
 xmlNodePtr simulation2idf_attributes(const char *filename);
 xmlNodePtr simulation2idf_elementsandmolecules(const sample_model *sm);
-xmlNodePtr simulation2idf_structure(const sample_model *sm);
-xmlNodePtr simulation2idf_layers(const sample_model *sm);
-xmlNodePtr simulation2idf_spectra(const fit_data *fit);
+xmlNodePtr simulation2idf_structure(const idf_writer *idf, const sample_model *sm);
+xmlNodePtr simulation2idf_layers(const idf_writer *idf, const sample_model *sm);
+xmlNodePtr simulation2idf_spectra(const idf_writer *idf, const fit_data *fit);
 xmlNodePtr simulation2idf_beam(const simulation *sim);
 xmlNodePtr simulation2idf_geometry(const simulation *sim, const detector *det);
-xmlNodePtr simulation2idf_detection(const detector *det);
+xmlNodePtr simulation2idf_detection(const idf_writer *idf, const detector *det);
 xmlNodePtr simulation2idf_calibrations(const jibal_element *elements, const simulation *sim, const detector *det);
 xmlNodePtr simulation2idf_detectorresolution(const detector *det, const calibration *cal, const char  *ion_name);
 xmlNodePtr simulation2idf_energycalibration(const detector *det, const calibration *cal, const char *ion_name);

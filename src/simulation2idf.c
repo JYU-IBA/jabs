@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <libxml/parser.h>
+#include <libxml/xpath.h>
 #include "defaults.h"
 #include "options.h"
 #include "geostragg.h"
@@ -25,7 +26,7 @@
 #include "simulation2idf.h"
 
 
-int simulation2idf(const fit_data *fit, const char *filename) {
+int simulation2idf(const fit_data *fit, const char *filename, int simnra_extensions) {
     if(!fit->sim) {
         return EXIT_FAILURE;
     }
@@ -33,44 +34,50 @@ int simulation2idf(const fit_data *fit, const char *filename) {
     if(!f) {
         return EXIT_FAILURE;
     }
-    xmlDocPtr doc = xmlNewDoc(BAD_CAST "1.0");
-    xmlNodePtr n = xmlNewNode(NULL, BAD_CAST "idf");
-    xmlSetProp(n, BAD_CAST "xmlns:xsi", BAD_CAST "http://www.w3.org/2001/XMLSchema-instance");
-    xmlSetProp(n, BAD_CAST "xmlns", BAD_CAST "http://idf.schemas.itn.pt");
-    xmlDocSetRootElement(doc, n);
+    idf_writer idf;
+    idf.doc = xmlNewDoc(BAD_CAST "1.0");
+    idf.root = xmlNewNode(NULL, BAD_CAST "idf");
+    xmlDocSetRootElement(idf.doc, idf.root);
 
+    idf.ns = xmlNewNs(idf.root, BAD_CAST "http://idf.schemas.itn.pt", NULL);
+    xmlNsPtr xsi = xmlNewNs(idf.root, BAD_CAST "http://www.w3.org/2001/XMLSchema-instance", BAD_CAST "xsi");
+    if(simnra_extensions) {
+        idf.simnra = xmlNewNs(idf.root, BAD_CAST "http://www.simnra.com/simnra", BAD_CAST "simnra");
+    } else {
+        idf.simnra = NULL; /* Note that NULL is a valid xmlNsPtr in xmlNewNode. If we don't want to add a node, remember to check that idf->simnra == NULL */
+    }
     xmlNodePtr notes = simulation2idf_notes();
     if(notes) {
-        xmlAddChild(n, notes);
+        xmlAddChild(idf.root, notes);
     }
 
     xmlNodePtr attributes = simulation2idf_attributes(filename);
     if(attributes) {
-        xmlAddChild(n, attributes);
+        xmlAddChild(idf.root, attributes);
     }
 
-    xmlNodePtr sample = xmlNewChild(n, NULL, BAD_CAST "sample", NULL);
+    xmlNodePtr sample = xmlNewChild(idf.root, NULL, BAD_CAST "sample", NULL);
 
     sample_model *sm2 = sample_model_split_elements(fit->sm); /* TODO: this splits molecules. We might not necessarily want it always, but it is a reasonable default. */
     xmlNodePtr elementsandmolecules = simulation2idf_elementsandmolecules(sm2);
-    xmlNodePtr structure = simulation2idf_structure(sm2);
+    xmlNodePtr structure = simulation2idf_structure(&idf, sm2);
     if(elementsandmolecules && structure) {
         xmlAddChild(sample, elementsandmolecules);
         xmlAddChild(sample, structure);
     }
     sample_model_free(sm2);
 
-    xmlNodePtr spectra = simulation2idf_spectra(fit);
+    xmlNodePtr spectra = simulation2idf_spectra(&idf, fit);
     if(spectra) {
         xmlAddChild(sample, spectra);
     }
 
     xmlChar *xmlbuff;
     int buffersize;
-    xmlDocDumpFormatMemory(doc, &xmlbuff, &buffersize, 1);
+    xmlDocDumpFormatMemory(idf.doc, &xmlbuff, &buffersize, 1);
     fprintf(f, "%s", (char *) xmlbuff);
     fclose(f);
-    xmlFreeDoc(doc);
+    xmlFreeDoc(idf.doc);
     return EXIT_SUCCESS;
 }
 
@@ -107,7 +114,7 @@ xmlNodePtr simulation2idf_elementsandmolecules(const sample_model *sm) {
     return elementsandmolecules;
 }
 
-xmlNodePtr simulation2idf_structure(const sample_model *sm) {
+xmlNodePtr simulation2idf_structure(const idf_writer *idf, const sample_model *sm) {
     if(!sm) {
         return NULL;
     }
@@ -115,7 +122,7 @@ xmlNodePtr simulation2idf_structure(const sample_model *sm) {
     if(sm->type == SAMPLE_MODEL_LAYERED) {
         xmlNodePtr layeredstructure = xmlNewChild(structure, NULL, BAD_CAST "layeredstructure", NULL);
         xmlAddChild(layeredstructure, idf_new_node_printf(BAD_CAST "nlayers", "%zu", sm->n_ranges));
-        xmlNodePtr layers = simulation2idf_layers(sm);
+        xmlNodePtr layers = simulation2idf_layers(idf, sm);
         if(layers) {
             xmlAddChild(layeredstructure, layers);
         }
@@ -124,7 +131,7 @@ xmlNodePtr simulation2idf_structure(const sample_model *sm) {
     return structure;
 }
 
-xmlNodePtr simulation2idf_layers(const sample_model *sm) {
+xmlNodePtr simulation2idf_layers(const idf_writer *idf, const sample_model *sm) {
     xmlNodePtr layers = xmlNewNode(NULL, BAD_CAST "layers");
     for(size_t i = 0; i < sm->n_ranges; i++) {
         const sample_range *r = &sm->ranges[i];
@@ -134,6 +141,12 @@ xmlNodePtr simulation2idf_layers(const sample_model *sm) {
         if(r->rough.model == ROUGHNESS_GAMMA && r->rough.x > 0.0) {
             xmlNodePtr layeruniformity = idf_new_node_units(BAD_CAST "layeruniformity", BAD_CAST IDF_UNIT_TFU, BAD_CAST "FWHM", r->rough.x);
             xmlAddChild(layer, layeruniformity);
+            if(idf->simnra) { /* Gamma model in SIMNRA and JaBS is the same, so we can add relevant <simnra:roughness> in the file */
+                xmlNewChild(layer, idf->simnra, BAD_CAST "hasroughness", BAD_CAST idf_boolean_to_str(TRUE));
+                xmlNodePtr roughness = xmlNewNode(idf->simnra, BAD_CAST "roughness");
+                xmlNewChild(roughness, idf->simnra, BAD_CAST "distribution", BAD_CAST "Gamma");
+                xmlAddChild(layer, roughness);
+            }
         }
         xmlNodePtr layerelements = xmlNewChild(layer, NULL, BAD_CAST "layerelements", NULL);
         for(size_t j = 0; j < sm->n_materials; j++) {
@@ -151,7 +164,7 @@ xmlNodePtr simulation2idf_layers(const sample_model *sm) {
     return layers;
 }
 
-xmlNodePtr simulation2idf_spectra(const fit_data *fit) {
+xmlNodePtr simulation2idf_spectra(const idf_writer *idf, const fit_data *fit) {
     if(!fit || !fit->sim || !fit->sim->beam_isotope) {
         return NULL;
     }
@@ -161,7 +174,7 @@ xmlNodePtr simulation2idf_spectra(const fit_data *fit) {
         xmlNodePtr spectrum = xmlNewNode(NULL, BAD_CAST "spectrum");
         xmlAddChild(spectrum, simulation2idf_beam(fit->sim));
         xmlAddChild(spectrum, simulation2idf_geometry(fit->sim, det));
-        xmlAddChild(spectrum, simulation2idf_detection(det));
+        xmlAddChild(spectrum, simulation2idf_detection(idf, det));
         xmlAddChild(spectrum, simulation2idf_calibrations(fit->jibal->elements, fit->sim, det));
         xmlAddChild(spectrum, simulation2idf_reactions(fit->sim, det));
         if(i_det < fit->n_det_spectra) {
@@ -217,7 +230,7 @@ xmlNodePtr simulation2idf_geometry(const simulation *sim, const detector *det) {
     return geometry;
 }
 
-xmlNodePtr simulation2idf_detection(const detector *det) {
+xmlNodePtr simulation2idf_detection(const idf_writer *idf, const detector *det) {
     xmlNodePtr detection = xmlNewNode(NULL, BAD_CAST "detection");
     xmlNodePtr detector = xmlNewChild(detection, NULL, BAD_CAST "detector", NULL);
     char *detectortype = NULL;
@@ -252,7 +265,7 @@ xmlNodePtr simulation2idf_detection(const detector *det) {
     if(det->foil_sm) {
         xmlNodePtr stoppingfoil = xmlNewChild(detection, NULL, BAD_CAST "stoppingfoil", NULL);
         xmlNodePtr foillayers = xmlNewChild(stoppingfoil, NULL, BAD_CAST "foillayers", NULL);
-        xmlAddChild(foillayers, simulation2idf_layers(det->foil_sm));
+        xmlAddChild(foillayers, simulation2idf_layers(idf, det->foil_sm));
         xmlAddChild(detection, stoppingfoil);
     }
     return detection;

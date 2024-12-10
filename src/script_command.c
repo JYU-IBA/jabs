@@ -274,7 +274,7 @@ script_command_status script_save_simulation(script_session *s, int argc, char *
         jabs_message(MSG_ERROR, "Usage: save simulation <file>\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(simulation2idf(fit, argv[0])) {
+    if(simulation2idf(fit, argv[0], TRUE)) {
         jabs_message(MSG_ERROR, "Could not save simulation to file %s.", argv[0]);
         return SCRIPT_COMMAND_FAILURE;
     }
