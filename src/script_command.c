@@ -1417,7 +1417,10 @@ script_command *script_commands_create(script_session *s) {
     script_command_list_add_command(&c->subcommands, script_command_new("detectors", "Reset detectors.", 0, 0, &script_reset_detectors));
     script_command_list_add_command(&c->subcommands, script_command_new("experimental", "Reset experimental spectra.", 0, 0, &script_reset_experimental));
     script_command_list_add_command(&c->subcommands, script_command_new("reference", "Reset reference spectrum.", 0, 0, &script_reset_reference));
-    script_command_list_add_command(&c->subcommands, script_command_new("fit", "Reset fit (ranges).", 0, 0, &script_reset_fit));
+    script_command *c_reset_fit = script_command_new("fit", "Reset fit data.", 0, 0, &script_reset_fit);
+    script_command_list_add_command(&c_reset_fit->subcommands, script_command_new("ranges", "Reset fit ranges.", 0, 0, &script_reset_fit_ranges));
+    script_command_list_add_command(&c->subcommands, c_reset_fit);
+
     script_command_list_add_command(&c->subcommands, script_command_new("reactions", "Reset reactions.", 0, 0, &script_reset_reactions));
     script_command_list_add_command(&c->subcommands, script_command_new("sample", "Reset sample.", 0, 0, &script_reset_sample));
     script_command_list_add_command(&c->subcommands, script_command_new("stopping", "Reset stopping assignments.", 0, 0, &script_reset_stopping));
@@ -1717,6 +1720,13 @@ script_command_status script_reset_fit(script_session *s, int argc, char *const 
     (void) argc;
     (void) argv;
     fit_data_reset(s->fit);
+    return 0;
+}
+
+script_command_status script_reset_fit_ranges(script_session *s, int argc, char * const *argv) {
+    (void) argc;
+    (void) argv;
+    fit_data_fit_ranges_free(s->fit);
     return 0;
 }
 

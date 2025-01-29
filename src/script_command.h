@@ -79,6 +79,7 @@ script_command_status script_reset_detectors(script_session *s, int argc, char *
 script_command_status script_reset_experimental(script_session *s, int argc, char * const *argv);
 script_command_status script_reset_reference(script_session *s, int argc, char *const *argv);
 script_command_status script_reset_fit(script_session *s, int argc, char * const *argv);
+script_command_status script_reset_fit_ranges(script_session *s, int argc, char * const *argv);
 script_command_status script_reset_reactions(script_session *s, int argc, char * const *argv);
 script_command_status script_reset_sample(script_session *s, int argc, char * const *argv);
 script_command_status script_reset_stopping(script_session *s, int argc, char * const *argv);
