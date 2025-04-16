@@ -894,9 +894,9 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
         fit_iter_stats_update(fit, w);
         fit_iter_stats_print(&fit->stats);
 #ifdef DEBUG
-        if(fit_data->stats.phase > FIT_PHASE_FAST) {
+        if(fit->stats.phase > FIT_PHASE_FAST) {
             char *jacobian_filename;
-            asprintf(&jacobian_filename, "jacobian_iter%zu.dat", fit_data->stats.iter);
+            asprintf(&jacobian_filename, "jacobian_iter%zu.dat", fit->stats.iter);
             if(jacobian_filename) {
                 multifit_nlinear_print_jacobian(w, jacobian_filename);
                 free(jacobian_filename);
