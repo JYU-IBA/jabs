@@ -266,6 +266,7 @@ int sim_workspace_print_spectra(const result_spectra *spectra, const char *filen
     }
     FILE *f = fopen_file_or_stream(filename, "w");
     if(!f) {
+        jabs_message(MSG_ERROR, "Could not open file \"%s\" for writing.\n", filename);
         return EXIT_FAILURE;
     }
     if(filename) {
