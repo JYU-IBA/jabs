@@ -35,6 +35,7 @@ typedef struct {
     double S; /* Energy loss straggling (variance) of reaction product */
     double S_geo_x; /* Geometric straggling in "width" direction */
     double S_geo_y; /* Geometric straggling in "height" direction */
+    double S_det; /* Detector energy resolution (variance) at E */
     double Q; /* Counts in brick (concentration, cross section, fluence, solid angle etc) */
     double sc; /* Concentration cross-section product. Possibly weighted by straggling and affected by concentration gradients. */
     double S_sum; /* Sum (quadrature) of all broadening. */

@@ -328,6 +328,7 @@ int sim_workspace_print_bricks(const sim_workspace *ws, const char *filename) {
     fprintf(f, "#\"E_s\" and \"S_s(el)\" are the same, but for the reaction product at the surface (before detector foil)\n");
     fprintf(f, "#\"E(det)\" and \"S(el)\" are the same, but for the reaction product at the detector (after detector foil, if one is set).\n");
     fprintf(f, "#\"S(geo)\" is the broadening due to finite beam spot and detector size (keV FWHM) at the surface if calculated, zero otherwise.\n");
+    fprintf(f, "#\"S(det)\" is the broadening due to detector resolution.\n");
     fprintf(f, "#\"S(sum)\" is the sum of all broadening (electronic, geometric and detector resolution) in keV FWHM. This is the actual broadening used for convolution.\n");
     fprintf(f, "#When convoluting, JaBS convolutes a the brick (a box from low energy to high energy edge with area of Q counts) by a gaussian with varying sigma (different S(sum) for either edge)\n");
     fprintf(f, "#\"sigma * conc\" is the concentration of the target isotope multiplied by the (straggling weighted) cross section, in mb/sr. This is representative of the entire brick.\n");
