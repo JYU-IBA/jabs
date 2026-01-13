@@ -197,14 +197,15 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
             sim_workspace_free(ws);
             return SCRIPT_COMMAND_FAILURE;
         }
-#ifdef DEBUG
-        char *bricks_filename;
-        asprintf(&bricks_filename, "bricks_%zu.dat", i_det + 1);
-        if(bricks_filename) {
-            sim_workspace_print_bricks(ws, bricks_filename);
-            free(bricks_filename);
+        if(fit->sim->params->bricks_save) {
+            char *bricks_filename;
+            asprintf(&bricks_filename, "bricks_%zu.dat", i_det + 1);
+            jabs_message(MSG_VERBOSE, "Bricks of detector \"%s\" saved to \"%s\".\n", det->name, bricks_filename);
+            if(bricks_filename) {
+                sim_workspace_print_bricks(ws, bricks_filename);
+                free(bricks_filename);
+            }
         }
-#endif
         fit_data_spectra_copy_to_spectra_from_ws(&fit->spectra[i_det], det, s->fit->exp[i_det], ws);
         sim_workspace_free(ws);
     }
@@ -1333,6 +1334,7 @@ script_command *script_commands_create(script_session *s) {
         {JIBAL_CONFIG_VAR_UNIT,   "reaction_file_angle_tolerance", "deg", JIBAL_UNIT_TYPE_ANGLE,           &sim->params->reaction_file_angle_tolerance, NULL, "Reaction file (R33) angle tolerance"},
         {JIBAL_CONFIG_VAR_BOOL,   "bricks_skip_zero_conc_ranges",  0,     0,                               &sim->params->bricks_skip_zero_conc_ranges,  NULL, "Brick calculation skips ranges with zero concentration"},
         {JIBAL_CONFIG_VAR_BOOL,   "screening_tables",              0,     0,                               &sim->params->screening_tables,              NULL, "Compute screening tables"},
+        {JIBAL_CONFIG_VAR_BOOL,   "bricks_save",                   0,     0,                               &sim->params->bricks_save,                   NULL, "Save bricks (text file)"},
         {JIBAL_CONFIG_VAR_OPTION, "cs_rbs",                        0,     0,                               &sim->cs_rbs,                                jabs_cs_types, "Default model for RBS cross section"},
         {JIBAL_CONFIG_VAR_OPTION, "cs_erd",                        0,     0,                               &sim->cs_erd,                                jabs_cs_types,  "Default model for ERD cross section"},
         {JIBAL_CONFIG_VAR_NONE, NULL,                              0,     0, NULL,                                                                      NULL, NULL}

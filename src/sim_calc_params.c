@@ -56,6 +56,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->reaction_file_angle_tolerance = REACTION_FILE_ANGLE_TOLERANCE_DEFAULT;
     p->bricks_skip_zero_conc_ranges = FALSE;
     p->screening_tables = FALSE;
+    p->bricks_save = FALSE;
     DEBUGSTR("New calc params created.");
     return p;
 }
