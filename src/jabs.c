@@ -709,6 +709,7 @@ int simulate_with_ds(sim_workspace *ws) {
     ion ion2 = ion1;
     depth d_before = depth_seek(ws->sample, 0.0);
     int ds_steps_polar = ws->params->ds_steps_polar;
+    int ds_steps_polar_substeps = ws->params->ds_steps_polar_substeps;
     int ds_steps_azi = ws->params->ds_steps_azi;
     sim_calc_params_defaults_fast(ws->params); /* This makes DS faster. Changes to ws->params are not reverted, but they don't affect original sim settings */
     ws->params->incident_stop_params.min *= 3.0;
@@ -759,9 +760,9 @@ int simulate_with_ds(sim_workspace *ws) {
                     continue;
                 }
                 double cs = 0.0;
-                for(int polar_substep = 0; polar_substep < DUAL_SCATTER_POLAR_SUBSTEPS; polar_substep++) {
-                    double ds_polar_sub = ds_polar_step * (1.0 * (polar_substep - (DUAL_SCATTER_POLAR_SUBSTEPS / 2)) / (DUAL_SCATTER_POLAR_SUBSTEPS * 1.0)) + ds_polar;
-                    cs += jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar_sub) / (DUAL_SCATTER_POLAR_SUBSTEPS * 1.0);
+                for(int polar_substep = 0; polar_substep < ds_steps_polar_substeps; polar_substep++) {
+                    double ds_polar_sub = ds_polar_step * (1.0 * (polar_substep - (ds_steps_polar_substeps / 2)) / (ds_steps_polar_substeps * 1.0)) + ds_polar;
+                    cs += jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar_sub) / (ds_steps_polar_substeps * 1.0);
                 }
                 cs_sum += c * cs;
 

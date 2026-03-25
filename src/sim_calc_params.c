@@ -37,6 +37,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->ds = FALSE;
     p->ds_steps_azi = 0;
     p->ds_steps_polar = 0;
+    p->ds_steps_polar_substeps = 0;
     p->rk4 = TRUE;
     p->nuclear_stopping_accurate = TRUE;
     p->mean_conc_and_energy = FALSE;
@@ -138,9 +139,16 @@ void sim_calc_params_update(sim_calc_params *p) {
     }
     p->cs_stragg_pd = prob_dist_gaussian(p->cs_n_stragg_steps);
 
-    if(p->ds && p->ds_steps_azi == 0 && p->ds_steps_polar == 0) { /* DS defaults are applied if nothing else is specified */
-        p->ds_steps_azi = DUAL_SCATTER_AZI_STEPS;
-        p->ds_steps_polar = DUAL_SCATTER_POLAR_STEPS;
+    if(p->ds) {
+        if(p->ds_steps_azi == 0) {
+            p->ds_steps_azi = DUAL_SCATTER_AZI_STEPS_DEFAULT;
+        }
+        if(p->ds_steps_polar == 0) {
+            p->ds_steps_polar = DUAL_SCATTER_POLAR_STEPS_DEFAULT;
+        }
+        if(p->ds_steps_polar_substeps == 0) {
+            p->ds_steps_polar_substeps = DUAL_SCATTER_POLAR_SUBSTEPS_DEFAULT;
+        }
     }
 }
 
@@ -188,4 +196,10 @@ void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_lev
         }
     }
     jabs_message(msg_level, "reaction file (R33) angle tolerance = %g deg\n", params->reaction_file_angle_tolerance / C_DEG);
+    jabs_message(msg_level, "dual scattering = %s\n", params->ds ? "true" : "false");
+    if(params->ds) {
+        jabs_message(msg_level, "dual scattering polar steps = %i\n", params->ds_steps_polar);
+        jabs_message(msg_level, "dual scattering polar substeps = %i\n", params->ds_steps_polar_substeps);
+        jabs_message(msg_level, "dual scattering azimuthal steps = %i\n", params->ds_steps_azi);
+    }
 }

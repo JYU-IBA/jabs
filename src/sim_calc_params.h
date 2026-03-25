@@ -25,6 +25,7 @@ typedef struct sim_calc_params {
     int ds; /* Dual scattering true/false */
     int ds_steps_azi;
     int ds_steps_polar;
+    int ds_steps_polar_substeps;
     prob_dist *cs_stragg_pd;
     size_t cs_n_stragg_steps; /* Number of steps to take, when calculating straggling weighted cross sections. If zero, adaptive integration is used. */
     size_t n_bricks_max;
