@@ -42,7 +42,7 @@ void usage(void) {
 }
 
 void greeting(int interactive) {
-    jabs_message(MSG_IMPORTANT, "JaBS version %s. Copyright (C) 2021 - 2024 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
+    jabs_message(MSG_IMPORTANT, "JaBS version %s. Copyright (C) 2021 - 2026 Jaakko Julin.\n", jabs_version()); /* These are printed when running non-interactively with just command line parameters */
     jabs_message(MSG_VERBOSE, "Compiled using JIBAL %s, current library version %s.\n", JIBAL_VERSION, jibal_version());
     jabs_message(MSG_INFO, "%s", COPYRIGHT_STRING);
     if(interactive) {
