@@ -1,6 +1,7 @@
 #!/bin/bash
 
 jabslogfile="tests.log"
+JABS="${JABS:-jabs}"
 
 ./clean.sh
 
@@ -23,7 +24,7 @@ for jabsfile in *.jbs; do
         echo "Skipping plugin test."; # JaBS can be compiled without plugin support 
         continue
     fi      
-    jabs "$jabsfile" 2>>"$jabslogfile" ||  error_exit "$jabsfile"
+    "$JABS" "$jabsfile" 2>>"$jabslogfile" ||  error_exit "$jabsfile"
 done
 
 echo "All tests passed! Output saved in $jabslogfile."
