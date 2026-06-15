@@ -1,6 +1,6 @@
 # JaBS - Jaakko's Backscattering Simulator
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6362701.svg)](https://doi.org/10.5281/zenodo.6362701)
+[![DOI](release_scripts/zenodo.svg)](https://doi.org/10.5281/zenodo.6362701)
 
 Simulates and fits RBS, EBS, ERD and NRA spectra rapidly.
     
