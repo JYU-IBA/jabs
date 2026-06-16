@@ -317,6 +317,7 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         b->S_r = sim_r->p.S;
 
         if(stop_sample_exit(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, &sim_r->p, d_after, sample) != 0) {
+            b->valid = FALSE;/* Discards entire brick, may not be the perfect choice! */
             DEBUGMSG("Stop before exit, energy of reaction product after reaction %g keV.", b->E_r / C_KEV);
             if(product_and_incident_go_in_different_directions) { /* Lowering incident energy will lower reaction product energy */
                 DEBUGSTR("We can stop calculation, because lowering incident energy will also lower reaction product energy. This will be the last brick.");
@@ -331,11 +332,11 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             ion ion_foil = *&sim_r->p;
             ion_set_angle(&ion_foil, 0.0, 0.0); /* Foils are not tilted. We use a temporary copy of "p" to do this step. */
             if(stop_sample_exit(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, &ion_foil, d_foil, ws->det->foil)) {
+                b->valid = FALSE;/* Discards entire brick, may not be the perfect choice! */
                 DEBUGMSG("Stop in detector foil. Energy after reaction was %g keV.", b->E_r / C_KEV);
                 if(product_and_incident_go_in_different_directions) { /* Lowering incident energy will lower reaction product energy */
                     DEBUGSTR("We can stop calculation, because lowering incident energy will also lower reaction product energy. This will be the last brick.");
-                    last = TRUE; /* Discards entire brick, may not be the perfect choice! */
-                    b->valid = FALSE;
+                    last = TRUE;
                 }
             }
             b->E = ion_foil.E;
