@@ -295,7 +295,7 @@ script_command_status script_save_spectra(script_session *s, int argc, char *con
         jabs_message(MSG_ERROR, "Not enough arguments for save spectra.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    if(sim_workspace_print_spectra(fit->spectra, argv[0], fit->cl)) {
+    if(sim_workspace_print_spectra(&fit->spectra[i_det], argv[0], fit->cl)) {
         jabs_message(MSG_ERROR,
                      "Could not save spectra of detector %zu to file \"%s\"! There should be %zu detector(s).\n",
                      i_det + 1, argv[0], fit->sim->n_det);
