@@ -19,6 +19,7 @@
 #include "generic.h"
 #include "defaults.h"
 #include "reaction.h"
+#include "scatint.h"
 #include "message.h"
 
 
@@ -313,6 +314,20 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     /* TODO: copy and convert data (check units etc) */
     r->n_cs_table = rfile->n_data;
     r->cs_table = calloc(r->n_cs_table, sizeof(reaction_point));
+
+    double cs_conversion_ratio = 0.0;
+    if(rfile->unit == R33_UNIT_TOT) {
+        double m12 = r->incident->mass/r->target->mass;
+        if(m12 > 1.0) { /* Inverse kinematics needed? */
+            cs_conversion_ratio = 0.0;
+            jabs_message(MSG_WARNING, "R33 total cross section with m1 > m2 is not yet supported.\n");
+        } else {
+            double theta_cm = r->theta + asin(m12 * sin(r->theta));
+            cs_conversion_ratio = sigma_lab_to_cm(theta_cm, m12) / (4.0 * C_PI);
+        }
+        DEBUGMSG("R33 CS total to differential (assuming isotropic in CM) conv ratio %g, CM theta %g deg, lab theta %g deg", cs_conversion_ratio, theta_cm/C_DEG, r->theta/C_DEG);
+    }
+
     for(size_t i = 0; i < rfile->n_data; i++) {
         reaction_point *rp = &r->cs_table[i];
         rp->E = rfile->data[i][0] * rfile->enfactors[0] * C_KEV; /* TODO: other factors? */
@@ -320,6 +335,8 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
             rp->sigma = rfile->data[i][2] * rfile->sigfactors[0] * jibal_cross_section_rbs(r->incident, r->target, r->theta, rp->E, JIBAL_CS_RUTHERFORD);
         } else if (rfile->unit == R33_UNIT_MB){
             rp->sigma = rfile->data[i][2] * rfile->sigfactors[0] * C_MB_SR;
+        } else if (rfile->unit == R33_UNIT_TOT) {
+            rp->sigma = rfile->data[i][2] * rfile->sigfactors[0] * C_MB_SR * cs_conversion_ratio;
         } else {
             rp->sigma = 0.0;
         }
