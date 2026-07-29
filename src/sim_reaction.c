@@ -342,7 +342,7 @@ void sim_reaction_product_energy_and_straggling(sim_reaction *r, const ion *inci
     r->p.E = reaction_product_energy(r->r, r->theta, incident->E);
     const double epsilon = 0.001*C_KEV;
     double deriv = (reaction_product_energy(r->r, r->theta, incident->E+epsilon) - reaction_product_energy(r->r, r->theta, incident->E-epsilon))/(2.0 * epsilon); /* TODO: this derivative could be solved analytically */
-    r->p.S = incident->S * pow2(deriv) * incident->E;
+    r->p.S = incident->S * pow2(deriv);
     DEBUGVERBOSEMSG("deriv %g, E_out/E %g, E_out = %g keV, E = %g keV\n", deriv, r->p.E / incident->E, r->p.E/C_KEV, incident->E/C_KEV);
 }
 
