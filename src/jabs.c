@@ -142,6 +142,7 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
     params.w = ws->w_int_cs_stragg; /* Can be NULL */
     params.cs_stragg_pd = ws->params->cs_stragg_pd; /* Can be NULL */
     params.stragg_slope = (S_back-S_front)/(E_back-E_front);
+    params.stragg_int_accuracy = 1e-8;
     gsl_function F;
     F.function = &cs_function;
     F.params = &params;
