@@ -23,6 +23,7 @@
 #include <jibal_kin.h>
 #include <gsl/gsl_integration.h>
 #include <gsl/gsl_errno.h>
+#include <gsl/gsl_cdf.h>
 
 #include "jabs_debug.h"
 #include "geostragg.h"
@@ -100,18 +101,25 @@ double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integra
     gsl_function F;
     F.function = &cs_stragg_function;
     F.params = &params;
-    double E_low = E - 4.0*params.sigma;
+    const double sigmas = 3.0; /* Integration limits +/- number of standard deviations. */
+    double E_low = E - sigmas * params.sigma;
     if(E_low < 1.0*C_KEV)
         E_low = 1.0*C_KEV;
-    double E_high = E + 4.0*params.sigma;
+    double E_high = E + sigmas * params.sigma;
     double result, error;
 #ifdef SINGULARITIES
     gsl_integration_qags(&F, E_low, E_high, 0, accuracy, w->limit,w, &result, &error);
 #else
-    gsl_integration_qag(&F, E_low, E_high, 1e-6 * C_MB_SR, accuracy, w->limit, GSL_INTEG_GAUSS15, w, &result, &error); /* For some reason 0 as epsabs doesn't work anymore so a very small number is used instead */
+    gsl_integration_qag(&F, E_low, E_high, 1e-6 * C_MB_SR, accuracy, w->limit, GSL_INTEG_GAUSS21, w, &result, &error); /* For some reason 0 as epsabs doesn't work anymore so a very small number is used instead */
 #endif
     static const double inv_sqrt_2pi = 0.398942280401432703;
-    result *= (inv_sqrt_2pi / params.sigma) * 1.000063346496191; /* Normalize gaussian. The 1.00006 accounts for tails outside +- 4 sigmas */
+#if 0
+    const double scaling = 1/(1.0-2.0*gsl_cdf_ugaussian_P(-1.0 * sigmas)); /* This accounts for the truncation of the gaussian. If sigmas is constant, so is this, so no need to recompute. */
+    DEBUGMSG("Got cross_section_straggling_adaptive scaling %.12e", scaling);
+#else
+    const double scaling = 1.002707104694; /* For sigmas = 3.0 */
+#endif
+    result *= (inv_sqrt_2pi / params.sigma) * scaling;
     DEBUGVERBOSEMSG("Integrated from %g keV to %g keV in %zu steps (limit %zu), got (%g +- %g) mb/sr", E_low/C_KEV, E_high/C_KEV, w->size, w->limit, result/C_MB_SR, error/C_MB_SR);
     return result;
 }
