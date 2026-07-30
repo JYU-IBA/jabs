@@ -44,7 +44,7 @@ prob_dist *prob_dist_gaussian(size_t n) { /* creates a discrete gaussian (mu = 0
         double x_low = low + i * step;
         double x_high = low + (i + 1) * step;
         double x = (x_low + x_high)/2.0;
-        double p = gsl_cdf_gaussian_P(x_high, 1.0) - gsl_cdf_gaussian_P(x_low, 1.0);
+        double p = gsl_cdf_ugaussian_P(x_high) - gsl_cdf_ugaussian_P(x_low);
         pp->x = x;
         pp->p = p;
         DEBUGVERBOSEMSG("%zu %12g %12g %12g %12g", i, pp->x, pp->p, x_low, x_high);
