@@ -151,6 +151,9 @@ double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integra
 double resonance_effect_mean_energy(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, const prob_dist *pd, double E, double S) { /* Does not take concentration gradients into account */
     double sigma_e = cross_section_straggling(sim_r, w, accuracy, pd, E, S, TRUE);
     double sigma = cross_section_straggling(sim_r, w, accuracy, pd, E, S, FALSE);
+    if(sigma < 1e-6 * C_MB_SR) { /* If cross section is zero, prevent division by zero */
+        return reaction_product_energy(sim_r->r, sim_r->theta, E);
+    }
     double mean_energy = sigma_e/sigma;
     return mean_energy;
 }
@@ -362,6 +365,7 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0);
             if(sim_r->r->type == REACTION_FILE) { /* TODO: this could also be calculated for other reactions, maybe a user configurable parameter */
                 sim_r->p.E = resonance_effect_mean_energy(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, b->E_0, b->S_0);
+                DEBUGMSG("Computed mean energy after reaction with resonance_effect_mean_energy(), got %g keV", sim_r->p.E/C_KEV);
             }
         }
 
