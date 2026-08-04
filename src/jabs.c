@@ -34,13 +34,16 @@
 #include "stop.h"
 #include "win_compat.h"
 
-double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S) {
+double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S, int emult) {
     const double std_dev = sqrt(S);
     double cs_sum = 0.0;
     for(size_t i = 0; i < pd->n; i++) {
         prob_point *pp = &(pd->points[i]);
         double E_stragg = E + pp->x * std_dev;
         double cs = pp->p * sim_r->cross_section(sim_r, E_stragg);
+        if(emult) {
+            cs *= reaction_product_energy(sim_r->r, sim_r->theta, E_stragg);
+        }
         cs_sum += cs;
         DEBUGVERBOSEMSG("%zu %10g %10g %10g %10g", i, pp->x, E_stragg/C_KEV, pp->p, cs/C_MB_SR);
     }
@@ -58,9 +61,14 @@ double cross_section_straggling(const sim_reaction *sim_r, gsl_integration_works
         return cross_section_straggling_adaptive(sim_r, w, accuracy, E, S, emult);
     }
     if(pd) {
-        return cross_section_straggling_fixed(sim_r, pd, E, S);
+        return cross_section_straggling_fixed(sim_r, pd, E, S, emult);
     }
-    return sim_r->cross_section(sim_r, E); /* Fallback, no weights applied */
+    double fallback = sim_r->cross_section(sim_r, E); /* Fallback, no weights applied */
+    if(emult) {
+        return fallback * reaction_product_energy(sim_r->r, sim_r->theta, E);
+    } else {
+        return fallback;
+    }
 }
 
 
@@ -140,7 +148,7 @@ double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integra
     return result;
 }
 
-double resonance_effect_mean_energy(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, double E, double S) {
+double resonance_effect_mean_energy(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, const prob_dist *pd, double E, double S) { /* Does not take concentration gradients into account */
     double sigma_e = cross_section_straggling_adaptive(sim_r, w, accuracy, E, S, TRUE);
     double sigma = cross_section_straggling_adaptive(sim_r, w, accuracy, E, S, FALSE);
     double mean_energy = sigma_e/sigma;
@@ -359,8 +367,8 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             double E_mean_out = 0.0;
             sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0, &E_mean_out);
             //double mean_energy = resonance_effect_mean_energy(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Alternative, inaccurate way */
-            if(ws->params->cs_adaptive && sim_r->r->type == REACTION_FILE && E_mean_out > 0.0) {
-                sim_r->p.E = resonance_effect_mean_energy(sim_r, ws->w_int_cs, 1e-6, b->E_0, b->S_0);
+            if(sim_r->r->type == REACTION_FILE) {
+                sim_r->p.E = resonance_effect_mean_energy(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, b->E_0, b->S_0);
             }
         }
 
