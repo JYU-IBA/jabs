@@ -34,13 +34,16 @@
 #include "stop.h"
 #include "win_compat.h"
 
-double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S) {
+double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S, int emult) {
     const double std_dev = sqrt(S);
     double cs_sum = 0.0;
     for(size_t i = 0; i < pd->n; i++) {
         prob_point *pp = &(pd->points[i]);
         double E_stragg = E + pp->x * std_dev;
         double cs = pp->p * sim_r->cross_section(sim_r, E_stragg);
+        if(emult) {
+            cs *= reaction_product_energy(sim_r->r, sim_r->theta, E_stragg);
+        }
         cs_sum += cs;
         DEBUGVERBOSEMSG("%zu %10g %10g %10g %10g", i, pp->x, E_stragg/C_KEV, pp->p, cs/C_MB_SR);
     }
@@ -53,14 +56,19 @@ double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist
 }
 
 
-double cross_section_straggling(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, const prob_dist *pd, double E, double S) {
+double cross_section_straggling(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, const prob_dist *pd, double E, double S, int emult) {
     if(w) {
-        return cross_section_straggling_adaptive(sim_r, w, accuracy, E, S);
+        return cross_section_straggling_adaptive(sim_r, w, accuracy, E, S, emult);
     }
     if(pd) {
-        return cross_section_straggling_fixed(sim_r, pd, E, S);
+        return cross_section_straggling_fixed(sim_r, pd, E, S, emult);
     }
-    return sim_r->cross_section(sim_r, E); /* Fallback, no weights applied */
+    double fallback = sim_r->cross_section(sim_r, E); /* Fallback, no weights applied */
+    if(emult) {
+        return fallback * reaction_product_energy(sim_r->r, sim_r->theta, E);
+    } else {
+        return fallback;
+    }
 }
 
 
@@ -78,6 +86,14 @@ double cs_stragg_function(double x, void *params) {
     return result;
 }
 
+double cs_stragg_e_function(double x, void *params) { /* Weighted with reaction product energy, used to calculate mean reaction product energy */
+    struct cs_stragg_int_params *p = (struct cs_stragg_int_params *) params;
+    double a = (x - p->E_mean) / p->sigma;
+    double result = exp(-0.5 * a * a) * p->sim_r->cross_section(p->sim_r, x) * reaction_product_energy(p->sim_r->r, p->sim_r->theta, x); /* Gaussian (not normalized!) times cross section and energy of the reaction product */
+    DEBUGVERBOSEMSG("cs_stragg_e_function(), E = %g keV, S = %g keV FWHM, E_mean = %g keV, a = %g. Result %g keV mb/sr.", x/C_KEV, p->sigma*C_FWHM/C_KEV, p->E_mean/C_KEV, a, (0.398942280401432703/p->sigma) * result/C_MB_SR/C_KEV );
+    return result;
+}
+
 struct cs_int_params {
     const depth *d_before;
     const depth *d_after;
@@ -91,15 +107,17 @@ struct cs_int_params {
     gsl_integration_workspace *w;
     double stragg_int_accuracy;
     depth d; /* changes between calls */
+    double E_mean_out; /* another result of calculation, mean energy of reaction product */
 };
 
-double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, double E, double S) { /* Uses real numerical integration */
+
+double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, double E, double S, int emult) { /* Uses real numerical integration */
     struct cs_stragg_int_params params;
     params.sigma = sqrt(S);
     params.E_mean = E;
     params.sim_r = sim_r;
     gsl_function F;
-    F.function = &cs_stragg_function;
+
     F.params = &params;
     const double sigmas = 3.0; /* Integration limits +/- number of standard deviations. */
     double E_low = E - sigmas * params.sigma;
@@ -110,10 +128,16 @@ double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integra
 #ifdef SINGULARITIES
     gsl_integration_qags(&F, E_low, E_high, 0, accuracy, w->limit,w, &result, &error);
 #else
-    gsl_integration_qag(&F, E_low, E_high, 1e-6 * C_MB_SR, accuracy, w->limit, GSL_INTEG_GAUSS21, w, &result, &error); /* For some reason 0 as epsabs doesn't work anymore so a very small number is used instead */
+    if(emult) { /* Advanced, compute E weighed sigma */
+        F.function = &cs_stragg_e_function; /* Different integrand */
+        gsl_integration_qag(&F, E_low, E_high, 1e-6 * C_MB_SR * C_KEV, accuracy, w->limit, GSL_INTEG_GAUSS15, w, &result, &error);
+    } else { /* Default, compute sigma */
+        F.function = &cs_stragg_function;
+        gsl_integration_qag(&F, E_low, E_high, 1e-6 * C_MB_SR, accuracy, w->limit, GSL_INTEG_GAUSS15, w, &result, &error); /* For some reason 0 as epsabs doesn't work anymore so a very small number is used instead */
+    }
 #endif
     static const double inv_sqrt_2pi = 0.398942280401432703;
-#if 0
+#if 1
     const double scaling = 1/(1.0-2.0*gsl_cdf_ugaussian_P(-1.0 * sigmas)); /* This accounts for the truncation of the gaussian. If sigmas is constant, so is this, so no need to recompute. */
     DEBUGMSG("Got cross_section_straggling_adaptive scaling %.12e", scaling);
 #else
@@ -124,13 +148,25 @@ double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integra
     return result;
 }
 
+double resonance_effect_mean_energy(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, const prob_dist *pd, double E, double S) { /* Does not take concentration gradients into account */
+    double sigma_e = cross_section_straggling(sim_r, w, accuracy, pd, E, S, TRUE);
+    double sigma = cross_section_straggling(sim_r, w, accuracy, pd, E, S, FALSE);
+    if(sigma < 1e-6 * C_MB_SR) { /* If cross section is zero, prevent division by zero */
+        return reaction_product_energy(sim_r->r, sim_r->theta, E);
+    }
+    double mean_energy = sigma_e/sigma;
+    return mean_energy;
+}
+
 double cs_function(double x, void * params) {
     struct cs_int_params *p = (struct cs_int_params *) params;
     p->d.x = p->d_before->x + p->stop_slope * (x - p->E_front); /* Depth assuming constant stopping inside brick */
     double c = get_conc(p->sample, p->d, p->sim_r->i_isotope);
-    double sigma;
     double S = p->S_front + p->stragg_slope * (x - p->E_front);
-    sigma = cross_section_straggling(p->sim_r, p->w, p->stragg_int_accuracy, p->cs_stragg_pd, x, S);
+    double sigma = cross_section_straggling(p->sim_r, p->w, p->stragg_int_accuracy, p->cs_stragg_pd, x, S, FALSE);
+    double sigma_e = cross_section_straggling(p->sim_r, p->w, p->stragg_int_accuracy, p->cs_stragg_pd, x, S, TRUE);
+    p->E_mean_out = sigma_e/sigma;
+    //fprintf(stderr, "got sigma_e = %g, sigma = %g\n", sigma_e, sigma);
     DEBUGVERBOSEMSG("Depth %g tfu, energy %g keV, stragg %g keV, sigma %g mb/sr, c %g %%", p->d.x/C_TFU, x/C_KEV, C_FWHM * sqrt(S)/C_KEV, sigma/C_MB_SR, c/C_PERCENT);
     return c*sigma;
 }
@@ -151,6 +187,7 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
     params.cs_stragg_pd = ws->params->cs_stragg_pd; /* Can be NULL */
     params.stragg_slope = (S_back-S_front)/(E_back-E_front);
     params.stragg_int_accuracy = 1e-8;
+    params.E_mean_out = 0.0;
     gsl_function F;
     F.function = &cs_function;
     F.params = &params;
@@ -195,6 +232,7 @@ double cross_section_concentration_product_stepping(const sim_workspace *ws, con
     const double x_step = (d_after->x - d_before->x) * frac;
     const double E_step = (E_back - E_front) * frac;
     const double S_step = (S_back - S_front) * frac;
+
 #ifdef JABS_DEBUG_CS
     fprintf(stderr, "E_step_nominal = %g keV, n_steps = %zu, S_avg %g keV, E = %g ... %g keV, actual E_step = %g keV\n", E_step_nominal / C_KEV, n_steps, S_avg_FWHM / C_KEV, E_front / C_KEV, E_back / C_KEV, E_step / C_KEV);
 #endif
@@ -203,7 +241,7 @@ double cross_section_concentration_product_stepping(const sim_workspace *ws, con
         double E = E_front + E_step * i;
         double S = S_front + S_step * i;
         d.x = d_before->x + x_step * i;
-        double sigma_partial = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, E, S);
+        double sigma_partial = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, E, S, FALSE);
         if(!sample->no_conc_gradients) { /* We have concentration gradient */
             double c = get_conc(sample, d, sim_r->i_isotope);
             sigma_partial *= c;
@@ -321,6 +359,17 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             b->S_geo_y = geostragg(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, sample, sim_r, &(g->y), d_after, b->E_0);
         }
         sim_reaction_product_energy_and_straggling(sim_r, &ion1); /* sets sim_r->p */
+        double sigma_conc;
+
+        if(b_prev) {
+            sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0);
+            if(sim_r->r->type == REACTION_FILE) { /* TODO: this could also be calculated for other reactions, maybe a user configurable parameter */
+                sim_r->p.E = resonance_effect_mean_energy(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, b->E_0, b->S_0);
+                DEBUGMSG("Computed mean energy after reaction with resonance_effect_mean_energy(), got %g keV", sim_r->p.E/C_KEV);
+            }
+        }
+
+
         assert(sim_r->p.S >= 0.0);
         b->E_r = sim_r->p.E;
         b->S_r = sim_r->p.S;
@@ -335,6 +384,8 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         }
         b->E_s = sim_r->p.E;
         b->S_s = sim_r->p.S;
+
+        double E_deriv;
 
         if(ws->det->foil) { /* Energy loss in detector foil */
             depth d_foil = {.i = 0, .x = 0.0};
@@ -355,9 +406,6 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             b->S = sim_r->p.S;
         }
 
-        double E_deriv;
-        double sigma_conc;
-
         if(b_prev) {
             double d_diff = depth_diff(d_before, d_after);
             if(d_diff == 0) { /* Zero thickness brick, so no energy change either */
@@ -369,7 +417,6 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
                 sigma_conc = 0.0;
             } else {
                 b->thick = d_diff;
-                sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Product of concentration and sigma for isotope i_isotope target and this reaction. */
                 assert(b_prev->E_0 > b->E_0);
                 double E0_diff = b_prev->E_0 - b->E_0;
                 b->dE = b_prev->E - b->E;
