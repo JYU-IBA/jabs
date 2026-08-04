@@ -40,6 +40,7 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
 double cross_section_straggling(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, const prob_dist *pd, double E, double S, int emult);
 double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S);
 double cross_section_straggling_adaptive(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, double E, double S, int emult);
+double resonance_effect_mean_energy(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, double E, double S);
 #ifdef __cplusplus
 }
 #endif

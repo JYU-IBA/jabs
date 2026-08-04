@@ -103,39 +103,6 @@ struct cs_int_params {
 };
 
 
-double resonance_effect_mean_energy(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
-    const double E_step_nominal = 1.0 * C_KEV;
-    depth d = *d_before;
-    double E_diff = E_back - E_front;
-    size_t n_steps = E_diff/E_step_nominal;
-    n_steps = 5;
-    const double frac = 1.0/(1.0*(n_steps+1));
-    const double x_step = (d_after->x - d_before->x) * frac;
-    const double E_step = (E_back - E_front) * frac;
-    const double S_step = (S_back - S_front) * frac;
-
-    double sum = 0.0, sum_e = 0.0;
-    double E_mean_out;
-    for(size_t i = 1; i <= n_steps; i++) { /* Find mean energy by computing two integrals. */
-        double E = E_front + E_step * i;
-        double E_r = reaction_product_energy(sim_r->r, sim_r->theta, E_front + E_step/2.0 * i);
-        //fprintf(stderr, "E_r = %g keV\n", E_r/C_KEV);
-        double S = S_front + S_step * i;
-        d.x = d_before->x + x_step * i;
-        double sigma_partial = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, E, S, FALSE);
-        double sigma_e_partial = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, E, S, TRUE);
-        if(!sample->no_conc_gradients) { /* We have concentration gradient */
-            double c = get_conc(sample, d, sim_r->i_isotope);
-            sigma_partial *= c;
-            sigma_e_partial *= c;
-        }
-        sum += sigma_partial;
-        sum_e += sigma_e_partial;
-    }
-    return sum_e / sum;
-}
-
-
 double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, double E, double S, int emult) { /* Uses real numerical integration */
     struct cs_stragg_int_params params;
     params.sigma = sqrt(S);
@@ -172,6 +139,14 @@ double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integra
     DEBUGVERBOSEMSG("Integrated from %g keV to %g keV in %zu steps (limit %zu), got (%g +- %g) mb/sr", E_low/C_KEV, E_high/C_KEV, w->size, w->limit, result/C_MB_SR, error/C_MB_SR);
     return result;
 }
+
+double resonance_effect_mean_energy(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, double E, double S) {
+    double sigma_e = cross_section_straggling_adaptive(sim_r, w, accuracy, E, S, TRUE);
+    double sigma = cross_section_straggling_adaptive(sim_r, w, accuracy, E, S, FALSE);
+    double mean_energy = sigma_e/sigma;
+    return mean_energy;
+}
+
 
 double cs_function(double x, void * params) {
     struct cs_int_params *p = (struct cs_int_params *) params;
@@ -385,15 +360,7 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0, &E_mean_out);
             //double mean_energy = resonance_effect_mean_energy(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Alternative, inaccurate way */
             if(ws->params->cs_adaptive && sim_r->r->type == REACTION_FILE && E_mean_out > 0.0) {
-                fprintf(stderr, "Maybe got mean energy %g keV all the way through instead of %g keV\n", E_mean_out/C_KEV, sim_r->p.E / C_KEV);
-                fprintf(stderr, "Is %g < %g < %g ?\n", reaction_product_energy(sim_r->r, sim_r->theta, ion1.E) / C_KEV, E_mean_out / C_KEV, reaction_product_energy(sim_r->r, sim_r->theta, b_prev->E_0) / C_KEV);
-                double E_diff = (reaction_product_energy(sim_r->r, sim_r->theta, b->E_0) - reaction_product_energy(sim_r->r, sim_r->theta, b_prev->E_0));
-                double mean_naive = (reaction_product_energy(sim_r->r, sim_r->theta, b_prev->E_0) + reaction_product_energy(sim_r->r, sim_r->theta, b->E_0))/ 2.0;
-                double shift_abs = (E_mean_out - mean_naive);
-                double shift_rel = shift_abs / E_diff;
-                fprintf(stderr, "E_0 = %g keV, E_diff = %g keV, mean_naive = %g keV, mean_out = %g keV. Shift %g keV is %.3lf%% of brick width\n", b->E_0 / C_KEV, E_diff / C_KEV, mean_naive / C_KEV, E_mean_out / C_KEV, shift_abs / C_KEV, shift_rel * 100);
-                //sim_r->p.E -= 1.0*shift_abs; /* TODO: mean energy is not something we should use. Unless we pass this to the convolution? */
-                fprintf(stderr, "\n");
+                sim_r->p.E = resonance_effect_mean_energy(sim_r, ws->w_int_cs, 1e-6, b->E_0, b->S_0);
             }
         }
 
