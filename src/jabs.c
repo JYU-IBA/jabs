@@ -107,7 +107,6 @@ struct cs_int_params {
     gsl_integration_workspace *w;
     double stragg_int_accuracy;
     depth d; /* changes between calls */
-    double E_mean_out; /* another result of calculation, mean energy of reaction product */
 };
 
 
@@ -164,9 +163,6 @@ double cs_function(double x, void * params) {
     double c = get_conc(p->sample, p->d, p->sim_r->i_isotope);
     double S = p->S_front + p->stragg_slope * (x - p->E_front);
     double sigma = cross_section_straggling(p->sim_r, p->w, p->stragg_int_accuracy, p->cs_stragg_pd, x, S, FALSE);
-    double sigma_e = cross_section_straggling(p->sim_r, p->w, p->stragg_int_accuracy, p->cs_stragg_pd, x, S, TRUE);
-    p->E_mean_out = sigma_e/sigma;
-    //fprintf(stderr, "got sigma_e = %g, sigma = %g\n", sigma_e, sigma);
     DEBUGVERBOSEMSG("Depth %g tfu, energy %g keV, stragg %g keV, sigma %g mb/sr, c %g %%", p->d.x/C_TFU, x/C_KEV, C_FWHM * sqrt(S)/C_KEV, sigma/C_MB_SR, c/C_PERCENT);
     return c*sigma;
 }
@@ -187,7 +183,6 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
     params.cs_stragg_pd = ws->params->cs_stragg_pd; /* Can be NULL */
     params.stragg_slope = (S_back-S_front)/(E_back-E_front);
     params.stragg_int_accuracy = 1e-8;
-    params.E_mean_out = 0.0;
     gsl_function F;
     F.function = &cs_function;
     F.params = &params;
