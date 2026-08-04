@@ -149,12 +149,11 @@ double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integra
 }
 
 double resonance_effect_mean_energy(const sim_reaction *sim_r, gsl_integration_workspace *w, double accuracy, const prob_dist *pd, double E, double S) { /* Does not take concentration gradients into account */
-    double sigma_e = cross_section_straggling_adaptive(sim_r, w, accuracy, E, S, TRUE);
-    double sigma = cross_section_straggling_adaptive(sim_r, w, accuracy, E, S, FALSE);
+    double sigma_e = cross_section_straggling(sim_r, w, accuracy, pd, E, S, TRUE);
+    double sigma = cross_section_straggling(sim_r, w, accuracy, pd, E, S, FALSE);
     double mean_energy = sigma_e/sigma;
     return mean_energy;
 }
-
 
 double cs_function(double x, void * params) {
     struct cs_int_params *p = (struct cs_int_params *) params;
@@ -170,7 +169,7 @@ double cs_function(double x, void * params) {
 }
 
 double cross_section_concentration_product_adaptive(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after,
-                                                    double S_front, double S_back, double *E_mean_out) {
+                                                    double S_front, double S_back) {
     double result, error;
     struct cs_int_params params;
     params.sim_r = sim_r;
@@ -204,8 +203,6 @@ double cross_section_concentration_product_adaptive(const sim_workspace *ws, con
     DEBUGVERBOSEMSG("integration estimated error = % 18g", error);
     DEBUGVERBOSEMSG("integration intervals       = %zu", ws->w_int_cs->size);
     DEBUGVERBOSEMSG("final result                = %g mb/sr", final/C_MB_SR);
-    DEBUGVERBOSEMSG("mean energy of reaction product = %.3lf keV", params.E_mean_out/C_KEV);
-    *E_mean_out = params.E_mean_out;
     return final;
 }
 
@@ -232,7 +229,7 @@ double cross_section_concentration_product_stepping(const sim_workspace *ws, con
     const double x_step = (d_after->x - d_before->x) * frac;
     const double E_step = (E_back - E_front) * frac;
     const double S_step = (S_back - S_front) * frac;
-    double E_mean_out; /* TODO: not used */
+
 #ifdef JABS_DEBUG_CS
     fprintf(stderr, "E_step_nominal = %g keV, n_steps = %zu, S_avg %g keV, E = %g ... %g keV, actual E_step = %g keV\n", E_step_nominal / C_KEV, n_steps, S_avg_FWHM / C_KEV, E_front / C_KEV, E_back / C_KEV, E_step / C_KEV);
 #endif
@@ -259,7 +256,7 @@ double cross_section_concentration_product_stepping(const sim_workspace *ws, con
 }
 
 
-double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back, double *E_mean_out) {
+double cross_section_concentration_product(const sim_workspace *ws, const sample *sample, const sim_reaction *sim_r, double E_front, double E_back, const depth *d_before, const depth *d_after, double S_front, double S_back) {
     double sigmaconc;
     if(ws->params->mean_conc_and_energy) {
         double c;
@@ -275,12 +272,10 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
             return 0.0;
         }
         sigmaconc = sim_r->cross_section(sim_r, (E_front + E_back)/2.0) * c;
-        *E_mean_out = 0.0;
     } else if(ws->params->cs_adaptive) {
-        sigmaconc = cross_section_concentration_product_adaptive(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back, E_mean_out);
+        sigmaconc = cross_section_concentration_product_adaptive(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
     } else {
         sigmaconc = cross_section_concentration_product_stepping(ws, sample, sim_r, E_front, E_back, d_before, d_after, S_front, S_back);
-        *E_mean_out = 0.0;
     }
     if(sample->ranges[d_before->i].yield != 1.0 || sample->ranges[d_before->i].yield_slope != 0) {
         double depth = (d_before->x + d_after->x) / 2.0 - sample->ranges[d_before->i].x; /* How deep are we (on average), for yield slope calculation */
@@ -364,10 +359,8 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         double sigma_conc;
 
         if(b_prev) {
-            double E_mean_out = 0.0;
-            sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0, &E_mean_out);
-            //double mean_energy = resonance_effect_mean_energy(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0); /* Alternative, inaccurate way */
-            if(sim_r->r->type == REACTION_FILE) {
+            sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0);
+            if(sim_r->r->type == REACTION_FILE) { /* TODO: this could also be calculated for other reactions, maybe a user configurable parameter */
                 sim_r->p.E = resonance_effect_mean_energy(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, b->E_0, b->S_0);
             }
         }
