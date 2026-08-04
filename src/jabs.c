@@ -137,7 +137,7 @@ double cross_section_straggling_adaptive( const sim_reaction *sim_r, gsl_integra
     }
 #endif
     static const double inv_sqrt_2pi = 0.398942280401432703;
-#if 1
+#if 0
     const double scaling = 1/(1.0-2.0*gsl_cdf_ugaussian_P(-1.0 * sigmas)); /* This accounts for the truncation of the gaussian. If sigmas is constant, so is this, so no need to recompute. */
     DEBUGMSG("Got cross_section_straggling_adaptive scaling %.12e", scaling);
 #else
