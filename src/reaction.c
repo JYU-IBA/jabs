@@ -324,8 +324,8 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
         } else {
             double theta_cm = r->theta + asin(m12 * sin(r->theta));
             cs_conversion_ratio = sigma_lab_to_cm(theta_cm, m12) / (4.0 * C_PI);
+            DEBUGMSG("R33 CS total to differential (assuming isotropic in CM) conv ratio %g, CM theta %g deg, lab theta %g deg", cs_conversion_ratio, theta_cm/C_DEG, r->theta/C_DEG);
         }
-        DEBUGMSG("R33 CS total to differential (assuming isotropic in CM) conv ratio %g, CM theta %g deg, lab theta %g deg", cs_conversion_ratio, theta_cm/C_DEG, r->theta/C_DEG);
     }
 
     for(size_t i = 0; i < rfile->n_data; i++) {
