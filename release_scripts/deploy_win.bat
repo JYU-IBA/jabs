@@ -5,7 +5,7 @@ cd ..
 set INSTALL_DIR=..\install
 set BUILD_DIR=..\build_qjabs\Release
 
-curl "http://users.jyu.fi/~jaakjuli/jibal/data/data.tar.gz" -o jibal_data.tar.gz
+curl "https://users.jyu.fi/~jaakjuli/jibal/data/data.tar.gz" -o jibal_data.tar.gz
 mkdir "%BUILD_DIR%\JIBAL_data"
 tar -zxvf jibal_data.tar.gz -C "%BUILD_DIR%\JIBAL_data"
 copy "%INSTALL_DIR%\bin\*.dll" "%BUILD_DIR%"
