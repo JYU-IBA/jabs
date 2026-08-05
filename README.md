@@ -78,11 +78,10 @@ The scripting language is not a programming language, there is no flow control, 
  - Slower (more accurate) modes 
  - Two-phase fitting, where faster physics model is used in the beginning and more accurate (user configurable) model is turned on after the first phase is starting to converge. User can skip the faster fitting phase.
  - User defined "molecules" i.e. elements with fixed concentration ratios (e.g. you can fit C in SiO2 without changing Si/O ratio)
- - Weighting of cross-sections by straggling 
  - Kinematic (geometric) broadening due to finite detector size and beam spot
  - Stopping corrections can be supplied by user (Bragg correction) for a specific layer as well as similar corrections for straggling and yield
  - Testing of areal sum (counts) and residuals. Some test cases are run by the developer to check sanity and accuracy of simulations for every new release.
- - Higher accuracy mode using adaptive integration for more accurate handling of sharp peaks in cross sections (resonances) and accurate weighting of cross sections by (Gaussian) straggling.
+ - Higher accuracy mode using adaptive integration for more accurate handling of sharp peaks in cross sections (resonances) and accurate weighting of cross sections by (Gaussian) straggling. Average beam energy after scattering can also be calculated accurately, taking into account the so-called resonance effect.
  - Conversion tool from IDF to JaBS script (partial support)
  - Export of simulations to IDF (partial support)
  - Simulation of large angle plural scattering (dual scattering model), with the assumption that first scattering is RBS (not ERD).
