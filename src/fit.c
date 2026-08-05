@@ -945,7 +945,7 @@ void fit_correlation_print(const gsl_matrix *covar, jabs_msg_level msg_level) {
     if(!covar) {
         return;
     }
-    jabs_message(msg_level, "\nCorrelation coefficients (sigma_ij/(sigma_i*sigma_j)) matrix:\n       | ");
+    jabs_message(msg_level, "\nCorrelation coefficients (sigma_ij/sqrt(sigma_ii*sigma_jj)) matrix:\n       | ");
     for(size_t i = 0; i < covar->size1; i++) {
         jabs_message(msg_level, " %4zu  ", i + 1);
     }
