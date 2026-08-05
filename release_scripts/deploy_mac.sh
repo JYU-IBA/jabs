@@ -30,7 +30,7 @@ if [ -f "${jibal_gsto_data_file}" ]; then
     echo "JIBAL data file exists."
 else
     echo "Downloading JIBAL data file."
-    curl "http://users.jyu.fi/~jaakjuli/jibal/data/data.tar.gz" -o "jibal_data.tar.gz"
+    curl "https://users.jyu.fi/~jaakjuli/jibal/data/data.tar.gz" -o "jibal_data.tar.gz"
 fi
 if echo "799a74a37cfd3d003a8b4914e6ff2c554c1b78eacbba84e3a6a414f982ce0bce  jibal_data.tar.gz" | shasum -a 256 --check --status; then
         echo "$jibal_gsto_data_file passes SHA sum check."
