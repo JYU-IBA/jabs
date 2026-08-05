@@ -61,8 +61,9 @@ cp "$jibal_gsto_data_dir"/*.ele "${resources}"
 cp "$jibal_gsto_data_dir"/*.stg "${resources}"
 cp "LICENSE.txt" "${resources}"
 cd "$builddir"
-echo "Operating in $pwd"
+echo "Operating in $(pwd)"
 #mv qjabs.app JaBS.app
+rm JaBS.dmg
 rm -rf JaBS.app
 cp -R qjabs.app JaBS.app
 echo "Running macdeployqt"
