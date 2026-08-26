@@ -2739,8 +2739,13 @@ script_command_status script_kinematics(script_session *s, int argc, char * cons
             sim_r->r = r;
             sim_reaction_set_cross_section_by_type(sim_r);
             sim_r->emax_incident = sim->beam_E;
-            sim_reaction_recalculate_internal_variables(sim_r, sim->params, det->theta, sim->emin, sim->beam_E, sim->beam_E);
-            sim_reaction_recalculate_screening_table(sim_r); /* TODO: only when necessary (Universal) */
+            if(sim_reaction_recalculate_internal_variables(sim_r, sim->params, det->theta, sim->emin, sim->beam_E, sim->beam_E)) {
+                jabs_message(MSG_ERROR, "Could not recalculate internal variables for reaction \"%s\".\n", r->name);
+                reaction_free(r);
+                free(sim_r);
+                return SCRIPT_COMMAND_FAILURE;
+            }
+            sim_reaction_recalculate_screening_table(sim_r); /* TODO: only when necessary (e.g. Universal) */
             double E = reaction_product_energy(r, det->theta, sim->beam_E);
             const jibal_isotope *product = r->product;
             if(!product) {

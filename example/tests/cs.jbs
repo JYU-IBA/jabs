@@ -20,3 +20,7 @@ set cs_rbs Universal
 set cs_erd Universal
 kin RBS 197Au
 #kin ERD 59Co
+
+set cs_rbs NLH
+set cs_erd NLH
+kin RBS 197Au

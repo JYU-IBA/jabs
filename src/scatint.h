@@ -26,7 +26,6 @@ extern "C" {
 #define INTEGRATION_ACCURACY (1e-7)
 #define IMPACT_FACTOR_ACCURACY (1e-9)
 
-
 typedef enum potential_type {
     POTENTIAL_NONE = 0,
     POTENTIAL_BOHR = 1,
@@ -34,7 +33,8 @@ typedef enum potential_type {
     POTENTIAL_ANDERSEN = 3,
     POTENTIAL_RUTHERFORD = 4,
     POTENTIAL_TF_SOMMERFELD = 5,
-    POTENTIAL_TEST = 6
+    POTENTIAL_NLH = 6,
+    POTENTIAL_TEST = 7
 } potential_type;
 
 typedef struct scatint_params {
@@ -63,22 +63,23 @@ typedef struct scatint_params {
     double ik_scaling;
     double E_ik_ratio;
     double sigma_lab_to_cm_ratio;
-    double (*potential)(double);
+    double (*potential)(const struct scatint_params *, double);
     gsl_integration_workspace *w;
     double accuracy;
 } scatint_params;
 
 double scatint_sigma_lab(scatint_params *p, double E_lab, double theta_lab); /* This is the easiest one to use */
 double scatint_sigma(scatint_params *p);
-double potential_universal(double x);
-double potential_andersen(double x);
-double potential_rutherford(double x);
+double potential_universal(const scatint_params *p, double x);
+double potential_andersen(const scatint_params *p, double x);
+double potential_rutherford(const scatint_params *p, double x);
 double screening_length_universal(int Z1, int Z2);
 double screening_length_test(int Z1, int Z2, double em);
 double screening_length_andersen(int Z1, int Z2);
 double screening_length_bohr(int Z1, int Z2);
 double screening_length_thomas_fermi(int Z2);
-double potential_bohr(double x);
+double potential_bohr(const scatint_params *p, double x);
+double potential_nlh(const scatint_params *p, double x);
 double apsis_f (double x, void *p);
 int apsis(scatint_params *params);
 double scat_theta_f(double x, void *params);

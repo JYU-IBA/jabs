@@ -20,6 +20,7 @@
 #include "sim_reaction.h"
 #include "scatint.h"
 #include "defaults.h"
+#include "nlh.h"
 
 sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks) {
     if(!r) {
@@ -124,7 +125,7 @@ int sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_c
         sim_r->lecuyer_factor = 48.73 * C_EV * incident->Z * pow(target->Z, 4.0/3.0); /* Factor 0.049 given in NIM 160 (1979) 337-346 */
     }
     if(sim_r->r->cs != JABS_CS_NONE && (type == REACTION_RBS || type == REACTION_RBS_ALT || type == REACTION_ERD)) {
-        if(params->screening_tables || sim_r->r->cs == JABS_CS_UNIVERSAL) { /* Universal needs to be precalculated to be remotely useful. Forcing it! */
+        if(params->screening_tables || sim_r->r->cs == JABS_CS_UNIVERSAL || sim_r->r->cs == JABS_CS_THOMASFERMI || sim_r->r->cs == JABS_CS_NLH) { /* Universal etc need to be precalculated to be remotely useful. Forcing it! */
             if(sim_reaction_recalculate_screening_table(sim_r)) {
                 jabs_message(MSG_ERROR, "Recalculating screening table for reaction %s failed.\n", reaction_name(sim_r->r));
                 DEBUGMSG("Recalculating screening table for reaction %s failed.", reaction_name(sim_r->r));
@@ -161,6 +162,13 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
         case JABS_CS_THOMASFERMI:
             pt = POTENTIAL_TF_SOMMERFELD;
             break;
+        case JABS_CS_NLH:
+            if(sim_r->r->incident->Z > NLH_MAX_Z || sim_r->r->target->Z > NLH_MAX_Z) {
+                jabs_message(MSG_ERROR, "NLH cross section requested for Z1 = %i, Z2 = %i, but Z is limited to %i.\n", sim_r->r->incident->Z, sim_r->r->target->Z, NLH_MAX_Z);
+                return EXIT_FAILURE;
+            }
+            pt = POTENTIAL_NLH;
+            break;
         case JABS_CS_LECUYER:
             break;
         default:
@@ -169,11 +177,12 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
     if(pt != POTENTIAL_NONE) {
         sp = scatint_init(sim_r->r->type, pt, sim_r->r->incident, sim_r->r->target);
         if(!sp) {
+            jabs_message(MSG_ERROR, "Could not initialize scattering integral solver.\n");
             return EXIT_FAILURE;
         }
         scatint_set_theta(sp, sim_r->theta);
     }
-    sim_r->cs_table = malloc(n * sizeof(reaction_point));
+    sim_r->cs_table = calloc(n, sizeof(reaction_point));
     if(!sim_r->cs_table) {
         return EXIT_FAILURE;
     }
@@ -196,6 +205,7 @@ int sim_reaction_recalculate_screening_table(sim_reaction *sim_r) {
                 rp->sigma = sim_reaction_lecuyer(sim_r, E_cm);
                 break;
             case JABS_CS_TEST:
+            case JABS_CS_NLH:
             case JABS_CS_THOMASFERMI:
             case JABS_CS_UNIVERSAL:
                 scatint_set_energy(sp, E);
