@@ -11,6 +11,7 @@
 #include <gsl/gsl_roots.h>
 #include <gsl/gsl_integration.h>
 #include "jabs_debug.h"
+#include "nlh.h"
 #include "scatint.h"
 
 double scatint_sigma(scatint_params *p) {
@@ -118,15 +119,15 @@ int main_scatint(int argc, char **argv) {
     return EXIT_SUCCESS;
 }
 
-double potential_universal(double x) {
+double potential_universal(const scatint_params *p, double x) {
     return 0.1818*exp(-3.2*(x)) +  0.5099*exp(-0.9423*(x)) + 0.2802*exp(-0.4029*(x)) + 0.02817*exp(-0.2016*(x));
 }
 
-double potential_test(double x) {
+double potential_test(const scatint_params *p, double x) {
     return 0.1818*exp(-3.2*(x)) +  0.5099*exp(-0.9423*(x)) + 0.2802*exp(-0.4029*(x)) + 0.02817*exp(-0.2016*(x));
 }
 
-double potential_andersen(double x) {
+double potential_andersen(const scatint_params *p, double x) {
     if(x < 1.0/1.586) {
         return 1.0 - 1.586 * x;
     } else {
@@ -134,28 +135,32 @@ double potential_andersen(double x) {
     }
 }
 
-double potential_rutherford(double x) { /* Good old Coulomb */
+double potential_rutherford(const scatint_params *p, double x) { /* Good old Coulomb */
     (void) x;
     return 1.0;
 }
 
-double potential_thomas_fermi_sommerfeld(double x) { /* Sommerfeld approximation of Thomas-Fermi screening function */
+double potential_thomas_fermi_sommerfeld(const scatint_params *p, double x) { /* Sommerfeld approximation of Thomas-Fermi screening function */
     const double alpha = 5.2414828; /* 12^(2/3) */
     const double beta = 0.8034;
     const double gamma = 3.734;
     return pow(1.0 + pow(x / alpha, beta), -1.0 * gamma);
 }
 
-
-double potential_bohr(double x) {
+double potential_bohr(const scatint_params *p, double x) {
     return exp(-(x));
+}
+
+double potential_nlh(const scatint_params *p, double x) {
+    const nlhcoeff *nlh = nlh_coeffs(p->Z1, p->Z2);
+    return nlh->a1*exp(-nlh->b1*x) + nlh->a2*exp(-nlh->b2*x) + nlh->a3*exp(-nlh->b3*x);
 }
 
 double apsis_f (double x, void *p) {
     scatint_params * params = (scatint_params *)p;
     double s = (params->s);
     double E_rel = (params->E_rel);
-    double out = 1.0 - (s*s)/(x*x) - params->potential(x) / x / E_rel;
+    double out = 1.0 - (s*s)/(x*x) - params->potential(params, x) / x / E_rel;
 //    fprintf(stderr, "apsis_f(s = %g, E_rel = %g, r = %g) = %g\n", s, E_rel, x, out); 
     return out;
 }
@@ -281,6 +286,7 @@ scatint_params *scatint_init(reaction_type rt, potential_type pt, const jibal_is
         p->incident = incident;
         p->target = target;
     } else {
+        jabs_message(MSG_ERROR, "Can not calculate cross sections using a scattering integral solver for reaction type %s.", reaction_type_to_string(rt));
         free(p);
         return NULL;
     }
@@ -310,6 +316,10 @@ scatint_params *scatint_init(reaction_type rt, potential_type pt, const jibal_is
             p->a = screening_length_thomas_fermi(target->Z);
             p->potential = potential_thomas_fermi_sommerfeld;
             break;
+        case POTENTIAL_NLH:
+            p->a = 1.0e-10; /* There is no "screening length" in NLH, but some coefficients are given in units of angstrom, so we can do the conversion here */
+            p->potential = potential_nlh;
+            break;
         case POTENTIAL_NONE:
         default:
             p->a = 0.0;
@@ -336,6 +346,10 @@ scatint_params *scatint_init(reaction_type rt, potential_type pt, const jibal_is
     p->ik_scaling = 1.0; /* Will be changed for ERD when theta is changed */
     p->E_ik_ratio = target->mass / incident->mass; /* Remember, target and incident are already inverted */
     p->w = gsl_integration_workspace_alloc(INTEGRATION_WORKSPACE_N);
+    if(!p->w) {
+        free(p);
+        return NULL;
+    }
     p->accuracy = INTEGRATION_ACCURACY;
     return p;
 }
@@ -532,6 +546,8 @@ const char *scatint_potential_name(potential_type pt) {
             return "Andersen";
         case POTENTIAL_RUTHERFORD:
             return "Rutherford";
+        case POTENTIAL_NLH:
+            return "NLH";
         case POTENTIAL_NONE:
         default:
             return "None";

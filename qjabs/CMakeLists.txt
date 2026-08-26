@@ -106,6 +106,7 @@ set(PROJECT_SOURCES
         ../src/gsl_inline.c
         ../src/scatint.c
         ../src/simulation2idf.c
+        ../src/nlh.c
         "$<$<BOOL:${JABS_PLUGINS}>:../src/plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui
