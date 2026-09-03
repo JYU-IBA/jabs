@@ -95,6 +95,7 @@ script_command_status script_show_fit(script_session *s, int argc, char * const 
 script_command_status script_show_fit_variables(script_session *s, int argc, char * const *argv);
 script_command_status script_show_fit_ranges(script_session *s, int argc, char * const *argv);
 script_command_status script_show_fit_correlation(script_session *s, int argc, char *const *argv);
+script_command_status script_show_reaction(script_session *s, int argc, char *const *argv);
 script_command_status script_show_reactions(script_session *s, int argc, char * const *argv);
 script_command_status script_show_sample(script_session *s, int argc, char * const *argv);
 script_command_status script_show_sample_profile(script_session *s, int argc, char * const *argv);

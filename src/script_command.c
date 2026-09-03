@@ -1370,6 +1370,7 @@ script_command *script_commands_create(script_session *s) {
     script_command_list_add_command(&c_fit->subcommands, script_command_new("ranges", "Show fit ranges.", 0, 0, &script_show_fit_ranges));
     script_command_list_add_command(&c_fit->subcommands, script_command_new("correlation", "Show fit parameter correlations.", 0, 0, &script_show_fit_correlation));
 
+    script_command_list_add_command(&c_show->subcommands, script_command_new("reaction", "Show reaction.", 0, 0, &script_show_reaction));
     script_command_list_add_command(&c_show->subcommands, script_command_new("reactions", "Show reactions.", 0, 0, &script_show_reactions));
 
     script_command *c_show_sample = script_command_new("sample", "Show sample.", 0, 0, &script_show_sample);
@@ -1971,6 +1972,68 @@ script_command_status script_show_detector(script_session *s, int argc, char *co
         jabs_message(MSG_INFO, "Use 'show detector <number>' to get more information on a particular detector or 'reset detectors' to remove all of them.\n");
     }
     return argc_orig - argc; /* Number of arguments */
+}
+
+script_command_status script_show_reaction(script_session *s, int argc, char *const *argv) {
+    (void) argc;
+    (void) argv;
+    const int argc_orig = argc;
+    const char *show_reaction_usage = "Usage: show reaction <reaction number>\nExample: show reaction 1.\nSee also 'show reactions'\n";
+    fit_data *fit = s->fit;
+    if(fit->sim->n_reactions == 0) {
+        jabs_message(MSG_INFO, "No reactions.\n");
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    if(argc < 1) {
+        jabs_message(MSG_ERROR, show_reaction_usage);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    char *end;
+    size_t i_reaction = strtoull(argv[0], &end, 10);
+    if(*end != '\0' || i_reaction == 0 || i_reaction > fit->sim->n_reactions) {
+        jabs_message(MSG_ERROR, "Reaction number must be between 1 and %zu (number of reactions).\n", fit->sim->n_reactions);
+        return SCRIPT_COMMAND_FAILURE;
+    }
+    const reaction *r = fit->sim->reactions[i_reaction - 1];
+    jabs_message(MSG_INFO, "Reaction %zu:\n", i_reaction);
+    jabs_message(MSG_INFO, "Name: %s\n", r->name);
+    jabs_message(MSG_INFO, "Type: %s\n", reaction_type_to_string(r->type));
+    if(r->filename) {
+        jabs_message(MSG_INFO, "Filename: %s\n", r->filename);
+    }
+    if(r->incident) {
+        jabs_message(MSG_INFO, "Incident: %s (Z = %i, A = %i, mass = %g u)\n", r->incident->name, r->incident->Z, r->incident->A, r->incident->mass / C_U);
+    }
+    if(r->target) {
+        jabs_message(MSG_INFO, "Target: %s (Z = %i, A = %i, mass = %g u)\n", r->target->name, r->target->Z, r->target->A, r->target->mass / C_U);
+    }
+    if(r->product) {
+        jabs_message(MSG_INFO, "Product: %s (Z = %i, A = %i, mass = %g u)\n", r->product->name, r->product->Z, r->product->A, r->product->mass / C_U);
+    }
+    if(r->residual) {
+        jabs_message(MSG_INFO, "Residual: %s (Z = %i, A = %i, mass = %g u)\n", r->residual->name, r->residual->Z, r->residual->A, r->residual->mass / C_U);
+    }
+    jabs_message(MSG_INFO, "Q-value: %g MeV\n", r->Q / C_MEV);
+    if(r->incident && r->target && r->product && r->residual) {
+        jabs_message(MSG_INFO, "Q-value (from masses): %g MeV\n", (r->incident->mass + r->target->mass - r->product->mass - r->residual->mass) * C_C2 / C_MEV);
+    }
+    jabs_message(MSG_INFO, "Theta = %g deg (zero for arbitrary, will be calculated based on detector theta)\n", r->theta / C_DEG);
+    jabs_message(MSG_INFO, "E_min = %g MeV\n", r->E_min / C_MEV);
+    jabs_message(MSG_INFO, "E_max = %g MeV\n", r->E_max / C_MEV);
+    jabs_message(MSG_INFO, "Yield correction factor: %g\n", r->yield);
+    if(r->type == REACTION_FILE && r->cs_table) {
+        jabs_message(MSG_INFO, "Cross section table:\n");
+        jabs_message(MSG_INFO, "           E    E_product              sigma\n");
+        jabs_message(MSG_INFO, "         MeV          MeV              mb/sr\n");
+        for(size_t i = 0; i < r->n_cs_table; i++) {
+            const reaction_point *rp = &r->cs_table[i];
+            double E_product = reaction_product_energy(r, r->theta, rp->E);
+            jabs_message(MSG_INFO, "%12.6lf %12.6lf %18.6lf\n", rp->E/C_MEV, E_product/C_MEV, rp->sigma/C_MB_SR);
+        }
+    }
+    argv++;
+    argc--;
+    return argc_orig - argc;
 }
 
 script_command_status script_show_reactions(script_session *s, int argc, char *const *argv) {
@@ -2718,14 +2781,25 @@ script_command_status script_kinematics(script_session *s, int argc, char * cons
     fit_data *fit = s->fit;
     const simulation *sim = s->fit->sim;
     if(argc < 1) {
-        jabs_message(MSG_ERROR, "Usage: kinematics <type> <target atom>\nSyntax of \"add reaction\" is used.\n");
+        jabs_message(MSG_ERROR, "Usage: kinematics <type> <target atom>\nSyntax of \"add reaction\" is used. Alternatively: kinematics <reaction number>\n");
         return SCRIPT_COMMAND_FAILURE;
     }
     if(sim->n_det == 0) {
         jabs_message(MSG_ERROR, "No detectors defined.\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    reaction *r = sim_reaction_make_from_argv(fit->jibal, fit->sim, &argc, &argv);
+    reaction *r;
+    int reaction_allocated = FALSE;
+    char *end;
+    size_t i_reaction = strtoull(argv[0], &end, 10); /* Bare number, attempt to check an existing reaction */
+    if(*end == '\0' && i_reaction <= sim->n_reactions && i_reaction > 0) {
+        r = sim->reactions[i_reaction - 1];
+        argc -= 1;
+        argv += 1;
+    } else {
+        r = sim_reaction_make_from_argv(fit->jibal, fit->sim, &argc, &argv);
+        reaction_allocated = TRUE;
+    }
     if(!r) {
         jabs_message(MSG_ERROR, "Reaction could not be initialized.\n");
         return SCRIPT_COMMAND_FAILURE;
@@ -2741,7 +2815,9 @@ script_command_status script_kinematics(script_session *s, int argc, char * cons
             sim_r->emax_incident = sim->beam_E;
             if(sim_reaction_recalculate_internal_variables(sim_r, sim->params, det->theta, sim->emin, sim->beam_E, sim->beam_E)) {
                 jabs_message(MSG_ERROR, "Could not recalculate internal variables for reaction \"%s\".\n", r->name);
-                reaction_free(r);
+                if(reaction_allocated) {
+                    reaction_free(r);
+                }
                 free(sim_r);
                 return SCRIPT_COMMAND_FAILURE;
             }
@@ -2765,6 +2841,8 @@ script_command_status script_kinematics(script_session *s, int argc, char * cons
 
         }
     }
-    reaction_free(r);
+    if(reaction_allocated) {
+        reaction_free(r);
+    }
     return argc_orig - argc;
 }
