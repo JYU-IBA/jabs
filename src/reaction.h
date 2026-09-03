@@ -59,8 +59,8 @@ static const jibal_option jabs_cs_types[] = {
         {"Andersen", JABS_CS_ANDERSEN},
         {"Universal", JABS_CS_UNIVERSAL},
         {"LEcuyer", JABS_CS_LECUYER},
-        {"NLH", JABS_CS_NLH},
         {"ThomasFermi", JABS_CS_THOMASFERMI},
+        {"NLH", JABS_CS_NLH},
 #ifdef JABS_CS_TEST
         {"Test", JABS_CS_TEST},
 #endif

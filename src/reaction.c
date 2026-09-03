@@ -203,7 +203,6 @@ int reaction_modifiers_from_argv(const jibal *jibal, reaction *r, int *argc, cha
             r->cs = jibal_option_get_value(jabs_cs_types, (*argv)[1]);
             if(r->cs == 0) {
                 jabs_message(MSG_ERROR, "Cross section type \"%s\" not recognized.\n", (*argv)[1]);
-                reaction_free(r);
                 return -1;
             }
         } else if(strcmp((*argv)[0], "yield") == 0) {
