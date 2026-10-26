@@ -58,6 +58,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->bricks_skip_zero_conc_ranges = FALSE;
     p->screening_tables = FALSE;
     p->bricks_save = FALSE;
+    p->mean_energy_after_reaction_accurate = FALSE;
     DEBUGSTR("New calc params created.");
     return p;
 }
@@ -90,6 +91,7 @@ sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
     p->exiting_stop_params.min *= 0.5;
     p->exiting_stop_params.sigmas *= 0.5;
     p->brick_width_sigmas *= 0.25;
+    p->mean_energy_after_reaction_accurate = TRUE;
     return p;
 }
 

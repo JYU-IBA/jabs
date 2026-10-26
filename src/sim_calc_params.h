@@ -53,6 +53,7 @@ typedef struct sim_calc_params {
     int bricks_skip_zero_conc_ranges; /* TRUE/FALSE, determines if we should calculate so-called "empty" bricks or skip over them.*/
     int screening_tables;
     int bricks_save; /* Saving of brick data to text files (for debugging purposes etc) */
+    int mean_energy_after_reaction_accurate; /* Calculate mean energy after reaction with for all reactions, not for REACTION_FILE type reactions. */
 } sim_calc_params; /* All "calculation" parameters, i.e. not physical parameters */
 
 sim_calc_params *sim_calc_params_defaults(sim_calc_params *p); /* if p is NULL, allocates params */

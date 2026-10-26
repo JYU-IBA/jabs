@@ -1337,7 +1337,8 @@ script_command *script_commands_create(script_session *s) {
         {JIBAL_CONFIG_VAR_UNIT,   "reaction_file_angle_tolerance", "deg", JIBAL_UNIT_TYPE_ANGLE,           &sim->params->reaction_file_angle_tolerance, NULL, "Reaction file (R33) angle tolerance"},
         {JIBAL_CONFIG_VAR_BOOL,   "bricks_skip_zero_conc_ranges",  0,     0,                               &sim->params->bricks_skip_zero_conc_ranges,  NULL, "Brick calculation skips ranges with zero concentration"},
         {JIBAL_CONFIG_VAR_BOOL,   "screening_tables",              0,     0,                               &sim->params->screening_tables,              NULL, "Compute screening tables"},
-        {JIBAL_CONFIG_VAR_BOOL,   "bricks_save",                   0,     0,                               &sim->params->bricks_save,                   NULL, "Save bricks (text file)"},
+        {JIBAL_CONFIG_VAR_BOOL,   "mean_energy_after_reaction_accurate", 0, 0,                             &sim->params->mean_energy_after_reaction_accurate,NULL, "Calculate mean energy after reaction with for all reactions, not just for R33 reactions."},
+        {JIBAL_CONFIG_VAR_BOOL, "bricks_save", 0, 0, &sim->params->bricks_save, NULL, "Save bricks (text file)"},
         {JIBAL_CONFIG_VAR_OPTION, "cs_rbs",                        0,     0,                               &sim->cs_rbs,                                jabs_cs_types, "Default model for RBS cross section"},
         {JIBAL_CONFIG_VAR_OPTION, "cs_erd",                        0,     0,                               &sim->cs_erd,                                jabs_cs_types,  "Default model for ERD cross section"},
         {JIBAL_CONFIG_VAR_NONE, NULL,                              0,     0, NULL,                                                                      NULL, NULL}

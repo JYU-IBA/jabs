@@ -358,7 +358,7 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
 
         if(b_prev) {
             sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0);
-            if(sim_r->r->type == REACTION_FILE) { /* TODO: this could also be calculated for other reactions, maybe a user configurable parameter */
+            if(sim_r->r->type == REACTION_FILE || ws->params->mean_energy_after_reaction_accurate)  {
                 sim_r->p.E = resonance_effect_mean_energy(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, b->E_0, b->S_0);
                 DEBUGMSG("Computed mean energy after reaction with resonance_effect_mean_energy(), got %g keV", sim_r->p.E/C_KEV);
             }
@@ -453,8 +453,8 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
                 skipped
                 );
         assert(!isnan(ion1.E));
-        if(ion1.E < sim_r->emin_incident) {
-            DEBUGMSG("E = %g keV sufficiently below reaction emin_incident %g keV.", b->E / C_KEV, sim_r->emin_incident / C_KEV);
+        if(ion1.E <  sim_r->emin_incident - 3.0 * sqrt(ion1.S)) {
+            DEBUGMSG("E = %g keV sufficiently below reaction emin_incident %g keV, considering straggling %g keV FWHM.", ion1.E / C_KEV, sim_r->emin_incident / C_KEV, C_FWHM * sqrt(ion1.S) / C_KEV);
             break;
         }
         if(ion1.inverse_cosine_theta > 0.0 && d_after.x >= sim_r->max_depth) {
