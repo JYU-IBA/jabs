@@ -199,7 +199,11 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
         }
         if(fit->sim->params->bricks_save) {
             char *bricks_filename;
-            asprintf(&bricks_filename, "bricks_%zu.dat", i_det + 1);
+            if(asprintf(&bricks_filename, "bricks_%zu.dat", i_det + 1) < 0) {
+                jabs_message(MSG_ERROR, "Could not allocate memory for bricks filename.\n");
+                sim_workspace_free(ws);
+                return SCRIPT_COMMAND_FAILURE;
+            }
             jabs_message(MSG_VERBOSE, "Bricks of detector \"%s\" saved to \"%s\".\n", det->name, bricks_filename);
             if(bricks_filename) {
                 sim_workspace_print_bricks(ws, bricks_filename);
