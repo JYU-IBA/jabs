@@ -134,8 +134,12 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     double start = jabs_clock();
     volatile int error = FALSE;
     const int n = (int) fit->fit_params->n_active;
+    int n_done = 0; /* Columns of Jacobian calculated, for progress */
+    const char *phase_str = fit_phase_to_str(fit->stats.phase);
+    const size_t iter = fit->stats.iter;
+    jabs_progress(0.0, "Fit (%s phase), iteration %zu: derivatives 0/%i", phase_str, iter, n);
     int j;
-#pragma omp parallel default(none) shared(fit, J, error, n)
+#pragma omp parallel default(none) shared(fit, J, error, n, n_done, phase_str, iter)
 #pragma omp for schedule(dynamic)
     for(j = 0; j < n; j++) {
         //fprintf(stderr, "Thread id %i got %zu.\n", omp_get_thread_num(), j);
@@ -172,10 +176,16 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
                 jabs_gsl_matrix_set(J, i + fdd->f_offset, j, (fnext - fi) * spc->delta_inv);
             }
         }
+#pragma omp critical(jabs_fit_progress)
+        { /* Columns finish in parallel threads, progress is reported one at a time */
+            n_done++;
+            jabs_progress((1.0 * n_done) / n, "Fit (%s phase), iteration %zu: derivatives %i/%i", phase_str, iter, n_done, n);
+        }
         if(error) {
             continue;
         }
     }
+    jabs_progress_done();
     fit_deriv_cleanup_jspaces(fit);
     double end = jabs_clock();
     fit->stats.cputime_iter += (end - start);
@@ -218,6 +228,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     }
     double start = jabs_clock();
     volatile int error = FALSE;
+    jabs_progress(-1.0, "Fit (%s phase), iteration %zu: simulating", fit_phase_to_str(fit->stats.phase), fit->stats.iter);
     if(fit->sim->n_det == 1) { /* Skip OpenMP if only one workspace */
         fit_data_det *fdd = &fit->fdd[0];
         result_spectra *spectra = (fit->stats.iter_call == 1 ? &fit->spectra[fdd->i_det] : NULL);
@@ -242,6 +253,7 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
             }
         }
     }
+    jabs_progress_done();
     double end = jabs_clock();
     DEBUGMSG("Fit iteration %zu call %zu simulation done.", fit->stats.iter, fit->stats.iter_call);
     if(error) {

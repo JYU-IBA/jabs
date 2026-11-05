@@ -123,6 +123,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         ws->histo_ds = NULL;
     }
     ws->ds_running = FALSE;
+    ws->progress = FALSE;
 
     sim_workspace_calculate_number_of_bricks(ws);
     sim_workspace_init_reactions(ws);

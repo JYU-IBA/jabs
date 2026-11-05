@@ -37,6 +37,8 @@ extern jabs_msg_level jabs_message_verbosity;
 void jabs_message_printf(jabs_msg_level level, FILE *f, const char *format, ...);
 void jabs_message(jabs_msg_level level, const char *format, ...);
 const char *jabs_message_level_str(jabs_msg_level level);
+void jabs_progress(double fraction, const char *format, ...); /* Progress of a long calculation (fraction 0...1, negative if unknown) and a one line description. Replaces previous progress, does not accumulate like messages. Implementation depends on the user interface. */
+void jabs_progress_done(void); /* Removes progress display */
 #ifdef __cplusplus
 }
 #endif

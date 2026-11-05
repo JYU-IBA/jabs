@@ -192,6 +192,7 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
             jabs_message(MSG_ERROR, "Could not initialize workspace of detector %s.\n", det->name);
             return SCRIPT_COMMAND_FAILURE;
         }
+        ws->progress = TRUE;
         if(simulate_with_ds(ws)) {
             jabs_message(MSG_ERROR, "Simulation failed.\n");
             sim_workspace_free(ws);

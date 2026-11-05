@@ -111,7 +111,6 @@ set(PROJECT_SOURCES
         "$<$<BOOL:${JABS_PLUGINS}>:../src/plugin.c>"
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui
-       fitdialog.cpp fitdialog.h fitdialog.ui
        jabsworker.cpp jabsworker.h
        colorprofile.cpp colorprofile.h
        qcustomplot.cpp qcustomplot.h

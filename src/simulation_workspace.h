@@ -45,6 +45,7 @@ typedef struct sim_workspace {
     jabs_histogram *histo_sum;
     jabs_histogram *histo_ds; /* Dual scattering contribution to histo_sum (sum of reaction histo_ds), NULL if dual scattering is not calculated */
     int ds_running; /* TRUE while dual scattering trajectories are calculated, spectra are then convoluted to histo_ds of reactions */
+    int progress; /* Report progress of (long) calculations, e.g. dual scattering, to terminal. FALSE by default (e.g. fits). */
     ion ion;
     sim_reaction **reactions; /* table of reaction pointers, size n_reactions */
     const jibal_isotope *isotopes;

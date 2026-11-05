@@ -39,6 +39,7 @@ public:
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 signals:
     void rangeSelected(QString);

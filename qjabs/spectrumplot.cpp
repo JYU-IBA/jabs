@@ -285,7 +285,7 @@ void SpectrumPlot::resetZoom()
 {
     xAxis->setRange(xmin, xmax);
     updateVerticalRange(true);
-    replot();
+    replot(QCustomPlot::rpQueuedReplot);
 }
 
 void SpectrumPlot::saveAsFile()
@@ -311,6 +311,12 @@ SpectrumPlot::~SpectrumPlot() {
     delete legendOutsideAction;
     delete zoomAction;
     delete energyScaleAction;
+}
+
+void SpectrumPlot::showEvent(QShowEvent *event)
+{ /* A hidden plot is not laid out. Contents rendered before showing (or while hidden) can have wrong size, so replot after the plot has been shown and laid out. */
+    QCustomPlot::showEvent(event);
+    replot(QCustomPlot::rpQueuedReplot);
 }
 
 void SpectrumPlot::setColors(const QColor &background, const QColor &foreground, const QColor &grid, const QColor &legendBackground)

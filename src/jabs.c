@@ -1048,6 +1048,13 @@ int simulate_with_ds(sim_workspace *ws) {
     ws->ms_spread = FALSE; /* Energy spread due to multiple scattering is not calculated for dual scattering trajectories (straggling is) */
     ws->ds_running = TRUE; /* Spectra from here on are convoluted into dual scattering histograms */
     const double grazing_inverse_cosine_max = 1.0 / sin(GSL_MAX_DBL(ws->params->ds_grazing_angle, DUAL_SCATTER_GRAZING_ANGLE_MIN));
+    int progress_shown = FALSE;
+    const double t_start = jabs_clock();
+    double t_progress = t_start;
+    const double E_start = ion1.E;
+    double E_progress = E_start;
+    double rate = 0.0; /* Smoothed rate of incident energy decrease per second, for estimate of remaining time */
+    size_t n_trajectories = 0;
     for(size_t i_depth = 0; ; i_depth++) {
         if(last) {
             break;
@@ -1139,6 +1146,7 @@ int simulate_with_ds(sim_workspace *ws) {
                     }
                     if(scatangle > scatangle_min * (1.0 - 1e-6)) {
                         int n_ok = simulate(&ion2, d_halfdepth, ws, ws->sample);
+                        n_trajectories++;
                         if(n_ok < 0) {
                             ws->ds_traj.active = FALSE;
                             ws->ds_traj.lateral = FALSE;
@@ -1159,6 +1167,24 @@ int simulate_with_ds(sim_workspace *ws) {
             }
         }
         ws->ds_traj.active = FALSE;
+        const double t_now = jabs_clock();
+        if(ws->progress && t_now - t_progress >= DUAL_SCATTER_PROGRESS_INTERVAL) {
+            const double rate_now = (E_progress - E_back) / (t_now - t_progress); /* Cost of depth steps varies (e.g. heavy layers with many isotopes), recent rate is a better predictor */
+            rate = (rate > 0.0) ? 0.5 * rate + 0.5 * rate_now : rate_now;
+            t_progress = t_now;
+            E_progress = E_back;
+            double fraction = (E_start - E_back) / (E_start - emin);
+            fraction = GSL_MIN_DBL(GSL_MAX_DBL(fraction, 0.0), 1.0);
+            double elapsed = t_now - t_start;
+            if(rate > 0.0) { /* Remaining time is an upper estimate, calculation often ends before minimum energy */
+                jabs_progress(fraction, "Dual scattering: E = %.1lf keV, depth %.0lf tfu, %zu trajectories, %.0lf s, ~%.0lf s left",
+                              E_back / C_KEV, d_after.x / C_TFU, n_trajectories, elapsed, (E_back - emin) / rate);
+            } else {
+                jabs_progress(fraction, "Dual scattering: E = %.1lf keV, depth %.0lf tfu, %zu trajectories, %.0lf s",
+                              E_back / C_KEV, d_after.x / C_TFU, n_trajectories, elapsed);
+            }
+            progress_shown = TRUE;
+        }
         if(ws->sample->ranges[ws->sample->n_ranges - 1].x - d_after.x < 0.01 * C_TFU)
             break;
         d_before = d_after;
@@ -1174,6 +1200,12 @@ int simulate_with_ds(sim_workspace *ws) {
     ws->stragg.ms = stop_ms_orig;
     ws->ms_spread = ms_spread_orig;
     ws->ds_running = FALSE;
+    if(progress_shown) {
+        jabs_progress_done();
+    }
+    if(ws->progress) {
+        jabs_message(MSG_INFO, "Dual scattering: %zu trajectories in %.1lf s.\n", n_trajectories, jabs_clock() - t_start);
+    }
     if(status < 0) {
         jabs_message(MSG_ERROR, "Dual scattering simulation aborted.\n");
         return EXIT_FAILURE;

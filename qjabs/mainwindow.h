@@ -4,12 +4,16 @@
 #include <QMainWindow>
 #include <QSettings>
 #include <QElapsedTimer>
+#include <QProgressBar>
+#include <QFrame>
+#include <QLabel>
+#include <QCheckBox>
+#include <QPushButton>
 #include <QThread>
 #include <QSharedPointer>
 #include <atomic>
 #include <vector>
 #include "highlighter.h"
-#include "fitdialog.h"
 #include "plotdialog.h"
 #include "jabsworker.h"
 #include "colorprofile.h"
@@ -17,6 +21,7 @@
 extern "C" {
 #include <jibal_units.h>
 #include "jabs.h"
+#include "fit.h"
 #include "sample.h"
 #include "script_generic.h"
 #include "generic.h"
@@ -59,6 +64,8 @@ public:
     MainWindow(QWidget *parent = nullptr);
     void addMessage(jabs_msg_level level, const char *msg);
     int fitCallback(fit_stats stats); /* Called by the worker thread during a fit, must not touch widgets */
+    void reportProgress(double fraction, const char *msg); /* Can be called from any thread */
+    void reportProgressDone(); /* Can be called from any thread */
     ~MainWindow();
 
 signals:
@@ -66,6 +73,7 @@ signals:
     void sendMessage(jabs_msg_level level, QString msg);
     void startRun(const QStringList &lines); /* Handled by the worker thread */
     void fitProgress(fit_stats stats, QSharedPointer<PlotSnapshot> snapshot); /* Emitted by the worker thread */
+    void progressChanged(double fraction, QString msg, bool done); /* Emitted by any thread */
 
 public slots:
     void openFile(const QString &filename);
@@ -81,6 +89,8 @@ private slots:
     void onFitProgress(fit_stats stats, QSharedPointer<PlotSnapshot> snapshot);
 
     void stopRun();
+
+    void onProgressChanged(double fraction, QString msg, bool done);
 
     void applyColors(); /* Applies the active color profile (settings) to widgets, plot and icons */
 
@@ -157,7 +167,8 @@ private:
     void closeEvent(QCloseEvent *event);
     void changeEvent(QEvent *event) override;
     void enableRun(bool enabled);
-    void closeFitDialog();
+    void setupRunPanel();
+    void showRunPanel(bool show);
     int initSession();
     int closeSession();
     static QString makeFileLink(const QString &filename, const QString &linkname = "");
@@ -165,7 +176,6 @@ private:
     void showInitialMessages();
 
     Ui::MainWindow *ui;
-    FitDialog *fitDialog;
     PlotDialog *plotDialog;
     struct jibal *jibal;
     script_session *session;
@@ -196,8 +206,18 @@ private:
     RunMode runMode;
     QElapsedTimer runTimer;
     QAction *actionStop;
-    std::atomic<bool> fitAbort; /* Graceful abort of fit (after current iteration), set by fit dialog */
+    QFrame *runPanel; /* Shown during a run: progress, fit statistics, stop */
+    QLabel *runStatusLabel;
+    QProgressBar *progressBar;
+    QWidget *fitRow; /* Part of run panel shown during fits */
+    QLabel *fitPhaseLabel;
+    QLabel *fitIterLabel;
+    QLabel *fitChisqLabel;
+    QCheckBox *plotWhileFittingCheckBox;
+    QPushButton *endFitButton;
+    std::atomic<bool> fitAbort; /* Graceful abort of fit (after current iteration) */
     std::atomic<bool> plotWhileFitting;
     QSharedPointer<PlotSnapshot> snapshot; /* Latest spectra received during a run */
+    bool snapshotPlotted; /* Snapshot has been plotted during this run */
 };
 #endif // MAINWINDOW_H

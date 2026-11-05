@@ -2,6 +2,9 @@
 #include "./ui_mainwindow.h"
 #include <QFontDatabase>
 #include <QStyleHints>
+#include <QToolButton>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QDebug>
 #include <QTextStream>
 #include "preferencesdialog.h"
@@ -17,9 +20,10 @@ int fit_iter_callback(fit_stats stats);
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow),
-      maxRecentFiles(5), fitDialog(NULL), jibal(NULL), session(NULL), highlighter(NULL), plotDialog(NULL),
+      maxRecentFiles(5), jibal(NULL), session(NULL), highlighter(NULL), plotDialog(NULL),
       showIsotopes(false), plotIsotopesZ(JIBAL_ANY_Z), workerThread(nullptr), worker(nullptr), running(false), runMode(RUN_SCRIPT),
-      actionStop(nullptr), fitAbort(false), plotWhileFitting(false), applyingColors(false), applyColorsPending(false), forcedColorScheme(Qt::ColorScheme::Unknown)
+      actionStop(nullptr), runPanel(nullptr), runStatusLabel(nullptr), progressBar(nullptr), fitRow(nullptr), fitPhaseLabel(nullptr), fitIterLabel(nullptr),
+      fitChisqLabel(nullptr), plotWhileFittingCheckBox(nullptr), endFitButton(nullptr), fitAbort(false), plotWhileFitting(false), applyingColors(false), applyColorsPending(false), snapshotPlotted(false), forcedColorScheme(Qt::ColorScheme::Unknown)
 {
     qRegisterMetaType<fit_stats>("fit_stats");
     qRegisterMetaType<jabs_msg_level>("jabs_msg_level"); /* Messages can come from other threads (worker, OpenMP), queued connection needs this */
@@ -74,6 +78,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->toolBar->addAction(actionStop);
     ui->menu_File->insertAction(ui->action_New_File, actionStop);
     connect(this, &MainWindow::fitProgress, this, &MainWindow::onFitProgress); /* Emitted from worker thread, queued */
+    connect(this, &MainWindow::progressChanged, this, &MainWindow::onProgressChanged); /* Emitted from worker thread, queued */
+    setupRunPanel();
     ColorProfile::migrateOldSettings(settings);
     readSettings(); /* Also applies colors */
     readPlotSettings();
@@ -90,7 +96,7 @@ MainWindow::MainWindow(QWidget *parent)
         connect(workerThread, &QThread::finished, worker, &QObject::deleteLater);
         connect(this, &MainWindow::startRun, worker, &JabsWorker::run);
         connect(worker, &JabsWorker::finished, this, &MainWindow::onRunFinished);
-        connect(worker, &JabsWorker::statusMessage, this, [this](const QString &msg) {statusBar()->showMessage(msg);});
+        connect(worker, &JabsWorker::statusMessage, this, [this](const QString &msg) {runStatusLabel->setText(msg); statusBar()->showMessage(msg);});
         workerThread->start();
     }
     connect(ui->widget, &SpectrumPlot::rangeSelected, this, &MainWindow::runRoi);
@@ -113,6 +119,113 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::addMessage(jabs_msg_level level, const char *msg)
 {
     emit sendMessage(level, QString(msg));
+}
+
+void MainWindow::reportProgress(double fraction, const char *msg)
+{
+    emit progressChanged(fraction, msg ? QString(msg) : QString(), false);
+}
+
+void MainWindow::reportProgressDone()
+{
+    emit progressChanged(0.0, QString(), true);
+}
+
+void MainWindow::setupRunPanel()
+{ /* Panel below the main area, shown during runs. The central widget (from .ui) is put in a container together with the panel. */
+    QWidget *main = takeCentralWidget();
+    QWidget *container = new QWidget(this);
+    QVBoxLayout *containerLayout = new QVBoxLayout(container);
+    containerLayout->setContentsMargins(0, 0, 0, 0);
+    containerLayout->setSpacing(0);
+    containerLayout->addWidget(main, 1);
+    runPanel = new QFrame(container);
+    runPanel->setFrameShape(QFrame::StyledPanel);
+    QVBoxLayout *panelLayout = new QVBoxLayout(runPanel);
+    QHBoxLayout *progressRow = new QHBoxLayout();
+    runStatusLabel = new QLabel(runPanel);
+    runStatusLabel->setMinimumWidth(100);
+    runStatusLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred); /* Long text does not widen the window */
+    progressRow->addWidget(runStatusLabel, 3);
+    progressBar = new QProgressBar(runPanel);
+    progressBar->setRange(0, 0);
+    progressBar->setTextVisible(true);
+    progressBar->setFormat("%p%");
+    progressRow->addWidget(progressBar, 2);
+    QToolButton *stopButton = new QToolButton(runPanel);
+    stopButton->setDefaultAction(actionStop);
+    stopButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    progressRow->addWidget(stopButton);
+    panelLayout->addLayout(progressRow);
+    fitRow = new QWidget(runPanel);
+    QHBoxLayout *fitLayout = new QHBoxLayout(fitRow);
+    fitLayout->setContentsMargins(0, 0, 0, 0);
+    fitPhaseLabel = new QLabel(fitRow);
+    fitIterLabel = new QLabel(fitRow);
+    fitChisqLabel = new QLabel(fitRow);
+    fitLayout->addWidget(fitPhaseLabel);
+    fitLayout->addSpacing(20);
+    fitLayout->addWidget(fitIterLabel);
+    fitLayout->addSpacing(20);
+    fitLayout->addWidget(fitChisqLabel);
+    fitLayout->addStretch(1);
+    plotWhileFittingCheckBox = new QCheckBox(QString("Plot while fitting"), fitRow);
+    connect(plotWhileFittingCheckBox, &QCheckBox::toggled, this, [this](bool checked) {
+        plotWhileFitting = checked;
+        settings.setValue("plotWhileFitting", checked);
+        if(!checked && running) {
+            ui->widget->setVisible(false);
+        }
+    });
+    fitLayout->addWidget(plotWhileFittingCheckBox);
+    endFitButton = new QPushButton(QString("End fit after this iteration"), fitRow);
+    endFitButton->setToolTip(QString("Fit stops after the current iteration, result so far is kept"));
+    connect(endFitButton, &QPushButton::clicked, this, [this]() {
+        fitAbort = true;
+        endFitButton->setEnabled(false);
+        endFitButton->setText(QString("Ending after this iteration..."));
+    });
+    fitLayout->addWidget(endFitButton);
+    panelLayout->addWidget(fitRow);
+    containerLayout->addWidget(runPanel);
+    setCentralWidget(container);
+    showRunPanel(false);
+}
+
+void MainWindow::showRunPanel(bool show)
+{
+    runPanel->setVisible(show);
+    if(show) {
+        runStatusLabel->setText(QString("Running."));
+        progressBar->setRange(0, 0); /* Busy indicator */
+        fitRow->setVisible(false);
+        plotWhileFittingCheckBox->blockSignals(true);
+        plotWhileFittingCheckBox->setChecked(plotWhileFitting);
+        plotWhileFittingCheckBox->blockSignals(false);
+        endFitButton->setEnabled(true);
+        endFitButton->setText(QString("End fit after this iteration"));
+    }
+}
+
+void MainWindow::onProgressChanged(double fraction, QString msg, bool done)
+{
+    if(!running) {
+        return;
+    }
+    if(done) {
+        progressBar->setRange(0, 0); /* Something is still running, but no progress information */
+        return;
+    }
+    if(fraction < 0.0) {
+        progressBar->setRange(0, 0); /* Busy indicator */
+    } else {
+        progressBar->setRange(0, 1000);
+        progressBar->setValue((int)(1000.0 * qBound(0.0, fraction, 1.0)));
+    }
+    if(!msg.isEmpty()) {
+        runStatusLabel->setText(msg);
+        runStatusLabel->setToolTip(msg);
+    }
 }
 
 MainWindow::~MainWindow()
@@ -184,8 +297,10 @@ void MainWindow::startWorker(const QStringList &lines, RunMode mode)
     fitAbort = false;
     plotWhileFitting = settings.value("plotWhileFitting", QVariant(false)).toBool();
     snapshot.clear();
+    snapshotPlotted = false;
     jabs_abort_set(FALSE);
     enableRun(false);
+    showRunPanel(true);
     runTimer.start();
     statusBar()->showMessage(QString("Running."));
     emit startRun(lines);
@@ -295,14 +410,6 @@ void MainWindow::enableRun(bool enabled)
     }
 }
 
-void MainWindow::closeFitDialog()
-{
-    if(fitDialog) {
-        fitDialog->close();
-        delete fitDialog;
-        fitDialog = NULL;
-    }
-}
 
 int MainWindow::initSession()
 {
@@ -574,19 +681,21 @@ void MainWindow::onFitProgress(fit_stats stats, QSharedPointer<PlotSnapshot> sna
     if(!running) { /* Late signal, run has already finished */
         return;
     }
-    if(!fitDialog) {
-        fitDialog = new FitDialog();
-        connect(fitDialog, &FitDialog::abortRequested, this, [this]() {fitAbort = true;});
-        connect(fitDialog, &FitDialog::plotWhileFittingChanged, this, [this](bool plot) {plotWhileFitting = plot;});
-        plotWhileFitting = fitDialog->isPlotWhileFitting();
-        fitDialog->show();
-    }
-    fitDialog->updateStats(stats);
-    if(fitDialog->isPlotWhileFitting()) {
+    fitRow->setVisible(true);
+    fitPhaseLabel->setText(QString("Phase: %1").arg(fit_phase_to_str((fit_phase) stats.phase)));
+    fitIterLabel->setText(QString("Iteration: %1").arg(stats.iter));
+    fitChisqLabel->setText(stats.chisq_dof > 0.0 ? QString("χ²/dof: %1").arg(stats.chisq_dof, 0, 'g', 6) : QString("χ²/dof: -"));
+    if(plotWhileFittingCheckBox->isChecked()) {
         if(snap) {
             snapshot = snap;
-            plotSpectrum(ui->comboBox->currentIndex());
             ui->widget->setVisible(true);
+            plotSpectrum(ui->comboBox->currentIndex());
+            if(!snapshotPlotted) { /* First plot during this run: axes are set to data (like plotSession() does on first run), later the user's zoom is kept */
+                snapshotPlotted = true;
+                if(firstRun) {
+                    ui->widget->resetZoom();
+                }
+            }
         }
     } else {
         ui->widget->setVisible(false);
@@ -626,10 +735,10 @@ void MainWindow::on_action_Run_triggered()
 void MainWindow::onRunFinished(bool error, qsizetype lineno)
 {
     running = false;
+    showRunPanel(false);
     snapshot.clear();
     bool aborted = jabs_abort_requested() || fitAbort;
     jabs_abort_set(FALSE);
-    closeFitDialog();
     enableRun(true);
     QString message;
     if(runMode == RUN_COMMAND_LINE) {
@@ -778,7 +887,7 @@ void MainWindow::plotSpectra(const result_spectra *spectra, const jabs_histogram
 
     }
     ui->widget->updateVerticalRange();
-    ui->widget->replot();
+    ui->widget->replot(QCustomPlot::rpQueuedReplot); /* Widget may have just been made visible (or resized), replot after layout has been updated */
 }
 
 

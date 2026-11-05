@@ -100,6 +100,22 @@ void jabs_message_printf(jabs_msg_level level, FILE *f, const char * format, ...
     va_end(argp);
 }
 
+void jabs_progress(double fraction, const char *format, ...) { /* GUI: progress is shown in status bar (may be called from worker thread) */
+    va_list argp;
+    va_start(argp, format);
+    char *str_out;
+    if(vasprintf(&str_out, format, argp) < 0) {
+        str_out = NULL;
+    }
+    va_end(argp);
+    mainWindow->reportProgress(fraction, str_out);
+    free(str_out);
+}
+
+void jabs_progress_done(void) {
+    mainWindow->reportProgressDone();
+}
+
 int fit_iter_callback(fit_stats stats) {
     return mainWindow->fitCallback(stats);
 }
