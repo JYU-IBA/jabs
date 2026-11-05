@@ -1,1 +1,6 @@
 rbs_rough*.jbs
+*_out.*
+*_exp.dat
+*_sim.dat
+tests.log
+bricks_*.dat
