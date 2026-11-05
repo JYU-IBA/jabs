@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
 #include <QFontDatabase>
+#include <QStyleHints>
 #include <QDebug>
 #include <QTextStream>
 #include "preferencesdialog.h"
@@ -18,7 +19,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow),
       maxRecentFiles(5), fitDialog(NULL), jibal(NULL), session(NULL), highlighter(NULL), plotDialog(NULL),
       showIsotopes(false), plotIsotopesZ(JIBAL_ANY_Z), workerThread(nullptr), worker(nullptr), running(false), runMode(RUN_SCRIPT),
-      actionStop(nullptr), fitAbort(false), plotWhileFitting(false)
+      actionStop(nullptr), fitAbort(false), plotWhileFitting(false), applyingColors(false), applyColorsPending(false), forcedColorScheme(Qt::ColorScheme::Unknown)
 {
     qRegisterMetaType<fit_stats>("fit_stats");
     qRegisterMetaType<jabs_msg_level>("jabs_msg_level"); /* Messages can come from other threads (worker, OpenMP), queued connection needs this */
@@ -65,8 +66,6 @@ MainWindow::MainWindow(QWidget *parent)
         connect(a, &QAction::triggered, this, &MainWindow::openRecentFile);
     }
     ui->menuRecent_Files->setToolTipsVisible(true);
-    readSettings();
-    readPlotSettings();
     actionStop = new QAction(QIcon(":/icons/stop-box.svg"), QString("Stop"), this);
     actionStop->setToolTip(QString("Stop running simulation or fit"));
     actionStop->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Period));
@@ -75,6 +74,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->toolBar->addAction(actionStop);
     ui->menu_File->insertAction(ui->action_New_File, actionStop);
     connect(this, &MainWindow::fitProgress, this, &MainWindow::onFitProgress); /* Emitted from worker thread, queued */
+    ColorProfile::migrateOldSettings(settings);
+    readSettings(); /* Also applies colors */
+    readPlotSettings();
+    connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged, this, &MainWindow::scheduleApplyColors); /* OS light / dark mode */
     int status = initSession();
     if(status != 0) {
         enableRun(false);
@@ -408,23 +411,99 @@ void MainWindow::readSettings()
     messageFont.setPointSize(settings.value("messageFontSize", 10).toInt());
     ui->msgTextBrowser->setFont(messageFont);
     defaultVerbosity = settings.value("defaultVerbosity", JABS_DEFAULT_VERBOSITY).toInt();
+    applyColors();
+}
 
-    QString messageColorStr = settings.value("messageColor").toString();
-    if(messageColorStr.isEmpty()) {
-        messageColor = this->palette().color(QPalette::Text);
-    } else {
-        messageColor = QColor::fromString(messageColorStr);
+void MainWindow::applyColors()
+{
+    if(applyingColors) {
+        return;
     }
+    applyingColors = true;
+    colorProfile = ColorProfile::active(settings);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    const Qt::ColorScheme scheme = colorProfile.colorScheme(); /* Light or dark appearance of the whole application (window, toolbar, dialogs), or follow OS */
+    if(scheme != forcedColorScheme) {
+        forcedColorScheme = scheme;
+        QGuiApplication::styleHints()->setColorScheme(scheme); /* Palette change follows, colors will be applied again */
+    }
+#endif
+    const QPalette appPalette = QApplication::palette();
 
+    /* Only roles set in profile are set in widget palettes, others ("System") are inherited from application palette and follow its changes */
+    QPalette editorPalette;
+    if(colorProfile.color("editorBackground").isValid()) {
+        const QColor bg = colorProfile.color("editorBackground");
+        editorPalette.setColor(QPalette::Base, bg);
+        editorPalette.setColor(QPalette::Button, bg.lightness() < 128 ? bg.lighter(130) : bg.darker(108)); /* Line number area */
+    }
+    if(colorProfile.color("editorText").isValid()) {
+        const QColor text = colorProfile.color("editorText");
+        editorPalette.setColor(QPalette::Text, text);
+        QColor lineNumbers = text;
+        lineNumbers.setAlpha(150);
+        editorPalette.setColor(QPalette::ButtonText, lineNumbers);
+    }
+    ui->editor->setPalette(editorPalette);
     QTextCharFormat format;
-    format.setForeground(QColor::fromString(settings.value("commentColor", "lightslategray").toString()));
+    format.setForeground(colorProfile.color("editorComment"));
     highlighter->setCommentFormat(format);
-    format.setForeground(QColor::fromString(settings.value("commandColor", "cornflowerblue").toString()));
+    format.setForeground(colorProfile.color("editorCommand"));
     format.setFontWeight(QFont::Bold);
     highlighter->setCommandFormat(format);
-    format.setForeground(QColor::fromString(settings.value("variableColor", "lightcoral").toString()));
+    format.setForeground(colorProfile.color("editorVariable"));
     format.setFontWeight(QFont::StyleItalic);
     highlighter->setVariableFormat(format);
+    highlighter->rehighlight();
+
+    QPalette messagePalette;
+    if(colorProfile.color("messageBackground").isValid()) {
+        messagePalette.setColor(QPalette::Base, colorProfile.color("messageBackground"));
+    }
+    if(colorProfile.color("messageText").isValid()) {
+        messagePalette.setColor(QPalette::Text, colorProfile.color("messageText"));
+    }
+    ui->msgTextBrowser->setPalette(messagePalette);
+
+    ui->widget->setColors(colorProfile.color("plotBackground"), colorProfile.color("plotForeground"), colorProfile.color("plotGrid"), colorProfile.color("plotLegendBackground"));
+
+    const QColor iconColor = colorProfile.color("iconColor", appPalette.color(QPalette::ButtonText));
+    const QList<QPair<QAction *, QString>> icons = {
+        {ui->action_Run, ":/icons/play-box.svg"},
+        {ui->action_New_File, ":/icons/file-document.svg"},
+        {ui->action_Open_File, ":/icons/folder-open.svg"},
+        {ui->action_Save_File, ":/icons/content-save.svg"},
+        {ui->actionNext_detector, ":/icons/chevron-right.svg"},
+        {ui->actionPrevious_detector, ":/icons/chevron-left.svg"},
+        {actionStop, ":/icons/stop-box.svg"}
+    };
+    for(const auto &icon : icons) {
+        if(icon.first) {
+            icon.first->setIcon(ColorProfile::themedIcon(icon.second, iconColor));
+        }
+    }
+    plotSession();
+    applyingColors = false;
+}
+
+void MainWindow::scheduleApplyColors()
+{
+    if(applyColorsPending) {
+        return;
+    }
+    applyColorsPending = true;
+    QTimer::singleShot(100, this, [this]() {
+        applyColorsPending = false;
+        applyColors();
+    });
+}
+
+void MainWindow::changeEvent(QEvent *event)
+{
+    if(event->type() == QEvent::ApplicationPaletteChange || event->type() == QEvent::PaletteChange || event->type() == QEvent::ThemeChange) { /* System colors may have changed */
+        scheduleApplyColors();
+    }
+    QMainWindow::changeEvent(event);
 }
 
 void MainWindow::setNeedsSaving(bool value)
@@ -459,17 +538,17 @@ void MainWindow::receiveMessage(jabs_msg_level level, QString msg)
     ui->msgTextBrowser->moveCursor(QTextCursor::End);
     switch(level) {
     case MSG_ERROR:
-        ui->msgTextBrowser->setTextColor(Qt::red);
+        ui->msgTextBrowser->setTextColor(colorProfile.color("messageError"));
         break;
     case MSG_WARNING:
-        ui->msgTextBrowser->setTextColor(Qt::darkYellow);
+        ui->msgTextBrowser->setTextColor(colorProfile.color("messageWarning"));
         warningCounter++;
         break;
     case MSG_DEBUG:
-        ui->msgTextBrowser->setTextColor(Qt::gray);
+        ui->msgTextBrowser->setTextColor(colorProfile.color("messageDebug"));
         break;
     default:
-        ui->msgTextBrowser->setTextColor(messageColor);
+        ui->msgTextBrowser->setTextColor(ui->msgTextBrowser->palette().color(QPalette::Text));
         break;
     }
     ui->msgTextBrowser->insertPlainText(msg);
@@ -599,22 +678,22 @@ void MainWindow::plotSpectra(const result_spectra *spectra, const jabs_histogram
 {
     ui->widget->clearAll();
     if(ref_histo) {
-        QCPGraph *g = ui->widget->addGraphHisto("Reference", QColor("Gray"));
+        QCPGraph *g = ui->widget->addGraphHisto("Reference", colorProfile.color("plotReference"));
         ui->widget->drawDataToGraph(g, ref_histo);
     }
     if(spectra) {
         if(spectra->n_spectra > RESULT_SPECTRA_SIMULATED) {
-            QCPGraph *g = ui->widget->addGraphHisto("Simulated", QColor("blue"));
+            QCPGraph *g = ui->widget->addGraphHisto("Simulated", colorProfile.color("plotSimulated"));
             ui->widget->drawDataToGraph(g, result_spectra_simulated_histo(spectra));
             ui->widget->setGraphVisibility(g, false);
         }
         if(spectra->n_spectra > RESULT_SPECTRA_EXPERIMENTAL) {
-            QCPGraph *g = ui->widget->addGraphHisto("Experimental", QColor("black"));
+            QCPGraph *g = ui->widget->addGraphHisto("Experimental", colorProfile.color("plotExperimental"));
             ui->widget->drawDataToGraph(g, result_spectra_experimental_histo(spectra));
             ui->widget->setGraphVisibility(g, false);
         }
         if(confidenceLimits && spectra->n_spectra > RESULT_SPECTRA_UNCERTAINTY_POSITIVE) {
-            ui->widget->drawFilledDataToGraphs("Confidence limit", result_spectra_uncertainty_histo_negative(spectra), result_spectra_uncertainty_histo_positive(spectra), QColor(0, 0, 0, 50));
+            ui->widget->drawFilledDataToGraphs("Confidence limit", result_spectra_uncertainty_histo_negative(spectra), result_spectra_uncertainty_histo_positive(spectra), colorProfile.color("plotConfidence"));
         }
         size_t n_spectra = spectra->n_spectra;
         jabs_histogram *histo = NULL;
@@ -669,7 +748,7 @@ void MainWindow::plotSpectra(const result_spectra *spectra, const jabs_histogram
                         name.append(" (DS)");
                     }
                 }
-                QColor color = SpectrumPlot::getColor(colorindex);
+                QColor color = colorProfile.reactionColor(colorindex);
                 colorindex++;
                 QCPGraph *g = ui->widget->addGraphHisto(name, color);
                 ui->widget->drawDataToGraph(g, histo);

@@ -313,6 +313,25 @@ SpectrumPlot::~SpectrumPlot() {
     delete energyScaleAction;
 }
 
+void SpectrumPlot::setColors(const QColor &background, const QColor &foreground, const QColor &grid, const QColor &legendBackground)
+{
+    setBackground(QBrush(background));
+    for(QCPAxis *axis : {xAxis, yAxis, xAxis2, yAxis2}) {
+        axis->setBasePen(QPen(foreground));
+        axis->setTickPen(QPen(foreground));
+        axis->setSubTickPen(QPen(foreground));
+        axis->setTickLabelColor(foreground);
+        axis->setLabelColor(foreground);
+        axis->grid()->setPen(QPen(grid, 0, Qt::DotLine));
+        axis->grid()->setZeroLinePen(QPen(grid));
+    }
+    legend->setBrush(QBrush(legendBackground));
+    legend->setTextColor(foreground);
+    legend->setSelectedTextColor(foreground);
+    coordinatesText->setColor(foreground);
+    replot();
+}
+
 const QColor SpectrumPlot::getColor(int index)
 {
     return colors[index % n_colors];

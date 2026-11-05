@@ -12,6 +12,7 @@
 #include "fitdialog.h"
 #include "plotdialog.h"
 #include "jabsworker.h"
+#include "colorprofile.h"
 
 extern "C" {
 #include <jibal_units.h>
@@ -80,6 +81,10 @@ private slots:
     void onFitProgress(fit_stats stats, QSharedPointer<PlotSnapshot> snapshot);
 
     void stopRun();
+
+    void applyColors(); /* Applies the active color profile (settings) to widgets, plot and icons */
+
+    void scheduleApplyColors();
 
     void on_actionPreferences_triggered();
 
@@ -150,6 +155,7 @@ private:
     void plotSpectra(const result_spectra *spectra, const jabs_histogram *ref_histo);
     bool askToSave();
     void closeEvent(QCloseEvent *event);
+    void changeEvent(QEvent *event) override;
     void enableRun(bool enabled);
     void closeFitDialog();
     int initSession();
@@ -180,7 +186,10 @@ private:
     QStringList visibleGraphs;
     int warningCounter;
     int defaultVerbosity;
-    QColor messageColor;
+    ColorProfile colorProfile; /* Active profile */
+    bool applyingColors;
+    bool applyColorsPending;
+    Qt::ColorScheme forcedColorScheme; /* Color scheme set by us (Unknown = follow OS) */
     QThread *workerThread;
     JabsWorker *worker;
     bool running; /* Worker is running. GUI must not access session while this is true. */

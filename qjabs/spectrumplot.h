@@ -35,6 +35,7 @@ public:
     };
     static const QColor getColor(int index);
     QStringList visibleGraphs();
+    void setColors(const QColor &background, const QColor &foreground, const QColor &grid, const QColor &legendBackground);
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
