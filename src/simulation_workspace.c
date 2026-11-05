@@ -134,15 +134,15 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->stop.emin = ws->emin;
     ws->ms = NULL;
     ws->ms_spread = (ws->params->ms != MS_MODEL_NONE);
-    if(ws->ms_spread) {
-        ws->ms = ms_model_new(ws->params->ms);
+    if(ws->ms_spread || (ws->params->ds && ws->params->ds_lateral_spread)) {
+        ws->ms = ms_model_new(ws->ms_spread ? ws->params->ms : MS_MODEL_AMSEL_TF); /* Lateral spread in dual scattering also requires a model */
         if(!ws->ms) {
             jabs_message(MSG_ERROR, "Could not initialize multiple scattering model.\n");
             sim_workspace_free(ws);
             return NULL;
         }
     }
-    ws->stop.ms = ws->ms_spread ? ws->ms : NULL;
+    ws->stop.ms = ws->ms_spread ? ws->ms : NULL; /* Dual scattering may enable this temporarily for lateral spread */
     ws->stragg = ws->stop; /* Copy */
     ws->stragg.type = GSTO_STO_STRAGG;
     return ws;

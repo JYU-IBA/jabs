@@ -12,6 +12,8 @@
 
  */
 #include <stdlib.h>
+#include <math.h>
+#include <jibal_cross_section.h>
 #include <gsl/gsl_math.h>
 #include <assert.h>
 #include "jabs_debug.h"
@@ -198,13 +200,39 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     incident->ms.sum_b = des_low->ms.sum_b + frac * (des_high->ms.sum_b - des_low->ms.sum_b);
     incident->ms.I = des_low->ms.I + frac * (des_high->ms.I - des_low->ms.I);
     incident->ms.P = des_low->ms.P + frac * (des_high->ms.P - des_low->ms.P);
+    incident->flux = des_low->flux + frac * (des_high->flux - des_low->flux);
     DEBUGVERBOSEMSG("d_out = %g tfu (i = %zu), E = %g keV, S = %g keV", d_out.x / C_TFU, d_out.i, incident->E / C_KEV, sqrt(incident->S) * C_FWHM / C_KEV);
     return d_out;
 }
 
-des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, const sim_calc_params *scp, const sample *sample, const ion *incident, depth depth_start, double emin) {
+double des_total_cross_section(const jibal_isotope *incident, const jibal_isotope *target, double theta_min, double E) {
+    const int n = DES_BEAM_LOSS_ANGLE_STEPS;
+    const double u_min = log(theta_min), u_max = log(C_PI);
+    const double du = (u_max - u_min) / n;
+    double sum = 0.0;
+    for(int i = 0; i < n; i++) { /* Midpoint rule in u = ln(theta), d(Omega) = 2 pi sin(theta) theta du */
+        double theta = exp(u_min + (i + 0.5) * du);
+        sum += jibal_cross_section_rbs(incident, target, theta, E, JIBAL_CS_ANDERSEN) * 2.0 * C_PI * sin(theta) * theta * du;
+    }
+    return sum;
+}
+
+static double des_beam_loss(const sample *sample, const ion *ion, const depth d, double E, double path, double theta_min) { /* Probability of scattering to counted dual scattering angles over path length */
+    double sum = 0.0;
+    for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
+        double c = get_conc(sample, d, i_isotope);
+        if(c < CONC_TOLERANCE) {
+            continue;
+        }
+        sum += c * des_total_cross_section(ion->isotope, sample->isotopes[i_isotope], theta_min, E);
+    }
+    return sum * path;
+}
+
+des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, const sim_calc_params *scp, const sample *sample, const ion *incident, depth depth_start, double emin, double beam_loss_angle_min) {
     ion ion = *incident;
     ion_ms_reset(&ion.ms); /* Path of incident ion starts here */
+    ion.flux = 1.0;
     des_table *dt = des_table_init(DES_TABLE_INITIAL_ALLOC);
     if(!dt) {
         return NULL;
@@ -232,13 +260,20 @@ des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, con
         des->E = ion.E;
         des->S = ion.S;
         des->ms = ion.ms;
+        des->flux = ion.flux;
         des->d = d_before;
         if((ion.inverse_cosine_theta > 0.0 && d_before.x >= sample->thickness - DEPTH_TOLERANCE) || (ion.inverse_cosine_theta < 0.0 && d_before.x < DEPTH_TOLERANCE)) {
             DEBUGMSG("DES table calculation stops at %g tfu (i = %zu).", d_before.x / C_TFU, i);
             i++;
             break;
         }
+        double E_before = ion.E;
         d_after = stop_step(stop, stragg, &ion, sample, d_before, stop_step_calc(&scp->incident_stop_params, &ion));
+        if(beam_loss_angle_min > 0.0) {
+            depth d_half = {.x = (d_before.x + d_after.x) / 2.0, .i = d_after.i};
+            double path = fabs(d_after.x - d_before.x) * fabs(ion.inverse_cosine_theta);
+            ion.flux *= exp(-des_beam_loss(sample, &ion, d_half, (E_before + ion.E) / 2.0, path, beam_loss_angle_min));
+        }
         i++;
     } while(ion.E > emin);
     if(dt->n) {
@@ -261,6 +296,7 @@ void des_set_ion(const des *des, ion *ion) {
     ion->E = des->E;
     ion->S = des->S;
     ion->ms = des->ms;
+    ion->flux = des->flux;
 }
 
 depth des_next_range(const des_table *dt, ion *incident, depth d) {
@@ -281,5 +317,6 @@ depth des_next_range(const des_table *dt, ion *incident, depth d) {
     incident->E = des_skip->E; /* TODO: long skips may make E_deriv calculation inaccurate */
     incident->S = des_skip->S;
     incident->ms = des_skip->ms;
+    incident->flux = des_skip->flux;
     return des_skip->d;
 }

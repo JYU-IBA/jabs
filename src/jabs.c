@@ -387,6 +387,65 @@ void simulate_reaction_ms(const sim_workspace *ws, const sim_reaction *sim_r, co
                     p->ms.w / C_DEG, p->ms.I / C_KEV, a_out[0] * C_DEG / C_KEV, a_out[1] * C_DEG / C_KEV, b_out[0] * C_DEG / C_KEV, b_out[1] * C_DEG / C_KEV, 2.0 * hwhm_out / C_KEV, nu_out);
 }
 
+static double ds_exit_path_length(const ion *p, const sample *sample, double x) { /* Path length of reaction product from depth x to exit */
+    if(p->inverse_cosine_theta < 0.0) {
+        return -1.0 * x * p->inverse_cosine_theta;
+    }
+    return (sample->thickness - x) * p->inverse_cosine_theta;
+}
+
+int ds_trajectory_accept(const ds_trajectory *t, const ion *incident, const sim_reaction *sim_r, const sample *sample, double x2) { /* Path length criterion (Barradas, NIMB 225 (2004) 318) for dual scattering trajectories with one small scattering angle. Returns TRUE if trajectory (second scattering at depth x2) should be included. */
+    if(!t->active) {
+        return TRUE;
+    }
+    int second_small = (sim_r->theta < t->angle_min);
+    if(!t->first_small && !second_small) {
+        return TRUE;
+    }
+    if(t->first_small && second_small) {
+        return FALSE;
+    }
+    double l_out = ds_exit_path_length(&sim_r->p, sample, x2);
+    double l_ds = t->l1 + fabs(x2 - t->x1) * fabs(incident->inverse_cosine_theta) + l_out;
+    double l_ss;
+    if(t->first_small) { /* Corresponding single scattering trajectory scatters at x2 */
+        l_ss = x2 * t->inverse_cosine_in + l_out;
+    } else { /* Corresponding single scattering trajectory scatters at x1 */
+        l_ss = t->l1 + ds_exit_path_length(&sim_r->p, sample, t->x1);
+    }
+    return (l_ds > t->path_cutoff * l_ss || l_ds * t->path_cutoff < l_ss);
+}
+
+double ds_lateral_conc(const sim_workspace *ws, const sample *sample, size_t i_isotope, const ion *incident, double x) { /* Concentration at depth x averaged over depth distribution caused by lateral spread of ions after first scattering at ws->ds_traj.x1 (Barradas, NIMB 225 (2004) 318) */
+    static const double gh_x[3] = {-1.7320508075688772, 0.0, 1.7320508075688772}; /* Gauss-Hermite (probabilists'), three points */
+    static const double gh_w[3] = {1.0 / 6.0, 2.0 / 3.0, 1.0 / 6.0};
+    double l = fabs(x - ws->ds_traj.x1) * fabs(incident->inverse_cosine_theta); /* Path length after first scattering */
+    double sin_theta = sqrt(GSL_MAX_DBL(1.0 - pow2(incident->cosine_theta), 0.0));
+    double C_b, nu;
+    ms_table_params(ws->ms, ms_tau_star(ws->ms, &incident->ms), &C_b, NULL, &nu);
+    double hwhm = l * incident->ms.w / C_b * sin_theta; /* Depth component of lateral displacement, chord angle times path length */
+    if(hwhm < DEPTH_TOLERANCE) {
+        return get_conc(sample, depth_seek(sample, x), i_isotope);
+    }
+    ms_mix m;
+    ms_mix_t(ws->ms, hwhm, nu, &m);
+    double sum = 0.0;
+    for(int k = 0; k < MS_MIX_N; k++) {
+        if(m.w[k] <= 0.0) {
+            continue;
+        }
+        double sigma = sqrt(m.v[k]);
+        for(int j = 0; j < 3; j++) {
+            double x_j = x + sigma * gh_x[j];
+            if(x_j < 0.0 || x_j > sample->thickness) { /* Outside of sample */
+                continue;
+            }
+            sum += m.w[k] * gh_w[j] * get_conc(sample, depth_seek(sample, x_j), i_isotope);
+        }
+    }
+    return sum;
+}
+
 int simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
     ion ion1 = *incident; /* Shallow copy */
     ion_ms_reset(&ion1.ms);
@@ -465,7 +524,11 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         double sigma_conc;
 
         if(b_prev) {
-            sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0);
+            if(ws->ds_traj.lateral) { /* Mean cross section and concentration averaged over lateral spread */
+                sigma_conc = sim_r->cross_section(sim_r, (b_prev->E_0 + b->E_0) / 2.0) * ds_lateral_conc(ws, sample, sim_r->i_isotope, &ion1, (d_before.x + d_after.x) / 2.0);
+            } else {
+                sigma_conc = cross_section_concentration_product(ws, sample, sim_r, b_prev->E_0, b->E_0, &d_before, &d_after, b_prev->S_0, b->S_0);
+            }
             if(sim_r->r->type == REACTION_FILE || ws->params->mean_energy_after_reaction_accurate)  {
                 sim_r->p.E = resonance_effect_mean_energy(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, b->E_0, b->S_0);
                 DEBUGMSG("Computed mean energy after reaction with resonance_effect_mean_energy(), got %g keV", sim_r->p.E/C_KEV);
@@ -556,7 +619,10 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         E_deriv = GSL_MIN_DBL(E_deriv, ENERGY_DERIVATIVE_MAX);
         b->deriv = E_deriv;
         b->sc = sigma_conc;
-        b->Q = ion1.inverse_cosine_theta * sigma_conc * b->thick;
+        b->Q = ion1.inverse_cosine_theta * sigma_conc * b->thick * ion1.flux;
+        if(b->Q != 0.0 && !ds_trajectory_accept(&ws->ds_traj, &ion1, sim_r, sample, d_after.x)) {
+            b->Q = 0.0;
+        }
         DEBUGVERBOSEMSG("%s %s %3zu %3zu:%10.3lf %3zu:%10.3lf %3zu %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3lf %10.3e %8.3lf %2i",
                 sim_r->r->target->name, reaction_type_to_string(sim_r->r->type), i_brick,
                 d_before.i, d_before.x / C_TFU,
@@ -610,7 +676,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     geostragg_vars g = geostragg_vars_calculate(incident, ws->sim->sample_theta, ws->sim->sample_phi,
                                                 ws->det, ws->sim->beam_aperture,
                                                 ws->params->geostragg, ws->params->beta_manual);
-    des_table *dt = des_table_compute(&ws->stop, &ws->stragg, ws->params, sample, incident, depth_start, ws->emin); /* Depth, energy and straggling of incident ion */
+    des_table *dt = des_table_compute(&ws->stop, &ws->stragg, ws->params, sample, incident, depth_start, ws->emin, ws->ds_beam_loss_angle); /* Depth, energy and straggling of incident ion */
     if(!dt) {
         jabs_message(MSG_ERROR, "DES table computation failed.\n");
         return -1;
@@ -859,13 +925,57 @@ int simulate_with_roughness(sim_workspace *ws) {
     return status;
 }
 
+static int ds_weight_compare(const void *a, const void *b) {
+    const ds_weight *wa = *(const ds_weight * const *)a;
+    const ds_weight *wb = *(const ds_weight * const *)b;
+    return (wa->fluence > wb->fluence) - (wa->fluence < wb->fluence);
+}
+
+void ds_weights_skip_smallest(ds_weight *weights, size_t n, double fraction) { /* Marks to be skipped the trajectories with the smallest weights, which together account for at most given fraction of total weight */
+    if(fraction <= 0.0 || n == 0) {
+        return;
+    }
+    ds_weight **sorted = malloc(n * sizeof(ds_weight *));
+    if(!sorted) {
+        return;
+    }
+    size_t n_sorted = 0;
+    double sum = 0.0;
+    for(size_t i = 0; i < n; i++) {
+        if(!weights[i].skip) {
+            sorted[n_sorted++] = &weights[i];
+            sum += weights[i].fluence;
+        }
+    }
+    qsort(sorted, n_sorted, sizeof(ds_weight *), ds_weight_compare);
+    double cumul = 0.0;
+    for(size_t i = 0; i < n_sorted; i++) {
+        cumul += sorted[i]->fluence;
+        if(cumul > fraction * sum) {
+            break;
+        }
+        sorted[i]->skip = TRUE;
+    }
+    free(sorted);
+}
+
+double ds_sample_offset(size_t i, double alpha) { /* Low-discrepancy (additive recurrence, R2 sequence) offset in [0, 1) for sample points of dual scattering, varies with depth step i */
+    double x = 0.5 + alpha * i;
+    return x - floor(x);
+}
+
 int simulate_with_ds(sim_workspace *ws) {
     if(!ws) {
         jabs_message(MSG_ERROR, "Congratulations, you've found a bug in %s:%i.\n", __FILE__, __LINE__);
         return EXIT_FAILURE;
     }
     const double fluence = ws->fluence;
-    if(simulate_with_roughness(ws) < 0) {
+    if(ws->params->ds && ws->params->ds_beam_loss) { /* Single scattering with incident beam attenuated by dual scattering. Small angles are not included, since most of those trajectories are rejected by the path length criterion, i.e. they are still single scattering. */
+        ws->ds_beam_loss_angle = DUAL_SCATTER_ANGLE_MIN;
+    }
+    int status = simulate_with_roughness(ws);
+    ws->ds_beam_loss_angle = 0.0;
+    if(status < 0) {
         return EXIT_FAILURE;
     }
     if(!ws->params->ds) {
@@ -880,18 +990,61 @@ int simulate_with_ds(sim_workspace *ws) {
     int ds_steps_polar = ws->params->ds_steps_polar;
     int ds_steps_polar_substeps = ws->params->ds_steps_polar_substeps;
     int ds_steps_azi = ws->params->ds_steps_azi;
-    sim_calc_params_defaults_fast(ws->params); /* This makes DS faster. Changes to ws->params are not reverted, but they don't affect original sim settings */
-    ws->params->incident_stop_params.min *= 3.0;
+    const int ds_small_angles = ws->params->ds_small_angles;
+    const int ds_steps_small = ds_small_angles ? ws->params->ds_small_angle_steps : 0;
+    const double ds_small_angle_min = ws->params->ds_small_angle_min;
+    const double ds_path_cutoff = ws->params->ds_path_cutoff;
+    const int ds_lateral_spread = ws->params->ds_lateral_spread;
+    const double inverse_cosine_in = fabs(ion1.inverse_cosine_theta);
+    const int n_bins = ds_steps_small + ds_steps_polar;
+    const size_t n_isotopes = ws->sample->n_isotopes;
+    const size_t n_traj = n_bins * n_isotopes; /* First scattering: polar angle bin and target isotope */
+    double *bin_low = malloc(n_bins * sizeof(double));
+    double *bin_high = malloc(n_bins * sizeof(double));
+    ds_weight *weights = malloc(n_traj * sizeof(ds_weight));
+    if(!bin_low || !bin_high || !weights) {
+        free(bin_low);
+        free(bin_high);
+        free(weights);
+        return EXIT_FAILURE;
+    }
+    for(int i = 0; i < ds_steps_small; i++) { /* Logarithmic steps for small angles */
+        bin_low[i] = ds_small_angle_min * pow(DUAL_SCATTER_ANGLE_MIN / ds_small_angle_min, (1.0 * i) / ds_steps_small);
+        bin_high[i] = ds_small_angle_min * pow(DUAL_SCATTER_ANGLE_MIN / ds_small_angle_min, (1.0 * (i + 1)) / ds_steps_small);
+    }
+    for(int i = 0; i < ds_steps_polar; i++) {
+        double step = (C_PI - DUAL_SCATTER_ANGLE_MIN) / ds_steps_polar;
+        bin_low[ds_steps_small + i] = DUAL_SCATTER_ANGLE_MIN + i * step;
+        bin_high[ds_steps_small + i] = DUAL_SCATTER_ANGLE_MIN + (i + 1) * step;
+    }
+    const double scatangle_min = ds_small_angles ? ds_small_angle_min : DUAL_SCATTER_ANGLE_MIN;
+    sim_calc_params_ds_trajectories(ws->params); /* This makes DS faster. Changes to ws->params are not reverted, but they don't affect original sim settings */
+    const int ds_lateral = ds_lateral_spread && ws->ms;
+    if(ds_lateral) {
+        ws->params->bricks_skip_zero_conc_ranges = FALSE; /* Ions can spread into layers that do not contain the target isotope */
+    }
     sim_calc_params_update(ws->params);
     const jibal_isotope *incident = ws->sim->beam_isotope;
     int last = FALSE;
     jabs_message(MSG_VERBOSE, "Dual scattering simulation starts.\n\n");
     double emin = ws->emin;
-
-    while(1) {
+    ws->ds_traj.angle_min = DUAL_SCATTER_ANGLE_MIN;
+    ws->ds_traj.path_cutoff = ds_path_cutoff;
+    ws->ds_traj.inverse_cosine_in = inverse_cosine_in;
+    const ms_model *stop_ms_orig = ws->stop.ms;
+    if(ds_lateral) { /* Angular spread is needed along second leg */
+        ws->stop.ms = ws->ms;
+        ws->stragg.ms = ws->ms;
+    }
+    const int ms_spread_orig = ws->ms_spread;
+    ws->ms_spread = FALSE; /* Energy spread due to multiple scattering is not calculated for dual scattering trajectories (straggling is) */
+    const double grazing_inverse_cosine_max = 1.0 / sin(GSL_MAX_DBL(ws->params->ds_grazing_angle, DUAL_SCATTER_GRAZING_ANGLE_MIN));
+    for(size_t i_depth = 0; ; i_depth++) {
         if(last) {
             break;
         }
+        const double polar_offset = ds_sample_offset(i_depth, DUAL_SCATTER_SAMPLE_ALPHA_POLAR); /* Position of sample point inside polar angle bin */
+        const double azi_offset = ds_sample_offset(i_depth, DUAL_SCATTER_SAMPLE_ALPHA_AZI); /* Offset of azimuthal angles (in steps) */
         double E_front = ion1.E;
         if(E_front <= emin)
             break;
@@ -912,14 +1065,17 @@ int simulate_with_ds(sim_workspace *ws) {
 
         jabs_message(MSG_VERBOSE, "\rDS depth from %9.3lf to %9.3lf tfu, E from %6.1lf to %6.1lf keV.", d_before.x / C_TFU, d_after.x / C_TFU, E_front / C_KEV,
                      E_back / C_KEV);
+        ws->ds_traj.x1 = d_halfdepth.x;
+        ws->ds_traj.l1 = d_halfdepth.x * inverse_cosine_in;
         int n_running = 0; /* How many reactions are still producing data, largest number of all simulations for this depth step. */
-        for(int i_polar = 0; i_polar < ds_steps_polar; i_polar++) {
-            const double ds_polar_min = 20.0 * C_DEG;
-            const double ds_polar_max = 180.0 * C_DEG;
-            double ds_polar_step = (ds_polar_max - ds_polar_min) / (ds_steps_polar * 1.0);
-            double ds_polar = ds_polar_min + i_polar * ds_polar_step;
-            double cs_sum = 0.0;
-            for(size_t i = 0; i < ws->sample->n_isotopes; i++) {
+        for(int i_polar = 0; i_polar < n_bins; i_polar++) { /* Weights (fraction of incident ions scattered) of all first scattering possibilities */
+            const double ds_polar_low = bin_low[i_polar];
+            const double ds_polar_step = bin_high[i_polar] - ds_polar_low;
+            const double ds_polar = ds_polar_low + ds_polar_step * polar_offset;
+            for(size_t i = 0; i < n_isotopes; i++) {
+                ds_weight *dw = &weights[i_polar * n_isotopes + i];
+                dw->fluence = 0.0;
+                dw->skip = TRUE;
                 double c = get_conc(ws->sample, d_halfdepth, i);
                 if(c < ABUNDANCE_THRESHOLD) {
                     continue;
@@ -930,28 +1086,55 @@ int simulate_with_ds(sim_workspace *ws) {
                 }
                 double cs = 0.0;
                 for(int polar_substep = 0; polar_substep < ds_steps_polar_substeps; polar_substep++) {
-                    double ds_polar_sub = ds_polar_step * (1.0 * (polar_substep - (ds_steps_polar_substeps / 2)) / (ds_steps_polar_substeps * 1.0)) + ds_polar;
+                    double ds_polar_sub = ds_polar_low + ds_polar_step * (polar_substep + 0.5) / (ds_steps_polar_substeps * 1.0);
                     cs += jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar_sub) / (ds_steps_polar_substeps * 1.0);
                 }
-                cs_sum += c * cs;
-
-                double fluence_tot = cs_sum * thick_step * ion1.inverse_cosine_theta * (2.0 * C_PI) * ds_polar_step; /* TODO: check calculation after moving from p_sr to fluence!*/
+                dw->fluence = c * cs * thick_step * ion1.inverse_cosine_theta * (2.0 * C_PI) * ds_polar_step; /* Fraction of incident ions scattered into this polar angle bin */
+                dw->skip = FALSE;
+            }
+        }
+        ds_weights_skip_smallest(weights, n_traj, ws->params->ds_skip_fraction);
+        for(int i_polar = 0; i_polar < n_bins; i_polar++) {
+            const double ds_polar_low = bin_low[i_polar];
+            const double ds_polar_step = bin_high[i_polar] - ds_polar_low;
+            const double ds_polar = ds_polar_low + ds_polar_step * polar_offset;
+            ws->ds_traj.first_small = (ds_polar < DUAL_SCATTER_ANGLE_MIN);
+            ws->ds_traj.active = ds_small_angles;
+            ws->ds_traj.lateral = ds_lateral;
+            for(size_t i = 0; i < n_isotopes; i++) {
+                const ds_weight *dw = &weights[i_polar * n_isotopes + i];
+                if(dw->skip) {
+                    continue;
+                }
+                const jibal_isotope *target = ws->sample->isotopes[i];
+                double fluence_tot = dw->fluence;
                 double fluence_azi = fluence_tot / (1.0 * (ds_steps_azi));
                 for(int i_azi = 0; i_azi < ds_steps_azi; i_azi++) {
                     ion2 = ion1;
                     double K = jibal_kin_rbs(incident->mass, target->mass, ds_polar, '+');
                     ion2.E *= K;
                     ion2.S *= pow2(K);
-                    double ds_azi = C_2PI * (1.0 * i_azi) / (ds_steps_azi * 1.0);
+                    double ds_azi = C_2PI * (i_azi + azi_offset) / (ds_steps_azi * 1.0);
                     ion_rotate(&ion2, ds_polar, ds_azi); /* Dual scattering: first scattering to some angle (scattering angle: ds_polar). Note that this does not follow SimNRA conventions. */
+                    if(fabs(ion2.inverse_cosine_theta) > grazing_inverse_cosine_max) { /* Path (nearly) parallel to surface */
+                        continue;
+                    }
                     ws->fluence = fluence_azi * fluence;
                     double scatangle = scattering_angle(&ion2, ws->sim->sample_theta, ws->sim->sample_phi, ws->det);
                     if(d_before.x == 0.0) {
                         DEBUGMSG("DS polar %.3lf, azi %.3lf, scatter %.3lf", ds_polar/C_DEG, ds_azi/C_DEG, scatangle/C_DEG);
                     }
-                    if(scatangle > 19.99999 * C_DEG) {
+                    if(scatangle > scatangle_min * (1.0 - 1e-6)) {
                         int n_ok = simulate(&ion2, d_halfdepth, ws, ws->sample);
                         if(n_ok < 0) {
+                            ws->ds_traj.active = FALSE;
+                            ws->ds_traj.lateral = FALSE;
+                            ws->stop.ms = stop_ms_orig;
+                            ws->stragg.ms = stop_ms_orig;
+                            ws->ms_spread = ms_spread_orig;
+                            free(bin_low);
+                            free(bin_high);
+                            free(weights);
                             return EXIT_FAILURE;
                         }
                         if(n_ok > n_running) {
@@ -961,6 +1144,7 @@ int simulate_with_ds(sim_workspace *ws) {
                 }
             }
         }
+        ws->ds_traj.active = FALSE;
         if(ws->sample->ranges[ws->sample->n_ranges - 1].x - d_after.x < 0.01 * C_TFU)
             break;
         d_before = d_after;
@@ -969,6 +1153,12 @@ int simulate_with_ds(sim_workspace *ws) {
             break;
         }
     }
+    free(bin_low);
+    free(bin_high);
+    free(weights);
+    ws->stop.ms = stop_ms_orig;
+    ws->stragg.ms = stop_ms_orig;
+    ws->ms_spread = ms_spread_orig;
     jabs_message(MSG_VERBOSE, "\nDual scattering simulation complete.\n");
     sim_workspace_calculate_sum_spectra(ws);
     return EXIT_SUCCESS;

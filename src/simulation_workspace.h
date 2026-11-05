@@ -23,6 +23,17 @@ extern "C" {
 #endif
 
 
+typedef struct ds_trajectory { /* Dual scattering trajectory information, used for path length criterion of trajectories with a small scattering angle (Barradas, NIMB 225 (2004) 318) */
+    int active; /* TRUE when simulating dual scattering (second scattering) and criterion should be checked */
+    int first_small; /* First scattering angle is small */
+    double x1; /* Depth of first scattering */
+    double l1; /* Path length of incident ion before first scattering */
+    double inverse_cosine_in; /* Absolute value of inverse cosine of incident beam (in sample) */
+    double angle_min; /* Scattering angles below this are small */
+    double path_cutoff; /* Path length ratio required */
+    int lateral; /* TRUE when lateral spread (depth spread) of ions between first and second scattering is taken into account */
+} ds_trajectory;
+
 typedef struct sim_workspace {
     double fluence; /* With DS can be different from sim->fluence, otherwise the same */
     const simulation *sim;
@@ -40,6 +51,8 @@ typedef struct sim_workspace {
     jabs_stop stragg; /* Straggling calculation parameters and data */
     ms_model *ms; /* Multiple scattering model, NULL if not needed */
     int ms_spread; /* Energy spread due to multiple scattering is calculated (TRUE/FALSE) */
+    ds_trajectory ds_traj;
+    double ds_beam_loss_angle; /* If larger than zero, incident beam is attenuated by scattering to larger angles than this (dual scattering) */
     double emin;
     gsl_integration_workspace *w_int_cs; /* Integration workspace for conc * cross section product */
     gsl_integration_workspace *w_int_cs_stragg;

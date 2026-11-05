@@ -76,6 +76,18 @@ extern "C" {
 #define DUAL_SCATTER_POLAR_SUBSTEPS_DEFAULT 9
 #define DUAL_SCATTER_AZI_STEPS_DEFAULT 15
 #define DUAL_SCATTER_INCIDENT_STOP_STEP_FACTOR_DEFAULT (2.0)
+#define DUAL_SCATTER_GRAZING_ANGLE_DEFAULT (0.06 * C_DEG) /* Dual scattering trajectories (between first and second scattering) closer than this angle to the sample surface are not calculated */
+#define DUAL_SCATTER_SKIP_FRACTION_DEFAULT (0.0) /* Dual scattering trajectories with smallest weights, accounting for this fraction of total weight at each depth, are not calculated (Barradas, NIMB 225 (2004) 318) */
+#define DUAL_SCATTER_GRAZING_ANGLE_MIN (0.01 * C_DEG) /* Lower limit for the grazing angle, paths parallel to the surface can not be calculated */
+#define DUAL_SCATTER_SAMPLE_ALPHA_POLAR (0.7548776662466927) /* Additive recurrence constants (R2 sequence) for offsets of polar and azimuthal sample points */
+#define DUAL_SCATTER_SAMPLE_ALPHA_AZI (0.5698402909980532)
+#define DUAL_SCATTER_EXITING_STEP_MULTIPLIER (1.5) /* Minimum and maximum exiting ion step in dual scattering trajectories, relative to single scattering */
+#define DUAL_SCATTER_STEP_SIGMAS_MULTIPLIER (1.5) /* Exiting ion steps (in straggling sigmas) in dual scattering trajectories, relative to single scattering */
+#define DUAL_SCATTER_ANGLE_MIN (20.0 * C_DEG) /* Trajectories with both scattering angles larger than this are always considered dual scattering */
+#define DUAL_SCATTER_SMALL_ANGLE_MIN_DEFAULT (2.0 * C_DEG) /* Smallest scattering angle considered when small angles are enabled (Barradas, NIMB 225 (2004) 318) */
+#define DUAL_SCATTER_SMALL_ANGLE_STEPS_DEFAULT 10 /* Number of (logarithmic) polar steps between small angle minimum and DUAL_SCATTER_ANGLE_MIN */
+#define DES_BEAM_LOSS_ANGLE_STEPS 48 /* Integration steps of total dual scattering cross section, logarithmic in angle */
+#define DUAL_SCATTER_PATH_CUTOFF_DEFAULT (1.5) /* Trajectories with one small scattering angle must have path length differing from the corresponding single scattering trajectory by this factor */
 #define MS_HWHM_MAX_FRACTION (0.5) /* Multiple scattering theory fails at large energy losses. HWHM of multiple scattering energy spread is limited to this fraction of detected energy. */
 #define MS_SIGMA_MAX_FRACTION (1.0) /* Standard deviation of each component of multiple scattering energy spread mixture is limited to this fraction of detected energy */
 #define BRICK_MS_COMPONENT_CUTOFF (1.0e-6) /* Components of multiple scattering mixture are convoluted to a range where weight times gaussian is above this */

@@ -51,6 +51,7 @@ typedef struct ion {
     double E;
     double S;
     ion_ms ms;
+    double flux; /* Fraction of incident beam remaining, i.e. not lost due to (counted) dual scattering */
     double mass;
     double mass_inverse;
     int Z;

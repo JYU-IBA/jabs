@@ -27,6 +27,15 @@ typedef struct sim_calc_params {
     int ds_steps_azi;
     int ds_steps_polar;
     int ds_steps_polar_substeps;
+    int ds_small_angles; /* Include trajectories with one small scattering angle (TRUE/FALSE) */
+    double ds_small_angle_min; /* Smallest scattering angle considered when ds_small_angles is TRUE */
+    int ds_small_angle_steps; /* Polar steps between ds_small_angle_min and DUAL_SCATTER_ANGLE_MIN */
+    double ds_path_cutoff; /* Path length ratio criterion for trajectories with a small scattering angle */
+    int ds_beam_loss; /* Incident beam is attenuated by dual scattering (TRUE/FALSE) */
+    int ds_lateral_spread; /* Lateral spread due to multiple scattering is taken into account between first and second scattering (TRUE/FALSE) */
+    double ds_skip_fraction; /* Dual scattering trajectories with smallest weights that account for this fraction of total weight (at each depth) are not calculated */
+    double ds_grazing_angle; /* Dual scattering trajectories (after first scattering) closer than this angle to the sample surface are not calculated */
+    int ds_accurate; /* Dual scattering trajectories are calculated with the same parameters as single scattering (TRUE) or with parameters adjusted for speed (FALSE, see sim_calc_params_ds_trajectories()) */
     prob_dist *cs_stragg_pd;
     size_t cs_n_stragg_steps; /* Number of steps to take, when calculating straggling weighted cross sections. If zero, adaptive integration is used. */
     size_t n_bricks_max;
@@ -67,6 +76,7 @@ void sim_calc_params_free(sim_calc_params *p);
 void sim_calc_params_copy(const sim_calc_params *p_src, sim_calc_params *p_dst);
 void sim_calc_params_update(sim_calc_params *p); /* Computes variables that can be computed from other variables */
 void sim_calc_params_ds(sim_calc_params *p, int ds); /* if ds is TRUE, set DS parameters, otherwise no action is taken */
+void sim_calc_params_ds_trajectories(sim_calc_params *p); /* Adjusts (current) parameters for calculation of dual scattering trajectories, unless p->ds_accurate is TRUE. DS settings are not changed. */
 void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_level);
 #ifdef __cplusplus
 }

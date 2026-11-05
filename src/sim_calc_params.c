@@ -12,6 +12,7 @@
 
  */
 
+#include <gsl/gsl_minmax.h>
 #include "jabs_debug.h"
 #include "defaults.h"
 #include "message.h"
@@ -38,6 +39,15 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->ds_steps_azi = 0;
     p->ds_steps_polar = 0;
     p->ds_steps_polar_substeps = 0;
+    p->ds_small_angles = FALSE;
+    p->ds_small_angle_min = DUAL_SCATTER_SMALL_ANGLE_MIN_DEFAULT;
+    p->ds_small_angle_steps = 0;
+    p->ds_path_cutoff = DUAL_SCATTER_PATH_CUTOFF_DEFAULT;
+    p->ds_beam_loss = TRUE;
+    p->ds_lateral_spread = TRUE;
+    p->ds_grazing_angle = DUAL_SCATTER_GRAZING_ANGLE_DEFAULT;
+    p->ds_skip_fraction = DUAL_SCATTER_SKIP_FRACTION_DEFAULT;
+    p->ds_accurate = FALSE;
     p->ms = MS_MODEL_NONE;
     p->rk4 = TRUE;
     p->nuclear_stopping_accurate = TRUE;
@@ -152,6 +162,9 @@ void sim_calc_params_update(sim_calc_params *p) {
         if(p->ds_steps_polar_substeps == 0) {
             p->ds_steps_polar_substeps = DUAL_SCATTER_POLAR_SUBSTEPS_DEFAULT;
         }
+        if(p->ds_small_angle_steps == 0) {
+            p->ds_small_angle_steps = DUAL_SCATTER_SMALL_ANGLE_STEPS_DEFAULT;
+        }
     }
 }
 
@@ -159,6 +172,27 @@ void sim_calc_params_ds(sim_calc_params *p, int ds) {
     if(ds) {
         p->ds = TRUE;
     }
+}
+
+void sim_calc_params_ds_trajectories(sim_calc_params *p) {
+    if(p->ds_accurate) {
+        return;
+    }
+    /* Changes are relative to the current (user) settings. Dual scattering spectra are smooth, so straggling weighting of cross sections, geometric straggling and
+     * accurate gaussians are not needed and exiting ion steps can be longer. Incident ion steps are not changed, since they determine the depth resolution of the
+     * first scattering. Stopping (RK4, nuclear stopping) is not changed either, it is set when the workspace is initialized. */
+    p->mean_conc_and_energy = TRUE;
+    p->cs_n_stragg_steps = 0;
+    p->cs_adaptive = FALSE;
+    p->mean_energy_after_reaction_accurate = FALSE;
+    p->geostragg = FALSE;
+    p->gaussian_accurate = FALSE;
+    p->rough_layer_multiplier *= 0.5;
+    p->sigmas_cutoff = GSL_MIN_DBL(p->sigmas_cutoff, SIGMAS_FAST_CUTOFF);
+    p->exiting_stop_params.min *= DUAL_SCATTER_EXITING_STEP_MULTIPLIER;
+    p->exiting_stop_params.sigmas *= DUAL_SCATTER_STEP_SIGMAS_MULTIPLIER;
+    p->exiting_stop_params.max *= DUAL_SCATTER_EXITING_STEP_MULTIPLIER;
+    p->bricks_skip_zero_conc_ranges = TRUE;
 }
 
 void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_level) {
@@ -205,5 +239,16 @@ void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_lev
         jabs_message(msg_level, "dual scattering polar steps = %i\n", params->ds_steps_polar);
         jabs_message(msg_level, "dual scattering polar substeps = %i\n", params->ds_steps_polar_substeps);
         jabs_message(msg_level, "dual scattering azimuthal steps = %i\n", params->ds_steps_azi);
+        jabs_message(msg_level, "dual scattering beam loss = %s\n", params->ds_beam_loss ? "true" : "false");
+        jabs_message(msg_level, "dual scattering lateral spread = %s\n", params->ds_lateral_spread ? "true" : "false");
+        jabs_message(msg_level, "dual scattering grazing angle (minimum angle to surface) = %g deg\n", params->ds_grazing_angle / C_DEG);
+        jabs_message(msg_level, "dual scattering skipped fraction of trajectories (smallest weights) = %g\n", params->ds_skip_fraction);
+        jabs_message(msg_level, "dual scattering accurate (same parameters as single scattering) = %s\n", params->ds_accurate ? "true" : "false");
+        jabs_message(msg_level, "dual scattering small angles = %s\n", params->ds_small_angles ? "true" : "false");
+        if(params->ds_small_angles) {
+            jabs_message(msg_level, "dual scattering small angle minimum = %g deg\n", params->ds_small_angle_min / C_DEG);
+            jabs_message(msg_level, "dual scattering small angle polar steps = %i\n", params->ds_small_angle_steps);
+            jabs_message(msg_level, "dual scattering path length cutoff = %g\n", params->ds_path_cutoff);
+        }
     }
 }

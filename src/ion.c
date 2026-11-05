@@ -35,6 +35,7 @@ void ion_reset(ion *ion) {
     ion->nucl_stop = NULL; /* Beware of memory leaks! */
     ion->ion_gsto = NULL; /* Beware of memory leaks! */
     ion_ms_reset(&ion->ms);
+    ion->flux = 1.0;
 }
 
 void ion_ms_reset(ion_ms *ms) {

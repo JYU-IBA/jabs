@@ -8,4 +8,4 @@ set sample Au 1000tfu Si 20000tfu
 add reactions RBS
 simulate
 save spectra "ds_out.csv"
-test roi [650:950] 3.92e7 1e-2
+test roi [650:950] 3.886e7 1e-2
