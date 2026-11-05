@@ -972,6 +972,8 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
     gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, J, covar, 0.0, JC); /* TODO: we can probably optimize these matrix multiplications, since eventually we are only interested about the diagonal */
     gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, JC, J, 0.0, JCJT);
     gsl_vector_view err_vec = gsl_matrix_diagonal(JCJT);
+    double c = GSL_MAX_DBL(1, sqrt(fit->stats.chisq_dof));
+    double c2 = c * c;
     size_t i_vec = 0;
     jabs_histogram **h_minus = calloc(fit->n_det_spectra, sizeof(jabs_histogram *));
     jabs_histogram **h_plus = calloc(fit->n_det_spectra, sizeof(jabs_histogram *));
@@ -1003,9 +1005,11 @@ int fit_uncertainty_spectra(const fit_data *fit, const gsl_matrix *J, const gsl_
             double exp_counts = exp ? jabs_histogram_get(exp, ch) : 0.0;
 
             double weight = gsl_vector_get(w, i_vec); /* Fit weight (1/variance, i.e. 1 / N_exp in bin) */
-            double err = gsl_vector_get(&err_vec.vector, i_vec); /* Something(J * C * J^T diagonal), should be standard error of the fit, i.e. how much do the (statistical) errors in parameters propagated to this particular bin give us uncertainty. This is probably variance. */
-            double error_fit_final = 1.96 * sqrt(err) * sqrt(sim_counts); /* 2 sigma, TODO: sqrt(sim_counts)? Why? Looks ok... */
-            double error_prediction_final = 1.96 * sqrt(err + weight) * sqrt(sim_counts); /*  1.96 sigma, "asymptotic standard prediction error", "reflects the standard error of the fit as well as the measurement error.", 95 % CL */
+            double err = gsl_vector_get(&err_vec.vector, i_vec); /* Diagonal of J_w * C * J_w^T. J_w = sqrt(W) * J is the weighted Jacobian (GSL), so this is weight * Var(model), i.e. variance of the fit in units of measurement variance. */
+            double var_fit = err * c2 / weight; /* Variance of the fitted model in this bin (counts^2), parameter errors propagated. Scaled like parameter errors (see fit_parameters_update()). */
+            double var_meas = 1.0 / weight; /* Measurement variance in this bin (counts^2) */
+            double error_fit_final = 1.96 * sqrt(var_fit); /* 1.96 sigma, standard error of the fit, 95 % CL */
+            double error_prediction_final = 1.96 * sqrt(var_fit + var_meas); /*  1.96 sigma, "asymptotic standard prediction error", "reflects the standard error of the fit as well as the measurement error.", 95 % CL */
             double error_positive = sim_counts + error_prediction_final;
             double error_negative = sim_counts - error_prediction_final;
             if(error_negative < 0.0) {
