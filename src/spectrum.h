@@ -35,6 +35,7 @@ typedef struct {
     char *name;
     const jibal_isotope *target_isotope;
     reaction_type type;
+    int ds; /* TRUE if this is a dual scattering contribution (already included in the simulated spectrum) */
 } result_spectrum;
 
 typedef struct result_spectra {

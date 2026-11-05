@@ -1038,6 +1038,7 @@ int simulate_with_ds(sim_workspace *ws) {
     }
     const int ms_spread_orig = ws->ms_spread;
     ws->ms_spread = FALSE; /* Energy spread due to multiple scattering is not calculated for dual scattering trajectories (straggling is) */
+    ws->ds_running = TRUE; /* Spectra from here on are convoluted into dual scattering histograms */
     const double grazing_inverse_cosine_max = 1.0 / sin(GSL_MAX_DBL(ws->params->ds_grazing_angle, DUAL_SCATTER_GRAZING_ANGLE_MIN));
     for(size_t i_depth = 0; ; i_depth++) {
         if(last) {
@@ -1132,6 +1133,7 @@ int simulate_with_ds(sim_workspace *ws) {
                             ws->stop.ms = stop_ms_orig;
                             ws->stragg.ms = stop_ms_orig;
                             ws->ms_spread = ms_spread_orig;
+                            ws->ds_running = FALSE;
                             free(bin_low);
                             free(bin_high);
                             free(weights);
@@ -1159,6 +1161,7 @@ int simulate_with_ds(sim_workspace *ws) {
     ws->stop.ms = stop_ms_orig;
     ws->stragg.ms = stop_ms_orig;
     ws->ms_spread = ms_spread_orig;
+    ws->ds_running = FALSE;
     jabs_message(MSG_VERBOSE, "\nDual scattering simulation complete.\n");
     sim_workspace_calculate_sum_spectra(ws);
     return EXIT_SUCCESS;

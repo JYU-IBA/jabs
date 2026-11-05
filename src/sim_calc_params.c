@@ -48,6 +48,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->ds_grazing_angle = DUAL_SCATTER_GRAZING_ANGLE_DEFAULT;
     p->ds_skip_fraction = DUAL_SCATTER_SKIP_FRACTION_DEFAULT;
     p->ds_accurate = FALSE;
+    p->ds_reaction_spectra = DS_REACTION_SPECTRA_INCLUDED;
     p->ms = MS_MODEL_NONE;
     p->rk4 = TRUE;
     p->nuclear_stopping_accurate = TRUE;
@@ -244,6 +245,7 @@ void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_lev
         jabs_message(msg_level, "dual scattering grazing angle (minimum angle to surface) = %g deg\n", params->ds_grazing_angle / C_DEG);
         jabs_message(msg_level, "dual scattering skipped fraction of trajectories (smallest weights) = %g\n", params->ds_skip_fraction);
         jabs_message(msg_level, "dual scattering accurate (same parameters as single scattering) = %s\n", params->ds_accurate ? "true" : "false");
+        jabs_message(msg_level, "dual scattering in reaction spectra = %s\n", jibal_option_get_string(ds_reaction_spectra_option, params->ds_reaction_spectra));
         jabs_message(msg_level, "dual scattering small angles = %s\n", params->ds_small_angles ? "true" : "false");
         if(params->ds_small_angles) {
             jabs_message(msg_level, "dual scattering small angle minimum = %g deg\n", params->ds_small_angle_min / C_DEG);

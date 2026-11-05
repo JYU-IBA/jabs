@@ -22,7 +22,7 @@
 #include "defaults.h"
 #include "nlh.h"
 
-sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks) {
+sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks, int ds) {
     if(!r) {
         return NULL;
     }
@@ -42,6 +42,13 @@ sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const
     sim_r->histo = jabs_histogram_alloc(n_channels); /* free'd by sim_workspace_free */
     calibration_apply_to_histogram(detector_get_calibration(det, r->product->Z), sim_r->histo); /* Setting histogram with Z-specific (or as fallback, default) calibration. */
     jabs_histogram_reset(sim_r->histo);
+    if(ds) {
+        sim_r->histo_ds = jabs_histogram_alloc(n_channels);
+        calibration_apply_to_histogram(detector_get_calibration(det, r->product->Z), sim_r->histo_ds);
+        jabs_histogram_reset(sim_r->histo_ds);
+    } else {
+        sim_r->histo_ds = NULL;
+    }
     sim_r->n_bricks = n_bricks;
     sim_r->bricks = calloc(sim_r->n_bricks, sizeof(brick));
     ion_set_isotope(p, r->product);
@@ -63,6 +70,8 @@ void sim_reaction_free(sim_reaction *sim_r) {
         jabs_histogram_free(sim_r->histo);
         sim_r->histo = NULL;
     }
+    jabs_histogram_free(sim_r->histo_ds);
+    sim_r->histo_ds = NULL;
     if(sim_r->bricks) {
         free(sim_r->bricks);
         sim_r->bricks = NULL;

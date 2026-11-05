@@ -715,21 +715,48 @@ jabs_histogram *fit_data_histo_sum(const fit_data *fit, size_t i_det) {
 }
 
 void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *spectra, const detector *det, const jabs_histogram *exp, const sim_workspace *ws) {
-    spectra->n_spectra = ws->n_reactions + RESULT_SPECTRA_N_FIXED; /* Simulated, experimental, confidence limits (2) + reaction spectra */
+    const ds_reaction_spectra_type ds_rs = ws->params->ds_reaction_spectra;
+    const int ds = (ws->histo_ds != NULL);
+    const int ds_separate = ds && ds_rs == DS_REACTION_SPECTRA_SEPARATE;
+    spectra->n_spectra = RESULT_SPECTRA_N_FIXED + ws->n_reactions * (ds_separate ? 2 : 1) + (ds ? 1 : 0); /* Simulated, experimental, confidence limits (2) + reaction spectra (+ dual scattering of each reaction) + dual scattering sum */
     spectra->s = calloc(spectra->n_spectra, sizeof(result_spectrum));
     result_spectrum_set(&spectra->s[RESULT_SPECTRA_SIMULATED], ws->histo_sum, "Simulated", NULL, REACTION_NONE);
     result_spectrum_set(&spectra->s[RESULT_SPECTRA_EXPERIMENTAL], exp, "Experimental", NULL, REACTION_NONE);
     calibration_apply_to_histogram(det->calibration, result_spectra_experimental_histo(spectra));
     DEBUGMSG("Copying %zu spectra (%zu reactions) from ws to spectra structure.", spectra->n_spectra, ws->n_reactions);
+    size_t i_spectrum = RESULT_SPECTRA_N_FIXED;
     for(size_t i = 0; i < ws->n_reactions; i++) {
-        const reaction *r = ws->reactions[i]->r;
-        result_spectrum *s = &spectra->s[RESULT_SPECTRA_REACTION_SPECTRUM(i)];
-        s->histo = jabs_histogram_clone(ws->reactions[i]->histo);
+        const sim_reaction *sim_r = ws->reactions[i];
+        const reaction *r = sim_r->r;
+        result_spectrum *s = &spectra->s[i_spectrum++];
+        s->histo = jabs_histogram_clone(sim_r->histo);
+        if(ds && ds_rs == DS_REACTION_SPECTRA_INCLUDED && sim_r->histo_ds) {
+            for(size_t j = 0; j < s->histo->n && j < sim_r->histo_ds->n; j++) {
+                s->histo->bin[j] += sim_r->histo_ds->bin[j];
+            }
+        }
         if(asprintf(&s->name, "%s (%s)", r->target->name, reaction_type_to_string(r->type)) < 0) {
             s->name = NULL;
         }
         s->target_isotope = r->target;
         s->type = r->type;
+    }
+    for(size_t i = 0; ds_separate && i < ws->n_reactions; i++) { /* Dual scattering of each reaction, after all reaction spectra */
+        const sim_reaction *sim_r = ws->reactions[i];
+        const reaction *r = sim_r->r;
+        result_spectrum *s = &spectra->s[i_spectrum++];
+        s->histo = sim_r->histo_ds ? jabs_histogram_clone(sim_r->histo_ds) : NULL;
+        if(asprintf(&s->name, "%s (%s, DS)", r->target->name, reaction_type_to_string(r->type)) < 0) {
+            s->name = NULL;
+        }
+        s->target_isotope = r->target;
+        s->type = r->type;
+        s->ds = TRUE;
+    }
+    if(ds) { /* Sum of dual scattering is the last spectrum */
+        result_spectrum *s = &spectra->s[i_spectrum];
+        result_spectrum_set(s, ws->histo_ds, "Dual scattering", NULL, REACTION_NONE);
+        s->ds = TRUE;
     }
 }
 

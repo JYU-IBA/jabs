@@ -22,6 +22,19 @@
 extern "C" {
 #endif
 
+typedef enum ds_reaction_spectra_type {
+    DS_REACTION_SPECTRA_INCLUDED = 0, /* Dual scattering is included in reaction spectra (they sum up to the simulated spectrum) */
+    DS_REACTION_SPECTRA_SEPARATE = 1, /* Reaction spectra are single scattering only, dual scattering of each reaction is output separately */
+    DS_REACTION_SPECTRA_NONE = 2 /* Reaction spectra are single scattering only, dual scattering is only in the sum spectrum */
+} ds_reaction_spectra_type;
+
+static const jibal_option ds_reaction_spectra_option[] = {
+        {"included", DS_REACTION_SPECTRA_INCLUDED},
+        {"separate", DS_REACTION_SPECTRA_SEPARATE},
+        {JIBAL_OPTION_STR_NONE, DS_REACTION_SPECTRA_NONE},
+        {NULL, 0}
+};
+
 typedef struct sim_calc_params {
     int ds; /* Dual scattering true/false */
     int ds_steps_azi;
@@ -35,6 +48,7 @@ typedef struct sim_calc_params {
     int ds_lateral_spread; /* Lateral spread due to multiple scattering is taken into account between first and second scattering (TRUE/FALSE) */
     double ds_skip_fraction; /* Dual scattering trajectories with smallest weights that account for this fraction of total weight (at each depth) are not calculated */
     double ds_grazing_angle; /* Dual scattering trajectories (after first scattering) closer than this angle to the sample surface are not calculated */
+    ds_reaction_spectra_type ds_reaction_spectra; /* How dual scattering is shown in reaction spectra (output only). Sum of dual scattering is always output separately. */
     int ds_accurate; /* Dual scattering trajectories are calculated with the same parameters as single scattering (TRUE) or with parameters adjusted for speed (FALSE, see sim_calc_params_ds_trajectories()) */
     prob_dist *cs_stragg_pd;
     size_t cs_n_stragg_steps; /* Number of steps to take, when calculating straggling weighted cross sections. If zero, adaptive integration is used. */

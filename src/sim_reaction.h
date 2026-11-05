@@ -25,7 +25,8 @@ extern "C" {
 typedef struct sim_reaction {
     const reaction *r;
     ion p; /* Reaction product */
-    jabs_histogram *histo;
+    jabs_histogram *histo; /* Spectrum (single scattering) */
+    jabs_histogram *histo_ds; /* Dual scattering contribution, NULL if not calculated */
     brick *bricks;
     size_t n_bricks;
     size_t last_brick; /* inclusive, from 0 up to n_bricks-1 */
@@ -52,7 +53,7 @@ typedef struct sim_reaction {
     double cs_estep; /* calculated by sim_reaction_recalculate_screening_table(), step size based on n_cs_table */
 } sim_reaction; /* Workspace for a single reaction. Yes, the naming is confusing. */
 
-sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks);
+sim_reaction *sim_reaction_init(const sample *sample, const detector *det, const reaction *r, size_t n_channels, size_t n_bricks, int ds); /* If ds is TRUE, histogram for dual scattering is allocated */
 void sim_reaction_free(sim_reaction *sim_r);
 int sim_reaction_recalculate_internal_variables(sim_reaction *sim_r, const sim_calc_params *params, double theta, double emin, double emin_incident, double emax_incident);
 int sim_reaction_recalculate_screening_table(sim_reaction *sim_r);

@@ -25,7 +25,7 @@ void sim_workspace_init_reactions(sim_workspace *ws) {
     const simulation *sim = ws->sim;
     ws->reactions = calloc(sim->n_reactions, sizeof (sim_reaction *));
     for(size_t i_reaction = 0; i_reaction < sim->n_reactions; i_reaction++) {
-        ws->reactions[i_reaction] = sim_reaction_init(sim->sample, ws->det, sim->reactions[i_reaction], ws->n_channels, ws->n_bricks);
+        ws->reactions[i_reaction] = sim_reaction_init(sim->sample, ws->det, sim->reactions[i_reaction], ws->n_channels, ws->n_bricks, ws->params->ds);
         ws->n_reactions++;
     }
 }
@@ -111,6 +111,17 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     }
     calibration_apply_to_histogram(ws->det->calibration, ws->histo_sum); /* Calibration (assuming default calibration) can be set now. */
     jabs_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
+    if(ws->params->ds) {
+        ws->histo_ds = jabs_histogram_alloc(ws->n_channels);
+        if(!ws->histo_ds) {
+            return NULL;
+        }
+        calibration_apply_to_histogram(ws->det->calibration, ws->histo_ds);
+        jabs_histogram_reset(ws->histo_ds);
+    } else {
+        ws->histo_ds = NULL;
+    }
+    ws->ds_running = FALSE;
 
     sim_workspace_calculate_number_of_bricks(ws);
     sim_workspace_init_reactions(ws);
@@ -159,6 +170,7 @@ void sim_workspace_free(sim_workspace *ws) {
     gsl_integration_workspace_free(ws->w_int_cs);
     gsl_integration_workspace_free(ws->w_int_cs_stragg);
     jabs_histogram_free(ws->histo_sum);
+    jabs_histogram_free(ws->histo_ds);
     ms_model_free(ws->ms);
     free(ws);
 }
@@ -215,16 +227,29 @@ void sim_workspace_calculate_sum_spectra(sim_workspace *ws) {
         for(size_t i = 0; i < n; i++) {
             ws->histo_sum->bin[i] += sim_r->histo->bin[i];
         }
+        if(sim_r->histo_ds && ws->histo_ds) {
+            n = GSL_MIN(ws->histo_ds->n, sim_r->histo_ds->n);
+            for(size_t i = 0; i < n; i++) {
+                ws->histo_ds->bin[i] += sim_r->histo_ds->bin[i];
+                ws->histo_sum->bin[i] += sim_r->histo_ds->bin[i];
+            }
+        }
     }
 }
 
 void sim_workspace_histograms_reset(sim_workspace *ws) {
     jabs_histogram_reset(ws->histo_sum);
+    if(ws->histo_ds) {
+        jabs_histogram_reset(ws->histo_ds);
+    }
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = ws->reactions[i];
         if(!r)
             continue;
         jabs_histogram_reset(r->histo);
+        if(r->histo_ds) {
+            jabs_histogram_reset(r->histo_ds);
+        }
     }
 }
 
@@ -244,7 +269,8 @@ size_t sim_workspace_histograms_calculate(sim_workspace *ws) {
         fprintf(stdout, "BRICK #Reaction %zu: %s, last brick %zu\n", i + 1, r->r->name, r->last_brick);
 #endif
         double scale = ws->fluence * ws->det->solid * r->r->yield;
-        bricks_convolute(r->histo, c, r->bricks, r->last_brick, scale, ws->params->sigmas_cutoff, ws->emin, ws->params->gaussian_accurate);
+        jabs_histogram *h = (ws->ds_running && r->histo_ds) ? r->histo_ds : r->histo; /* Dual scattering trajectories have their own histograms */
+        bricks_convolute(h, c, r->bricks, r->last_brick, scale, ws->params->sigmas_cutoff, ws->emin, ws->params->gaussian_accurate);
 #ifdef DEBUG_BRICK_OUTPUT
         fprintf(stdout, "BRICK \nBRICK \n");
 #endif
@@ -260,6 +286,9 @@ void sim_workspace_histograms_scale(sim_workspace *ws, double scale) {
         if(!r || !r->histo)
             continue;
         jabs_histogram_scale(r->histo, scale);
+        if(r->histo_ds) {
+            jabs_histogram_scale(r->histo_ds, scale);
+        }
     }
 }
 

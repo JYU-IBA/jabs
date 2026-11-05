@@ -538,7 +538,7 @@ void MainWindow::plotSpectrum(size_t i_det)
             } else {
                 histo = jabs_histogram_clone(s->histo);
             }
-            bool nextMatches = s_next && s->type == s_next->type && Z_this == Z_next && Z_this != JIBAL_ANY_Z;
+            bool nextMatches = s_next && s->type == s_next->type && s->ds == s_next->ds && Z_this == Z_next && Z_this != JIBAL_ANY_Z;
             bool showThisIsotope = showIsotopes &&  (plotIsotopesZ == JIBAL_ANY_Z || plotIsotopesZ == Z_this);
             if(nextMatches && !showThisIsotope) {
                 continue;
@@ -558,6 +558,9 @@ void MainWindow::plotSpectrum(size_t i_det)
                         name.append(s->target_isotope->name);
                     } else {
                         name.append(jibal_element_name(jibal->elements, Z_this));
+                    }
+                    if(s->ds) {
+                        name.append(" (DS)");
                     }
                 }
                 QColor color = SpectrumPlot::getColor(colorindex);

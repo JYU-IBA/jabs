@@ -57,6 +57,7 @@ int result_spectra_copy(result_spectra *dest, const result_spectra *src) {
 
 int result_spectrum_copy(result_spectrum *dest, const result_spectrum *src) {
     result_spectrum_set(dest, src->histo, src->name, src->target_isotope, src->type);
+    dest->ds = src->ds;
     return EXIT_SUCCESS;
 }
 
@@ -65,6 +66,7 @@ int result_spectrum_set(result_spectrum *dest, const jabs_histogram *h, const ch
     dest->name = name ? strdup(name) : NULL;
     dest->target_isotope = target_isotope;
     dest->type = type;
+    dest->ds = FALSE;
     return EXIT_SUCCESS;
 }
 
