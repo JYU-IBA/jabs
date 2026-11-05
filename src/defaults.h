@@ -85,6 +85,7 @@ extern "C" {
 #define DUAL_SCATTER_STEP_SIGMAS_MULTIPLIER (1.5) /* Exiting ion steps (in straggling sigmas) in dual scattering trajectories, relative to single scattering */
 #define DUAL_SCATTER_ANGLE_MIN (20.0 * C_DEG) /* Trajectories with both scattering angles larger than this are always considered dual scattering */
 #define DUAL_SCATTER_SMALL_ANGLE_MIN_DEFAULT (2.0 * C_DEG) /* Smallest scattering angle considered when small angles are enabled (Barradas, NIMB 225 (2004) 318) */
+#define DUAL_SCATTER_SMALL_ANGLE_MIN_LIMIT (0.1 * C_DEG) /* Smaller angles from IDF files are replaced by this */
 #define DUAL_SCATTER_SMALL_ANGLE_STEPS_DEFAULT 10 /* Number of (logarithmic) polar steps between small angle minimum and DUAL_SCATTER_ANGLE_MIN */
 #define DES_BEAM_LOSS_ANGLE_STEPS 48 /* Integration steps of total dual scattering cross section, logarithmic in angle */
 #define DUAL_SCATTER_PATH_CUTOFF_DEFAULT (1.5) /* Trajectories with one small scattering angle must have path length differing from the corresponding single scattering trajectory by this factor */

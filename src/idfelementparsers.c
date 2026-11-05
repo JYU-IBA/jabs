@@ -18,12 +18,15 @@
 #endif
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
+#include <gsl/gsl_math.h>
 #include "idfelementparsers.h"
 #include "generic.h"
 #ifdef WIN32
 #include "win_compat.h"
 #endif
 #include "geostragg.h"
+#include "defaults.h"
 
 idf_error idf_parse_note(idf_parser *idf, xmlNode *note) {
     char *s = idf_node_content_to_str(note);
@@ -410,7 +413,7 @@ idf_error idf_parse_physicsdefaults(idf_parser *idf, xmlNode *physicsdefaults) {
     xmlNode *energyspreaddefault = idf_findnode(physicsdefaults, "energyspreaddefault");
     if(energyspreaddefault) {
         int beamsizespread = idf_node_content_to_boolean(idf_findnode(energyspreaddefault, "geometricspread/beamsize"));
-        int detectoraperturespread = idf_node_content_to_boolean(idf_findnode(energyspreaddefault, "geometricspread/beamsize"));
+        int detectoraperturespread = idf_node_content_to_boolean(idf_findnode(energyspreaddefault, "geometricspread/detectoraperture"));
         if(beamsizespread == TRUE && detectoraperturespread == TRUE) {
             idf_output_printf(idf, "set geostragg true\n");
         } else if(beamsizespread == TRUE) {
@@ -419,6 +422,37 @@ idf_error idf_parse_physicsdefaults(idf_parser *idf, xmlNode *physicsdefaults) {
         } else if(detectoraperturespread == TRUE) {
             idf_output_printf(idf, "#In IDF file only detector size spread is set to true. The following line may also enable beam size spread.\n");
             idf_output_printf(idf, "set geostragg true\n");
+        }
+        if(idf_node_content_to_boolean(idf_findnode(energyspreaddefault, "multiplescattering")) == TRUE) {
+            char *model = idf_node_content_to_str(idf_findnode(energyspreaddefault, "multiplescatteringmodel")); /* SIMNRA extension, e.g. "Amsel (2003) TF" */
+            if(model && strstr(model, "LJ")) {
+                idf_output_printf(idf, "set ms LJ\n");
+            } else {
+                if(model && !strstr(model, "TF")) {
+                    idf_output_printf(idf, "#Multiple scattering model \"%s\" in IDF file is not supported, using Amsel TF model instead.\n", model);
+                }
+                idf_output_printf(idf, "set ms TF\n");
+            }
+            free(model);
+        }
+    }
+    xmlNode *dualscatteringdefault = idf_findnode(physicsdefaults, "dualscatteringdefault"); /* SIMNRA extension */
+    if(dualscatteringdefault && idf_node_content_to_boolean(idf_findnode(dualscatteringdefault, "dualscattering")) == TRUE) {
+        idf_output_printf(idf, "set ds true\n");
+        xmlNode *cutofflength = idf_findnode(dualscatteringdefault, "cutofflength");
+        xmlNode *cutoffminangle = idf_findnode(dualscatteringdefault, "cutoffminangle");
+        xmlNode *cutoffmaxangle = idf_findnode(dualscatteringdefault, "cutoffmaxangle");
+        if(cutofflength && cutoffminangle && cutoffmaxangle) {
+            double min_angle = idf_node_content_to_double(cutoffminangle);
+            double max_angle = idf_node_content_to_double(cutoffmaxangle);
+            if(min_angle < max_angle) {
+                if(fabs(max_angle - DUAL_SCATTER_ANGLE_MIN) > 0.001 * C_DEG) {
+                    idf_output_printf(idf, "#Dual scattering small angle maximum is %g deg in IDF file, JaBS always uses %g deg.\n", max_angle / C_DEG, DUAL_SCATTER_ANGLE_MIN / C_DEG);
+                }
+                idf_output_printf(idf, "set ds_small_angles true\n");
+                idf_output_printf(idf, "set ds_small_angle_min %gdeg\n", GSL_MAX_DBL(min_angle, DUAL_SCATTER_SMALL_ANGLE_MIN_LIMIT) / C_DEG);
+                idf_output_printf(idf, "set ds_path_cutoff %g\n", idf_node_content_to_double(cutofflength));
+            }
         }
     }
     return IDF2JBS_SUCCESS;

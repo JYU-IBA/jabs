@@ -43,7 +43,8 @@ xmlNodePtr simulation2idf_detectorresolution(const detector *det, const calibrat
 xmlNodePtr simulation2idf_energycalibration(const detector *det, const calibration *cal, const char *ion_name);
 xmlNodePtr simulation2idf_aperture(const char *name, const aperture *aperture);
 xmlNodePtr simulation2idf_reactions(const simulation *sim, const detector *det);
-xmlNodePtr simulation2idf_process(const simulation *sim, const result_spectra *spectra);
+xmlNodePtr simulation2idf_physicsdefaults(const idf_writer *idf, const sim_calc_params *params);
+xmlNodePtr simulation2idf_process(const idf_writer *idf, const simulation *sim, const result_spectra *spectra);
 xmlNodePtr simulation2idf_data(const jabs_histogram *h);
 xmlNodePtr simulation2idf_simpledata(const jabs_histogram *h);
 

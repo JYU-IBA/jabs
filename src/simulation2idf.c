@@ -182,7 +182,7 @@ xmlNodePtr simulation2idf_spectra(const idf_writer *idf, const fit_data *fit) {
             if(data) {
                 xmlAddChild(spectrum, data);
             }
-            xmlNodePtr process = simulation2idf_process(fit->sim, &fit->spectra[i_det]);
+            xmlNodePtr process = simulation2idf_process(idf, fit->sim, &fit->spectra[i_det]);
             if(process) {
                 xmlAddChild(spectrum, process);
             }
@@ -411,8 +411,32 @@ xmlNodePtr simulation2idf_data(const jabs_histogram *h) {
     return data;
 }
 
-xmlNodePtr simulation2idf_process(const simulation *sim, const result_spectra *spectrum) {
+xmlNodePtr simulation2idf_physicsdefaults(const idf_writer *idf, const sim_calc_params *params) {
+    xmlNodePtr physicsdefaults = xmlNewNode(NULL, BAD_CAST "physicsdefaults");
+    xmlNodePtr energyspreaddefault = xmlNewChild(physicsdefaults, NULL, BAD_CAST "energyspreaddefault", NULL);
+    xmlNewChild(energyspreaddefault, NULL, BAD_CAST "multiplescattering", BAD_CAST idf_boolean_to_str(params->ms != MS_MODEL_NONE));
+    if(idf->simnra && params->ms != MS_MODEL_NONE) {
+        xmlNewChild(energyspreaddefault, idf->simnra, BAD_CAST "multiplescatteringmodel", BAD_CAST (params->ms == MS_MODEL_AMSEL_LJ ? "Amsel (2003) LJ" : "Amsel (2003) TF"));
+    }
+    xmlNodePtr geometricspread = xmlNewChild(energyspreaddefault, NULL, BAD_CAST "geometricspread", NULL);
+    xmlNewChild(geometricspread, NULL, BAD_CAST "beamsize", BAD_CAST idf_boolean_to_str(params->geostragg));
+    xmlNewChild(geometricspread, NULL, BAD_CAST "detectoraperture", BAD_CAST idf_boolean_to_str(params->geostragg));
+    if(idf->simnra) {
+        xmlNodePtr dualscatteringdefault = xmlNewChild(physicsdefaults, idf->simnra, BAD_CAST "dualscatteringdefault", NULL);
+        xmlNewChild(dualscatteringdefault, idf->simnra, BAD_CAST "dualscattering", BAD_CAST idf_boolean_to_str(params->ds));
+        xmlAddChild(dualscatteringdefault, idf_new_node_units(BAD_CAST "cutofflength", NULL, NULL, params->ds_path_cutoff));
+        xmlAddChild(dualscatteringdefault, idf_new_node_units(BAD_CAST "cutoffminangle", BAD_CAST IDF_UNIT_DEGREE, NULL, params->ds_small_angles ? params->ds_small_angle_min : DUAL_SCATTER_ANGLE_MIN));
+        xmlAddChild(dualscatteringdefault, idf_new_node_units(BAD_CAST "cutoffmaxangle", BAD_CAST IDF_UNIT_DEGREE, NULL, DUAL_SCATTER_ANGLE_MIN));
+        for(xmlNodePtr n = dualscatteringdefault->children; n; n = n->next) {
+            xmlSetNs(n, idf->simnra);
+        }
+    }
+    return physicsdefaults;
+}
+
+xmlNodePtr simulation2idf_process(const idf_writer *idf, const simulation *sim, const result_spectra *spectrum) {
     xmlNodePtr process = xmlNewNode(NULL, BAD_CAST "process");
+    xmlAddChild(process, simulation2idf_physicsdefaults(idf, sim->params));
     xmlNodePtr simulations = xmlNewChild(process, NULL, BAD_CAST "simulations", NULL);
     xmlNodePtr simulation = xmlNewChild(simulations, NULL, BAD_CAST "simulation", NULL);
     xmlNewChild(simulation, NULL, BAD_CAST "simulationtype", BAD_CAST "total");
