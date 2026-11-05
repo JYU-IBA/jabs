@@ -45,6 +45,30 @@ depth stop_next_crossing(const ion *incident, const sample *sample, const depth 
 }
 
 
+void stop_ms_step(const ms_model *ms, ion *ion, const sample *sample, const depth d, double E, double h) {
+    if(!ms || ion->Z == 0 || h <= 0.0 || E <= 0.0) {
+        return;
+    }
+    int Z2_prev = 0;
+    double c_sum = 0.0;
+    for(size_t i_isotope = 0; i_isotope <= sample->n_isotopes; i_isotope++) { /* Isotopes of the same element are summed if they are consecutive. One extra iteration to handle the last element. */
+        int Z2 = 0;
+        double c = 0.0;
+        if(i_isotope < sample->n_isotopes) {
+            Z2 = sample->isotopes[i_isotope]->Z;
+            c = sample->no_conc_gradients ? *sample_conc_bin(sample, d.i, i_isotope) : get_conc(sample, d, i_isotope);
+        }
+        if(Z2 != Z2_prev) {
+            if(Z2_prev > 0 && c_sum > CONC_TOLERANCE) {
+                ms_step_element(ms, &ion->ms, ion->Z, Z2_prev, c_sum, E, h);
+            }
+            c_sum = 0.0;
+            Z2_prev = Z2;
+        }
+        c_sum += c;
+    }
+}
+
 depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, const sample *sample, depth depth_before, double step) {
     double k1, k2, k3, k4, stopping, dE, E;
     depth depth_next = stop_next_crossing(incident, sample, &depth_before);
@@ -118,11 +142,18 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
     assert(stopping > 0.0);
 #endif
     dE = -1.0 * h * stopping; /* Energy change in thickness "h". It is always negative! */
+    double stop_end = stop_sample(stop, incident, sample, fulldepth, E + dE);
 #ifndef NO_STATISTICAL_STRAGGLING
-    double s_ratio = stop_sample(stop, incident, sample, fulldepth, E + dE) / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
+    double s_ratio = stop_end / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
     incident->S *= pow2(s_ratio);
 #endif
     incident->S += h * stop_sample(stragg, incident, sample, halfdepth, E + (0.5 * dE)); /* Straggling, calculate at mid-energy */
+    if(stop->ms) {
+        double p_ratio = stop_end / k1; /* Energy differences propagate over the step like straggling above */
+        incident->ms.P *= p_ratio;
+        incident->ms.I = incident->ms.I * p_ratio + h * stop_end; /* Exact for constant composition: I = l * S(E) */
+        stop_ms_step(stop->ms, incident, sample, halfdepth, E + (0.5 * dE), h);
+    }
     incident->E += dE;
     return fulldepth; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }

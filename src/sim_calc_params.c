@@ -38,6 +38,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->ds_steps_azi = 0;
     p->ds_steps_polar = 0;
     p->ds_steps_polar_substeps = 0;
+    p->ms = MS_MODEL_NONE;
     p->rk4 = TRUE;
     p->nuclear_stopping_accurate = TRUE;
     p->mean_conc_and_energy = FALSE;
@@ -181,6 +182,7 @@ void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_lev
         jabs_message(msg_level, "maximum number of bricks = %zu\n", params->n_bricks_max);
     }
     jabs_message(msg_level, "geometric broadening = %s\n", params->geostragg?"true":"false");
+    jabs_message(msg_level, "multiple scattering = %s\n", ms_model_name(params->ms));
     jabs_message(msg_level, "brick width = %g times detector and straggling sum sigma\n", params->brick_width_sigmas);
     jabs_message(msg_level, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");
     if(!params->mean_conc_and_energy) {

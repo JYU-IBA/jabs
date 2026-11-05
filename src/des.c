@@ -193,12 +193,18 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
     incident->E = E;
 #endif
     incident->S = des_low->S + frac * S_interval;
+    incident->ms.w = des_low->ms.w + frac * (des_high->ms.w - des_low->ms.w);
+    incident->ms.sum_a = des_low->ms.sum_a + frac * (des_high->ms.sum_a - des_low->ms.sum_a);
+    incident->ms.sum_b = des_low->ms.sum_b + frac * (des_high->ms.sum_b - des_low->ms.sum_b);
+    incident->ms.I = des_low->ms.I + frac * (des_high->ms.I - des_low->ms.I);
+    incident->ms.P = des_low->ms.P + frac * (des_high->ms.P - des_low->ms.P);
     DEBUGVERBOSEMSG("d_out = %g tfu (i = %zu), E = %g keV, S = %g keV", d_out.x / C_TFU, d_out.i, incident->E / C_KEV, sqrt(incident->S) * C_FWHM / C_KEV);
     return d_out;
 }
 
 des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, const sim_calc_params *scp, const sample *sample, const ion *incident, depth depth_start, double emin) {
     ion ion = *incident;
+    ion_ms_reset(&ion.ms); /* Path of incident ion starts here */
     des_table *dt = des_table_init(DES_TABLE_INITIAL_ALLOC);
     if(!dt) {
         return NULL;
@@ -225,6 +231,7 @@ des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, con
         des *des = &dt->t[i];
         des->E = ion.E;
         des->S = ion.S;
+        des->ms = ion.ms;
         des->d = d_before;
         if((ion.inverse_cosine_theta > 0.0 && d_before.x >= sample->thickness - DEPTH_TOLERANCE) || (ion.inverse_cosine_theta < 0.0 && d_before.x < DEPTH_TOLERANCE)) {
             DEBUGMSG("DES table calculation stops at %g tfu (i = %zu).", d_before.x / C_TFU, i);
@@ -253,6 +260,7 @@ des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, con
 void des_set_ion(const des *des, ion *ion) {
     ion->E = des->E;
     ion->S = des->S;
+    ion->ms = des->ms;
 }
 
 depth des_next_range(const des_table *dt, ion *incident, depth d) {
@@ -272,5 +280,6 @@ depth des_next_range(const des_table *dt, ion *incident, depth d) {
     des *des_skip = &(dt->t[i_des_skip]);
     incident->E = des_skip->E; /* TODO: long skips may make E_deriv calculation inaccurate */
     incident->S = des_skip->S;
+    incident->ms = des_skip->ms;
     return des_skip->d;
 }

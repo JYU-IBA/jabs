@@ -43,10 +43,13 @@ add_executable(jabs
         calibration.c prob_dist.c idf2jbs.c idfelementparsers.c
         idfparse.c nuclear_stopping.c stop.c des.c
         simulation_workspace.c sim_reaction.c sim_calc_params.c
-        histogram.c gsl_inline.c scatint.c simulation2idf.c nlh.c
+        histogram.c gsl_inline.c scatint.c simulation2idf.c nlh.c ms.c
         "$<$<BOOL:${JABS_PLUGINS}>:plugin.c>"
         "$<$<BOOL:${WIN32}>:win_compat.c>"
         )
+
+add_executable(amsel amsel.c ms.c)
+target_link_libraries(amsel PRIVATE jibal PRIVATE GSL::gsl)
 
 target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
 
@@ -58,6 +61,7 @@ target_link_libraries(jabs
     PRIVATE "$<$<BOOL:${UNIX}>:m>"
     ${GETOPT_LIBRARY} gitwatcher
     )
+
 
 if(OpenMP_C_FOUND)
     target_link_libraries(jabs PUBLIC OpenMP::OpenMP_C)

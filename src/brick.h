@@ -18,6 +18,7 @@
 #include "sample.h"
 #include "detector.h"
 #include "histogram.h"
+#include "ms.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -36,6 +37,9 @@ typedef struct {
     double S_geo_x; /* Geometric straggling in "width" direction */
     double S_geo_y; /* Geometric straggling in "height" direction */
     double S_det; /* Detector energy resolution (variance) at E */
+    ms_mix ms; /* Energy spread due to small angle multiple scattering, scale mixture of Gaussians (variances) */
+    double ms_hwhm; /* HWHM of multiple scattering energy spread, zero if not calculated */
+    double S_sum_ms[MS_MIX_N]; /* Sum of all broadening (as S_sum) for each component of multiple scattering mixture */
     double Q; /* Counts in brick (concentration, cross section, fluence, solid angle etc) */
     double sc; /* Concentration cross-section product. Possibly weighted by straggling and affected by concentration gradients. */
     double S_sum; /* Sum (quadrature) of all broadening. */

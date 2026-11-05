@@ -34,6 +34,15 @@ void ion_reset(ion *ion) {
     ion->inverse_cosine_phi = 1.0;
     ion->nucl_stop = NULL; /* Beware of memory leaks! */
     ion->ion_gsto = NULL; /* Beware of memory leaks! */
+    ion_ms_reset(&ion->ms);
+}
+
+void ion_ms_reset(ion_ms *ms) {
+    ms->w = 0.0;
+    ms->sum_a = 0.0;
+    ms->sum_b = 0.0;
+    ms->I = 0.0;
+    ms->P = 1.0;
 }
 
 void ion_set_isotope(ion *ion, const jibal_isotope *isotope) {

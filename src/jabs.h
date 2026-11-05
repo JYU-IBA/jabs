@@ -29,6 +29,7 @@ extern "C" {
 #endif
 
 int simulate(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample);
+void simulate_reaction_ms(const sim_workspace *ws, const sim_reaction *sim_r, const ion *incident, double P_foil, brick *b); /* Calculates multiple scattering energy spread for brick b */
 int simulate_reaction(const ion *incident, depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r);
 int simulate_init_reaction(sim_reaction *sim_r, const sample *sample, const sim_calc_params *params, const geostragg_vars *g, double emin, double emin_incident, double emax_incident);
 int assign_stopping(jibal_gsto *gsto, const simulation *sim);

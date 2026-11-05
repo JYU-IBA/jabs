@@ -4,6 +4,7 @@
 #include <gsl/gsl_sf_erf.h>
 #include <gsl/gsl_math.h>
 #include "brick.h"
+#include "defaults.h"
 
 extern inline double erf_Q_fast(double x) { /* Approximative gaussian CDF */
     return x < 0.0 ? 1.0-0.5*exp(0.77428768622*x-0.37825569191*x*x) : 0.5*exp(-0.77428768622*x-0.37825569191*x*x);
@@ -13,7 +14,11 @@ extern inline double erf_Q_fast(double x) { /* Approximative gaussian CDF */
 void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, brick *bricks, size_t last_brick) {
     for(size_t i = 0; i <= last_brick; i++) {
         bricks[i].S_det = detector_resolution(det, isotope, bricks[i].E);
-        bricks[i].S_sum = sqrt(bricks[i].S + bricks[i].S_det + bricks[i].S_geo_x + bricks[i].S_geo_y);
+        double S_gauss = bricks[i].S + bricks[i].S_det + bricks[i].S_geo_x + bricks[i].S_geo_y;
+        bricks[i].S_sum = sqrt(S_gauss);
+        for(int k = 0; k < MS_MIX_N; k++) {
+            bricks[i].S_sum_ms[k] = bricks[i].ms_hwhm > 0.0 ? sqrt(S_gauss + bricks[i].ms.v[k]) : bricks[i].S_sum;
+        }
     }
 }
 
@@ -34,13 +39,26 @@ void bricks_convolute(jabs_histogram *h, const calibration *c, const brick *bric
             continue;
         }
         const brick *b_high = &bricks[i-1];
+        const int ms = (b_low->ms_hwhm > 0.0 || b_high->ms_hwhm > 0.0); /* Multiple scattering, convolution with a mixture of Gaussians */
+        double ms_w[MS_MIX_N];
+        double S_low = b_low->S_sum * sigmas_cutoff, S_high = b_high->S_sum * sigmas_cutoff; /* Cutoff distances */
+        if(ms) {
+            for(int k = 0; k < MS_MIX_N; k++) {
+                ms_w[k] = (b_low->ms.w[k] + b_high->ms.w[k]) / 2.0; /* Components with same index are paired, both have variances in increasing order */
+                if(ms_w[k] > 0.0) { /* Cutoff of a component depends on its weight, wide components in the tails have small weights */
+                    double sigmas = GSL_MIN_DBL(sigmas_cutoff, sqrt(2.0 * log(GSL_MAX_DBL(ms_w[k] / BRICK_MS_COMPONENT_CUTOFF, 1.0))));
+                    S_low = GSL_MAX_DBL(S_low, b_low->S_sum_ms[k] * sigmas);
+                    S_high = GSL_MAX_DBL(S_high, b_high->S_sum_ms[k] * sigmas);
+                }
+            }
+        }
         double E_cutoff_low, E_cutoff_high; /* Low energy cutoff (gaussian), High energy cutoff (gaussian) */
         if(b_low->E < b_high->E) { /* Detected energy increasing as brick number increases */
-            E_cutoff_low = b_low->E - b_low->S_sum * sigmas_cutoff;
-            E_cutoff_high = b_high->E + b_high->S_sum * sigmas_cutoff;
+            E_cutoff_low = b_low->E - S_low;
+            E_cutoff_high = b_high->E + S_high;
         } else { /* Energy decreasing as brick number increases */
-            E_cutoff_low = b_high->E - b_high->S_sum * sigmas_cutoff;
-            E_cutoff_high = b_low->E + b_low->S_sum * sigmas_cutoff;
+            E_cutoff_low = b_high->E - S_high;
+            E_cutoff_high = b_low->E + S_low;
         }
         if(E_cutoff_high < emin) { /* Brick (before convolution) is entirely far below emin. Safe to ignore. */
             continue;
@@ -56,7 +74,17 @@ void bricks_convolute(jabs_histogram *h, const calibration *c, const brick *bric
                 break; /* Assumes histograms have increasing energy */
             const double E = (h->range[j] + h->range[j + 1]) / 2.0; /* Approximate gaussian at center bin */
             const double w = h->range[j + 1] - h->range[j];
-            const double y = (erf_Q((b_low->E - E) / b_low->S_sum) - erf_Q((b_high->E - E) / b_high->S_sum));
+            double y;
+            if(ms) {
+                y = 0.0;
+                for(int k = 0; k < MS_MIX_N; k++) {
+                    if(ms_w[k] > 0.0) {
+                        y += ms_w[k] * (erf_Q((b_low->E - E) / b_low->S_sum_ms[k]) - erf_Q((b_high->E - E) / b_high->S_sum_ms[k]));
+                    }
+                }
+            } else {
+                y = (erf_Q((b_low->E - E) / b_low->S_sum) - erf_Q((b_high->E - E) / b_high->S_sum));
+            }
             double out = scale * y * w * b_w_inv * b_low->Q;
             h->bin[j] += out;
 #ifdef DEBUG_BRICK_OUTPUT

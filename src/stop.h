@@ -16,6 +16,7 @@
 #include "jibal_gsto.h"
 #include "ion.h"
 #include "sample.h"
+#include "ms.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,6 +29,7 @@ typedef struct jabs_stop {
     int nuclear_stopping_accurate;
     int rk4;
     double emin;
+    const ms_model *ms; /* Small angle multiple scattering model, NULL if multiple scattering is not calculated */
 } jabs_stop;
 
 typedef struct jabs_stop_step_params {
@@ -38,6 +40,7 @@ typedef struct jabs_stop_step_params {
 } jabs_stop_step_params;
 
 depth stop_next_crossing(const ion *incident, const sample *sample, const depth *d_from);
+void stop_ms_step(const ms_model *ms, ion *ion, const sample *sample, depth d, double E, double h); /* Updates multiple scattering (angular spread) of ion after path length h (at/m2) */
 depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, const sample *sample, depth depth_before, double step);
 double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sample, depth depth, double E);
 double stop_step_calc(const jabs_stop_step_params *params, const ion *ion);

@@ -284,8 +284,116 @@ double cross_section_concentration_product(const sim_workspace *ws, const sample
     return sigmaconc;
 }
 
+static void ms_direction(double theta, double phi, double d[3]) { /* Unit vector in sample coordinates, z is perpendicular to surface (into the sample) */
+    d[0] = sin(theta) * cos(phi);
+    d[1] = sin(theta) * sin(phi);
+    d[2] = cos(theta);
+}
+
+static double ms_dot(const double a[3], const double b[3]) {
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+static void ms_basis(const double d[3], const double d_other[3], double e[2][3]) { /* Two unit vectors perpendicular to d. First one is in the plane of d and surface normal (or d_other if d is perpendicular to surface). */
+    const double z[3] = {0.0, 0.0, 1.0};
+    const double *refs[] = {z, d_other};
+    double norm = 0.0;
+    for(int i_ref = 0; i_ref < 2 && norm < 1e-9; i_ref++) {
+        const double *ref = refs[i_ref];
+        double dot = ms_dot(ref, d);
+        for(int i = 0; i < 3; i++) {
+            e[0][i] = ref[i] - dot * d[i];
+        }
+        norm = sqrt(ms_dot(e[0], e[0]));
+    }
+    if(norm < 1e-9) { /* Any perpendicular vector will do */
+        e[0][0] = -d[1];
+        e[0][1] = d[0];
+        e[0][2] = 0.0;
+        norm = sqrt(ms_dot(e[0], e[0]));
+        if(norm < 1e-9) {
+            e[0][0] = 1.0;
+            e[0][1] = 0.0;
+            norm = 1.0;
+        }
+    }
+    for(int i = 0; i < 3; i++) {
+        e[0][i] /= norm;
+    }
+    e[1][0] = d[1] * e[0][2] - d[2] * e[0][1]; /* e_y = d x e_x */
+    e[1][1] = d[2] * e[0][0] - d[0] * e[0][2];
+    e[1][2] = d[0] * e[0][1] - d[1] * e[0][0];
+}
+
+void simulate_reaction_ms(const sim_workspace *ws, const sim_reaction *sim_r, const ion *incident, double P_foil, brick *b) {
+    /* Energy spread due to small angle multiple scattering on the incoming and outgoing paths, see ms.h.
+     * On each path the detected energy changes by a * alpha + b * beta, where alpha is the angular deviation at the end
+     * (incoming path) or beginning (outgoing path) and beta is the chord angle. Both are projected to two orthogonal directions. */
+    const ion *p = &sim_r->p; /* Reaction product at sample surface */
+    b->ms_hwhm = 0.0;
+    ms_mix_zero(&b->ms);
+    if(!b->valid) {
+        return;
+    }
+    const double E_0 = b->E_0;
+    const double dE = 0.001 * E_0;
+    const double dtheta = 0.01 * C_DEG;
+    const double C_out = p->ms.P * P_foil; /* Propagation of energy change from just after reaction to detector */
+    const double dEr_dE0 = (reaction_product_energy(sim_r->r, sim_r->theta, E_0 + dE) - reaction_product_energy(sim_r->r, sim_r->theta, E_0 - dE)) / (2.0 * dE);
+    const double dEr_dtheta = (reaction_product_energy(sim_r->r, sim_r->theta + dtheta, E_0) - reaction_product_energy(sim_r->r, sim_r->theta - dtheta, E_0)) / (2.0 * dtheta);
+    double d_in[3], d_out[3];
+    ms_direction(incident->theta, incident->phi, d_in);
+    ms_direction(p->theta, p->phi, d_out);
+    double cos_theta = ms_dot(d_in, d_out);
+    double sin_theta = sqrt(GSL_MAX_DBL(1.0 - cos_theta * cos_theta, 1e-12));
+    double e_in[2][3], e_out[2][3];
+    ms_basis(d_in, d_out, e_in);
+    ms_basis(d_out, d_in, e_out);
+    double a_in[2], b_in[2], a_out[2], b_out[2];
+    for(int i = 0; i < 2; i++) {
+        double dtheta_dalpha = -ms_dot(e_in[i], d_out) / sin_theta;
+        a_in[i] = C_out * dEr_dtheta * dtheta_dalpha;
+        double f = -e_in[i][2] / d_in[2]; /* Relative change of path length to reach depth per unit chord angle */
+        b_in[i] = -C_out * dEr_dE0 * incident->ms.I * f;
+        dtheta_dalpha = -ms_dot(e_out[i], d_in) / sin_theta;
+        a_out[i] = C_out * dEr_dtheta * dtheta_dalpha;
+        f = -e_out[i][2] / d_out[2];
+        b_out[i] = -P_foil * p->ms.I * f;
+    }
+    double nu_in, nu_out;
+    double hwhm_in = ms_leg_hwhm(ws->ms, &incident->ms, a_in, b_in, &nu_in);
+    double hwhm_out = ms_leg_hwhm(ws->ms, &p->ms, a_out, b_out, &nu_out);
+    if(hwhm_in <= 0.0 && hwhm_out <= 0.0) {
+        return;
+    }
+    ms_mix m_in, m_out;
+    ms_mix_t(ws->ms, hwhm_in, nu_in, &m_in);
+    ms_mix_t(ws->ms, hwhm_out, nu_out, &m_out);
+    ms_mix_convolve(&m_in, &m_out, &b->ms);
+    b->ms_hwhm = sqrt(hwhm_in * hwhm_in + hwhm_out * hwhm_out); /* Approximate, for reporting purposes. Distribution is in b->ms. */
+    double hwhm_max = MS_HWHM_MAX_FRACTION * b->E;
+    double scale = 1.0;
+    if(b->ms_hwhm > hwhm_max) { /* Theory is not valid, spread would be unphysically large. */
+        scale = pow2(hwhm_max / b->ms_hwhm);
+        b->ms_hwhm = hwhm_max;
+    }
+    const double v_max = pow2(MS_SIGMA_MAX_FRACTION * b->E);
+    for(int k = 0; k < MS_MIX_N; k++) {
+        b->ms.v[k] = GSL_MIN_DBL(b->ms.v[k] * scale, v_max);
+    }
+    DEBUGVERBOSEMSG("MS at depth %g tfu: in w = %g deg, I = %g keV, a = (%g, %g) keV/deg, b = (%g, %g) keV/deg, %g keV FWHM (nu %g). Out w = %g deg, I = %g keV, a = (%g, %g) keV/deg, b = (%g, %g) keV/deg, %g keV FWHM (nu %g).",
+                    b->d.x / C_TFU,
+                    incident->ms.w / C_DEG, incident->ms.I / C_KEV, a_in[0] * C_DEG / C_KEV, a_in[1] * C_DEG / C_KEV, b_in[0] * C_DEG / C_KEV, b_in[1] * C_DEG / C_KEV, 2.0 * hwhm_in / C_KEV, nu_in,
+                    p->ms.w / C_DEG, p->ms.I / C_KEV, a_out[0] * C_DEG / C_KEV, a_out[1] * C_DEG / C_KEV, b_out[0] * C_DEG / C_KEV, b_out[1] * C_DEG / C_KEV, 2.0 * hwhm_out / C_KEV, nu_out);
+}
+
 int simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
     ion ion1 = *incident; /* Shallow copy */
+    ion_ms_reset(&ion1.ms);
+    jabs_stop stop_exit = ws->stop; /* Multiple scattering on exit path is only needed for energy spread */
+    if(!ws->ms_spread) {
+        stop_exit.ms = NULL;
+    }
     if(simulate_init_reaction(sim_r, sample, ws->params, g, ws->emin, ion1.ion_gsto->emin, ion1.E + ws->params->sigmas_cutoff * sqrt(ion1.S))) {
         return EXIT_FAILURE;
     }
@@ -369,7 +477,7 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         b->E_r = sim_r->p.E;
         b->S_r = sim_r->p.S;
 
-        if(stop_sample_exit(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, &sim_r->p, d_after, sample) != 0) {
+        if(stop_sample_exit(&stop_exit, &ws->stragg, &ws->params->exiting_stop_params, &sim_r->p, d_after, sample) != 0) {
             b->valid = FALSE;/* Discards entire brick, may not be the perfect choice! */
             DEBUGMSG("Stop before exit, energy of reaction product after reaction %g keV.", b->E_r / C_KEV);
             if(product_and_incident_go_in_different_directions) { /* Lowering incident energy will lower reaction product energy */
@@ -381,12 +489,13 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         b->S_s = sim_r->p.S;
 
         double E_deriv;
+        double P_foil = 1.0; /* Propagation factor of energy differences through detector foil */
 
         if(ws->det->foil) { /* Energy loss in detector foil */
             depth d_foil = {.i = 0, .x = 0.0};
             ion ion_foil = *&sim_r->p;
             ion_set_angle(&ion_foil, 0.0, 0.0); /* Foils are not tilted. We use a temporary copy of "p" to do this step. */
-            if(stop_sample_exit(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, &ion_foil, d_foil, ws->det->foil)) {
+            if(stop_sample_exit(&stop_exit, &ws->stragg, &ws->params->exiting_stop_params, &ion_foil, d_foil, ws->det->foil)) {
                 b->valid = FALSE;/* Discards entire brick, may not be the perfect choice! */
                 DEBUGMSG("Stop in detector foil. Energy after reaction was %g keV.", b->E_r / C_KEV);
                 if(product_and_incident_go_in_different_directions) { /* Lowering incident energy will lower reaction product energy */
@@ -396,9 +505,17 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             }
             b->E = ion_foil.E;
             b->S = ion_foil.S;
+            if(sim_r->p.ms.P > 0.0) {
+                P_foil = ion_foil.ms.P / sim_r->p.ms.P;
+            }
         } else {
             b->E = sim_r->p.E;
             b->S = sim_r->p.S;
+        }
+        if(ws->ms_spread) {
+            simulate_reaction_ms(ws, sim_r, &ion1, P_foil, b);
+        } else {
+            b->ms_hwhm = 0.0;
         }
 
         if(b_prev) {

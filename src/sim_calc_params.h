@@ -16,6 +16,7 @@
 #include "stop.h"
 #include "prob_dist.h"
 #include "message.h"
+#include "ms.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,6 +34,7 @@ typedef struct sim_calc_params {
     int nuclear_stopping_accurate; /* Use accurate nuclear stopping equation true/false. When false a faster (poorly approximating) equation is used below the nuclear stopping maximum. */
     int mean_conc_and_energy; /* Calculation of cross-section concentration product is simplified by calculating cross section at mean energy of a depth step and concentration at mid-bin (only relevant for samples with concentration gradients) */
     int geostragg; /* Geometric straggling true/false */
+    ms_model_type ms; /* Small angle multiple scattering model, MS_MODEL_NONE if disabled */
     int beta_manual; /* Don't calculate exit angle based on detector geometry, use something given by user, true/false */
     int gaussian_accurate; /* If this is FALSE an approximative gaussian CDF is used in convolution of spectra, otherwise function from GSL is used. */
     jabs_stop_step_params incident_stop_params;

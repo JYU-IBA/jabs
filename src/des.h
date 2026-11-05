@@ -26,6 +26,7 @@ typedef struct {
     depth d; /* Depth */
     double E; /* Energy */
     double S; /* Straggling */
+    ion_ms ms; /* Multiple scattering state */
 } des; /* DES = Depth, Energy, Straggling */
 
 typedef struct {

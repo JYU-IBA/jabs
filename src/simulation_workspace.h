@@ -38,6 +38,8 @@ typedef struct sim_workspace {
     sim_calc_params *params;
     jabs_stop stop; /* Stopping calculation parameters and data, set on sim_workspace_init() */
     jabs_stop stragg; /* Straggling calculation parameters and data */
+    ms_model *ms; /* Multiple scattering model, NULL if not needed */
+    int ms_spread; /* Energy spread due to multiple scattering is calculated (TRUE/FALSE) */
     double emin;
     gsl_integration_workspace *w_int_cs; /* Integration workspace for conc * cross section product */
     gsl_integration_workspace *w_int_cs_stragg;

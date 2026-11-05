@@ -132,6 +132,17 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->stop.rk4 = ws->params->rk4;
     ws->stop.nuclear_stopping_accurate = ws->params->nuclear_stopping_accurate;
     ws->stop.emin = ws->emin;
+    ws->ms = NULL;
+    ws->ms_spread = (ws->params->ms != MS_MODEL_NONE);
+    if(ws->ms_spread) {
+        ws->ms = ms_model_new(ws->params->ms);
+        if(!ws->ms) {
+            jabs_message(MSG_ERROR, "Could not initialize multiple scattering model.\n");
+            sim_workspace_free(ws);
+            return NULL;
+        }
+    }
+    ws->stop.ms = ws->ms_spread ? ws->ms : NULL;
     ws->stragg = ws->stop; /* Copy */
     ws->stragg.type = GSTO_STO_STRAGG;
     return ws;
@@ -148,6 +159,7 @@ void sim_workspace_free(sim_workspace *ws) {
     gsl_integration_workspace_free(ws->w_int_cs);
     gsl_integration_workspace_free(ws->w_int_cs_stragg);
     jabs_histogram_free(ws->histo_sum);
+    ms_model_free(ws->ms);
     free(ws);
 }
 

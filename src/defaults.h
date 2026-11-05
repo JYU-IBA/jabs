@@ -76,6 +76,9 @@ extern "C" {
 #define DUAL_SCATTER_POLAR_SUBSTEPS_DEFAULT 9
 #define DUAL_SCATTER_AZI_STEPS_DEFAULT 15
 #define DUAL_SCATTER_INCIDENT_STOP_STEP_FACTOR_DEFAULT (2.0)
+#define MS_HWHM_MAX_FRACTION (0.5) /* Multiple scattering theory fails at large energy losses. HWHM of multiple scattering energy spread is limited to this fraction of detected energy. */
+#define MS_SIGMA_MAX_FRACTION (1.0) /* Standard deviation of each component of multiple scattering energy spread mixture is limited to this fraction of detected energy */
+#define BRICK_MS_COMPONENT_CUTOFF (1.0e-6) /* Components of multiple scattering mixture are convoluted to a range where weight times gaussian is above this */
 #define FIT_ITERS_MAX 100
 #define FIT_XTOL (1e-7)
 #define FIT_FAST_XTOL_MULTIPLIER (1.0)

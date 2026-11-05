@@ -124,7 +124,10 @@ geostragg_vars geostragg_vars_calculate(const ion *incident, double sample_theta
     return g;
 }
 
-double geostragg(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, const sample *sample, const sim_reaction *r, const geostragg_vars_dir *gd, const depth d, const double E_0) {
+double geostragg(const jabs_stop *stop_orig, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, const sample *sample, const sim_reaction *r, const geostragg_vars_dir *gd, const depth d, const double E_0) {
+    jabs_stop stop_copy = *stop_orig;
+    stop_copy.ms = NULL; /* Multiple scattering is not needed here */
+    const jabs_stop *stop = &stop_copy;
     ion ion;
     ion = r->p;
     ion_set_angle(&ion, gd->theta_product_plus, gd->phi_product_plus);

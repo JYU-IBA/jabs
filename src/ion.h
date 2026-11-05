@@ -38,10 +38,19 @@ typedef struct jabs_ion_gsto {
     int Z2_max; /* Copy of gsto->Z2_max */
 } jabs_ion_gsto;
 
+typedef struct ion_ms { /* Small angle multiple scattering state of ion, accumulated along the path. See ms.h. */
+    double w; /* HWHM of the projected angular distribution (radians) */
+    double sum_a; /* Sums for weighted mean of scaling factor mu (Szilagyi et al. NIMB 100 (1995) 103, Eq. (50)), sum of tau * mu^(1-nu) */
+    double sum_b; /* sum of tau * mu^(-nu) */
+    double I; /* Energy change caused by relative path length change (dE/df, where path length is l * (1 + f)), accumulated along path */
+    double P; /* Propagation factor of energy differences from start of path to current point (dE/dE_start) */
+} ion_ms;
+
 typedef struct ion {
     const jibal_isotope *isotope;
     double E;
     double S;
+    ion_ms ms;
     double mass;
     double mass_inverse;
     int Z;
@@ -56,6 +65,7 @@ typedef struct ion {
 } ion;
 
 void ion_reset(ion *ion);
+void ion_ms_reset(ion_ms *ms); /* Resets multiple scattering state, i.e. start of a new path */
 void ion_set_isotope(ion *ion, const jibal_isotope *isotope);
 void ion_set_angle(ion *ion, double theta, double phi);
 double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, int accurate);
