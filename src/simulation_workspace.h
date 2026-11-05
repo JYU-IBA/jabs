@@ -55,7 +55,8 @@ typedef struct sim_workspace {
     int ms_spread; /* Energy spread due to multiple scattering is calculated (TRUE/FALSE) */
     ds_trajectory ds_traj;
     double ds_beam_loss_angle; /* If larger than zero, incident beam is attenuated by scattering to larger angles than this (dual scattering) */
-    double emin;
+    double emin; /* Energy cutoff of spectra */
+    double emin_calc; /* Energy cutoff for transport of ions, lower than emin so that broadening of particles detected just below emin is included in the spectrum above emin */
     gsl_integration_workspace *w_int_cs; /* Integration workspace for conc * cross section product */
     gsl_integration_workspace *w_int_cs_stragg;
     size_t n_bricks; /* same as r->n_bricks in each reaction */
@@ -65,6 +66,7 @@ typedef struct sim_workspace {
 sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, const detector *det);
 void sim_workspace_init_reactions(sim_workspace *ws); /* used by sim_workspace_init(), ws->sim and ws->n_bricks should be set before calling */
 void sim_workspace_calculate_number_of_bricks(sim_workspace *ws);
+double sim_workspace_emin_calc(double emin, const sim_calc_params *params, const detector *det, const jibal_isotope *isotope); /* Energy cutoff for ion transport, see emin_calc in sim_workspace */
 void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);
 void sim_workspace_calculate_sum_spectra(sim_workspace *ws);

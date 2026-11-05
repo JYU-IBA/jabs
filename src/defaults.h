@@ -64,6 +64,7 @@ extern "C" {
 #define SIMULATE_WARNING_LIMIT 10 /* Allowed number of non-critical warnings for each run of simulate() */
 /* Other constants */
 #define E_MIN (10.0 * C_KEV) /* Absolute minimum for everything */
+#define EMIN_CALC_FRACTION (0.5) /* Ions are transported down to at most this fraction of emin (or lower, considering detector resolution), so that the spectrum just above emin is not truncated */
 #define E_MAX (1000.0*C_MEV) /* Absolute maximum for everything */
 #define DEPTH_TOLERANCE (1.0e-6 * C_TFU)
 #define ROUGH_TOLERANCE (0.1 * C_TFU) /* Roughness below this is equivalent to none */

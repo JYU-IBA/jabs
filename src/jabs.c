@@ -453,7 +453,7 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
     if(!ws->ms_spread) {
         stop_exit.ms = NULL;
     }
-    if(simulate_init_reaction(sim_r, sample, ws->params, g, ws->emin, ion1.ion_gsto->emin, ion1.E + ws->params->sigmas_cutoff * sqrt(ion1.S))) {
+    if(simulate_init_reaction(sim_r, sample, ws->params, g, ws->emin_calc, ion1.ion_gsto->emin, ion1.E + ws->params->sigmas_cutoff * sqrt(ion1.S))) {
         return EXIT_FAILURE;
     }
     if(sim_r->stop) {
@@ -676,7 +676,7 @@ int simulate(const ion *incident, const depth depth_start, sim_workspace *ws, co
     geostragg_vars g = geostragg_vars_calculate(incident, ws->sim->sample_theta, ws->sim->sample_phi,
                                                 ws->det, ws->sim->beam_aperture,
                                                 ws->params->geostragg, ws->params->beta_manual);
-    des_table *dt = des_table_compute(&ws->stop, &ws->stragg, ws->params, sample, incident, depth_start, ws->emin, ws->ds_beam_loss_angle); /* Depth, energy and straggling of incident ion */
+    des_table *dt = des_table_compute(&ws->stop, &ws->stragg, ws->params, sample, incident, depth_start, ws->emin_calc, ws->ds_beam_loss_angle); /* Depth, energy and straggling of incident ion */
     if(!dt) {
         jabs_message(MSG_ERROR, "DES table computation failed.\n");
         return -1;
@@ -1027,7 +1027,7 @@ int simulate_with_ds(sim_workspace *ws) {
     const jibal_isotope *incident = ws->sim->beam_isotope;
     int last = FALSE;
     jabs_message(MSG_VERBOSE, "Dual scattering simulation starts.\n\n");
-    double emin = ws->emin;
+    double emin = ws->emin_calc;
     ws->ds_traj.angle_min = DUAL_SCATTER_ANGLE_MIN;
     ws->ds_traj.path_cutoff = ds_path_cutoff;
     ws->ds_traj.inverse_cosine_in = inverse_cosine_in;

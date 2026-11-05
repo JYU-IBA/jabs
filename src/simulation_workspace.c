@@ -74,6 +74,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->params = sim_calc_params_defaults(NULL);
     sim_calc_params_copy(sim->params,  ws->params);
     sim_calc_params_update(ws->params);
+    ws->emin_calc = sim_workspace_emin_calc(ws->emin, ws->params, det, sim->beam_isotope);
     ws->gsto = jibal->gsto;
     ws->isotopes = jibal->isotopes;
     ws->n_reactions = 0; /* Will be incremented later */
@@ -142,7 +143,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->stop.gsto = jibal->gsto;
     ws->stop.rk4 = ws->params->rk4;
     ws->stop.nuclear_stopping_accurate = ws->params->nuclear_stopping_accurate;
-    ws->stop.emin = ws->emin;
+    ws->stop.emin = ws->emin_calc;
     ws->ms = NULL;
     ws->ms_spread = (ws->params->ms != MS_MODEL_NONE);
     if(ws->ms_spread || (ws->params->ds && ws->params->ds_lateral_spread)) {
@@ -157,6 +158,15 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->stragg = ws->stop; /* Copy */
     ws->stragg.type = GSTO_STO_STRAGG;
     return ws;
+}
+
+double sim_workspace_emin_calc(double emin, const sim_calc_params *params, const detector *det, const jibal_isotope *isotope) {
+    if(emin <= E_MIN) {
+        return emin;
+    }
+    double sigma_det = sqrt(detector_resolution(det, isotope, emin));
+    double emin_calc = GSL_MIN_DBL(EMIN_CALC_FRACTION * emin, emin - params->sigmas_cutoff * sigma_det);
+    return GSL_MAX_DBL(emin_calc, E_MIN);
 }
 
 void sim_workspace_free(sim_workspace *ws) {
