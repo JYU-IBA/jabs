@@ -348,3 +348,21 @@ int jabs_str_to_size_t(const char *str, size_t *out) {
     }
     return 0;
 }
+
+static volatile int jabs_abort_flag = 0; /* Set from one thread (e.g. GUI), read by calculation threads */
+
+void jabs_abort_set(int abort) {
+#if defined(__GNUC__) || defined(__clang__)
+    __atomic_store_n(&jabs_abort_flag, abort ? 1 : 0, __ATOMIC_RELAXED);
+#else
+    jabs_abort_flag = abort ? 1 : 0;
+#endif
+}
+
+int jabs_abort_requested(void) {
+#if defined(__GNUC__) || defined(__clang__)
+    return __atomic_load_n(&jabs_abort_flag, __ATOMIC_RELAXED);
+#else
+    return jabs_abort_flag;
+#endif
+}

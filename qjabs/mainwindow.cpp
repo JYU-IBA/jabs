@@ -17,8 +17,12 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow),
       maxRecentFiles(5), fitDialog(NULL), jibal(NULL), session(NULL), highlighter(NULL), plotDialog(NULL),
-      showIsotopes(false), plotIsotopesZ(JIBAL_ANY_Z)
+      showIsotopes(false), plotIsotopesZ(JIBAL_ANY_Z), workerThread(nullptr), worker(nullptr), running(false), runMode(RUN_SCRIPT),
+      actionStop(nullptr), fitAbort(false), plotWhileFitting(false)
 {
+    qRegisterMetaType<fit_stats>("fit_stats");
+    qRegisterMetaType<jabs_msg_level>("jabs_msg_level"); /* Messages can come from other threads (worker, OpenMP), queued connection needs this */
+    qRegisterMetaType<QSharedPointer<PlotSnapshot>>("QSharedPointer<PlotSnapshot>");
     aboutString = QString("JaBS version ") + jabs_version() + "\n\n"
                        + "Using JIBAL version "+ jibal_version() + ", compiled using version " + JIBAL_VERSION + "\n\n"
                        + "Using Qt version " + qVersion() + ", compiled using version " + QT_VERSION_STR + "\n\n"
@@ -63,10 +67,28 @@ MainWindow::MainWindow(QWidget *parent)
     ui->menuRecent_Files->setToolTipsVisible(true);
     readSettings();
     readPlotSettings();
+    actionStop = new QAction(QIcon(":/icons/stop-box.svg"), QString("Stop"), this);
+    actionStop->setToolTip(QString("Stop running simulation or fit"));
+    actionStop->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Period));
+    actionStop->setEnabled(false);
+    connect(actionStop, &QAction::triggered, this, &MainWindow::stopRun);
+    ui->toolBar->addAction(actionStop);
+    ui->menu_File->insertAction(ui->action_New_File, actionStop);
+    connect(this, &MainWindow::fitProgress, this, &MainWindow::onFitProgress); /* Emitted from worker thread, queued */
     int status = initSession();
     if(status != 0) {
         enableRun(false);
         ui->action_Plot->setEnabled(false);
+    } else {
+        workerThread = new QThread(this);
+        workerThread->setStackSize(8 * 1024 * 1024); /* Default for secondary threads is small on some platforms (512 kB on macOS) */
+        worker = new JabsWorker(session);
+        worker->moveToThread(workerThread);
+        connect(workerThread, &QThread::finished, worker, &QObject::deleteLater);
+        connect(this, &MainWindow::startRun, worker, &JabsWorker::run);
+        connect(worker, &JabsWorker::finished, this, &MainWindow::onRunFinished);
+        connect(worker, &JabsWorker::statusMessage, this, [this](const QString &msg) {statusBar()->showMessage(msg);});
+        workerThread->start();
     }
     connect(ui->widget, &SpectrumPlot::rangeSelected, this, &MainWindow::runRoi);
     connect(ui->widget, &SpectrumPlot::energyAxisSet, this, &MainWindow::onEnergyAxisSet);
@@ -92,6 +114,7 @@ void MainWindow::addMessage(jabs_msg_level level, const char *msg)
 
 MainWindow::~MainWindow()
 {
+    stopWorkerThread();
     closeSession();
     delete [] recentFileActs;
     delete highlighter;
@@ -100,6 +123,10 @@ MainWindow::~MainWindow()
 
 void MainWindow::openFile(const QString &filename)
 {
+    if(running) {
+        QMessageBox::warning(this, "Run in progress", QString("Can not open file %1 while a simulation or fit is running.").arg(filename));
+        return;
+    }
     QFile file(filename);
     if(file.open(QFile::ReadOnly | QFile::Text)) {
         QByteArray data = file.readAll();
@@ -117,6 +144,9 @@ void MainWindow::openFile(const QString &filename)
 }
 
 void MainWindow::runRoi(const QString &roi) {
+    if(running) {
+        return;
+    }
     runLine(QString("roi %1 %2").arg(ui->comboBox->currentIndex() + 1).arg(roi));
 }
 
@@ -137,17 +167,58 @@ void MainWindow::readPlotSettings()
 }
 
 
-int MainWindow::runLine(const QString &line) {
-    if(line.isEmpty()) {
-        return SCRIPT_COMMAND_SUCCESS;
+int MainWindow::runLine(const QString &line) { /* Runs line in GUI thread, only for quick commands (e.g. roi) */
+    if(running) {
+        return SCRIPT_COMMAND_FAILURE;
     }
-    jabs_message(MSG_INFO, "%s%s\n", PROMPT, qPrintable(line));
-    int status = script_execute_command(session, qPrintable(line));
-    return status;
+    return JabsWorker::runLine(session, line);
+}
+
+void MainWindow::startWorker(const QStringList &lines, RunMode mode)
+{
+    running = true;
+    runMode = mode;
+    fitAbort = false;
+    plotWhileFitting = settings.value("plotWhileFitting", QVariant(false)).toBool();
+    snapshot.clear();
+    jabs_abort_set(FALSE);
+    enableRun(false);
+    runTimer.start();
+    statusBar()->showMessage(QString("Running."));
+    emit startRun(lines);
+}
+
+void MainWindow::stopWorkerThread()
+{
+    if(!workerThread) {
+        return;
+    }
+    jabs_abort_set(TRUE);
+    fitAbort = true;
+    workerThread->quit(); /* Event loop of thread quits after current run (if any) has been aborted */
+    workerThread->wait();
+    workerThread = nullptr;
+    worker = nullptr;
+}
+
+void MainWindow::stopRun()
+{
+    if(!running) {
+        return;
+    }
+    statusBar()->showMessage(QString("Stopping..."));
+    fitAbort = true;
+    jabs_abort_set(TRUE);
 }
 
 void MainWindow::plotSession(bool error)
 {
+    if(running) { /* Session can not be accessed, but latest snapshot (if any) can be plotted */
+        if(snapshot && !error) {
+            plotSpectrum(ui->comboBox->currentIndex());
+        }
+        return;
+    }
     updateDetectorList();
     if(session && session->fit && session->fit->sim && !error) {
         size_t i_det = ui->comboBox->currentIndex();
@@ -188,6 +259,14 @@ bool MainWindow::askToSave()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    if(running) {
+        QMessageBox::StandardButton reply = QMessageBox::question(this, "Run in progress", "A simulation or fit is running. Stop it and quit?", QMessageBox::Yes | QMessageBox::Cancel);
+        if(reply != QMessageBox::Yes) {
+            event->ignore();
+            return;
+        }
+        stopRun();
+    }
     if(askToSave()) {
         event->accept();
     } else {
@@ -204,6 +283,13 @@ void MainWindow::enableRun(bool enabled)
     ui->menuRecent_Files->setEnabled(enabled);
     ui->action_Save_File->setEnabled(enabled && needsSaving);
     ui->action_Save_File_as->setEnabled(enabled);
+    ui->actionIDF->setEnabled(enabled);
+    ui->menuDetector->setEnabled(enabled);
+    ui->comboBox->setEnabled(enabled);
+    ui->editor->setReadOnly(!enabled); /* Highlighter uses session (commands), which a running script can modify */
+    if(actionStop) {
+        actionStop->setEnabled(!enabled && running);
+    }
 }
 
 void MainWindow::closeFitDialog()
@@ -390,29 +476,53 @@ void MainWindow::receiveMessage(jabs_msg_level level, QString msg)
 }
 
 int MainWindow::fitCallback(fit_stats stats)
+{ /* Called by the worker thread. Session can be accessed here (the worker is not using it), widgets can not. */
+    QSharedPointer<PlotSnapshot> snap;
+    if(plotWhileFitting && session && session->fit && session->fit->spectra) {
+        snap = QSharedPointer<PlotSnapshot>::create();
+        snap->spectra.resize(session->fit->n_det_spectra);
+        for(size_t i = 0; i < session->fit->n_det_spectra; i++) {
+            result_spectra_copy(&snap->spectra[i], &session->fit->spectra[i]);
+        }
+        snap->ref = session->fit->ref ? jabs_histogram_clone(session->fit->ref) : nullptr;
+    }
+    emit fitProgress(stats, snap);
+    return fitAbort ? 1 : 0;
+}
+
+void MainWindow::onFitProgress(fit_stats stats, QSharedPointer<PlotSnapshot> snap)
 {
+    if(!running) { /* Late signal, run has already finished */
+        return;
+    }
     if(!fitDialog) {
         fitDialog = new FitDialog();
+        connect(fitDialog, &FitDialog::abortRequested, this, [this]() {fitAbort = true;});
+        connect(fitDialog, &FitDialog::plotWhileFittingChanged, this, [this](bool plot) {plotWhileFitting = plot;});
+        plotWhileFitting = fitDialog->isPlotWhileFitting();
         fitDialog->show();
     }
     fitDialog->updateStats(stats);
     if(fitDialog->isPlotWhileFitting()) {
-        plotSession(/*stats.error < 0*/);
+        if(snap) {
+            snapshot = snap;
+            plotSpectrum(ui->comboBox->currentIndex());
+            ui->widget->setVisible(true);
+        }
     } else {
         ui->widget->setVisible(false);
     }
-    repaint();
-    QCoreApplication::processEvents();
-    return fitDialog->isAborted();
 }
 
 void MainWindow::on_action_Run_triggered()
 {
-    if(!session) {
+    if(!session || !worker) {
         QMessageBox::critical(this, "Error", "Session not initialized.\n");
         return;
     }
-    enableRun(false);
+    if(running) {
+        return;
+    }
     if(firstRun) {
         resetAll();
     } else {
@@ -425,52 +535,38 @@ void MainWindow::on_action_Run_triggered()
     }
     QString text = ui->editor->toPlainText();
     QTextStream stream = QTextStream(&text, QIODevice::ReadOnly);
-    size_t lineno = 0;
-    bool error = false;
+    QStringList lines;
+    while(!stream.atEnd()) {
+        lines.append(stream.readLine());
+    }
     warningCounter = 0;
     jabs_message_verbosity = (jabs_msg_level) defaultVerbosity;
-    QElapsedTimer refreshTimer;
-    refreshTimer.start();
-    QElapsedTimer runTimer;
-    runTimer.start();
-    while(!stream.atEnd() && !error) {
-        QString line = stream.readLine();
-        lineno++;
-        QString command_str = line.split(" ").first();
-        const script_command *c = script_command_find(session->commands, qPrintable(command_str));
-        if(refreshTimer.elapsed() > 200 || c && (c->f == script_fit || c->f == script_simulate)) { /* Make sure stuff gets shown before sim or fit starts, or occasionally with a timer */
-            refreshTimer.restart();
-            if(c && c->f == script_fit) {
-                statusBar()->showMessage(QString("Running a fit."));
-            } else if(c && c->f == script_simulate) {
-                statusBar()->showMessage(QString("Running a simulation."));
-            } else {
-                statusBar()->showMessage(QString("Running."));
-            }
-            //repaint();
-            QCoreApplication::processEvents();
-        }
-        if(runLine(line) < 0) {
-            error = true;
-            break;
-        }
-        if(session->file_depth > 0) {
-            if(script_process(session) < 0) {
-                error = true;
-                break;
-            }
-        }
-        //closeFitDialog(); /* if fit dialog was opened (by callback resulting in running this line), close it immediately*/
-    }
+    startWorker(lines, RUN_SCRIPT);
+}
+
+void MainWindow::onRunFinished(bool error, qsizetype lineno)
+{
+    running = false;
+    snapshot.clear();
+    bool aborted = jabs_abort_requested() || fitAbort;
+    jabs_abort_set(FALSE);
     closeFitDialog();
     enableRun(true);
-    plotSession();
     QString message;
-    if(error) {
-        message = QString("Error on line %1. Run aborted.").arg(lineno);
+    if(runMode == RUN_COMMAND_LINE) {
+        if(!error) {
+            ui->commandLineEdit->clear();
+        }
+        plotSession();
+        message = error ? QString("Command failed.") : QString("Command successful in %1 seconds.").arg(runTimer.elapsed()/1000.0);
     } else {
-        message = QString("Run successful in %1 seconds, %2 lines processed.").arg(runTimer.elapsed()/1000.0).arg(lineno);
-        firstRun = false;
+        plotSession();
+        if(error) {
+            message = aborted ? QString("Run stopped on line %1.").arg(lineno) : QString("Error on line %1. Run aborted.").arg(lineno);
+        } else {
+            message = QString("Run successful in %1 seconds, %2 lines processed.").arg(runTimer.elapsed()/1000.0).arg(lineno);
+            firstRun = false;
+        }
     }
     if(warningCounter == 1) {
         message.append(QString(" 1 warning."));
@@ -485,17 +581,27 @@ void MainWindow::on_action_Run_triggered()
 
 void MainWindow::plotSpectrum(size_t i_det)
 {
-    ui->widget->clearAll();
+    if(running) {
+        if(snapshot && i_det < snapshot->spectra.size()) {
+            plotSpectra(&snapshot->spectra[i_det], snapshot->ref);
+        }
+        return;
+    }
     if(!session || !session->fit || !session->fit->spectra || i_det >= session->fit->n_det_spectra) {
+        ui->widget->clearAll();
         ui->widget->setVisible(false);
         return;
     }
-    const jabs_histogram *ref_histo = session->fit->ref;
+    plotSpectra(&session->fit->spectra[i_det], session->fit->ref);
+}
+
+void MainWindow::plotSpectra(const result_spectra *spectra, const jabs_histogram *ref_histo)
+{
+    ui->widget->clearAll();
     if(ref_histo) {
         QCPGraph *g = ui->widget->addGraphHisto("Reference", QColor("Gray"));
         ui->widget->drawDataToGraph(g, ref_histo);
     }
-    result_spectra *spectra = &session->fit->spectra[i_det];
     if(spectra) {
         if(spectra->n_spectra > RESULT_SPECTRA_SIMULATED) {
             QCPGraph *g = ui->widget->addGraphHisto("Simulated", QColor("blue"));
@@ -738,14 +844,12 @@ void MainWindow::on_actionAbout_triggered()
 
 void MainWindow::on_commandLineEdit_returnPressed()
 {
+    if(running || !worker) {
+        return;
+    }
     warningCounter = 0;
     updateListOfVisibleGraphs();
-    int status = runLine(ui->commandLineEdit->text());
-    if(status == SCRIPT_COMMAND_SUCCESS) {
-            ui->commandLineEdit->clear();
-            plotSession();
-    }
-    closeFitDialog();
+    startWorker(QStringList(ui->commandLineEdit->text()), RUN_COMMAND_LINE);
 }
 
 void MainWindow::on_msgTextBrowser_textChanged()
@@ -881,6 +985,9 @@ void MainWindow::updateDetectorList()
 
 void MainWindow::on_comboBox_currentIndexChanged(int index)
 {
+    if(running) {
+        return;
+    }
     ui->actionPrevious_detector->setEnabled(index > 0);
     ui->actionNext_detector->setEnabled(index < session->fit->sim->n_det - 1);
     plotSpectrum(index);

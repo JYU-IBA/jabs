@@ -3,9 +3,15 @@
 
 #include <QMainWindow>
 #include <QSettings>
+#include <QElapsedTimer>
+#include <QThread>
+#include <QSharedPointer>
+#include <atomic>
+#include <vector>
 #include "highlighter.h"
 #include "fitdialog.h"
 #include "plotdialog.h"
+#include "jabsworker.h"
 
 extern "C" {
 #include <jibal_units.h>
@@ -26,6 +32,24 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
 
+struct PlotSnapshot { /* Copy of spectra (of all detectors), made by the worker thread during a fit, for plotting in the GUI thread */
+    std::vector<result_spectra> spectra;
+    jabs_histogram *ref = nullptr;
+    PlotSnapshot() = default;
+    PlotSnapshot(const PlotSnapshot &) = delete;
+    PlotSnapshot &operator=(const PlotSnapshot &) = delete;
+    ~PlotSnapshot() {
+        for(result_spectra &s : spectra) {
+            result_spectra_free(&s);
+        }
+        jabs_histogram_free(ref);
+    }
+};
+
+Q_DECLARE_METATYPE(fit_stats)
+Q_DECLARE_METATYPE(jabs_msg_level)
+Q_DECLARE_METATYPE(QSharedPointer<PlotSnapshot>)
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -33,12 +57,14 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     void addMessage(jabs_msg_level level, const char *msg);
-    int fitCallback(fit_stats stats);
+    int fitCallback(fit_stats stats); /* Called by the worker thread during a fit, must not touch widgets */
     ~MainWindow();
 
 signals:
     void runFinished();
     void sendMessage(jabs_msg_level level, QString msg);
+    void startRun(const QStringList &lines); /* Handled by the worker thread */
+    void fitProgress(fit_stats stats, QSharedPointer<PlotSnapshot> snapshot); /* Emitted by the worker thread */
 
 public slots:
     void openFile(const QString &filename);
@@ -48,6 +74,12 @@ public slots:
 
 private slots:
     void receiveMessage(jabs_msg_level level, QString msg);
+
+    void onRunFinished(bool error, qsizetype lineno);
+
+    void onFitProgress(fit_stats stats, QSharedPointer<PlotSnapshot> snapshot);
+
+    void stopRun();
 
     void on_actionPreferences_triggered();
 
@@ -108,10 +140,14 @@ private slots:
     void on_actionPrevious_detector_triggered();
 
 private:
+    enum RunMode {RUN_SCRIPT, RUN_COMMAND_LINE};
     void updateWindowTitle();
     void setFilename(const QString &filename);
     int runLine(const QString &line);
+    void startWorker(const QStringList &lines, RunMode mode);
+    void stopWorkerThread();
     void plotSession(bool error = false);
+    void plotSpectra(const result_spectra *spectra, const jabs_histogram *ref_histo);
     bool askToSave();
     void closeEvent(QCloseEvent *event);
     void enableRun(bool enabled);
@@ -145,5 +181,14 @@ private:
     int warningCounter;
     int defaultVerbosity;
     QColor messageColor;
+    QThread *workerThread;
+    JabsWorker *worker;
+    bool running; /* Worker is running. GUI must not access session while this is true. */
+    RunMode runMode;
+    QElapsedTimer runTimer;
+    QAction *actionStop;
+    std::atomic<bool> fitAbort; /* Graceful abort of fit (after current iteration), set by fit dialog */
+    std::atomic<bool> plotWhileFitting;
+    QSharedPointer<PlotSnapshot> snapshot; /* Latest spectra received during a run */
 };
 #endif // MAINWINDOW_H

@@ -22,6 +22,10 @@ public:
     void updateStats(fit_stats stats);
     ~FitDialog();
 
+signals:
+    void abortRequested();
+    void plotWhileFittingChanged(bool plot);
+
 private slots:
     void on_plotCheckBox_stateChanged(int arg1);
 

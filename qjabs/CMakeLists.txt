@@ -112,6 +112,7 @@ set(PROJECT_SOURCES
        main.cpp
        mainwindow.cpp mainwindow.h mainwindow.ui
        fitdialog.cpp fitdialog.h fitdialog.ui
+       jabsworker.cpp jabsworker.h
        qcustomplot.cpp qcustomplot.h
        spectrumplot.cpp spectrumplot.h
        codeeditor.cpp codeeditor.h

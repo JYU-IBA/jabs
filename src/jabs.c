@@ -31,6 +31,7 @@
 #include "jabs.h"
 #include "defaults.h"
 #include "message.h"
+#include "generic.h"
 #include "stop.h"
 #include "win_compat.h"
 
@@ -914,6 +915,10 @@ int simulate_with_roughness(sim_workspace *ws) {
         ion_set_angle(&ws->ion, 0.0, 0.0);
         ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
         sample_thickness_recalculate(sample_rough);
+        if(jabs_abort_requested()) {
+            status = -1;
+            break;
+        }
         status = simulate(&ws->ion, depth_seek(ws->sample, 0.0), ws, sample_rough);
         if(status < 0) {
             break;
@@ -1047,6 +1052,10 @@ int simulate_with_ds(sim_workspace *ws) {
         if(last) {
             break;
         }
+        if(jabs_abort_requested()) {
+            status = -1;
+            break;
+        }
         const double polar_offset = ds_sample_offset(i_depth, DUAL_SCATTER_SAMPLE_ALPHA_POLAR); /* Position of sample point inside polar angle bin */
         const double azi_offset = ds_sample_offset(i_depth, DUAL_SCATTER_SAMPLE_ALPHA_AZI); /* Offset of azimuthal angles (in steps) */
         double E_front = ion1.E;
@@ -1165,6 +1174,10 @@ int simulate_with_ds(sim_workspace *ws) {
     ws->stragg.ms = stop_ms_orig;
     ws->ms_spread = ms_spread_orig;
     ws->ds_running = FALSE;
+    if(status < 0) {
+        jabs_message(MSG_ERROR, "Dual scattering simulation aborted.\n");
+        return EXIT_FAILURE;
+    }
     jabs_message(MSG_VERBOSE, "\nDual scattering simulation complete.\n");
     sim_workspace_calculate_sum_spectra(ws);
     return EXIT_SUCCESS;

@@ -39,6 +39,7 @@ FitDialog::~FitDialog()
 void FitDialog::on_buttonBox_rejected()
 {
     abort = true;
+    emit abortRequested();
 }
 
 
@@ -46,5 +47,6 @@ void FitDialog::on_plotCheckBox_stateChanged(int arg1)
 {
     plot = (arg1 == Qt::Checked);
     settings.setValue("plotWhileFitting", plot);
+    emit plotWhileFittingChanged(plot);
 }
 

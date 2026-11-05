@@ -45,6 +45,8 @@ int jabs_unit_convert(const jibal_units *units, char type, const char *str, doub
 int jabs_unit_sanity_check(double value, int type); /* returns 1 if no issue was found, returns 0 and prints a warning via jabs_message() if value is suspicious, and returns -1 for really crazy stuff */
 int jabs_str_to_size_t(const char *str, size_t *out);
 double jabs_clock(void);
+void jabs_abort_set(int abort); /* Requests (TRUE) or clears (FALSE) abort of a running simulation or fit. Can be called from another thread (e.g. GUI). */
+int jabs_abort_requested(void); /* Long calculations check this regularly and stop (with an error) if abort was requested */
 #ifdef __cplusplus
 }
 #endif

@@ -139,6 +139,10 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
 #pragma omp for schedule(dynamic)
     for(j = 0; j < n; j++) {
         //fprintf(stderr, "Thread id %i got %zu.\n", omp_get_thread_num(), j);
+        if(error || jabs_abort_requested()) { /* An OpenMP loop can not be broken, but remaining columns are skipped */
+            error = TRUE;
+            continue;
+        }
         jacobian_space *spc = &fit->jspace[j];
         fit_variable *var = spc->var;
         size_t i_start, i_stop;
@@ -175,6 +179,9 @@ int fit_deriv_function(const gsl_vector *x, void *params, gsl_matrix *J) {
     fit_deriv_cleanup_jspaces(fit);
     double end = jabs_clock();
     fit->stats.cputime_iter += (end - start);
+    if(jabs_abort_requested()) {
+        fit->stats.error = FIT_ERROR_ABORTED;
+    }
     return error ? GSL_FAILURE : GSL_SUCCESS;
 }
 
@@ -192,6 +199,10 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     DEBUGMSG("Fit iteration %zu call %zu. Size of vector x: %zu, f: %zu. %zu active fit parameters.",
              fit->stats.iter, fit->stats.iter_call, x->size, f->size, fit->fit_params->n_active);
 
+    if(jabs_abort_requested()) {
+        fit->stats.error = FIT_ERROR_ABORTED;
+        return GSL_FAILURE;
+    }
     if(sim_sanity_check(fit->sim) == GSL_FAILURE) {
         fit->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
@@ -939,6 +950,9 @@ int jabs_gsl_multifit_nlinear_driver(const size_t maxiter, const double xtol, co
                 return FIT_ERROR_ABORTED;
             }
         }
+        if(jabs_abort_requested()) {
+            return FIT_ERROR_ABORTED;
+        }
         if(iter == 0)
             continue;
         /* test for convergence */
@@ -1220,7 +1234,7 @@ int fit_do(fit_data *fit) {
         status = gsl_multifit_nlinear_winit(x, &wts.vector, fdf, w);
         if(status != 0) {
             jabs_message(MSG_ERROR, "Fit aborted in initialization.\n");
-            fit->stats.error = FIT_ERROR_INIT;
+            fit->stats.error = jabs_abort_requested() ? FIT_ERROR_ABORTED : FIT_ERROR_INIT;
             break;
         }
         /* compute initial cost function */
