@@ -818,24 +818,26 @@ int assign_stopping(jibal_gsto *gsto, const simulation *sim) {
     return fail ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
+static size_t roughness_subspectra(const sample_range *r, double rough_layer_multiplier) { /* Number of subspectra for gamma roughness, zero if layer is not rough (gamma) */
+    if(r->rough.model != ROUGHNESS_GAMMA) {
+        return 0;
+    }
+    size_t n = (size_t)(r->rough.n * rough_layer_multiplier);
+    if(n > ROUGHNESS_SUBSPECTRA_MAXIMUM) { /* Artificial limit to n */
+        n = ROUGHNESS_SUBSPECTRA_MAXIMUM;
+    }
+    return n;
+}
+
 int simulate_with_roughness(sim_workspace *ws) {
+    /* Note that ws->sample must not be modified here. It can be shared by several workspaces simulated in parallel (e.g. Jacobian of fit). */
     int status = 0;
     const double fluence_original = ws->fluence;
+    const double rough_layer_multiplier = ws->params->rough_layer_multiplier;
     size_t n_rl = 0; /* Number of rough layers */
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
-        sample_range *r = &(ws->sample->ranges[i]);
-        if(r->rough.model == ROUGHNESS_FILE) {
-            n_rl++;
-            continue;
-        }
-        r->rough.n *= ws->params->rough_layer_multiplier;
-        if(r->rough.n > ROUGHNESS_SUBSPECTRA_MAXIMUM) { /* Artificial limit to n */
-            r->rough.n = ROUGHNESS_SUBSPECTRA_MAXIMUM;
-        }
-        if(r->rough.n == 0) {
-            r->rough.model = ROUGHNESS_NONE;
-        }
-        if(r->rough.model == ROUGHNESS_GAMMA) {
+        const sample_range *r = &(ws->sample->ranges[i]);
+        if(r->rough.model == ROUGHNESS_FILE || roughness_subspectra(r, rough_layer_multiplier) > 0) {
             n_rl++;
         }
     }
@@ -852,14 +854,15 @@ int simulate_with_roughness(sim_workspace *ws) {
         return -1;
     }
     for(size_t i = 0; i < ws->sample->n_ranges; i++) {
-        sample_range *r = &(ws->sample->ranges[i]);
-        if(r->rough.model == ROUGHNESS_NONE) {
+        const sample_range *r = &(ws->sample->ranges[i]);
+        const size_t n_sub = roughness_subspectra(r, rough_layer_multiplier);
+        if(r->rough.model != ROUGHNESS_FILE && n_sub == 0) {
             continue;
         }
         tpds[i_rl] = NULL;
         if(r->rough.model == ROUGHNESS_GAMMA) {
-            DEBUGMSG("Range %zu is rough (gamma), amount %g tfu, n = %zu spectra", i, ws->sample->ranges[i].rough.x/C_TFU, ws->sample->ranges[i].rough.n);
-            tpds[i_rl] = thickness_probability_table_gamma(r->x, r->rough.x, r->rough.n);
+            DEBUGMSG("Range %zu is rough (gamma), amount %g tfu, n = %zu spectra", i, ws->sample->ranges[i].rough.x/C_TFU, n_sub);
+            tpds[i_rl] = thickness_probability_table_gamma(r->x, r->rough.x, n_sub);
         } else if(r->rough.model == ROUGHNESS_FILE) {
             DEBUGMSG("Range %zu is rough (FILE), filename = \"%s\"", i, r->rough.file->filename);
             tpds[i_rl] = thickness_probability_table_copy(r->rough.file->tpd);

@@ -49,7 +49,7 @@ int fit_detector(const jibal *jibal, const fit_data_det *fdd, const simulation *
         jabs_message(MSG_ERROR, "No detector set.\n");
         return EXIT_FAILURE;
     }
-    detector_update(det); /* non-const pointer inside const... not great */
+    /* Detector must be up to date (detector_update()) before this is called. This can be called in parallel (OpenMP), so shared data must not be modified here. */
     sim_workspace *ws = sim_workspace_init(jibal, sim, det);
     if(!ws) {
         jabs_message(MSG_ERROR, "Could not initialize workspace of detector %s.\n", det->name);
@@ -94,6 +94,7 @@ void fit_deriv_prepare_jspaces(const gsl_vector *x, fit_data *fit) {
             case FIT_VARIABLE_DETECTOR:
                 spc->sim.det = spc->det;
                 spc->sim.det[var->i_det] = detector_clone(fit->sim->det[var->i_det]);
+                detector_update(spc->sim.det[var->i_det]); /* Here, not in parallel code (fit_detector()) */
                 break;
             default:
                 break;
@@ -200,6 +201,9 @@ int fit_function(const gsl_vector *x, void *params, gsl_vector *f) {
     if(!fit->sim->sample) {
         fit->stats.error = FIT_ERROR_SANITY;
         return GSL_FAILURE;
+    }
+    for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) { /* Before simulations, which can be parallel. Jacobian (fit_deriv_function()) is always computed after this. */
+        detector_update(fit->sim->det[i_det]);
     }
     double start = jabs_clock();
     volatile int error = FALSE;
