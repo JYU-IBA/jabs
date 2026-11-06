@@ -107,12 +107,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->msgTextBrowser->append("\n");
     ui->msgTextBrowser->ensureCursorVisible();
-    ui->editor->blockSignals(true); /* extremely dirty hack:
-    on Linux (for whatever reason) textChanged() gets emitted although the text does not change.
-    Maybe it is related to highlighter or clipboard, who knows.
-
-    The workaround is to wait 100 ms (0 was not enough, 50 ms was not enough) and then allow signals again. */
-    QTimer::singleShot(100, this, &MainWindow::postInit);
+    /* Modification flag of the document, not textChanged(), which is emitted also when only formats change (e.g. syntax highlighting after colors are applied) */
+    connect(ui->editor->document(), &QTextDocument::modificationChanged, this, &MainWindow::setNeedsSaving);
 }
 
 void MainWindow::addMessage(jabs_msg_level level, const char *msg)
@@ -633,6 +629,9 @@ void MainWindow::changeEvent(QEvent *event)
 void MainWindow::setNeedsSaving(bool value)
 {
     needsSaving = value;
+    if(!value) { /* Text as it is now is saved (or new) */
+        ui->editor->document()->setModified(false);
+    }
     updateWindowTitle();
 }
 
@@ -985,13 +984,6 @@ void MainWindow::on_action_New_File_triggered()
 }
 
 
-void MainWindow::on_editor_textChanged()
-{
-    if(!needsSaving) {
-        setNeedsSaving(true);
-    }
-}
-
 
 void MainWindow::on_action_Save_File_as_triggered()
 {
@@ -1096,11 +1088,6 @@ void MainWindow::openRecentFile()
 void MainWindow::openLink(const QUrl &link)
 {
     QDesktopServices::openUrl(link);
-}
-
-void MainWindow::postInit()
-{
-    ui->editor->blockSignals(false);
 }
 
 void MainWindow::on_action_Plot_triggered()

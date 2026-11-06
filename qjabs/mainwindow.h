@@ -116,8 +116,6 @@ private slots:
 
     void on_action_New_File_triggered();
 
-    void on_editor_textChanged();
-
     void on_action_Save_File_as_triggered();
 
     bool saveScriptToFile(const QString &filename);
@@ -137,8 +135,6 @@ private slots:
     void openRecentFile();
 
     void openLink(const QUrl &link);
-
-    void postInit();
 
     void on_actionIDF_triggered();
 
