@@ -22,11 +22,19 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+typedef struct jabs_gsto_table { /* Stopping or straggling of an incident ion in one element (Z2) */
+    const gsto_file_t *file; /* NULL if not assigned */
+    const double *data; /* Values at file->em */
+    double unit_factor; /* Converts data to SI units */
+    double *lnem; /* ln(em) at nodes, NULL if interpolation is linear in em */
+    double *deriv; /* Derivative of data with respect to ln(em) at nodes, of a cubic spline through data in ln(em). NULL if interpolation is linear in em. */
+    double lnem0; /* ln(em) of the first node */
+    double inv_dlnem; /* Inverse of node spacing in ln(em) if nodes are equally spaced in ln(em) (speedup), otherwise zero */
+} jabs_gsto_table;
+
 typedef struct jabs_gsto_assignment {
-        const gsto_file_t *stopfile;
-        const double *stopdata;
-        const gsto_file_t *straggfile;
-        const double *straggdata;
+    jabs_gsto_table stop;
+    jabs_gsto_table stragg;
 } jabs_ion_gsto_data;
 
 typedef struct jabs_ion_gsto {
@@ -72,6 +80,9 @@ void ion_set_angle(ion *ion, double theta, double phi);
 double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, double E);
 void ion_rotate(ion *ion, double theta2, double phi2);
 void ion_print(FILE *f, const ion *ion);
+void ion_gsto_table_init(jabs_gsto_table *t, const gsto_file_t *file, const double *data, double unit_factor);
+void ion_gsto_table_free(jabs_gsto_table *t);
+double ion_gsto_table_eval(const jabs_gsto_table *t, double em);
 jabs_ion_gsto *ion_gsto_new(const jibal_isotope *incident, const jibal_gsto *gsto);
 jabs_ion_gsto *ion_gsto_shared(jabs_ion_gsto *ion_gsto);
 void ion_gsto_free(jabs_ion_gsto *ion_gsto);

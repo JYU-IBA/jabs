@@ -23,6 +23,7 @@
 #include <jibal.h>
 #include <jibal_units.h>
 #include <gsl/gsl_math.h>
+#include <gsl/gsl_sort.h>
 #include "defaults.h"
 #include "ion.h"
 #include "sample.h"
@@ -359,11 +360,122 @@ static int scenario_run(jibal *jibal, const scenario *sc) {
     return EXIT_SUCCESS;
 }
 
+/* Checks spline interpolation (see ion_gsto_table_init()) of all stopping and straggling tables against linear interpolation in em: the largest relative difference,
+ * overshoot (spline leaves the range of the two nodes of a segment where the data is monotonic over four nodes) and negative values. Interpolation error is estimated by
+ * a leave-out test: table of every other node is used to estimate the left-out nodes. */
+static void tables_check(jibal_gsto *gsto) {
+    fprintf(stdout, "%-12s %5s %6s %10s %16s %9s %10s %9s %6s | leave-out rel. error (median, max): %-19s %-19s\n", "file", "type", "points", "combos", "max |spl-lin|/lin", "at Z1-Z2", "overshoots", "max ovs", "neg", "linear", "spline");
+    for(size_t i_file = 0; i_file < gsto->n_files; i_file++) {
+        gsto_file_t *file = &gsto->files[i_file];
+        if(file->xpoints < 3) {
+            continue;
+        }
+        jibal_gsto_assign_range(gsto, file->Z1_min, file->Z1_max, file->Z2_min, file->Z2_max, file); /* Data is loaded for assigned combinations only */
+        if(!jibal_gsto_load(gsto, FALSE, file)) {
+            fprintf(stderr, "Could not load %s.\n", file->name);
+            continue;
+        }
+        double max_rel = 0.0;
+        int max_Z1 = 0, max_Z2 = 0;
+        size_t n_combos = 0, n_overshoot = 0, n_negative = 0;
+        double max_overshoot = 0.0; /* Relative to segment value */
+        size_t n_half = (file->xpoints + 1) / 2;
+        double *err_lin = NULL, *err_spl = NULL;
+        size_t n_err = 0;
+        gsto_file_t half = *file;
+        half.xpoints = n_half;
+        half.xscale = GSTO_XSCALE_ARBITRARY; /* jibal_gsto_em_to_index() must not use the speedups of the original file */
+        half.em = malloc(n_half * sizeof(double));
+        double *half_data = malloc(n_half * sizeof(double));
+        for(size_t i = 0; i < n_half; i++) {
+            half.em[i] = file->em[2 * i];
+        }
+        for(int Z1 = file->Z1_min; Z1 <= file->Z1_max; Z1++) {
+            for(int Z2 = file->Z2_min; Z2 <= file->Z2_max; Z2++) {
+                const double *data = jibal_gsto_file_get_data(file, Z1, Z2);
+                if(!data || data[file->xpoints / 2] <= 0.0) {
+                    continue;
+                }
+                n_combos++;
+                jabs_gsto_table t;
+                ion_gsto_table_init(&t, file, data, 1.0);
+                if(!t.deriv) {
+                    continue;
+                }
+                for(size_t i = 0; i + 1 < file->xpoints; i++) {
+                    int monotonic = i > 0 && i + 2 < file->xpoints && ((data[i - 1] <= data[i] && data[i] <= data[i + 1] && data[i + 1] <= data[i + 2]) || (data[i - 1] >= data[i] && data[i] >= data[i + 1] && data[i + 1] >= data[i + 2]));
+                    double lo = GSL_MIN_DBL(data[i], data[i + 1]), hi = GSL_MAX_DBL(data[i], data[i + 1]);
+                    int overshoot = FALSE;
+                    for(int k = 1; k < 16; k++) {
+                        double em = exp(t.lnem[i] + (t.lnem[i + 1] - t.lnem[i]) * k / 16.0);
+                        double spl = ion_gsto_table_eval(&t, em);
+                        double lin = jibal_linear_interpolation(file->em[i], file->em[i + 1], data[i], data[i + 1], em);
+                        if(spl < 0.0) {
+                            n_negative++;
+                        }
+                        if(monotonic && (spl < lo - 1e-9 * hi || spl > hi + 1e-9 * hi)) {
+                            overshoot = TRUE;
+                            max_overshoot = GSL_MAX_DBL(max_overshoot, GSL_MAX_DBL(lo - spl, spl - hi) / hi);
+                        }
+                        double rel = fabs(spl - lin) / GSL_MAX_DBL(fabs(lin), 1e-6 * fabs(data[file->xpoints / 2]));
+                        if(rel > max_rel) {
+                            max_rel = rel;
+                            max_Z1 = Z1;
+                            max_Z2 = Z2;
+                        }
+                    }
+                    n_overshoot += overshoot;
+                }
+                ion_gsto_table_free(&t);
+                for(size_t i = 0; i < n_half; i++) {
+                    half_data[i] = data[2 * i];
+                }
+                jabs_gsto_table th;
+                ion_gsto_table_init(&th, &half, half_data, 1.0);
+                err_lin = realloc(err_lin, (n_err + file->xpoints) * sizeof(double));
+                err_spl = realloc(err_spl, (n_err + file->xpoints) * sizeof(double));
+                for(size_t i = 1; i + 1 < n_half * 2 - 1 && i < file->xpoints; i += 2) {
+                    double em = file->em[i];
+                    if(data[i] <= 0.0) {
+                        continue;
+                    }
+                    size_t j = i / 2;
+                    double lin = jibal_linear_interpolation(half.em[j], half.em[j + 1], half_data[j], half_data[j + 1], em);
+                    err_lin[n_err] = fabs(lin / data[i] - 1.0);
+                    err_spl[n_err] = th.deriv ? fabs(ion_gsto_table_eval(&th, em) / data[i] - 1.0) : err_lin[n_err];
+                    n_err++;
+                }
+                ion_gsto_table_free(&th);
+            }
+        }
+        free(half.em);
+        free(half_data);
+        double med_lin = 0.0, max_lin = 0.0, med_spl = 0.0, max_spl = 0.0;
+        if(n_err) {
+            gsl_sort(err_lin, 1, n_err);
+            gsl_sort(err_spl, 1, n_err);
+            med_lin = err_lin[n_err / 2];
+            max_lin = err_lin[n_err - 1];
+            med_spl = err_spl[n_err / 2];
+            max_spl = err_spl[n_err - 1];
+        }
+        free(err_lin);
+        free(err_spl);
+        fprintf(stdout, "%-12s %5s %6zu %10zu %16.2e %5i-%-3i %10zu %9.2e %6zu | %9.2e %9.2e %9.2e %9.2e\n", file->name, file->type == GSTO_STO_STRAGG ? "strg" : "stop", file->xpoints, n_combos,
+                max_rel, max_Z1, max_Z2, n_overshoot, max_overshoot, n_negative, med_lin, max_lin, med_spl, max_spl);
+    }
+}
+
 int main(int argc, char **argv) {
     jibal *jibal = jibal_init(NULL);
     if(jibal->error) {
         fprintf(stderr, "Initializing JIBAL failed with error code %i (%s)\n", jibal->error, jibal_error_string(jibal->error));
         return EXIT_FAILURE;
+    }
+    if(argc > 1 && strcmp(argv[1], "--tables") == 0) {
+        tables_check(jibal->gsto);
+        jibal_free(jibal);
+        return EXIT_SUCCESS;
     }
     fprintf(stdout, "Errors are (test - reference), evaluated at each step of the tested trajectory. Relative sigma errors where reference sigma > %g keV.\n"
                     "evals = number of passes over sample isotopes (stop_sample() calls or equivalent).\n", SIGMA_REL_THRESHOLD / C_KEV);

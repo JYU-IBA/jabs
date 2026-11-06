@@ -75,35 +75,11 @@ typedef struct stop_sw {
     double S_x; /* Derivative of stopping with respect to (perpendicular) depth at constant energy, i.e. due to concentration gradients */
 } stop_sw;
 
-static double stop_gsto(const ion *incident, gsto_stopping_type type, int Z2, double em) { /* Electronic stopping or straggling of incident ion in element Z2 */
+static double stop_gsto(const ion *incident, gsto_stopping_type type, int Z2, double em) { /* Electronic stopping or straggling of incident ion in element Z2, see ion_gsto_table_init() */
     const jabs_ion_gsto_data *gd = &incident->ion_gsto->gsto_data[Z2];
-    const gsto_file_t *file;
-    const double *data;
-    double unit_factor = 1.0;
-    if(type == GSTO_STO_STRAGG) {
-        file = gd->straggfile;
-        data = gd->straggdata;
-        if(file->straggunit == GSTO_STRAGG_UNIT_BOHR) {
-            unit_factor = jibal_stragg_bohr(incident->Z, Z2);
-        }
-    } else {
-        file = gd->stopfile;
-        data = gd->stopdata;
-        if(file->stounit == GSTO_STO_UNIT_EV15CM2) {
-            unit_factor = C_EV_TFU;
-        }
-    }
-    assert(file);
-    if(em < file->em[0]) {
-        DEBUGMSG("Energy %g keV/u below GSTO file minimum %g keV/u, returning value corresponding to minimum", em / (C_KEV / C_U), file->em[0] / (C_KEV / C_U));
-        return unit_factor * data[0];
-    }
-    if(em > file->em[file->xpoints - 1]) {
-        DEBUGMSG("Energy %g keV/u above GSTO file maximum %g keV/u, returning value corresponding to maximum", em / (C_KEV / C_U), file->em[file->xpoints - 1] / (C_KEV / C_U));
-        return unit_factor * data[file->xpoints - 1];
-    }
-    int lo = jibal_gsto_em_to_index(file, em);
-    return unit_factor * jibal_linear_interpolation(file->em[lo], file->em[lo + 1], data[lo], data[lo + 1], em);
+    const jabs_gsto_table *t = (type == GSTO_STO_STRAGG) ? &gd->stragg : &gd->stop;
+    assert(t->file);
+    return ion_gsto_table_eval(t, em);
 }
 
 static void stop_sample_sw(const jabs_stop *stop, const jabs_stop *stragg, const ion *incident, const sample *sample, const depth depth, double E, stop_sw *sw) { /* Stopping, straggling and stopping gradient in one go */
