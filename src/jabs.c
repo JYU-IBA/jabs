@@ -482,6 +482,8 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         b_prev = b;
         b = &sim_r->bricks[i_brick];
         b->valid = TRUE; /* Will be invalidated if necessary */
+        b->S_geo_x = 0.0;
+        b->S_geo_y = 0.0;
         d_before = d_after;
         DEBUGVERBOSEMSG("E = %g keV (incident), i_brick = %zu", ion1.E / C_KEV, i_brick);
         if(ion1.E < des_min->E) {
@@ -517,10 +519,6 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         b->d = d_after;
         b->E_0 = ion1.E;
         b->S_0 = ion1.S;
-        if(ws->params->geostragg) {
-            b->S_geo_x = geostragg(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, sample, sim_r, &(g->x), d_after, b->E_0);
-            b->S_geo_y = geostragg(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, sample, sim_r, &(g->y), d_after, b->E_0);
-        }
         sim_reaction_product_energy_and_straggling(sim_r, &ion1); /* sets sim_r->p */
         double sigma_conc;
 
@@ -551,6 +549,10 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
         }
         b->E_s = sim_r->p.E;
         b->S_s = sim_r->p.S;
+        if(ws->params->geostragg && b->valid) { /* Geometric straggling is not needed for discarded bricks */
+            b->S_geo_x = geostragg(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, sample, sim_r, &(g->x), d_after, b->E_0);
+            b->S_geo_y = geostragg(&ws->stop, &ws->stragg, &ws->params->exiting_stop_params, sample, sim_r, &(g->y), d_after, b->E_0);
+        }
 
         double E_deriv;
         double P_foil = 1.0; /* Propagation factor of energy differences through detector foil */
