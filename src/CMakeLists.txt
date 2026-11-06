@@ -51,6 +51,12 @@ add_executable(jabs
 add_executable(amsel amsel.c ms.c)
 target_link_libraries(amsel PRIVATE jibal PRIVATE GSL::gsl)
 
+add_executable(stop_accuracy EXCLUDE_FROM_ALL
+        stop_accuracy.c stop.c ion.c sample.c nuclear_stopping.c ms.c message.c roughness.c generic.c rotate.c sim_calc_params.c prob_dist.c
+        "$<$<BOOL:${WIN32}>:win_compat.c>"
+        )
+target_link_libraries(stop_accuracy PRIVATE jibal PRIVATE GSL::gsl PRIVATE "$<$<BOOL:${UNIX}>:m>")
+
 target_include_directories(jabs PRIVATE ${GETOPT_INCLUDE_DIR})
 
 
