@@ -33,6 +33,7 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->exiting_stop_params.min = EXITING_STOP_STEP_MIN_DEFAULT;
     p->exiting_stop_params.max = EXITING_STOP_STEP_MAX_DEFAULT;
     p->exiting_stop_params.max_rel = EXITING_STOP_STEP_MAX_REL_DEFAULT;
+    p->exiting_stop_accuracy = EXITING_STOP_ACCURACY_DEFAULT;
     p->brick_width_sigmas = BRICK_WIDTH_SIGMAS_DEFAULT;
     p->n_bricks_max = 0; /* automatic */
     p->geostragg = FALSE;
@@ -107,6 +108,7 @@ sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
     p->exiting_stop_params.sigmas *= 0.5;
     p->incident_stop_params.max_rel *= 0.5;
     p->exiting_stop_params.max_rel *= 0.5;
+    p->exiting_stop_accuracy = EXITING_STOP_ACCURACY_ACCURATE; /* Adaptive (Dormand-Prince) steps. Accuracy is mostly determined by max_rel above, see sim_calc_params.h. */
     p->brick_width_sigmas *= 0.25;
     p->mean_energy_after_reaction_accurate = TRUE;
     return p;
@@ -220,6 +222,7 @@ void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_lev
         jabs_message(msg_level, "maximum step for exiting ions = %.3lf keV\n", params->exiting_stop_params.max / C_KEV);
         jabs_message(msg_level, "maximum step for exiting ions relative to energy = %g (0 = no limit)\n", params->exiting_stop_params.max_rel);
     }
+    jabs_message(msg_level, "accuracy of adaptive steps for exiting ions = %.3lf eV (0 = fixed steps)\n", params->exiting_stop_accuracy / C_EV);
     jabs_message(msg_level, "stopping RK4 = %s\n", params->rk4?"true":"false");
     if(params->n_bricks_max) {
         jabs_message(msg_level, "maximum number of bricks = %zu\n", params->n_bricks_max);

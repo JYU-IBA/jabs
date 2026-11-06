@@ -61,6 +61,10 @@ typedef struct sim_calc_params {
     int gaussian_accurate; /* If this is FALSE an approximative gaussian CDF is used in convolution of spectra, otherwise function from GSL is used. */
     jabs_stop_step_params incident_stop_params;
     jabs_stop_step_params exiting_stop_params;
+    double exiting_stop_accuracy; /* Exiting ion steps are adaptive (Dormand-Prince), estimated energy error per step is about this. Zero for fixed steps (see exiting_stop_params).
+                                   * Steps are also limited by exiting_stop_params.max and .max_rel (or .step if given). The error estimate is reliable only when steps are short
+                                   * compared to node spacing of stopping tables, which is what .max_rel ensures, so in practice .max_rel determines the accuracy and adaptive
+                                   * steps mostly allow longer steps (up to the limits) than the fixed steps based on straggling. */
     double ds_incident_stop_step_factor;
     double brick_width_sigmas;
     double rough_layer_multiplier; /* Multiply given (or default) number of subspectra when calculating rough layers. */

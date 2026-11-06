@@ -143,6 +143,8 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
     ws->stop.type = GSTO_STO_TOT;
     ws->stop.gsto = jibal->gsto;
     ws->stop.rk4 = ws->params->rk4;
+    ws->stop.accuracy = ws->params->exiting_stop_accuracy;
+    ws->stop.stragg_accuracy = EXITING_STOP_STRAGG_ACCURACY;
     ws->stop.emin = ws->emin_calc;
     ws->ms = NULL;
     ws->ms_spread = (ws->params->ms != MS_MODEL_NONE);

@@ -69,12 +69,6 @@ void stop_ms_step(const ms_model *ms, ion *ion, const sample *sample, const dept
     }
 }
 
-typedef struct stop_sw {
-    double S; /* Stopping */
-    double W; /* Straggling (energy loss variance per unit path length) */
-    double S_x; /* Derivative of stopping with respect to (perpendicular) depth at constant energy, i.e. due to concentration gradients */
-} stop_sw;
-
 static double stop_gsto(const ion *incident, gsto_stopping_type type, int Z2, double em) { /* Electronic stopping or straggling of incident ion in element Z2, see ion_gsto_table_init() */
     const jabs_ion_gsto_data *gd = &incident->ion_gsto->gsto_data[Z2];
     const jabs_gsto_table *t = (type == GSTO_STO_STRAGG) ? &gd->stragg : &gd->stop;
@@ -236,6 +230,142 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
     return fulldepth; /*  Stopping is calculated in material the usual way, but we only report progress perpendicular to the sample. If incident->angle is 45 deg, cosine is 0.7-ish. */
 }
 
+/* Dormand-Prince 5(4): nodes, stages (the last row is the fifth order solution) and error estimate coefficients (difference of fifth and fourth order solutions).
+ * The last stage is evaluated at the fifth order solution and it is reused as the first stage of the next step. */
+static const double dp_c[7] = {0.0, 1.0 / 5.0, 3.0 / 10.0, 4.0 / 5.0, 8.0 / 9.0, 1.0, 1.0};
+static const double dp_a[7][6] = {
+        {0.0},
+        {1.0 / 5.0},
+        {3.0 / 40.0, 9.0 / 40.0},
+        {44.0 / 45.0, -56.0 / 15.0, 32.0 / 9.0},
+        {19372.0 / 6561.0, -25360.0 / 2187.0, 64448.0 / 6561.0, -212.0 / 729.0},
+        {9017.0 / 3168.0, -355.0 / 33.0, 46732.0 / 5247.0, 49.0 / 176.0, -5103.0 / 18656.0},
+        {35.0 / 384.0, 0.0, 500.0 / 1113.0, 125.0 / 192.0, -2187.0 / 6784.0, 11.0 / 84.0}
+};
+#define STOP_ADAPTIVE_SAFETY (0.9)
+#define STOP_ADAPTIVE_FACTOR_MIN (0.2) /* Smallest and largest change in step from one step to the next */
+#define STOP_ADAPTIVE_FACTOR_MAX (2.0)
+static const double dp_e[7] = {71.0 / 57600.0, 0.0, -71.0 / 16695.0, 71.0 / 1920.0, -17253.0 / 339200.0, 22.0 / 525.0, -1.0 / 40.0};
+
+depth stop_step_adaptive(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, const sample *sample, depth depth_before, double step, stop_adaptive *state) {
+    /* Same differential equations for E and u as in stop_step(), but integrated with Dormand-Prince 5(4) and the step (path length) is chosen so that the estimated
+     * error of energy is about stop->accuracy and relative error of u is about stop->stragg_accuracy. The step is also limited by energy loss "step" and by range
+     * boundaries. The error estimate of a step only determines the next step, steps are not rejected (and retried with a shorter step). This keeps the result a
+     * continuous function of the initial conditions and the sample, which is important for fitting (numerical derivatives). */
+    depth depth_next = stop_next_crossing(incident, sample, &depth_before);
+    double h_max_perp = depth_next.x - depth_before.x;
+    depth_before.i = depth_next.i;
+    const double E = incident->E;
+    stop_sw sw[7];
+    if(state->valid && state->d_end.i == depth_before.i && state->d_end.x == depth_before.x && state->E_end == E) {
+        sw[0] = state->sw_end;
+    } else {
+        stop_sample_sw(stop, stragg, incident, sample, depth_before, E, &sw[0]);
+        state->n_evals++;
+    }
+    state->valid = FALSE;
+    const double k1 = sw[0].S;
+    if(k1 < STOP_STEP_MINIMUM_STOPPING) { /* See stop_step() */
+        if(STOP_STEP_DEPTH_FALLBACK > h_max_perp) {
+            return depth_next;
+        }
+        depth_before.x += STOP_STEP_DEPTH_FALLBACK;
+        return depth_before;
+    }
+    const double h_max = h_max_perp * incident->inverse_cosine_theta; /* Path length to range boundary, positive */
+    double h = step / k1;
+    if(state->h > 0.0) {
+        h = GSL_MIN_DBL(h, state->h);
+    }
+    h = GSL_MAX_DBL(h, STOP_STEP_ABSOLUTE_MINIMUM_STEP);
+    const double u = incident->S / pow2(k1);
+    double k[7], g[7];
+    k[0] = k1;
+    g[0] = stop_u_derivative(&sw[0], u, incident->cosine_theta);
+    double E_new = E, u_new = u;
+    depth fulldepth;
+    const double h_ctrl = h; /* Step suggested by error control (or initial guess) */
+    int boundary = FALSE;
+    if(h >= h_max) {
+        h = h_max;
+        boundary = TRUE;
+        if(h < 0.001 * C_TFU) {
+            return depth_next;
+        }
+    }
+    double factor = 1.0;
+    while(1) {
+        fulldepth.i = depth_before.i;
+        fulldepth.x = boundary ? depth_next.x : depth_before.x + h * incident->cosine_theta;
+        int ok = TRUE;
+        for(int s = 1; s < 7; s++) {
+            double sk = 0.0, sg = 0.0;
+            for(int j = 0; j < s; j++) {
+                sk += dp_a[s][j] * k[j];
+                sg += dp_a[s][j] * g[j];
+            }
+            E_new = E - h * sk;
+            u_new = u + h * sg;
+            if(E_new <= 0.0) {
+                ok = FALSE;
+                break;
+            }
+            depth d = fulldepth;
+            if(dp_c[s] < 1.0) {
+                d.x = depth_before.x + dp_c[s] * (fulldepth.x - depth_before.x);
+            }
+            stop_sample_sw(stop, stragg, incident, sample, d, E_new, &sw[s]);
+            state->n_evals++;
+            k[s] = sw[s].S;
+            g[s] = stop_u_derivative(&sw[s], u_new, incident->cosine_theta);
+        } /* After the last stage E_new and u_new are the fifth order solution */
+        double err = 0.0; /* Error relative to tolerance */
+        factor = STOP_ADAPTIVE_FACTOR_MIN;
+        if(ok) {
+            double err_E = 0.0, err_u = 0.0;
+            for(int j = 0; j < 7; j++) {
+                err_E += dp_e[j] * k[j];
+                err_u += dp_e[j] * g[j];
+            }
+            err = h * fabs(err_E) / stop->accuracy;
+            double u_scale = stop->stragg_accuracy * GSL_MAX_DBL(fabs(u), fabs(u_new));
+            if(u_scale > 0.0) {
+                err = GSL_MAX_DBL(err, h * fabs(err_u) / u_scale);
+            }
+            factor = err > 0.0 ? STOP_ADAPTIVE_SAFETY * pow(err, -0.2) : 1e10;
+            factor = GSL_MIN_DBL(GSL_MAX_DBL(factor, STOP_ADAPTIVE_FACTOR_MIN), STOP_ADAPTIVE_FACTOR_MAX);
+            break;
+        }
+        state->n_rejected++; /* Energy went below zero, should not happen often since steps end at emin */
+        h *= STOP_ADAPTIVE_FACTOR_MIN;
+        boundary = FALSE;
+        if(h <= STOP_STEP_ABSOLUTE_MINIMUM_STEP) {
+            incident->E = GSL_MAX_DBL(0.0, E - h * k1);
+            fulldepth.x = depth_before.x + h * incident->cosine_theta;
+            return fulldepth;
+        }
+    }
+    state->h = h * factor;
+    if(boundary) { /* Step truncated at a boundary does not tell much about the next step. This is continuous with respect to h_ctrl when h_ctrl = h_max. */
+        state->h = GSL_MAX_DBL(state->h, h_ctrl * GSL_MIN_DBL(factor, 1.0));
+    }
+    const double stop_end = k[6];
+    incident->S = GSL_MAX_DBL(0.0, u_new) * pow2(stop_end);
+    if(stop->ms) { /* See stop_step() */
+        double p_ratio = stop_end / k1;
+        incident->ms.P *= p_ratio;
+        incident->ms.I = incident->ms.I * p_ratio + h * stop_end;
+        depth halfdepth = {.i = depth_before.i, .x = (depth_before.x + fulldepth.x) / 2.0};
+        stop_ms_step(stop->ms, incident, sample, halfdepth, (E + E_new) / 2.0, h);
+    }
+    incident->E = GSL_MAX_DBL(0.0, E_new);
+    state->sw_end = sw[6];
+    state->d_end = fulldepth;
+    state->E_end = incident->E;
+    state->valid = (E_new > 0.0);
+    return fulldepth;
+}
+
 double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sample, const depth depth, double E) {
     const double em = E * incident->mass_inverse;
     int Z2_old = -1; /* Not valid */
@@ -272,6 +402,16 @@ double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sam
     }
 }
 
+double stop_step_max(const jabs_stop_step_params *params, const ion *ion) { /* Largest step, used as a limit for adaptive steps */
+    if(params->step > 0.0) {
+        return params->step;
+    }
+    if(params->max_rel > 0.0) {
+        return GSL_MIN_DBL(params->max, params->max_rel * ion->E);
+    }
+    return params->max;
+}
+
 double stop_step_calc(const jabs_stop_step_params *params, const ion *ion) {
     if(params->step > 0.0) {
         return params->step;
@@ -289,6 +429,8 @@ int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_
     depth d = depth_start;
     int last = FALSE;
     double emin = GSL_MAX_DBL(stop->emin, p->ion_gsto->emin);
+    const int adaptive = stop->rk4 && stop->accuracy > 0.0;
+    stop_adaptive state = {0};
     while(1) { /* Exit from sample (hopefully) */
         if(p->inverse_cosine_theta > 0.0 && d.x >= (sample->thickness - DEPTH_TOLERANCE)) { /* Exit through back (transmission) */
             return 0;
@@ -301,6 +443,9 @@ int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_
             break;
         }
         double E_step = stop_step_calc(params_exiting, p);
+        if(adaptive && state.h > 0.0) { /* First adaptive step is the fixed step, then step is limited by error control and maximum step */
+            E_step = stop_step_max(params_exiting, p);
+        }
 
         if(p->E - E_step <= emin) {
             if(p->E <= emin) {
@@ -312,7 +457,7 @@ int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_
                             p->E / C_KEV, emin / C_KEV, E_step / C_KEV, d.x / C_TFU);
             last = TRUE;
         }
-        depth d_after = stop_step(stop, stragg, p, sample, d, E_step);
+        depth d_after = adaptive ? stop_step_adaptive(stop, stragg, p, sample, d, E_step, &state) : stop_step(stop, stragg, p, sample, d, E_step);
         if(last && p->E - emin > STOP_LAST_STEP_REMAINDER * E_step) { /* Last step was truncated at range boundary or energy loss was smaller than expected (stopping decreases with energy) */
             DEBUGMSG("Last step ended at depth %g tfu with E = %g keV, which is still above emin = %g keV, continuing.", d_after.x / C_TFU, p->E / C_KEV, emin / C_KEV);
             last = FALSE;

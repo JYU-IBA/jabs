@@ -82,6 +82,8 @@ typedef struct trajectory {
     size_t n;
     size_t n_alloc;
     int stopped; /* Ion stopped (E below emin) inside sample */
+    size_t n_evals; /* Passes over sample isotopes */
+    size_t n_rejected; /* Rejected adaptive steps */
     double t; /* CPU time (s) */
 } trajectory;
 
@@ -108,6 +110,8 @@ static void trajectory_free(trajectory *tr) {
 static trajectory trajectory_compute(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params, ion ion, depth d, const sample *sample, double emin) {
     trajectory tr = {0};
     int last = FALSE;
+    const int adaptive = stop->rk4 && stop->accuracy > 0.0;
+    stop_adaptive state = {0};
     emin = GSL_MAX_DBL(emin, ion.ion_gsto->emin);
     clock_t start = clock();
     trajectory_add(&tr, &d, &ion);
@@ -123,6 +127,9 @@ static trajectory trajectory_compute(const jabs_stop *stop, const jabs_stop *str
             break;
         }
         double E_step = stop_step_calc(params, &ion);
+        if(adaptive && state.h > 0.0) {
+            E_step = stop_step_max(params, &ion);
+        }
         if(ion.E - E_step <= emin) {
             if(ion.E <= emin) {
                 tr.stopped = TRUE;
@@ -131,13 +138,15 @@ static trajectory trajectory_compute(const jabs_stop *stop, const jabs_stop *str
             E_step = ion.E - emin;
             last = TRUE;
         }
-        d = stop_step(stop, stragg, &ion, sample, d, E_step);
+        d = adaptive ? stop_step_adaptive(stop, stragg, &ion, sample, d, E_step, &state) : stop_step(stop, stragg, &ion, sample, d, E_step);
         if(last && ion.E - emin > STOP_LAST_STEP_REMAINDER * E_step) { /* Last step was truncated at range boundary or energy loss was smaller than expected */
             last = FALSE;
         }
         trajectory_add(&tr, &d, &ion);
     }
     tr.t = (double)(clock() - start) / CLOCKS_PER_SEC;
+    tr.n_evals = adaptive ? state.n_evals : (tr.n - 1) * (stop->rk4 ? PASSES_RK4 : PASSES_EULER);
+    tr.n_rejected = state.n_rejected;
     return tr;
 }
 
@@ -190,6 +199,7 @@ static trajectory trajectory_reference(const jabs_stop *stop, const jabs_stop *s
         trajectory_add(&tr, &d, &ion);
     }
     tr.t = (double)(clock() - start) / CLOCKS_PER_SEC;
+    tr.n_evals = (tr.n - 1) * PASSES_REF;
     return tr;
 }
 
@@ -262,16 +272,20 @@ static int assign_stopping_sample(jibal_gsto *gsto, int Z1, const sample *sample
     return EXIT_SUCCESS;
 }
 
-static void print_result(const char *label, double step, const trajectory *tr, const trajectory_error *err, int evals_per_step) {
+static void print_result(const char *label, double step, const trajectory *tr, const trajectory_error *err) {
     char step_str[32];
     if(step > 0.0) {
         snprintf(step_str, sizeof(step_str), "%.1f", step / C_KEV);
     } else {
         snprintf(step_str, sizeof(step_str), "auto");
     }
-    fprintf(stdout, "  %-10s %8s %8zu %9zu %11.2f %11.2f %10.2f %9.4f %9.4f %9.2f  %s at %.1f tfu, E = %.3f keV\n", label, step_str, tr->n - 1, (tr->n - 1) * evals_per_step,
+    fprintf(stdout, "  %-10s %8s %8zu %9zu %11.2f %11.2f %10.2f %9.4f %9.4f %9.2f  %s at %.1f tfu, E = %.3f keV", label, step_str, tr->n - 1, tr->n_evals,
             err->E_max / C_EV, err->E_end / C_EV, err->sigma_max / C_EV, 100.0 * err->sigma_rel_max, 100.0 * err->sigma_rel_end, 1e3 * tr->t,
             tr->stopped ? "stopped" : "exited", tr->x[tr->n - 1] / C_TFU, tr->E[tr->n - 1] / C_KEV);
+    if(tr->n_rejected) {
+        fprintf(stdout, ", %zu rejected", tr->n_rejected);
+    }
+    fprintf(stdout, "\n");
 }
 
 static int scenario_run(jibal *jibal, const scenario *sc) {
@@ -324,33 +338,28 @@ static int scenario_run(jibal *jibal, const scenario *sc) {
 
     trajectory tr = trajectory_reference(&stop, &stragg, REF_CHECK_STEP, ion, d, sample, sc->emin);
     trajectory_error err = trajectory_compare(&ref, &tr);
-    print_result("ref check", REF_CHECK_STEP, &tr, &err, PASSES_REF);
+    print_result("ref check", REF_CHECK_STEP, &tr, &err);
     trajectory_free(&tr);
 
     tr = trajectory_compute(&stop, &stragg, &fixed, ion, d, sample, sc->emin); /* What stop_step() converges to */
     err = trajectory_compare(&ref, &tr);
-    print_result("rk4 fine", fixed.step, &tr, &err, PASSES_RK4);
+    print_result("rk4 fine", fixed.step, &tr, &err);
     trajectory_free(&tr);
 
-    const jabs_stop_step_params *defaults = sc->exiting ? &p->exiting_stop_params : &p->incident_stop_params;
-    tr = trajectory_compute(&stop, &stragg, defaults, ion, d, sample, sc->emin);
-    err = trajectory_compare(&ref, &tr);
-    print_result("default", 0.0, &tr, &err, p->rk4 ? PASSES_RK4 : PASSES_EULER);
-    trajectory_free(&tr);
-
-    jabs_stop stop_fast = stop, stragg_fast = stragg;
-    stop_fast.rk4 = stragg_fast.rk4 = p_fast->rk4;
-    const jabs_stop_step_params *defaults_fast = sc->exiting ? &p_fast->exiting_stop_params : &p_fast->incident_stop_params;
-    tr = trajectory_compute(&stop_fast, &stragg_fast, defaults_fast, ion, d, sample, sc->emin);
-    err = trajectory_compare(&ref, &tr);
-    print_result("fast", 0.0, &tr, &err, p_fast->rk4 ? PASSES_RK4 : PASSES_EULER);
-    trajectory_free(&tr);
-
-    const jabs_stop_step_params *defaults_acc = sc->exiting ? &p_acc->exiting_stop_params : &p_acc->incident_stop_params;
-    tr = trajectory_compute(&stop, &stragg, defaults_acc, ion, d, sample, sc->emin);
-    err = trajectory_compare(&ref, &tr);
-    print_result("accurate", 0.0, &tr, &err, p_acc->rk4 ? PASSES_RK4 : PASSES_EULER);
-    trajectory_free(&tr);
+    const sim_calc_params *presets[] = {p, p_fast, p_acc};
+    static const char *preset_names[] = {"default", "fast", "accurate"};
+    for(size_t i = 0; i < sizeof(presets) / sizeof(presets[0]); i++) { /* Presets, adaptive steps (exiting_stop_accuracy) are used for exiting ions only, like in stop_sample_exit() */
+        jabs_stop s = stop, sg = stragg;
+        s.rk4 = sg.rk4 = presets[i]->rk4;
+        if(sc->exiting) {
+            s.accuracy = sg.accuracy = presets[i]->exiting_stop_accuracy;
+            s.stragg_accuracy = sg.stragg_accuracy = EXITING_STOP_STRAGG_ACCURACY;
+        }
+        tr = trajectory_compute(&s, &sg, sc->exiting ? &presets[i]->exiting_stop_params : &presets[i]->incident_stop_params, ion, d, sample, sc->emin);
+        err = trajectory_compare(&ref, &tr);
+        print_result(preset_names[i], 0.0, &tr, &err);
+        trajectory_free(&tr);
+    }
 
     static const double steps_keV[] = {1.0, 5.0, 20.0, 50.0, 100.0, 250.0, 500.0};
     for(size_t i = 0; i < sizeof(steps_keV) / sizeof(steps_keV[0]); i++) {
@@ -364,7 +373,7 @@ static int scenario_run(jibal *jibal, const scenario *sc) {
             s.rk4 = sg.rk4 = rk4;
             tr = trajectory_compute(&s, &sg, &f, ion, d, sample, sc->emin);
             err = trajectory_compare(&ref, &tr);
-            print_result(rk4 ? "rk4" : "euler", f.step, &tr, &err, rk4 ? PASSES_RK4 : PASSES_EULER);
+            print_result(rk4 ? "rk4" : "euler", f.step, &tr, &err);
             trajectory_free(&tr);
         }
     }
