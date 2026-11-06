@@ -1177,11 +1177,11 @@ int simulate_with_ds(sim_workspace *ws) {
             fraction = GSL_MIN_DBL(GSL_MAX_DBL(fraction, 0.0), 1.0);
             double elapsed = t_now - t_start;
             if(rate > 0.0) { /* Remaining time is an upper estimate, calculation often ends before minimum energy */
-                jabs_progress(fraction, "Dual scattering: E = %.1lf keV, depth %.0lf tfu, %zu trajectories, %.0lf s, ~%.0lf s left",
-                              E_back / C_KEV, d_after.x / C_TFU, n_trajectories, elapsed, (E_back - emin) / rate);
+                jabs_progress(fraction, "Dual scattering: E = %.1lf keV, depth %.0lf tfu, %.0lf s, ~%.0lf s left",
+                              E_back / C_KEV, d_after.x / C_TFU, elapsed, (E_back - emin) / rate);
             } else {
-                jabs_progress(fraction, "Dual scattering: E = %.1lf keV, depth %.0lf tfu, %zu trajectories, %.0lf s",
-                              E_back / C_KEV, d_after.x / C_TFU, n_trajectories, elapsed);
+                jabs_progress(fraction, "Dual scattering: E = %.1lf keV, depth %.0lf tfu, %.0lf s",
+                              E_back / C_KEV, d_after.x / C_TFU, elapsed);
             }
             progress_shown = TRUE;
         }
