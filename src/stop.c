@@ -69,6 +69,98 @@ void stop_ms_step(const ms_model *ms, ion *ion, const sample *sample, const dept
     }
 }
 
+typedef struct stop_sw {
+    double S; /* Stopping */
+    double W; /* Straggling (energy loss variance per unit path length) */
+    double S_x; /* Derivative of stopping with respect to (perpendicular) depth at constant energy, i.e. due to concentration gradients */
+} stop_sw;
+
+static double stop_gsto(const ion *incident, gsto_stopping_type type, int Z2, double em) { /* Electronic stopping or straggling of incident ion in element Z2 */
+    const jabs_ion_gsto_data *gd = &incident->ion_gsto->gsto_data[Z2];
+    const gsto_file_t *file;
+    const double *data;
+    double unit_factor = 1.0;
+    if(type == GSTO_STO_STRAGG) {
+        file = gd->straggfile;
+        data = gd->straggdata;
+        if(file->straggunit == GSTO_STRAGG_UNIT_BOHR) {
+            unit_factor = jibal_stragg_bohr(incident->Z, Z2);
+        }
+    } else {
+        file = gd->stopfile;
+        data = gd->stopdata;
+        if(file->stounit == GSTO_STO_UNIT_EV15CM2) {
+            unit_factor = C_EV_TFU;
+        }
+    }
+    assert(file);
+    if(em < file->em[0]) {
+        DEBUGMSG("Energy %g keV/u below GSTO file minimum %g keV/u, returning value corresponding to minimum", em / (C_KEV / C_U), file->em[0] / (C_KEV / C_U));
+        return unit_factor * data[0];
+    }
+    if(em > file->em[file->xpoints - 1]) {
+        DEBUGMSG("Energy %g keV/u above GSTO file maximum %g keV/u, returning value corresponding to maximum", em / (C_KEV / C_U), file->em[file->xpoints - 1] / (C_KEV / C_U));
+        return unit_factor * data[file->xpoints - 1];
+    }
+    int lo = jibal_gsto_em_to_index(file, em);
+    return unit_factor * jibal_linear_interpolation(file->em[lo], file->em[lo + 1], data[lo], data[lo + 1], em);
+}
+
+static void stop_sample_sw(const jabs_stop *stop, const jabs_stop *stragg, const ion *incident, const sample *sample, const depth depth, double E, stop_sw *sw) { /* Stopping, straggling and stopping gradient in one go */
+    sw->S = 0.0;
+    sw->W = 0.0;
+    sw->S_x = 0.0;
+    if(incident->Z == 0) {
+        return;
+    }
+    const double em = E * incident->mass_inverse;
+    double inverse_width = 0.0; /* Concentrations are linear within a range. Zero if concentrations are constant. */
+    if(!sample->no_conc_gradients) {
+        double width = sample->ranges[depth.i + 1].x - sample->ranges[depth.i].x;
+        if(width > 0.0) {
+            inverse_width = 1.0 / width;
+        }
+    }
+    int Z2_old = -1; /* Not valid */
+    double S_Z2 = 0.0, W_Z2 = 0.0;
+    for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
+        const jibal_isotope *target = sample->isotopes[i_isotope];
+        double c = get_conc(sample, depth, i_isotope);
+        double dc = 0.0;
+        if(inverse_width > 0.0) {
+            const double *cbin = sample_conc_bin(sample, depth.i, i_isotope);
+            dc = (cbin[sample->n_isotopes] - cbin[0]) * inverse_width;
+        }
+        if(c < CONC_TOLERANCE && dc == 0.0)
+            continue;
+        int Z2 = target->Z;
+        assert(Z2 <= incident->ion_gsto->Z2_max);
+        if(Z2 != Z2_old) { /* Electronic stopping and straggling are the same for all isotopes of the same element */
+            S_Z2 = stop_gsto(incident, stop->type, Z2, em);
+            W_Z2 = stop_gsto(incident, stragg->type, Z2, em);
+            Z2_old = Z2;
+        }
+        double S = S_Z2;
+        if(stop->type == GSTO_STO_TOT) {
+            S += ion_nuclear_stop(incident, target, E, stop->nuclear_stopping_accurate);
+        }
+        sw->S += c * S;
+        sw->S_x += dc * S;
+        sw->W += c * W_Z2;
+    }
+    const sample_range *r = &sample->ranges[depth.i];
+    sw->S *= r->bragg;
+    sw->S_x *= r->bragg;
+    sw->W *= r->stragg;
+}
+
+static inline double stop_u_derivative(const stop_sw *sw, double u, double cosine_theta) { /* du/dl, see stop_step() */
+    if(sw->S <= 0.0) {
+        return 0.0;
+    }
+    return sw->W / pow2(sw->S) - 2.0 * u * sw->S_x * cosine_theta / sw->S;
+}
+
 depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, const sample *sample, depth depth_before, double step) {
     double k1, k2, k3, k4, stopping, dE, E;
     depth depth_next = stop_next_crossing(incident, sample, &depth_before);
@@ -82,13 +174,14 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
     assert(fabs(h_max_perp) > 0.01 * C_TFU);
 #endif
     depth_before.i = depth_next.i; /* depth_before may have the right depth (.x), but the index can be old. We need to cross the depth range somewhere, and it happens to be here. All calculations after this take place inside the same depth_before range (index depth_before.i). */
-    /* k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
+    /* Energy E and u = S_variance / S^2 are integrated along the path (l), where S_variance is the energy loss variance (incident->S). Two ions at the same depth with
+     * energy difference delta obey d(delta)/dl = -(dS/dE) delta, therefore d(S_variance)/dl = W - 2 (dS/dE) S_variance. Derivative of stopping with respect to energy
+     * cancels out from du/dl = W / S^2 - 2 u (dS/dl)_E / S, where (dS/dl)_E is the change of stopping due to concentration gradients (zero in layered samples).
+     * k1...k4 are slopes of energy loss (stopping) at various x (depth) and E. Note convention: positive values, i.e. -dE/dx! */
     E = incident->E;
-    if(incident->Z == 0) {
-        k1 = 0.0;
-    } else {
-        k1 = stop_sample(stop, incident, sample, depth_before, E);
-    }
+    stop_sw sw1;
+    stop_sample_sw(stop, stragg, incident, sample, depth_before, E, &sw1);
+    k1 = sw1.S;
     double h_max = h_max_perp * incident->inverse_cosine_theta; /*  we can take bigger steps since we are going sideways. Note that inverse_cosine_theta can be negative and in this case h_max should also be negative so h_max is always positive! */
     double h = (step / k1); /* (energy) step should always be positive, as well as k1, so depth step h (not perpendicular, but "real" depth) is always positive  */
     if(k1 < STOP_STEP_MINIMUM_STOPPING) { /* We are (almost) dividing by zero if there is no or very little stopping. Assume stopping is zero and make a jump. */
@@ -120,20 +213,33 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
     }
 
 
+    const double u = incident->S / pow2(k1);
+    double du; /* Mean du/dl over the step */
+    double g1 = stop_u_derivative(&sw1, u, incident->cosine_theta);
     if(stop->rk4) {
-        k2 = stop_sample(stop, incident, sample, halfdepth, E - (h / 2.0) * k1);
-        k3 = stop_sample(stop, incident, sample, halfdepth, E - (h / 2.0) * k2);
-        k4 = stop_sample(stop, incident, sample, fulldepth, E - h * k3);
+        stop_sw sw2, sw3, sw4;
+        stop_sample_sw(stop, stragg, incident, sample, halfdepth, E - (h / 2.0) * k1, &sw2);
+        double g2 = stop_u_derivative(&sw2, u + (h / 2.0) * g1, incident->cosine_theta);
+        k2 = sw2.S;
+        stop_sample_sw(stop, stragg, incident, sample, halfdepth, E - (h / 2.0) * k2, &sw3);
+        double g3 = stop_u_derivative(&sw3, u + (h / 2.0) * g2, incident->cosine_theta);
+        k3 = sw3.S;
+        stop_sample_sw(stop, stragg, incident, sample, fulldepth, E - h * k3, &sw4);
+        double g4 = stop_u_derivative(&sw4, u + h * g3, incident->cosine_theta);
+        k4 = sw4.S;
         stopping = (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0;
+        du = (g1 + 2.0 * g2 + 2.0 * g3 + g4) / 6.0;
 #ifdef DEBUG
         if(stopping <= 0.0) {
             DEBUGMSG("Stopping is negative: RK4 (k1 = %g, k2 = %g, k3 = %g, k4 = %g) eV/tfu\n",
                      k1 / C_EV_TFU, k2 / C_EV_TFU, k3 / C_EV_TFU, k4 / C_EV_TFU);
         }
 #endif
-    } else {
-
+    } else { /* Energy: Euler. u: midpoint. */
         stopping = k1;
+        stop_sw sw_mid;
+        stop_sample_sw(stop, stragg, incident, sample, halfdepth, E - (h / 2.0) * k1, &sw_mid);
+        du = stop_u_derivative(&sw_mid, u + (h / 2.0) * g1, incident->cosine_theta);
     }
 #ifdef DEBUG
     if(stopping <= 0.0) {
@@ -143,11 +249,7 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
 #endif
     dE = -1.0 * h * stopping; /* Energy change in thickness "h". It is always negative! */
     double stop_end = stop_sample(stop, incident, sample, fulldepth, E + dE);
-#ifndef NO_STATISTICAL_STRAGGLING
-    double s_ratio = stop_end / k1; /* Ratio of stopping for non-statistical broadening. TODO: at x? */
-    incident->S *= pow2(s_ratio);
-#endif
-    incident->S += h * stop_sample(stragg, incident, sample, halfdepth, E + (0.5 * dE)); /* Straggling, calculate at mid-energy */
+    incident->S = GSL_MAX_DBL(0.0, u + h * du) * pow2(stop_end);
     if(stop->ms) {
         double p_ratio = stop_end / k1; /* Energy differences propagate over the step like straggling above */
         incident->ms.P *= p_ratio;
@@ -161,61 +263,23 @@ depth stop_step(const jabs_stop *stop, const jabs_stop *stragg, ion *incident, c
 double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sample, const depth depth, double E) {
     const double em = E * incident->mass_inverse;
     int Z2_old = -1; /* Not valid */
+    double S_Z2 = 0.0;
     double out = 0.0;
-    int lo, hi = 0;
-    const gsto_file_t *file;
-    const double *data;
-    double unit_factor;
     if(incident->Z == 0) {
         return 0.0;
     }
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
-        double c;
         const jibal_isotope *target = sample->isotopes[i_isotope];
-        if(sample->no_conc_gradients) {
-            c = *sample_conc_bin(sample, depth.i, i_isotope);
-        } else {
-            c = get_conc(sample, depth, i_isotope);
-        }
+        double c = get_conc(sample, depth, i_isotope);
         if(c < CONC_TOLERANCE)
             continue;
         int Z2 = target->Z;
         assert(Z2 <= incident->ion_gsto->Z2_max);
-
-        if(Z2 != Z2_old) { /* This saves some computing time, but for electronic stopping we could just sum all isotopic concentrations (and note that those stay constant while we are doing stopping calculations) */
-            if(stop->type == GSTO_STO_TOT || stop->type == GSTO_STO_ELE) {
-                file = incident->ion_gsto->gsto_data[Z2].stopfile;
-                data = incident->ion_gsto->gsto_data[Z2].stopdata;
-                assert(file);
-                if(file->stounit == GSTO_STO_UNIT_EV15CM2) {
-                    unit_factor = C_EV_TFU;
-                } else {
-                    unit_factor = 1.0;
-                }
-            } else if(stop->type == GSTO_STO_STRAGG) {
-                file = incident->ion_gsto->gsto_data[Z2].straggfile;
-                data = incident->ion_gsto->gsto_data[Z2].straggdata;
-                if(file->straggunit == GSTO_STRAGG_UNIT_BOHR) {
-                    unit_factor = jibal_stragg_bohr(incident->Z, Z2);
-                } else {
-                    unit_factor = 1.0;
-                }
-            }
-            lo = jibal_gsto_em_to_index(file, em);
-            hi = lo + 1;
+        if(Z2 != Z2_old) { /* Electronic stopping (or straggling) is the same for all isotopes of the same element */
+            S_Z2 = stop_gsto(incident, stop->type, Z2, em);
+            Z2_old = Z2;
         }
-        Z2_old = Z2;
-        double S = unit_factor;
-        if(em < file->em[0]) {
-            DEBUGMSG("Energy %g keV/u below GSTO file minimum %g keV/u, returning value corresponding to minimum", em / (C_KEV / C_U), file->em[0]);
-            S *= data[0];
-        } else if(em > file->em[file->xpoints - 1]) {
-            DEBUGMSG("Energy %g keV/u above GSTO file maximum %g keV/u, returning value corresponding to maximum", em / (C_KEV / C_U), file->em[file->xpoints - 1] / (C_KEV / C_U));
-            S *= data[file->xpoints - 1];
-        } else {
-            S *= jibal_linear_interpolation(file->em[lo], file->em[hi], data[lo], data[hi], em);
-        }
-
+        double S = S_Z2;
         if(stop->type == GSTO_STO_TOT) {
             S += ion_nuclear_stop(incident, target, E, stop->nuclear_stopping_accurate);
         }
