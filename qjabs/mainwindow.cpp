@@ -209,6 +209,8 @@ void MainWindow::onProgressChanged(double fraction, QString msg, bool done)
     }
     if(done) {
         progressBar->setRange(0, 0); /* Something is still running, but no progress information */
+        runStatusLabel->setText(QString("Running.")); /* Previous progress text (e.g. fit phase) may no longer apply */
+        runStatusLabel->setToolTip(QString());
         return;
     }
     if(fraction < 0.0) {
@@ -695,6 +697,10 @@ int MainWindow::fitCallback(fit_stats stats)
 void MainWindow::onFitProgress(fit_stats stats, QSharedPointer<PlotSnapshot> snap)
 {
     if(!running) { /* Late signal, run has already finished */
+        return;
+    }
+    if(stats.phase == FIT_PHASE_NONE) { /* Fit is over, script may continue (e.g. simulate) */
+        fitRow->setVisible(false);
         return;
     }
     fitRow->setVisible(true);

@@ -1262,6 +1262,11 @@ int fit_do(fit_data *fit) {
         jabs_message(MSG_IMPORTANT, "Phase \"%s\" finished. Time used for actual simulation so far: %.3lf s.\n", fit_phase_to_str(phase), fit->stats.cputime_cumul);
         fit_report_results(fit, w, fdf);
     }
+    if(fit->fit_iter_callback) { /* Fit phases are over (final calculations may follow), callback gets phase FIT_PHASE_NONE */
+        fit_stats stats_done = fit->stats;
+        stats_done.phase = FIT_PHASE_NONE;
+        fit->fit_iter_callback(stats_done);
+    }
 
     if(fit->stats.error < 0) { /* Revert changes on error */
         for(size_t i = 0; i < fit_params->n; i++) {
