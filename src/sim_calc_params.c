@@ -27,10 +27,12 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->incident_stop_params.sigmas = INCIDENT_STOP_STEP_SIGMAS_DEFAULT;
     p->incident_stop_params.min = INCIDENT_STOP_STEP_MIN_DEFAULT;
     p->incident_stop_params.max = INCIDENT_STOP_STEP_MAX_DEFAULT;
+    p->incident_stop_params.max_rel = INCIDENT_STOP_STEP_MAX_REL_DEFAULT;
     p->exiting_stop_params.step = EXITING_STOP_STEP_DEFAULT;
     p->exiting_stop_params.sigmas = EXITING_STOP_STEP_SIGMAS_DEFAULT;
     p->exiting_stop_params.min = EXITING_STOP_STEP_MIN_DEFAULT;
     p->exiting_stop_params.max = EXITING_STOP_STEP_MAX_DEFAULT;
+    p->exiting_stop_params.max_rel = EXITING_STOP_STEP_MAX_REL_DEFAULT;
     p->brick_width_sigmas = BRICK_WIDTH_SIGMAS_DEFAULT;
     p->n_bricks_max = 0; /* automatic */
     p->geostragg = FALSE;
@@ -88,6 +90,8 @@ sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
     p->exiting_stop_params.min *= 2.5;
     p->exiting_stop_params.sigmas *= 2.5;
     p->exiting_stop_params.max *= 2.0;
+    p->incident_stop_params.max_rel *= 2.0;
+    p->exiting_stop_params.max_rel *= 2.0;
     p->bricks_skip_zero_conc_ranges = TRUE;
     return p;
 }
@@ -101,6 +105,8 @@ sim_calc_params *sim_calc_params_defaults_accurate(sim_calc_params *p) {
     p->incident_stop_params.min *= 0.5;
     p->exiting_stop_params.min *= 0.5;
     p->exiting_stop_params.sigmas *= 0.5;
+    p->incident_stop_params.max_rel *= 0.5;
+    p->exiting_stop_params.max_rel *= 0.5;
     p->brick_width_sigmas *= 0.25;
     p->mean_energy_after_reaction_accurate = TRUE;
     return p;
@@ -126,6 +132,8 @@ sim_calc_params *sim_calc_params_defaults_improved(sim_calc_params *p) {
     p->gaussian_accurate = TRUE;
     p->exiting_stop_params.min *= 0.75;
     p->exiting_stop_params.sigmas *= 0.75;
+    p->incident_stop_params.max_rel *= 0.75;
+    p->exiting_stop_params.max_rel *= 0.75;
     p->cs_energy_step_max *= 0.75;
     p->cs_depth_step_max *= 0.75;
     p->cs_stragg_step_sigmas = 0.75;
@@ -203,12 +211,14 @@ void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_lev
         jabs_message(msg_level, "step for incident ions = %g times straggling sigma\n", params->incident_stop_params.sigmas);
         jabs_message(msg_level, "minimum step for incident ions = %.3lf keV\n", params->incident_stop_params.min / C_KEV);
         jabs_message(msg_level, "maximum step for incident ions = %.3lf keV\n", params->incident_stop_params.max / C_KEV);
+        jabs_message(msg_level, "maximum step for incident ions relative to energy = %g (0 = no limit)\n", params->incident_stop_params.max_rel);
     }
     jabs_message(msg_level, "step for exiting ions = %.3lf keV (0 = auto)\n", params->exiting_stop_params.step / C_KEV);
     if(params->exiting_stop_params.step == 0.0) {
         jabs_message(msg_level, "step for exiting ions = %g times straggling sigma\n", params->exiting_stop_params.sigmas);
         jabs_message(msg_level, "minimum step for exiting ions = %.3lf keV\n", params->exiting_stop_params.min / C_KEV);
         jabs_message(msg_level, "maximum step for exiting ions = %.3lf keV\n", params->exiting_stop_params.max / C_KEV);
+        jabs_message(msg_level, "maximum step for exiting ions relative to energy = %g (0 = no limit)\n", params->exiting_stop_params.max_rel);
     }
     jabs_message(msg_level, "stopping RK4 = %s\n", params->rk4?"true":"false");
     if(params->n_bricks_max) {

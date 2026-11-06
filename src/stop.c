@@ -279,6 +279,9 @@ double stop_step_calc(const jabs_stop_step_params *params, const ion *ion) {
     double step = params->sigmas * sqrt(ion->S);
     step = GSL_MIN_DBL(step, params->max);
     step = GSL_MAX_DBL(step, params->min);
+    if(params->max_rel > 0.0) {
+        step = GSL_MIN_DBL(step, params->max_rel * ion->E);
+    }
     return step;
 }
 

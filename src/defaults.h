@@ -52,10 +52,12 @@ extern "C" {
 #define INCIDENT_STOP_STEP_SIGMAS_DEFAULT (1.0)
 #define INCIDENT_STOP_STEP_MIN_DEFAULT (0.5 * C_KEV) /* Default minimum stopping step. */
 #define INCIDENT_STOP_STEP_MAX_DEFAULT (50.0 * C_KEV) /* Default maximum stopping step.  */
+#define INCIDENT_STOP_STEP_MAX_REL_DEFAULT (0.1) /* Default maximum stopping step relative to energy */
 #define EXITING_STOP_STEP_DEFAULT (0.0*C_KEV) /* Zero is automatic */
 #define EXITING_STOP_STEP_SIGMAS_DEFAULT (5.0)
 #define EXITING_STOP_STEP_MIN_DEFAULT (20.0 * C_KEV) /* Default minimum stopping step. */
 #define EXITING_STOP_STEP_MAX_DEFAULT (250.0 * C_KEV) /* Default maximum stopping step.  */
+#define EXITING_STOP_STEP_MAX_REL_DEFAULT (0.1) /* Default maximum stopping step relative to energy */
 #define STOP_STEP_DEPTH_FALLBACK (100.0 * C_TFU) /* If stop step can't be determined using stopping reliable, do a maximum of this */
 #define STOP_STEP_MINIMUM_STOPPING (0.1 * C_EV_TFU) /* Stopping below this is suspicious */
 #define STOP_STEP_ABSOLUTE_MINIMUM_STEP (1.0 * C_TFU) /* In some cases smaller steps are taken, such as when approaching layer boundaries, but otherwise this should be smallest sanity check step. */

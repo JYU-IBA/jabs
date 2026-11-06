@@ -63,6 +63,16 @@ static const scenario scenarios[] = {
     {"1H 1 MeV recoil out of Al2O3",     "1H",    1.0 * C_MEV,  5.0 * C_KEV,  "Au 1tfu Al2O3 1000tfu Si 10000tfu", 110.0 * C_DEG,  900.0 * C_TFU,  TRUE,  10.0 * C_KEV},
     {"35Cl 300 keV out of Si 140deg",   "35Cl",  0.3 * C_MEV,  5.0 * C_KEV,  "Au 1tfu Al2O3 1000tfu Si 10000tfu", 140.0 * C_DEG,  1300.0 * C_TFU, TRUE,  10.0 * C_KEV},
     {"28Si 300 keV recoil out of Si",    "28Si",  0.3 * C_MEV,  5.0 * C_KEV,  "Au 1tfu Al2O3 1000tfu Si 10000tfu", 110.0 * C_DEG,  1300.0 * C_TFU, TRUE,  10.0 * C_KEV},
+    {"4He 2 MeV into Au/Si grazing 80deg", "4He",  2.0 * C_MEV,  0.0,          "Au 200tfu Si 20000tfu",            80.0 * C_DEG,    0.0,            FALSE, 50.0 * C_KEV},
+    {"4He 1.8 MeV out of Si grazing 85deg", "4He",  1.8 * C_MEV,  5.0 * C_KEV,  "Au 100tfu Si 20000tfu",            95.0 * C_DEG,    1000.0 * C_TFU, TRUE,  10.0 * C_KEV},
+    {"4He 1.5 MeV out of 20x(Ni/Ti)",      "4He",  1.5 * C_MEV,  5.0 * C_KEV,  "Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Ni 50tfu Ti 50tfu Si 10000tfu", 170.0 * C_DEG, 1950.0 * C_TFU, TRUE, 10.0 * C_KEV},
+    {"4He 1.4 MeV out of TiN/SiO2 gradient", "4He", 1.4 * C_MEV, 5.0 * C_KEV,  "file:../example/tests/point_by_point_profile.txt", 165.0 * C_DEG, 1900.0 * C_TFU, TRUE, 10.0 * C_KEV},
+    {"4He 900 keV out of Au, stops",       "4He",  0.9 * C_MEV,  5.0 * C_KEV,  "Au 20000tfu",                      170.0 * C_DEG,   15000.0 * C_TFU, TRUE, 10.0 * C_KEV},
+    {"4He 3.9 MeV NRA alpha out of TiN",   "4He",  3.9 * C_MEV,  10.0 * C_KEV, "TiN 20000tfu Si 20000tfu",         150.0 * C_DEG,   15000.0 * C_TFU, TRUE, 10.0 * C_KEV},
+    {"1H 3 MeV NRA proton out of thick Si", "1H",  3.0 * C_MEV,  10.0 * C_KEV, "Si 300000tfu",                     135.0 * C_DEG,   100000.0 * C_TFU, TRUE, 10.0 * C_KEV},
+    {"48Ti 6 MeV recoil out of TiN",       "48Ti", 6.0 * C_MEV,  20.0 * C_KEV, "TiN 2000tfu Si 10000tfu",          115.0 * C_DEG,   1500.0 * C_TFU, TRUE,  10.0 * C_KEV},
+    {"1H 1.5 MeV recoil out of Au/C grazing", "1H", 1.5 * C_MEV, 5.0 * C_KEV,  "Au 100tfu C 50000tfu",             100.0 * C_DEG,   3000.0 * C_TFU, TRUE,  10.0 * C_KEV},
+    {"12C 3 MeV recoil out of C grazing",  "12C",  3.0 * C_MEV,  10.0 * C_KEV, "Au 100tfu C 50000tfu",             100.0 * C_DEG,   1500.0 * C_TFU, TRUE,  10.0 * C_KEV},
 };
 
 typedef struct trajectory {
@@ -299,10 +309,11 @@ static int scenario_run(jibal *jibal, const scenario *sc) {
 
     sim_calc_params *p = sim_calc_params_defaults(NULL);
     sim_calc_params *p_fast = sim_calc_params_defaults_fast(sim_calc_params_defaults(NULL));
+    sim_calc_params *p_acc = sim_calc_params_defaults_accurate(sim_calc_params_defaults(NULL));
     jabs_stop stop = {.gsto = jibal->gsto, .type = GSTO_STO_TOT, .rk4 = TRUE, .emin = sc->emin, .ms = NULL};
     jabs_stop stragg = stop;
     stragg.type = GSTO_STO_STRAGG;
-    jabs_stop_step_params fixed = {.step = REF_STEP, .min = 0.0, .max = 0.0, .sigmas = 0.0};
+    jabs_stop_step_params fixed = {.step = REF_STEP, .min = 0.0, .max = 0.0, .sigmas = 0.0, .max_rel = 0.0};
 
     fprintf(stdout, "\n%s (sample %s, theta = %g deg, x0 = %g tfu, E0 = %g keV, sigma0 = %g keV)\n", sc->name, sc->sample, sc->theta / C_DEG, sc->x0 / C_TFU, sc->E / C_KEV, sc->sigma0 / C_KEV);
     trajectory ref = trajectory_reference(&stop, &stragg, REF_STEP, ion, d, sample, sc->emin);
@@ -335,6 +346,12 @@ static int scenario_run(jibal *jibal, const scenario *sc) {
     print_result("fast", 0.0, &tr, &err, p_fast->rk4 ? PASSES_RK4 : PASSES_EULER);
     trajectory_free(&tr);
 
+    const jabs_stop_step_params *defaults_acc = sc->exiting ? &p_acc->exiting_stop_params : &p_acc->incident_stop_params;
+    tr = trajectory_compute(&stop, &stragg, defaults_acc, ion, d, sample, sc->emin);
+    err = trajectory_compare(&ref, &tr);
+    print_result("accurate", 0.0, &tr, &err, p_acc->rk4 ? PASSES_RK4 : PASSES_EULER);
+    trajectory_free(&tr);
+
     static const double steps_keV[] = {1.0, 5.0, 20.0, 50.0, 100.0, 250.0, 500.0};
     for(size_t i = 0; i < sizeof(steps_keV) / sizeof(steps_keV[0]); i++) {
         jabs_stop_step_params f = fixed;
@@ -354,6 +371,7 @@ static int scenario_run(jibal *jibal, const scenario *sc) {
     trajectory_free(&ref);
     sim_calc_params_free(p);
     sim_calc_params_free(p_fast);
+    sim_calc_params_free(p_acc);
     nuclear_stopping_free(ion.nucl_stop);
     ion_gsto_free(ion.ion_gsto);
     sample_free(sample);

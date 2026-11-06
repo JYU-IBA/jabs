@@ -36,6 +36,7 @@ typedef struct jabs_stop_step_params {
     double min;
     double max;
     double sigmas;
+    double max_rel; /* Maximum step relative to energy (zero: no limit). Not applied to fixed steps. */
 } jabs_stop_step_params;
 
 depth stop_next_crossing(const ion *incident, const sample *sample, const depth *d_from);
