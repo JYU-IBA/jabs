@@ -47,6 +47,8 @@ extern "C" {
 #define DES_TABLE_MAX_SIZE (256 * DES_TABLE_INITIAL_ALLOC)
 #define ENERGY_DERIVATIVE_MIN (0.1) /* dE(detected)/dE(incident) is forced to be higher or equal to this. */
 #define ENERGY_DERIVATIVE_MAX (10.0)
+#define BRICK_EXIT_THRESHOLD_ITERATIONS (30) /* Maximum number of bisection steps when finding the depth where reaction products start to stop in the sample */
+#define BRICK_EXIT_THRESHOLD_TOLERANCE (0.02) /* Bisection stops when energy interval is this fraction of both parts of the brick (in incident ion energy) */
 #define BRICK_WIDTH_SIGMAS_DEFAULT (2.0) /* Attempt to make bricks width energy difference equal to this many times the detector resolution and straggling sigmas combined (in quadrature (variances)) */
 #define INCIDENT_STOP_STEP_DEFAULT (0.0*C_KEV) /* Zero is automatic */
 #define INCIDENT_STOP_STEP_SIGMAS_DEFAULT (1.0)

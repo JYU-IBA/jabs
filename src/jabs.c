@@ -447,6 +447,27 @@ double ds_lateral_conc(const sim_workspace *ws, const sample *sample, size_t i_i
     return sum;
 }
 
+static int brick_product_exits(const sim_workspace *ws, const jabs_stop *stop_exit, const sample *sample, sim_reaction *sim_r, const ion *incident, const depth d) {
+    /* Returns TRUE if reaction product (from incident ion at depth d) exits the sample and the detector foil (if any). Same calculation as in simulate_reaction(), sets sim_r->p. */
+    ion ion1 = *incident;
+    sim_reaction_product_energy_and_straggling(sim_r, &ion1);
+    if(sim_r->r->type == REACTION_FILE || ws->params->mean_energy_after_reaction_accurate) {
+        sim_r->p.E = resonance_effect_mean_energy(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, ion1.E, ion1.S);
+    }
+    ion p = sim_r->p;
+    if(stop_sample_exit(stop_exit, &ws->stragg, &ws->params->exiting_stop_params, &p, d, sample) != 0) {
+        return FALSE;
+    }
+    if(ws->det->foil) {
+        depth d_foil = {.i = 0, .x = 0.0};
+        ion_set_angle(&p, 0.0, 0.0);
+        if(stop_sample_exit(stop_exit, &ws->stragg, &ws->params->exiting_stop_params, &p, d_foil, ws->det->foil)) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
 int simulate_reaction(const ion *incident, const depth depth_start, sim_workspace *ws, const sample *sample, const des_table *dt, const geostragg_vars *g, sim_reaction *sim_r) {
     ion ion1 = *incident; /* Shallow copy */
     ion_ms_reset(&ion1.ms);
@@ -463,6 +484,7 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
     }
     depth d_before, d_after = depth_start;
     size_t i_des = 0;
+    int threshold_prev = FALSE; /* Previous brick ended where reaction products start (or stop) exiting the sample */
     brick *b = NULL, *b_prev = NULL;
     int skipped, last = FALSE;
 #ifdef DEBUG_VERBOSE
@@ -491,6 +513,8 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             des_set_ion(des_min, &ion1);
             d_after = des_min->d; /* des_table_find_depth() might change the depth */
         }
+        const size_t i_des_before = i_des;
+        const int last_before = last; /* Restored if brick is shortened, see brick_calculate */
         if(i_brick != 0) {
             d_after = des_table_find_depth(dt, &i_des, d_before, &ion1); /* Does this handle E below min? */
         }
@@ -515,6 +539,8 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             crossed = TRUE;
 #endif
         }
+        int threshold = FALSE; /* This brick ends where reaction products start (or stop) exiting the sample */
+brick_calculate: /* The brick is calculated again from here if it is shortened (see below) */
         assert(ion1.S >= 0.0);
         b->d = d_after;
         b->E_0 = ion1.E;
@@ -578,6 +604,38 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             b->E = sim_r->p.E;
             b->S = sim_r->p.S;
         }
+        if(ws->params->brick_exit_threshold && b_prev && !skipped && !threshold_prev && !threshold && b->valid != b_prev->valid && b_prev->E_0 > b->E_0) {
+            /* Reaction products from one end of the brick exit the sample, but from the other end they stop (in the sample or detector foil). A brick is valid or
+             * invalid as a whole, so the brick is shortened to end at the depth where products just stop (or start to exit), found by bisection in incident ion
+             * energy, and calculated again. The part on the other side of the threshold will be the next brick. */
+            const int valid_prev = b_prev->valid;
+            const double E_start = b_prev->E_0, E_end = b->E_0;
+            double E_same = E_start; /* Products exit (or stop) like from the previous brick */
+            double E_other = E_end;
+            for(int i = 0; i < BRICK_EXIT_THRESHOLD_ITERATIONS && E_same - E_other > BRICK_EXIT_THRESHOLD_TOLERANCE * GSL_MIN_DBL(E_start - E_same, E_other - E_end); i++) {
+                /* Threshold is found accurately compared to both parts of the brick (the shortened brick and the next one) */
+                ion ion_try = ion1;
+                ion_try.E = (E_same + E_other) / 2.0;
+                size_t i_des_try = i_des_before;
+                depth d_try = des_table_find_depth(dt, &i_des_try, d_before, &ion_try);
+                if(brick_product_exits(ws, &stop_exit, sample, sim_r, &ion_try, d_try) == valid_prev) {
+                    E_same = ion_try.E;
+                } else {
+                    E_other = ion_try.E;
+                }
+            }
+            ion1.E = E_same;
+            i_des = i_des_before;
+            d_after = des_table_find_depth(dt, &i_des, d_before, &ion1);
+            DEBUGMSG("Brick %zu ends at E = %g keV (incident), where reaction products %s exiting the sample.", i_brick, ion1.E / C_KEV, valid_prev ? "stop" : "start");
+            threshold = TRUE;
+            last = last_before || ion1.E <= des_min->E; /* Shortened brick is not the last one, unless it reaches DES minimum (same check as above) */
+            b->valid = TRUE;
+            b->S_geo_x = 0.0;
+            b->S_geo_y = 0.0;
+            goto brick_calculate;
+        }
+        threshold_prev = threshold;
         if(ws->ms_spread) {
             simulate_reaction_ms(ws, sim_r, &ion1, P_foil, b);
         } else {
