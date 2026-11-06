@@ -73,23 +73,13 @@ void ion_set_angle(ion *ion, double theta, double phi) {
     ion->inverse_cosine_phi = 1.0/ion->cosine_phi;
 }
 
-double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, double E, int accurate) {
+double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, double E) {
 #ifdef DEBUG
     assert(isotope->i < ion->nucl_stop->n_isotopes);
     assert(ion->nucl_stop->t[isotope->i].target == isotope);
 #endif
     nucl_stop_pair x = ion->nucl_stop->t[isotope->i];
-    const double epsilon = x.eps0 * E;
-    if(accurate) {
-        if(epsilon <= 30.0) {
-            return x.k * log(1 + 1.1383 * epsilon) / (2 * (epsilon + 0.01321 * pow(epsilon, 0.21226) + 0.19593 * sqrt(epsilon)));
-        }
-    } else {
-        if (epsilon <= M_E) {
-            return x.k / (2.0 * M_E); /* Below the maximum (of the else-branch) return maximum. The approximation is bad, but better than nothing. */
-        }
-    }
-    return (x.k * log(epsilon) / (2.0 * epsilon));
+    return x.k * nuclear_stopping_universal(ion->nucl_stop, x.eps0 * E);
 }
 
 void ion_rotate(ion *ion, double theta2, double phi2) { /* Wrapper for rotate() */

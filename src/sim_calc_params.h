@@ -54,7 +54,6 @@ typedef struct sim_calc_params {
     size_t cs_n_stragg_steps; /* Number of steps to take, when calculating straggling weighted cross sections. If zero, adaptive integration is used. */
     size_t n_bricks_max;
     int rk4; /* Use fourth order Runge-Kutta for energy loss calculation (differential equation with dE/dx). When false, a first-order method is used. */
-    int nuclear_stopping_accurate; /* Use accurate nuclear stopping equation true/false. When false a faster (poorly approximating) equation is used below the nuclear stopping maximum. */
     int mean_conc_and_energy; /* Calculation of cross-section concentration product is simplified by calculating cross section at mean energy of a depth step and concentration at mid-bin (only relevant for samples with concentration gradients) */
     int geostragg; /* Geometric straggling true/false */
     ms_model_type ms; /* Small angle multiple scattering model, MS_MODEL_NONE if disabled */

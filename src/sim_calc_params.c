@@ -51,7 +51,6 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
     p->ds_reaction_spectra = DS_REACTION_SPECTRA_INCLUDED;
     p->ms = MS_MODEL_NONE;
     p->rk4 = TRUE;
-    p->nuclear_stopping_accurate = TRUE;
     p->mean_conc_and_energy = FALSE;
     p->cs_n_stragg_steps = CS_STRAGG_STEPS;
     p->rough_layer_multiplier = 1.0;
@@ -77,18 +76,18 @@ sim_calc_params *sim_calc_params_defaults(sim_calc_params *p) {
 
 sim_calc_params *sim_calc_params_defaults_fast(sim_calc_params *p) {
     sim_calc_params_defaults(p);
-    p->rk4 = FALSE;
-    p->nuclear_stopping_accurate = FALSE;
     p->mean_conc_and_energy = TRUE;
     p->cs_n_stragg_steps = 0; /* Not used if mean_conc_and_energy == TRUE */
     p->geostragg = FALSE;
     p->rough_layer_multiplier = 0.5;
     p->sigmas_cutoff = SIGMAS_FAST_CUTOFF;
-    p->incident_stop_params.min *= 2.0;
-    p->incident_stop_params.sigmas *= 1.5;
-    p->exiting_stop_params.min *= 1.5;
-    p->exiting_stop_params.sigmas *= 1.5;
-    p->exiting_stop_params.max *= 1.5;
+    /* RK4 with long steps is both faster and much more accurate than first-order stepping with short steps */
+    p->incident_stop_params.min *= 4.0;
+    p->incident_stop_params.sigmas *= 2.5;
+    p->incident_stop_params.max *= 2.0;
+    p->exiting_stop_params.min *= 2.5;
+    p->exiting_stop_params.sigmas *= 2.5;
+    p->exiting_stop_params.max *= 2.0;
     p->bricks_skip_zero_conc_ranges = TRUE;
     return p;
 }
@@ -212,7 +211,6 @@ void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_lev
         jabs_message(msg_level, "maximum step for exiting ions = %.3lf keV\n", params->exiting_stop_params.max / C_KEV);
     }
     jabs_message(msg_level, "stopping RK4 = %s\n", params->rk4?"true":"false");
-    jabs_message(msg_level, "accurate nuclear stopping = %s\n", params->nuclear_stopping_accurate?"true":"false");
     if(params->n_bricks_max) {
         jabs_message(msg_level, "maximum number of bricks = %zu\n", params->n_bricks_max);
     }

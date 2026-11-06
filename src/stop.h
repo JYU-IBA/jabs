@@ -26,7 +26,6 @@ extern "C" {
 typedef struct jabs_stop {
     jibal_gsto *gsto;
     gsto_stopping_type type;
-    int nuclear_stopping_accurate;
     int rk4;
     double emin;
     const ms_model *ms; /* Small angle multiple scattering model, NULL if multiple scattering is not calculated */

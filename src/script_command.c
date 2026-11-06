@@ -1335,7 +1335,6 @@ script_command *script_commands_create(script_session *s) {
         {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_min",         "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->exiting_stop_params.min,       NULL,"Exiting ion stop step minimum"},
         {JIBAL_CONFIG_VAR_UNIT,   "exiting_stop_step_max",         "keV", JIBAL_UNIT_TYPE_ENERGY,          &sim->params->exiting_stop_params.max,       NULL,"Exiting ion stop step maximum"},
         {JIBAL_CONFIG_VAR_DOUBLE, "ds_incident_stop_step_factor",  0,     0,                               &sim->params->ds_incident_stop_step_factor,  NULL, "Dual scattering stopping step factor"},
-        {JIBAL_CONFIG_VAR_BOOL,   "nuclear_stopping_accurate",     0,     0,                               &sim->params->nuclear_stopping_accurate,     NULL, "Accurate nuclear stopping"},
         {JIBAL_CONFIG_VAR_BOOL,   "mean_conc_and_energy",          0,     0,                               &sim->params->mean_conc_and_energy,          NULL, "Calculate concentration and energy at mean brick width (fast but inaccurate)"},
         {JIBAL_CONFIG_VAR_BOOL,   "geostragg",                     0,     0,                               &sim->params->geostragg,                     NULL, "Geometric straggling"},
         {JIBAL_CONFIG_VAR_OPTION, "ms",                           0,     0,                               &sim->params->ms,                            ms_model_option, "Small angle multiple scattering model (none, TF or LJ)"},
