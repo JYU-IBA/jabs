@@ -206,7 +206,6 @@ void sim_calc_params_ds_trajectories(sim_calc_params *p) {
     p->exiting_stop_params.sigmas *= DUAL_SCATTER_STEP_SIGMAS_MULTIPLIER;
     p->exiting_stop_params.max *= DUAL_SCATTER_EXITING_STEP_MULTIPLIER;
     p->brick_yield_max_variation = 0.0; /* Bricks are not shortened due to yield variation */
-    p->brick_exit_threshold = FALSE;
     p->bricks_skip_zero_conc_ranges = TRUE;
 }
 
@@ -236,7 +235,7 @@ void sim_calc_params_print(const sim_calc_params *params, jabs_msg_level msg_lev
     jabs_message(msg_level, "multiple scattering = %s\n", ms_model_name(params->ms));
     jabs_message(msg_level, "brick width = %g times detector and straggling sum sigma\n", params->brick_width_sigmas);
     jabs_message(msg_level, "maximum relative variation of yield (cross section times concentration) across a brick = %g (0 = no limit)\n", params->brick_yield_max_variation);
-    jabs_message(msg_level, "bricks end where reaction products start or stop exiting the sample = %s\n", params->brick_exit_threshold ? "true" : "false");
+    jabs_message(msg_level, "bricks where reaction products start or stop exiting the sample are counted partially = %s\n", params->brick_exit_threshold ? "true" : "false");
     jabs_message(msg_level, "cross section of brick determined using mean concentration and energy = %s\n", params->mean_conc_and_energy?"true":"false");
     if(!params->mean_conc_and_energy) {
         if(params->cs_adaptive) {

@@ -51,8 +51,6 @@ extern "C" {
 #define BRICK_YIELD_SAMPLES (5) /* Number of yield evaluations across a brick, when brick_yield_max_variation is used */
 #define BRICK_YIELD_REFINE_MAX (16.0) /* Bricks are shortened at most by this factor due to yield variation */
 #define BRICK_YIELD_STRAGG_MIN (1.0 * C_EV) /* Energy spread (standard deviation) of incident ions below which cross section is not averaged over the energy distribution when determining yield variation */
-#define BRICK_EXIT_THRESHOLD_ITERATIONS (30) /* Maximum number of bisection steps when finding the depth where reaction products start to stop in the sample */
-#define BRICK_EXIT_THRESHOLD_TOLERANCE (0.02) /* Bisection stops when energy interval is this fraction of both parts of the brick (in incident ion energy) */
 #define BRICK_WIDTH_SIGMAS_DEFAULT (2.0) /* Attempt to make bricks width energy difference equal to this many times the detector resolution and straggling sigmas combined (in quadrature (variances)) */
 #define INCIDENT_STOP_STEP_DEFAULT (0.0*C_KEV) /* Zero is automatic */
 #define INCIDENT_STOP_STEP_SIGMAS_DEFAULT (1.0)

@@ -426,7 +426,19 @@ double stop_step_calc(const jabs_stop_step_params *params, const ion *ion) {
 }
 
 int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, const depth depth_start, const sample *sample) {
+    return stop_sample_exit_remaining(stop, stragg, params_exiting, p, depth_start, sample, NULL);
+}
+
+static double stop_remaining_path(const ion *p, const sample *sample, depth d) { /* Path length from depth d to the surface the ion is heading to */
+    double x = (p->inverse_cosine_theta > 0.0) ? sample->thickness - d.x : d.x;
+    return GSL_MAX_DBL(x, 0.0) * fabs(p->inverse_cosine_theta);
+}
+
+int stop_sample_exit_remaining(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, const depth depth_start, const sample *sample, double *remaining) {
     depth d = depth_start;
+    if(remaining) {
+        *remaining = 0.0;
+    }
     int last = FALSE;
     double emin = GSL_MAX_DBL(stop->emin, p->ion_gsto->emin);
     const int adaptive = stop->rk4 && stop->accuracy > 0.0;
@@ -450,6 +462,9 @@ int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_
         if(p->E - E_step <= emin) {
             if(p->E <= emin) {
                 DEBUGMSG("Energy %g keV is below %g keV. Assuming ion stops.\n", p->E / C_KEV, emin / C_KEV);
+                if(remaining) {
+                    *remaining = stop_remaining_path(p, sample, d);
+                }
                 return -1;
             }
             E_step = p->E - emin;
@@ -463,6 +478,9 @@ int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_
             last = FALSE;
         }
         d = d_after;
+    }
+    if(remaining) {
+        *remaining = stop_remaining_path(p, sample, d);
     }
     return -1; /* Stopped inside the sample */
 }

@@ -45,6 +45,7 @@ typedef struct {
     double S_sum; /* Sum (quadrature) of all broadening. */
     double deriv; /* dE_0/dE_r, estimate. Multiply this by wanted E_r change to get E_0 change  */
     double dE; /* Energy change in brick */
+    double excess; /* Excess range of reaction product (path length it could still go when detected), negative if it stopped (path length still remaining) */
     double effective_stopping;
 } brick;
 

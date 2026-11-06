@@ -65,6 +65,7 @@ double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sam
 double stop_step_calc(const jabs_stop_step_params *params, const ion *ion);
 double stop_step_max(const jabs_stop_step_params *params, const ion *ion);
 int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, depth depth_start, const sample *sample);
+int stop_sample_exit_remaining(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, depth depth_start, const sample *sample, double *remaining); /* Like stop_sample_exit(), if ion stops, path length it still had to go to the surface is stored in remaining (if not NULL) */
 #ifdef __cplusplus
 }
 #endif
