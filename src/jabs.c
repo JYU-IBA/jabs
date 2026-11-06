@@ -17,6 +17,7 @@
 #endif
 
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
 #include <math.h>
 #include <jibal_units.h>
@@ -447,6 +448,46 @@ double ds_lateral_conc(const sim_workspace *ws, const sample *sample, size_t i_i
     return sum;
 }
 
+static double brick_step_yield_limited(const sim_workspace *ws, const des_table *dt, const sample *sample, const sim_reaction *sim_r, const ion *incident, depth d_front, size_t i_des, double E_change) {
+    /* Shortens the incident ion energy step E_change (negative) of the next brick until the yield per unit thickness, i.e. effective cross section (cross section
+     * averaged over the energy distribution of incident ions, see cross_section_straggling() and Barradas et al. NIMB 247 (2006) 381) times concentration, varies
+     * at most brick_yield_max_variation (relative to mean) across the brick. Counts of a brick are distributed evenly between its edge energies, so yield that
+     * varies strongly inside a brick (e.g. near a resonance close to the surface or due to concentration gradients) would shift and distort the spectrum. Brick
+     * starts at d_front, incident ion energy and energy spread at sample points are found from the DES table starting from index i_des. The step is shortened at
+     * most by BRICK_YIELD_REFINE_MAX. */
+    const double max_variation = ws->params->brick_yield_max_variation;
+    const double E_change_min = E_change / BRICK_YIELD_REFINE_MAX;
+    while(fabs(E_change) > fabs(E_change_min) * 1.001) {
+        double y_min = 0.0, y_max = 0.0, y_sum = 0.0;
+        for(int k = 0; k < BRICK_YIELD_SAMPLES; k++) {
+            ion ion_k = *incident;
+            depth d_k = d_front;
+            if(k > 0) {
+                ion_k.E += E_change * k / (BRICK_YIELD_SAMPLES - 1.0);
+                size_t i_des_k = i_des;
+                d_k = des_table_find_depth(dt, &i_des_k, d_front, &ion_k);
+            }
+            double y;
+            if(ion_k.S > pow2(BRICK_YIELD_STRAGG_MIN)) {
+                y = cross_section_straggling(sim_r, ws->w_int_cs_stragg, ws->params->int_cs_stragg_accuracy, ws->params->cs_stragg_pd, ion_k.E, ion_k.S, FALSE);
+            } else { /* No energy spread (e.g. at the surface) */
+                y = sim_r->cross_section(sim_r, ion_k.E);
+            }
+            if(!sample->no_conc_gradients) {
+                y *= get_conc(sample, d_k, sim_r->i_isotope);
+            }
+            y_min = (k == 0) ? y : GSL_MIN_DBL(y_min, y);
+            y_max = (k == 0) ? y : GSL_MAX_DBL(y_max, y);
+            y_sum += y;
+        }
+        if(y_sum <= 0.0 || (y_max - y_min) <= max_variation * y_sum / BRICK_YIELD_SAMPLES) {
+            break;
+        }
+        E_change /= 2.0;
+    }
+    return E_change;
+}
+
 static int brick_product_exits(const sim_workspace *ws, const jabs_stop *stop_exit, const sample *sample, sim_reaction *sim_r, const ion *incident, const depth d) {
     /* Returns TRUE if reaction product (from incident ion at depth d) exits the sample and the detector foil (if any). Same calculation as in simulate_reaction(), sets sim_r->p. */
     ion ion1 = *incident;
@@ -501,6 +542,17 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
 #ifdef DEBUG_VERBOSE
         crossed = FALSE;
 #endif
+        if(i_brick > 0 && i_brick + 1 == sim_r->n_bricks && !ws->params->n_bricks_max && sim_r->n_bricks < BRICKS_MAX) { /* Running out of bricks, get more (unless user has set the maximum) */
+            size_t n_bricks = GSL_MIN(2 * sim_r->n_bricks, BRICKS_MAX);
+            brick *bricks = realloc(sim_r->bricks, n_bricks * sizeof(brick));
+            if(bricks) {
+                memset(bricks + sim_r->n_bricks, 0, (n_bricks - sim_r->n_bricks) * sizeof(brick));
+                sim_r->bricks = bricks;
+                sim_r->n_bricks = n_bricks;
+                b = &sim_r->bricks[i_brick - 1]; /* Pointers to bricks must be updated */
+                DEBUGMSG("Number of bricks increased to %zu.", n_bricks);
+            }
+        }
         b_prev = b;
         b = &sim_r->bricks[i_brick];
         b->valid = TRUE; /* Will be invalidated if necessary */
@@ -718,6 +770,9 @@ brick_calculate: /* The brick is calculated again from here if it is shortened (
             assert(S_sigma > 0.0);
             double E_change = -ws->params->brick_width_sigmas * S_sigma / E_deriv;
             assert(E_change < 0.0);
+            if(ws->params->brick_yield_max_variation > 0.0) {
+                E_change = brick_step_yield_limited(ws, dt, sample, sim_r, &ion1, d_after, i_des, E_change);
+            }
             ion1.E += E_change;
         }
     }

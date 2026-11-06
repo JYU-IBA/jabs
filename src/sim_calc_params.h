@@ -68,6 +68,7 @@ typedef struct sim_calc_params {
     double ds_incident_stop_step_factor;
     double brick_width_sigmas;
     int brick_exit_threshold; /* Bricks where reaction products start or stop exiting the sample (or detector foil) are ended at the threshold depth (TRUE/FALSE). Otherwise these bricks are valid or invalid as a whole. */
+    double brick_yield_max_variation; /* Bricks are shortened (up to BRICK_YIELD_REFINE_MAX times) until yield (effective cross section times concentration) varies at most this much relative to its mean across a brick. Counts of a brick are distributed evenly in energy, so yield variation within a brick shifts and distorts the spectrum. Zero: no limit. */
     double rough_layer_multiplier; /* Multiply given (or default) number of subspectra when calculating rough layers. */
     double sigmas_cutoff; /* Number of (+-) sigmas to consider when turning bricks to spectra */
     size_t int_cs_max_intervals;
