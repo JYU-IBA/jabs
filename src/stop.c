@@ -270,6 +270,10 @@ int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_
             last = TRUE;
         }
         depth d_after = stop_step(stop, stragg, p, sample, d, E_step);
+        if(last && p->E - emin > STOP_LAST_STEP_REMAINDER * E_step) { /* Last step was truncated at range boundary or energy loss was smaller than expected (stopping decreases with energy) */
+            DEBUGMSG("Last step ended at depth %g tfu with E = %g keV, which is still above emin = %g keV, continuing.", d_after.x / C_TFU, p->E / C_KEV, emin / C_KEV);
+            last = FALSE;
+        }
         d = d_after;
     }
     return -1; /* Stopped inside the sample */
