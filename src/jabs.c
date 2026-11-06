@@ -1052,8 +1052,6 @@ int simulate_with_ds(sim_workspace *ws) {
     const double t_start = jabs_clock();
     double t_progress = t_start;
     const double E_start = ion1.E;
-    double E_progress = E_start;
-    double rate = 0.0; /* Smoothed rate of incident energy decrease per second, for estimate of remaining time */
     size_t n_trajectories = 0;
     for(size_t i_depth = 0; ; i_depth++) {
         if(last) {
@@ -1169,20 +1167,10 @@ int simulate_with_ds(sim_workspace *ws) {
         ws->ds_traj.active = FALSE;
         const double t_now = jabs_clock();
         if(ws->progress && t_now - t_progress >= DUAL_SCATTER_PROGRESS_INTERVAL) {
-            const double rate_now = (E_progress - E_back) / (t_now - t_progress); /* Cost of depth steps varies (e.g. heavy layers with many isotopes), recent rate is a better predictor */
-            rate = (rate > 0.0) ? 0.5 * rate + 0.5 * rate_now : rate_now;
             t_progress = t_now;
-            E_progress = E_back;
             double fraction = (E_start - E_back) / (E_start - emin);
             fraction = GSL_MIN_DBL(GSL_MAX_DBL(fraction, 0.0), 1.0);
-            double elapsed = t_now - t_start;
-            if(rate > 0.0) { /* Remaining time is an upper estimate, calculation often ends before minimum energy */
-                jabs_progress(fraction, "Dual scattering: E = %.1lf keV, depth %.0lf tfu, %.0lf s, ~%.0lf s left",
-                              E_back / C_KEV, d_after.x / C_TFU, elapsed, (E_back - emin) / rate);
-            } else {
-                jabs_progress(fraction, "Dual scattering: E = %.1lf keV, depth %.0lf tfu, %.0lf s",
-                              E_back / C_KEV, d_after.x / C_TFU, elapsed);
-            }
+            jabs_progress(fraction, "Dual scattering: E = %.1lf keV, depth %.0lf tfu", E_back / C_KEV, d_after.x / C_TFU);
             progress_shown = TRUE;
         }
         if(ws->sample->ranges[ws->sample->n_ranges - 1].x - d_after.x < 0.01 * C_TFU)
