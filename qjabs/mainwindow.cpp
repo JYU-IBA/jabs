@@ -75,8 +75,7 @@ MainWindow::MainWindow(QWidget *parent)
     actionStop->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Period));
     actionStop->setEnabled(false);
     connect(actionStop, &QAction::triggered, this, &MainWindow::stopRun);
-    ui->toolBar->addAction(actionStop);
-    ui->menu_File->insertAction(ui->action_New_File, actionStop);
+    addAction(actionStop); /* Shortcut works in the whole window. Toolbar and menu have the run action, which stops a run. */
     connect(this, &MainWindow::fitProgress, this, &MainWindow::onFitProgress); /* Emitted from worker thread, queued */
     connect(this, &MainWindow::progressChanged, this, &MainWindow::onProgressChanged); /* Emitted from worker thread, queued */
     setupRunPanel();
@@ -394,7 +393,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::enableRun(bool enabled)
 {
-    ui->action_Run->setEnabled(enabled);
+    ui->action_Run->setEnabled(enabled || running); /* Stops a run */
+    updateRunAction();
     ui->commandLineEdit->setEnabled(enabled);
     ui->action_New_File->setEnabled(enabled);
     ui->action_Open_File->setEnabled(enabled);
@@ -407,6 +407,21 @@ void MainWindow::enableRun(bool enabled)
     ui->editor->setReadOnly(!enabled); /* Highlighter uses session (commands), which a running script can modify */
     if(actionStop) {
         actionStop->setEnabled(!enabled && running);
+    }
+}
+
+void MainWindow::updateRunAction()
+{
+    if(running) {
+        ui->action_Run->setIcon(stopIcon);
+        ui->action_Run->setText(QString("&Stop"));
+        ui->action_Run->setToolTip(QString("Stop running simulation or fit"));
+        ui->action_Run->setShortcut(QKeySequence()); /* Pressing run shortcut twice does not stop a run */
+    } else {
+        ui->action_Run->setIcon(runIcon);
+        ui->action_Run->setText(QString("&Run script"));
+        ui->action_Run->setToolTip(QString("Reset and run script"));
+        ui->action_Run->setShortcut(QKeySequence::Refresh);
     }
 }
 
@@ -575,8 +590,10 @@ void MainWindow::applyColors()
     ui->widget->setColors(colorProfile.color("plotBackground"), colorProfile.color("plotForeground"), colorProfile.color("plotGrid"), colorProfile.color("plotLegendBackground"));
 
     const QColor iconColor = colorProfile.color("iconColor", appPalette.color(QPalette::ButtonText));
+    runIcon = ColorProfile::themedIcon(":/icons/play-box.svg", iconColor);
+    stopIcon = ColorProfile::themedIcon(":/icons/stop-box.svg", iconColor);
+    updateRunAction();
     const QList<QPair<QAction *, QString>> icons = {
-        {ui->action_Run, ":/icons/play-box.svg"},
         {ui->action_New_File, ":/icons/file-document.svg"},
         {ui->action_Open_File, ":/icons/folder-open.svg"},
         {ui->action_Save_File, ":/icons/content-save.svg"},
@@ -708,7 +725,8 @@ void MainWindow::on_action_Run_triggered()
         QMessageBox::critical(this, "Error", "Session not initialized.\n");
         return;
     }
-    if(running) {
+    if(running) { /* Run action is a stop action while running */
+        stopRun();
         return;
     }
     if(firstRun) {

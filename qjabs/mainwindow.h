@@ -167,6 +167,7 @@ private:
     void closeEvent(QCloseEvent *event);
     void changeEvent(QEvent *event) override;
     void enableRun(bool enabled);
+    void updateRunAction(); /* Run action is a stop action while running */
     void setupRunPanel();
     void showRunPanel(bool show);
     int initSession();
@@ -205,7 +206,9 @@ private:
     bool running; /* Worker is running. GUI must not access session while this is true. */
     RunMode runMode;
     QElapsedTimer runTimer;
-    QAction *actionStop;
+    QAction *actionStop; /* In run panel (and shortcut) */
+    QIcon runIcon; /* Icons of run action (themed) */
+    QIcon stopIcon;
     QFrame *runPanel; /* Shown during a run: progress, fit statistics, stop */
     QLabel *runStatusLabel;
     QProgressBar *progressBar;
