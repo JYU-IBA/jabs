@@ -69,7 +69,7 @@ void ion_reset(ion *ion);
 void ion_ms_reset(ion_ms *ms); /* Resets multiple scattering state, i.e. start of a new path */
 void ion_set_isotope(ion *ion, const jibal_isotope *isotope);
 void ion_set_angle(ion *ion, double theta, double phi);
-double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, int accurate);
+double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, double E, int accurate);
 void ion_rotate(ion *ion, double theta2, double phi2);
 void ion_print(FILE *f, const ion *ion);
 jabs_ion_gsto *ion_gsto_new(const jibal_isotope *incident, const jibal_gsto *gsto);

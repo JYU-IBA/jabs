@@ -217,7 +217,7 @@ double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sam
         }
 
         if(stop->type == GSTO_STO_TOT) {
-            S += ion_nuclear_stop(incident, target, stop->nuclear_stopping_accurate);
+            S += ion_nuclear_stop(incident, target, E, stop->nuclear_stopping_accurate);
         }
         out += c * S;
     }
