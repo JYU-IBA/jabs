@@ -266,6 +266,8 @@ int reaction_theta_within_tolerance(const reaction *r, const sim_calc_params *p,
     return (fabs(theta - r->theta) <= p->reaction_file_angle_tolerance);
 }
 
+static void reaction_kinematic_coefficients(const reaction *r, double E, double *a13, double *a24);
+
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile) {
     const jibal_isotope *nuclei[R33_N_NUCLEI];
     if(rfile->n_data < 2) {
@@ -336,6 +338,16 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     }
     r->E_min = r->cs_table[0].E;
     r->E_max = r->cs_table[r->n_cs_table - 1].E;
+    if(r->cs_total) {
+        for(size_t i = 0; i < r->n_cs_table; i++) {
+            double a13, a24;
+            reaction_kinematic_coefficients(r, r->cs_table[i].E, &a13, &a24);
+            if(a13 > a24) {
+                jabs_message(MSG_WARNING, "Reaction product has two kinematic solutions at some energies (first at %g keV, maximum angle %g deg), only the higher energy solution is used with total cross section.\n", r->cs_table[i].E / C_KEV, asin(sqrt(a24 / a13)) / C_DEG);
+                break;
+            }
+        }
+    }
     r->nucl_stop = NULL; /* Will be handled when reaction is added */
     reaction_generate_name(r);
     return r;
