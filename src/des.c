@@ -13,6 +13,8 @@
  */
 #include <stdlib.h>
 #include <math.h>
+#include <jibal_units.h>
+#include <jibal_phys.h>
 #include <jibal_cross_section.h>
 #include <gsl/gsl_math.h>
 #include <assert.h>
@@ -206,13 +208,28 @@ depth des_table_find_depth(const des_table *dt, size_t *i_des, depth depth_prev,
 }
 
 double des_total_cross_section(const jibal_isotope *incident, const jibal_isotope *target, double theta_min, double E) {
+    /* Integrated in CM, since lab cross section is not defined above maximum scattering angle (m1 > m2) and has two branches below it.
+     * Lab angle exceeds theta_min between CM angles theta_min + asin(m12 sin(theta_min)) and pi (m1 <= m2) or theta_min + pi - asin(m12 sin(theta_min)) (m1 > m2). */
+    const double m12 = incident->mass / target->mass;
+    const double x = m12 * sin(theta_min);
+    if(theta_min >= C_PI || (m12 > 1.0 && (x >= 1.0 || theta_min >= C_PI_2))) { /* Scattering to lab angles above theta_min is not possible */
+        return 0.0;
+    }
+    const double theta_cm_low = theta_min + asin(x);
+    const double theta_cm_high = m12 > 1.0 ? theta_min + C_PI - asin(x) : C_PI;
+    if(theta_cm_high <= theta_cm_low) {
+        return 0.0;
+    }
+    const double E_cm = E * target->mass / (incident->mass + target->mass);
+    const double sigma_r_const = pow2((incident->Z * C_E * target->Z * C_E) / (4.0 * C_PI * C_EPSILON0)) * pow2(1.0 / (4.0 * E_cm)); /* Rutherford (CM) is this divided by sin^4(theta_cm/2) */
     const int n = DES_BEAM_LOSS_ANGLE_STEPS;
-    const double u_min = log(theta_min), u_max = log(C_PI);
+    const double u_min = log(theta_cm_low), u_max = log(theta_cm_high);
     const double du = (u_max - u_min) / n;
     double sum = 0.0;
-    for(int i = 0; i < n; i++) { /* Midpoint rule in u = ln(theta), d(Omega) = 2 pi sin(theta) theta du */
-        double theta = exp(u_min + (i + 0.5) * du);
-        sum += jibal_cross_section_rbs(incident, target, theta, E, JIBAL_CS_ANDERSEN) * 2.0 * C_PI * sin(theta) * theta * du;
+    for(int i = 0; i < n; i++) { /* Midpoint rule in u = ln(theta_cm), d(Omega_cm) = 2 pi sin(theta_cm) theta_cm du */
+        double theta_cm = exp(u_min + (i + 0.5) * du);
+        double sigma_cm = sigma_r_const / pow4(sin(theta_cm / 2.0)) * jibal_andersen_correction(incident->Z, target->Z, E_cm, theta_cm);
+        sum += sigma_cm * 2.0 * C_PI * sin(theta_cm) * theta_cm * du;
     }
     return sum;
 }

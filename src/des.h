@@ -41,7 +41,7 @@ typedef struct {
 int des_table_realloc(des_table *dt, size_t n);
 void des_table_free(des_table *dt);
 des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, const sim_calc_params *scp, const sample *sample, const ion *incident, depth depth_start, double emin, double beam_loss_angle_min); /* If beam_loss_angle_min > 0, beam is attenuated by scattering to angles above it (dual scattering) */
-double des_total_cross_section(const jibal_isotope *incident, const jibal_isotope *target, double theta_min, double E); /* Andersen screened cross section, integrated from theta_min to pi (lab) */
+double des_total_cross_section(const jibal_isotope *incident, const jibal_isotope *target, double theta_min, double E); /* Andersen screened cross section, integrated over lab scattering angles above theta_min (in CM, both kinematic branches when m1 > m2) */
 size_t des_table_size(const des_table *dt);
 des *des_table_element(const des_table *dt, size_t i);
 void des_table_rebuild_index(des_table *dt); /* called by des_table_compute() after setting values to table and before any other function can be used */

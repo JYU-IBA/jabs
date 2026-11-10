@@ -1201,12 +1201,16 @@ int simulate_with_ds(sim_workspace *ws) {
                     continue;
                 }
                 const jibal_isotope *target = ws->sample->isotopes[i];
-                if(incident->mass >= target->mass && ds_polar > asin(target->mass / incident->mass)) { /* Scattering not possible */
+                const double theta_max = incident->mass >= target->mass ? asin(target->mass / incident->mass) : C_PI; /* Maximum scattering angle */
+                if(ds_polar > theta_max) { /* Scattering not possible */
                     continue;
                 }
                 double cs = 0.0;
                 for(int polar_substep = 0; polar_substep < ds_steps_polar_substeps; polar_substep++) {
                     double ds_polar_sub = ds_polar_low + ds_polar_step * (polar_substep + 0.5) / (ds_steps_polar_substeps * 1.0);
+                    if(ds_polar_sub >= theta_max) { /* Substeps of the bin above maximum scattering angle do not contribute (cross section is not defined there) */
+                        continue;
+                    }
                     cs += jibal_cross_section_rbs(incident, target, ds_polar_sub, E_mean, JIBAL_CS_ANDERSEN) * sin(ds_polar_sub) / (ds_steps_polar_substeps * 1.0);
                 }
                 dw->fluence = c * cs * thick_step * ion1.inverse_cosine_theta * (2.0 * C_PI) * ds_polar_step; /* Fraction of incident ions scattered into this polar angle bin */
