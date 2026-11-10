@@ -392,7 +392,7 @@ double reaction_product_energy(const reaction *r, double theta, double E) { /* H
     double a13 = ((m1 * m3)/((m1 + m2)*(m3 + m4))) * (E / E_total);
     double a24 = ((m2 * m4)/((m1 + m2)*(m3 + m4))) * (1 + (m1/m2) * Q / E_total);
     if(a13 > a24) {
-        const double theta_max = sqrt(asin(a24/a13));
+        const double theta_max = asin(sqrt(a24/a13));
         if(theta > theta_max) {
             return 0.0;
         }
