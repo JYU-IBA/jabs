@@ -51,7 +51,11 @@ void reactions_print(reaction * const * reactions, size_t n_reactions) {
             jabs_message(MSG_INFO, ", yield = %g", r->yield);
         }
         if(r->type == REACTION_FILE) {
-            jabs_message(MSG_INFO, ", Theta = %g deg,  Data from file \"%s\".\n", r->theta/C_DEG, r->filename);
+            if(r->cs_total) {
+                jabs_message(MSG_INFO, ", total cross section (isotropic in CM, any angle),  Data from file \"%s\".\n", r->filename);
+            } else {
+                jabs_message(MSG_INFO, ", Theta = %g deg,  Data from file \"%s\".\n", r->theta/C_DEG, r->filename);
+            }
         }
 #ifdef JABS_PLUGINS
         else if(r->type == REACTION_PLUGIN) {
@@ -250,7 +254,10 @@ int reaction_is_possible(const reaction *r, const sim_calc_params *p, double the
             return FALSE;
         }
     } else if(type == REACTION_FILE) {
-            return reaction_theta_within_tolerance(r, p, theta);
+        if(r->cs_total) { /* Valid at any angle, cross section is zero where the product can not go */
+            return TRUE;
+        }
+        return reaction_theta_within_tolerance(r, p, theta);
     }
     return TRUE;
 }
@@ -303,7 +310,8 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
         jabs_message(MSG_ERROR, "R33 file is in units of ratio to Rutherford, but reaction product (%s) is not the same as target (%s). I don't know what to do.\n", r->product->name, r->target->name);
         return NULL;
     }
-    r->theta = rfile->theta * C_DEG;
+    r->cs_total = (rfile->unit == R33_UNIT_TOT);
+    r->theta = r->cs_total ? 0.0 : rfile->theta * C_DEG; /* Theta of a total cross section is meaningless, it is valid at any angle */
     r->Q = rfile->Qvalues[0] * C_KEV; /* TODO: other values? */
     if(rfile->filename) {
         r->filename = strdup(rfile->filename);
@@ -313,20 +321,6 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
     /* TODO: copy and convert data (check units etc) */
     r->n_cs_table = rfile->n_data;
     r->cs_table = calloc(r->n_cs_table, sizeof(reaction_point));
-
-    double cs_conversion_ratio = 0.0;
-    if(rfile->unit == R33_UNIT_TOT) {
-        double m12 = r->incident->mass/r->target->mass;
-        if(m12 > 1.0) { /* Inverse kinematics needed? */
-            cs_conversion_ratio = 0.0;
-            jabs_message(MSG_WARNING, "R33 total cross section with m1 > m2 is not yet supported.\n");
-        } else {
-            double theta_cm = r->theta + asin(m12 * sin(r->theta));
-            cs_conversion_ratio = sigma_lab_to_cm(theta_cm, m12) / (4.0 * C_PI);
-            DEBUGMSG("R33 CS total to differential (assuming isotropic in CM) conv ratio %g, CM theta %g deg, lab theta %g deg", cs_conversion_ratio, theta_cm/C_DEG, r->theta/C_DEG);
-        }
-    }
-
     for(size_t i = 0; i < rfile->n_data; i++) {
         reaction_point *rp = &r->cs_table[i];
         rp->E = rfile->data[i][0] * rfile->enfactors[0] * C_KEV; /* TODO: other factors? */
@@ -334,8 +328,8 @@ reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rf
             rp->sigma = rfile->data[i][2] * rfile->sigfactors[0] * jibal_cross_section_rbs(r->incident, r->target, r->theta, rp->E, JIBAL_CS_RUTHERFORD);
         } else if (rfile->unit == R33_UNIT_MB){
             rp->sigma = rfile->data[i][2] * rfile->sigfactors[0] * C_MB_SR;
-        } else if (rfile->unit == R33_UNIT_TOT) {
-            rp->sigma = rfile->data[i][2] * rfile->sigfactors[0] * C_MB_SR * cs_conversion_ratio;
+        } else if (rfile->unit == R33_UNIT_TOT) { /* Total cross section (mb), converted to lab differential cross section for each angle by sim_reaction_cross_section_tabulated_total() */
+            rp->sigma = rfile->data[i][2] * rfile->sigfactors[0] * C_MB_SR;
         } else {
             rp->sigma = 0.0;
         }
@@ -366,6 +360,16 @@ int reaction_compare(const void *a, const void *b) {
     }
 }
 
+static void reaction_kinematic_coefficients(const reaction *r, double E, double *a13, double *a24) { /* Non-relativistic two-body kinematics, product energy at lab angle theta is (E + Q) * a13 * (cos(theta) +- sqrt(a24/a13 - sin^2(theta)))^2 */
+    const double m1 = r->incident->mass;
+    const double m2 = r->target->mass;
+    const double m3 = r->product->mass;
+    const double m4 = r->residual->mass;
+    const double E_total = E + r->Q;
+    *a13 = ((m1 * m3)/((m1 + m2)*(m3 + m4))) * (E / E_total);
+    *a24 = ((m2 * m4)/((m1 + m2)*(m3 + m4))) * (1 + (m1/m2) * r->Q / E_total);
+}
+
 double reaction_product_energy(const reaction *r, double theta, double E) { /* Hint: call with E == 1.0 to get kinematic factor. Note that this function does not check if reaction is possible and may return "nan". */
     const double Q = r->Q;
     if(Q == 0.0) {
@@ -384,21 +388,31 @@ double reaction_product_energy(const reaction *r, double theta, double E) { /* H
             break;
         }
     }
-    const double m1 = r->incident->mass;
-    const double m2 = r->target->mass;
-    const double m3 = r->product->mass;
-    const double m4 = r->residual->mass;
-    double E_total = E + Q;
-    double a13 = ((m1 * m3)/((m1 + m2)*(m3 + m4))) * (E / E_total);
-    double a24 = ((m2 * m4)/((m1 + m2)*(m3 + m4))) * (1 + (m1/m2) * Q / E_total);
+    double a13, a24;
+    reaction_kinematic_coefficients(r, E, &a13, &a24);
     if(a13 > a24) {
         const double theta_max = asin(sqrt(a24/a13));
         if(theta > theta_max) {
             return 0.0;
         }
     }
-    const double E_out = E_total * a13 * pow2(cos(theta) + sqrt(a24/a13 - pow2(sin(theta)))); /* Solution with '-' is ignored. */
+    const double E_out = (E + Q) * a13 * pow2(cos(theta) + sqrt(a24/a13 - pow2(sin(theta)))); /* Solution with '-' is ignored. */
     return E_out;
+}
+
+double reaction_lab_to_cm_solid_angle_ratio(const reaction *r, double theta, double E) {
+    double a13, a24;
+    reaction_kinematic_coefficients(r, E, &a13, &a24);
+    if(a24 <= 0.0) { /* Below threshold */
+        return 0.0;
+    }
+    const double gamma = sqrt(a13 / a24); /* Velocity of CM divided by velocity of product in CM (m1/m2 in elastic scattering) */
+    const double x = gamma * sin(theta);
+    if(x > 1.0 || (gamma > 1.0 && theta > C_PI_2)) { /* Above maximum angle of product */
+        return 0.0;
+    }
+    const double theta_cm = theta + asin(x);
+    return sigma_lab_to_cm(theta_cm, gamma);
 }
 
 const char *jabs_reaction_cs_to_string(jabs_reaction_cs cs) {

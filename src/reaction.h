@@ -85,6 +85,7 @@ typedef struct reaction {
     reaction_point *cs_table; /* for REACTION_FILE */
     size_t n_cs_table;
     double theta; /* For REACTION_FILE */
+    int cs_total; /* For REACTION_FILE: cs_table is a total cross section (R33 units "tot"), assumed isotropic in CM, valid at any angle (theta is zero) */
     double Q;
     double E_min;
     double E_max;
@@ -106,6 +107,7 @@ int reaction_theta_within_tolerance(const reaction *r, const sim_calc_params *p,
 reaction *r33_file_to_reaction(const jibal_isotope *isotopes, const r33_file *rfile);
 int reaction_compare(const void *a, const void *b);
 double reaction_product_energy(const reaction *r, double theta, double E); /* Hint: call with E == 1.0 to get kinematic factor */
+double reaction_lab_to_cm_solid_angle_ratio(const reaction *r, double theta, double E); /* d(Omega_cm)/d(Omega_lab) of reaction product at lab angle theta (solution with '+', same as reaction_product_energy()), zero if not possible */
 const char *jabs_reaction_cs_to_string(jabs_reaction_cs cs);
 int reaction_generate_name(reaction *r); /* Used internally, don't call. */
 jabs_reaction_cs jabs_reaction_cs_from_jibal_cs(jibal_cross_section_type jcs);

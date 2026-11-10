@@ -1,0 +1,16 @@
+#!/usr/bin/env jabs
+# R33 total cross section (Units: tot) of a nuclear reaction with incident ion heavier than target, converted to lab
+# differential cross section at the detector angle assuming isotropic emission in CM. Theta in the file is ignored.
+# Thin layer, so the yield is fluence * solid angle * areal density * sigma_lab(1 MeV, 150 deg). With the synthetic
+# total cross section (355.89 mb at 1 MeV) and CM to lab conversion, sigma_lab = 24.070 mb/sr, yield 16.047.
+set ion 3He
+set energy 1MeV
+set alpha 0deg
+set det theta 150deg solid 1msr slope 3keV resolution 20keV
+set sample "C0.333333 2H0.666667" 10tfu Si 10000tfu
+set fluence 1e14
+reset reactions
+load reaction "nra_total_cs.r33"
+simulate
+save spectra "nra_total_cs_out.csv"
+test roi [4000:4400] 16.047 1e-3

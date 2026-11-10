@@ -63,6 +63,7 @@ void sim_reaction_reset_bricks(sim_reaction *sim_r);
 void sim_reaction_set_cross_section_by_type(sim_reaction *sim_r);
 double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E);
 double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E);
+double sim_reaction_cross_section_tabulated_total(const sim_reaction *sim_r, double E); /* R33 total cross section, isotropic in CM */
 #ifdef JABS_PLUGINS
 double sim_reaction_cross_section_plugin(const sim_reaction *sim_r, double E);
 #endif

@@ -267,7 +267,7 @@ void sim_reaction_set_cross_section_by_type(sim_reaction *sim_r) {
             sim_r->cross_section = sim_reaction_cross_section_rutherford;
             break;
         case REACTION_FILE:
-            sim_r->cross_section = sim_reaction_cross_section_tabulated;
+            sim_r->cross_section = sim_r->r->cs_total ? sim_reaction_cross_section_tabulated_total : sim_reaction_cross_section_tabulated;
             break;
 #ifdef JABS_PLUGINS
         case REACTION_PLUGIN:
@@ -318,19 +318,11 @@ double sim_reaction_cross_section_rutherford(const sim_reaction *sim_r, double E
 #endif
 }
 
-double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E) {
+static double reaction_cs_table_interpolate(const reaction *r, double E) { /* E must be within the table */
     size_t lo, mi, hi;
-    const reaction *r = sim_r->r;
     const reaction_point *t = r->cs_table;
     hi = r->n_cs_table - 1;
     lo = 0;
-    if(E < t[lo].E || E > t[hi].E) {
-#ifdef REACTIONS_FALL_BACK
-        return sim_reaction_cross_section_rutherford(sim_r, E); /* Fall back quietly to analytical formulae outside tabulated values */
-#else
-        return 0.0;
-#endif
-    }
     while (hi - lo > 1) {
         mi = (hi + lo) / 2;
         if (E >= t[mi].E) {
@@ -340,6 +332,26 @@ double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E)
         }
     }
     return t[lo].sigma+((t[lo+1].sigma-t[lo].sigma)/(t[lo+1].E-t[lo].E))*(E-t[lo].E);
+}
+
+double sim_reaction_cross_section_tabulated(const sim_reaction *sim_r, double E) {
+    const reaction *r = sim_r->r;
+    if(E < r->cs_table[0].E || E > r->cs_table[r->n_cs_table - 1].E) {
+#ifdef REACTIONS_FALL_BACK
+        return sim_reaction_cross_section_rutherford(sim_r, E); /* Fall back quietly to analytical formulae outside tabulated values */
+#else
+        return 0.0;
+#endif
+    }
+    return reaction_cs_table_interpolate(r, E);
+}
+
+double sim_reaction_cross_section_tabulated_total(const sim_reaction *sim_r, double E) { /* Total cross section, isotropic in CM, converted to lab differential cross section at sim_r->theta */
+    const reaction *r = sim_r->r;
+    if(E < r->cs_table[0].E || E > r->cs_table[r->n_cs_table - 1].E) {
+        return 0.0;
+    }
+    return reaction_cs_table_interpolate(r, E) / (4.0 * C_PI) * reaction_lab_to_cm_solid_angle_ratio(r, sim_r->theta, E);
 }
 
 #ifdef JABS_PLUGINS

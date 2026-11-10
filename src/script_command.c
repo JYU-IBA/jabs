@@ -1677,8 +1677,13 @@ script_command_status script_load_reaction(script_session *s, int argc, char *co
         jabs_message(MSG_ERROR, "Could not convert R33 file to a reaction!\n");
         return SCRIPT_COMMAND_FAILURE;
     }
-    jabs_message(MSG_INFO, "File: %s has a reaction with %s -> %s, product %s, theta %g deg\n",
-                 filename, r->incident->name, r->target->name, r->product->name, r->theta / C_DEG);
+    if(r->cs_total) {
+        jabs_message(MSG_INFO, "File: %s has a reaction with %s -> %s, product %s, total cross section (assumed isotropic in CM, used at any angle)\n",
+                     filename, r->incident->name, r->target->name, r->product->name);
+    } else {
+        jabs_message(MSG_INFO, "File: %s has a reaction with %s -> %s, product %s, theta %g deg\n",
+                     filename, r->incident->name, r->target->name, r->product->name, r->theta / C_DEG);
+    }
     if(reaction_modifiers_from_argv(s->jibal, r, &argc, &argv)) {
         reaction_free(r);
         jabs_message(MSG_ERROR, "Could not parse reaction modifiers.");
@@ -2043,9 +2048,9 @@ script_command_status script_show_reaction(script_session *s, int argc, char *co
     jabs_message(MSG_INFO, "E_max = %g MeV\n", r->E_max / C_MEV);
     jabs_message(MSG_INFO, "Yield correction factor: %g\n", r->yield);
     if(r->type == REACTION_FILE && r->cs_table) {
-        jabs_message(MSG_INFO, "Cross section table:\n");
+        jabs_message(MSG_INFO, "Cross section table%s:\n", r->cs_total ? " (total cross section, E_product at 0 deg)" : "");
         jabs_message(MSG_INFO, "           E    E_product              sigma\n");
-        jabs_message(MSG_INFO, "         MeV          MeV              mb/sr\n");
+        jabs_message(MSG_INFO, "         MeV          MeV              %s\n", r->cs_total ? "   mb" : "mb/sr");
         for(size_t i = 0; i < r->n_cs_table; i++) {
             const reaction_point *rp = &r->cs_table[i];
             double E_product = reaction_product_energy(r, r->theta, rp->E);
