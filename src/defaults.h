@@ -85,7 +85,7 @@ extern "C" {
 #define DUAL_SCATTER_POLAR_STEPS_DEFAULT 21
 #define DUAL_SCATTER_POLAR_SUBSTEPS_DEFAULT 9
 #define DUAL_SCATTER_AZI_STEPS_DEFAULT 15
-#define DUAL_SCATTER_INCIDENT_STOP_STEP_FACTOR_DEFAULT (2.0)
+#define DUAL_SCATTER_INCIDENT_STOP_STEP_FACTOR_DEFAULT (1.0)
 #define DUAL_SCATTER_GRAZING_ANGLE_DEFAULT (0.06 * C_DEG) /* Dual scattering trajectories (between first and second scattering) closer than this angle to the sample surface are not calculated */
 #define DUAL_SCATTER_PROGRESS_INTERVAL (1.0) /* Seconds between progress updates of dual scattering (in terminal) */
 #define DUAL_SCATTER_SKIP_FRACTION_DEFAULT (0.0) /* Dual scattering trajectories with smallest weights, accounting for this fraction of total weight at each depth, are not calculated (Barradas, NIMB 225 (2004) 318) */
