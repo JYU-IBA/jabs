@@ -699,7 +699,7 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
                 double E0_diff = b_prev->E_0 - b->E_0;
                 b->dE = b_prev->E - b->E;
                 E_deriv = fabs(b->dE / E0_diff); /* how many keVs does the reaction product energy change for each keV of incident ion1 energy change */
-                assert(E_deriv > 0.0);
+                assert(E_deriv > 0.0 || (b->excess < 0.0 && b_prev->excess < 0.0)); /* Energy of products that stop is emin (see stop_sample_exit_remaining()), derivative is zero if they stop in both bricks */
             }
             b->effective_stopping = b->dE / b->thick; /* Effective stopping from detector point-of-view, reciprocal is used in depth resolution calculation */
         } else { /* First brick */
