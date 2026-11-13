@@ -156,6 +156,7 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         }
     }
     ws->stop.ms = ws->ms_spread ? ws->ms : NULL; /* Dual scattering may enable this temporarily for lateral spread */
+    ws->stop.range_tables = stop_range_tables_new();
     ws->stragg = ws->stop; /* Copy */
     ws->stragg.type = GSTO_STO_STRAGG;
     return ws;
@@ -174,6 +175,7 @@ void sim_workspace_free(sim_workspace *ws) {
     jabs_histogram_free(ws->histo_sum);
     jabs_histogram_free(ws->histo_ds);
     ms_model_free(ws->ms);
+    stop_range_tables_free(ws->stop.range_tables);
     free(ws);
 }
 

@@ -23,6 +23,34 @@ extern "C" {
 #endif
 
 
+typedef struct stop_range_table { /* Ion in material of constant composition (a range of a sample): path length and straggling integrals as functions of energy, see stop_range_table_make() */
+    const jibal_isotope *isotope; /* Ion, stopping data, stopping and straggling types, emin and material are the key of the table */
+    const jabs_ion_gsto *ion_gsto;
+    gsto_stopping_type stop_type;
+    gsto_stopping_type stragg_type;
+    double emin;
+    size_t n_isotopes;
+    const jibal_isotope **isotopes;
+    double *conc;
+    double bragg;
+    double stragg;
+    int valid; /* FALSE if table could not be made (e.g. no stopping), then ion is stepped */
+    size_t n; /* Number of nodes, equally spaced in ln(E) starting from emin */
+    double emax;
+    double ln_emin;
+    double inv_dlne;
+    double *E;
+    double *R; /* Path length from E to emin, i.e. integral of 1/S from emin to E */
+    double *S; /* Stopping at E */
+    double *Q; /* Integral of W/S^3 from emin to E, where W is straggling (energy loss variance per unit path length) */
+    double *dQ; /* W/S^3 at E */
+} stop_range_table;
+
+typedef struct stop_range_tables { /* Cache of range tables, tables are made when needed */
+    stop_range_table **t;
+    size_t n;
+} stop_range_tables;
+
 typedef struct jabs_stop {
     jibal_gsto *gsto;
     gsto_stopping_type type;
@@ -31,6 +59,7 @@ typedef struct jabs_stop {
     double stragg_accuracy; /* Exiting ions: relative straggling (variance) error tolerance per step of adaptive steps */
     double emin;
     const ms_model *ms; /* Small angle multiple scattering model, NULL if multiple scattering is not calculated */
+    stop_range_tables *range_tables; /* Exiting ions cross ranges of constant composition using these tables (when multiple scattering is not calculated) instead of steps, see stop_sample_exit_remaining(). NULL if not used. */
 } jabs_stop;
 
 typedef struct jabs_stop_step_params {
@@ -64,6 +93,8 @@ depth stop_step_adaptive(const jabs_stop *stop, const jabs_stop *stragg, ion *in
 double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sample, depth depth, double E);
 double stop_step_calc(const jabs_stop_step_params *params, const ion *ion);
 double stop_step_max(const jabs_stop_step_params *params, const ion *ion);
+stop_range_tables *stop_range_tables_new(void);
+void stop_range_tables_free(stop_range_tables *rt);
 int stop_sample_exit(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, depth depth_start, const sample *sample);
 int stop_sample_exit_remaining(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, depth depth_start, const sample *sample, double *remaining); /* Like stop_sample_exit(), if ion stops, path length it still had to go to the surface is stored in remaining (if not NULL) */
 #ifdef __cplusplus

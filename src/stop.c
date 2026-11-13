@@ -436,6 +436,248 @@ static double stop_remaining_path(const ion *p, const sample *sample, depth d) {
     return GSL_MAX_DBL(x, 0.0) * fabs(p->inverse_cosine_theta);
 }
 
+stop_range_tables *stop_range_tables_new(void) {
+    return calloc(1, sizeof(stop_range_tables));
+}
+
+static void stop_range_table_free(stop_range_table *t) {
+    if(!t) {
+        return;
+    }
+    free(t->isotopes);
+    free(t->conc);
+    free(t->E);
+    free(t->R);
+    free(t->S);
+    free(t->Q);
+    free(t->dQ);
+    free(t);
+}
+
+void stop_range_tables_free(stop_range_tables *rt) {
+    if(!rt) {
+        return;
+    }
+    for(size_t i = 0; i < rt->n; i++) {
+        stop_range_table_free(rt->t[i]);
+    }
+    free(rt->t);
+    free(rt);
+}
+
+static int sample_range_conc_constant(const sample *sample, size_t i_range) {
+    if(i_range + 1 >= sample->n_ranges) {
+        return FALSE;
+    }
+    if(sample->no_conc_gradients) {
+        return TRUE;
+    }
+    const double *c = sample_conc_bin(sample, i_range, 0);
+    for(size_t i = 0; i < sample->n_isotopes; i++) {
+        if(c[i] != c[i + sample->n_isotopes]) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+static int stop_range_table_matches(const stop_range_table *t, const jabs_stop *stop, const jabs_stop *stragg, const ion *p, const sample *sample, size_t i_range, double emin) {
+    if(t->isotope != p->isotope || t->ion_gsto != p->ion_gsto || t->stop_type != stop->type || t->stragg_type != stragg->type || t->emin != emin || t->n_isotopes != sample->n_isotopes) {
+        return FALSE;
+    }
+    const sample_range *r = &sample->ranges[i_range];
+    if(t->bragg != r->bragg || t->stragg != r->stragg) {
+        return FALSE;
+    }
+    const double *c = sample_conc_bin(sample, i_range, 0);
+    for(size_t i = 0; i < sample->n_isotopes; i++) {
+        if(t->isotopes[i] != sample->isotopes[i] || t->conc[i] != c[i]) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+static stop_range_table *stop_range_table_make(const jabs_stop *stop, const jabs_stop *stragg, const ion *p, const sample *sample, size_t i_range, double emin) {
+    /* Nodes are equally spaced in ln(E) from emin to the maximum energy of stopping data. Path length R and straggling integral Q are integrated between nodes
+     * (Gauss-Legendre, three points). Between nodes they are interpolated with cubic Hermite polynomials using the derivatives (1/S and W/S^3) at the nodes,
+     * likewise energy as a function of path length (derivative S). In constant composition E and u = (energy loss variance) / S^2 obey dE/dl = -S and
+     * du/dl = W / S^2 (see stop_step()), therefore crossing path length l from E_in is E_out = R^-1(R(E_in) - l) and u_out = u_in + Q(E_in) - Q(E_out). */
+    stop_range_table *t = calloc(1, sizeof(stop_range_table));
+    if(!t) {
+        return NULL;
+    }
+    t->isotope = p->isotope;
+    t->ion_gsto = p->ion_gsto;
+    t->stop_type = stop->type;
+    t->stragg_type = stragg->type;
+    t->emin = emin;
+    t->n_isotopes = sample->n_isotopes;
+    t->bragg = sample->ranges[i_range].bragg;
+    t->stragg = sample->ranges[i_range].stragg;
+    t->isotopes = malloc(t->n_isotopes * sizeof(jibal_isotope *));
+    t->conc = malloc(t->n_isotopes * sizeof(double));
+    if(!t->isotopes || !t->conc) {
+        stop_range_table_free(t);
+        return NULL;
+    }
+    const double *c = sample_conc_bin(sample, i_range, 0);
+    for(size_t i = 0; i < t->n_isotopes; i++) {
+        t->isotopes[i] = sample->isotopes[i];
+        t->conc[i] = c[i];
+    }
+    t->valid = FALSE;
+    const double emax = GSL_MIN_DBL(p->ion_gsto->emax, E_MAX);
+    if(p->Z == 0 || emin <= 0.0 || emax <= emin) {
+        return t;
+    }
+    const double ln_range = log(emax / emin);
+    const size_t n = (size_t)ceil(ln_range / STOP_RANGE_TABLE_DLNE) + 1;
+    const double dlne = ln_range / (double)(n - 1);
+    t->E = malloc(n * sizeof(double));
+    t->R = malloc(n * sizeof(double));
+    t->S = malloc(n * sizeof(double));
+    t->Q = malloc(n * sizeof(double));
+    t->dQ = malloc(n * sizeof(double));
+    if(!t->E || !t->R || !t->S || !t->Q || !t->dQ) {
+        stop_range_table_free(t);
+        return NULL;
+    }
+    const depth d_mid = {.x = (sample->ranges[i_range].x + sample->ranges[i_range + 1].x) / 2.0, .i = i_range};
+    stop_sw sw;
+    for(size_t i = 0; i < n; i++) {
+        t->E[i] = (i == n - 1) ? emax : emin * exp(dlne * (double)i);
+        stop_sample_sw(stop, stragg, p, sample, d_mid, t->E[i], &sw);
+        if(sw.S < STOP_STEP_MINIMUM_STOPPING) {
+            return t; /* Not valid */
+        }
+        t->S[i] = sw.S;
+        t->dQ[i] = sw.W / (sw.S * sw.S * sw.S);
+    }
+    static const double gl_x[3] = {-0.7745966692414834, 0.0, 0.7745966692414834}; /* sqrt(3/5) */
+    static const double gl_w[3] = {5.0 / 9.0, 8.0 / 9.0, 5.0 / 9.0};
+    t->R[0] = 0.0;
+    t->Q[0] = 0.0;
+    for(size_t i = 0; i < n - 1; i++) {
+        const double E_mid = (t->E[i] + t->E[i + 1]) / 2.0, half = (t->E[i + 1] - t->E[i]) / 2.0;
+        double sum_R = 0.0, sum_Q = 0.0;
+        for(int k = 0; k < 3; k++) {
+            stop_sample_sw(stop, stragg, p, sample, d_mid, E_mid + half * gl_x[k], &sw);
+            if(sw.S < STOP_STEP_MINIMUM_STOPPING) {
+                return t;
+            }
+            sum_R += gl_w[k] / sw.S;
+            sum_Q += gl_w[k] * sw.W / (sw.S * sw.S * sw.S);
+        }
+        t->R[i + 1] = t->R[i] + half * sum_R;
+        t->Q[i + 1] = t->Q[i] + half * sum_Q;
+    }
+    t->n = n;
+    t->emax = emax;
+    t->ln_emin = log(emin);
+    t->inv_dlne = 1.0 / dlne;
+    t->valid = TRUE;
+    DEBUGMSG("Range table of %s in range %zu made, %zu nodes from %g keV to %g keV.", p->isotope->name, i_range, n, emin / C_KEV, emax / C_KEV);
+    return t;
+}
+
+static const stop_range_table *stop_range_table_get(const jabs_stop *stop, const jabs_stop *stragg, const ion *p, const sample *sample, size_t i_range, double emin) {
+    stop_range_tables *rt = stop->range_tables;
+    for(size_t i = 0; i < rt->n; i++) {
+        if(stop_range_table_matches(rt->t[i], stop, stragg, p, sample, i_range, emin)) {
+            return rt->t[i];
+        }
+    }
+    stop_range_table *t = stop_range_table_make(stop, stragg, p, sample, i_range, emin);
+    if(!t) {
+        return NULL;
+    }
+    stop_range_table **tables = realloc(rt->t, (rt->n + 1) * sizeof(stop_range_table *));
+    if(!tables) {
+        stop_range_table_free(t);
+        return NULL;
+    }
+    rt->t = tables;
+    rt->t[rt->n] = t;
+    rt->n++;
+    return t;
+}
+
+static inline double stop_hermite(double y0, double y1, double d0, double d1, double h, double u) { /* Cubic Hermite polynomial, values y and derivatives d at the ends of an interval of width h, u in [0, 1] */
+    const double u2 = u * u, u3 = u2 * u;
+    return y0 * (2.0 * u3 - 3.0 * u2 + 1.0) + y1 * (3.0 * u2 - 2.0 * u3) + h * (d0 * (u3 - 2.0 * u2 + u) + d1 * (u3 - u2));
+}
+
+static size_t stop_range_table_index(const stop_range_table *t, double E) { /* Index of node at or below E, E in [emin, emax] */
+    double x = (log(E) - t->ln_emin) * t->inv_dlne;
+    size_t i = x > 0.0 ? (size_t)x : 0;
+    if(i > t->n - 2) {
+        i = t->n - 2;
+    }
+    return i;
+}
+
+static void stop_range_table_eval(const stop_range_table *t, double E, double *R, double *Q) {
+    const size_t i = stop_range_table_index(t, E);
+    const double h = t->E[i + 1] - t->E[i];
+    const double u = (E - t->E[i]) / h;
+    *R = stop_hermite(t->R[i], t->R[i + 1], 1.0 / t->S[i], 1.0 / t->S[i + 1], h, u);
+    *Q = stop_hermite(t->Q[i], t->Q[i + 1], t->dQ[i], t->dQ[i + 1], h, u);
+}
+
+static double stop_range_table_energy(const stop_range_table *t, double R) { /* Inverse of path length R(E), R in [0, R[n - 1]] */
+    size_t lo = 0, hi = t->n - 1;
+    while(hi - lo > 1) {
+        size_t mi = (lo + hi) / 2;
+        if(R >= t->R[mi]) {
+            lo = mi;
+        } else {
+            hi = mi;
+        }
+    }
+    const double h = t->R[lo + 1] - t->R[lo];
+    return stop_hermite(t->E[lo], t->E[lo + 1], t->S[lo], t->S[lo + 1], h, (R - t->R[lo]) / h);
+}
+
+static int stop_range_table_cross(const jabs_stop *stop, const jabs_stop *stragg, ion *p, const sample *sample, depth *d, double emin, double *remaining) {
+    /* Moves exiting ion p from depth d across the range to the next range boundary (towards the surface it is heading to) using range tables. Returns 1 if the ion
+     * crossed the range (d is updated), -1 if it stopped in the range (path length it still had to go is stored in remaining, if not NULL) and 0 if tables
+     * can not be used (composition is not constant, energy is outside table), then the ion must be stepped. */
+    if(p->E <= emin) {
+        return 0;
+    }
+    const depth d_next = stop_next_crossing(p, sample, d);
+    const size_t i_range = d_next.i;
+    if(!sample_range_conc_constant(sample, i_range)) {
+        return 0;
+    }
+    const stop_range_table *t = stop_range_table_get(stop, stragg, p, sample, i_range, emin);
+    if(!t || !t->valid || p->E > t->emax) {
+        return 0;
+    }
+    const depth d_mid = {.x = (sample->ranges[i_range].x + sample->ranges[i_range + 1].x) / 2.0, .i = i_range};
+    const double l = (d_next.x - d->x) * p->inverse_cosine_theta; /* Path length to range boundary, positive */
+    double R_in, Q_in;
+    stop_range_table_eval(t, p->E, &R_in, &Q_in);
+    const double u_in = p->S / pow2(stop_sample(stop, p, sample, d_mid, p->E));
+    if(R_in <= l) { /* Stops in this range */
+        if(remaining) {
+            const depth d_stop = {.x = d->x + R_in * p->cosine_theta, .i = i_range};
+            *remaining = stop_remaining_path(p, sample, d_stop);
+        }
+        p->S = (u_in + Q_in) * pow2(t->S[0]);
+        p->E = emin;
+        return -1;
+    }
+    const double E_out = stop_range_table_energy(t, R_in - l);
+    double R_out, Q_out;
+    stop_range_table_eval(t, E_out, &R_out, &Q_out);
+    p->S = GSL_MAX_DBL(0.0, u_in + Q_in - Q_out) * pow2(stop_sample(stop, p, sample, d_mid, E_out));
+    p->E = E_out;
+    *d = d_next;
+    return 1;
+}
+
 int stop_sample_exit_remaining(const jabs_stop *stop, const jabs_stop *stragg, const jabs_stop_step_params *params_exiting, ion *p, const depth depth_start, const sample *sample, double *remaining) {
     depth d = depth_start;
     if(remaining) {
@@ -455,6 +697,14 @@ int stop_sample_exit_remaining(const jabs_stop *stop, const jabs_stop *stragg, c
         if(last) {
             DEBUGMSG("Last step taken, E = %g keV, depth still %.3lf tfu, break break.", p->E / C_KEV, d.x / C_TFU);
             break;
+        }
+        if(stop->range_tables && !stop->ms) {
+            int crossed = stop_range_table_cross(stop, stragg, p, sample, &d, emin, remaining);
+            if(crossed > 0) {
+                continue;
+            } else if(crossed < 0) {
+                return -1;
+            }
         }
         double E_step = stop_step_calc(params_exiting, p);
         if(adaptive && state.h > 0.0) { /* First adaptive step is the fixed step, then step is limited by error control and maximum step */
