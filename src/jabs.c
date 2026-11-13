@@ -35,6 +35,9 @@
 #include "generic.h"
 #include "stop.h"
 #include "win_compat.h"
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 double cross_section_straggling_fixed(const sim_reaction *sim_r, const prob_dist *pd, double E, double S, int emult) {
     const double std_dev = sqrt(S);
@@ -1074,6 +1077,59 @@ double ds_sample_offset(size_t i, double alpha) { /* Low-discrepancy (additive r
     return x - floor(x);
 }
 
+typedef struct ds_trajectory_index { /* First scattering of a dual scattering trajectory: polar angle bin, target isotope and azimuthal step */
+    int i_polar;
+    size_t i_isotope;
+    int i_azi;
+} ds_trajectory_index;
+
+static sim_workspace *ds_workspace_clone(const sim_workspace *ws) { /* Workspace for dual scattering trajectories calculated in another thread, in the same state as ws (see simulate_with_ds()) */
+    sim_workspace *ws_t = sim_workspace_init(ws->jibal, ws->sim, ws->det);
+    if(!ws_t) {
+        return NULL;
+    }
+    if(ws_t->n_reactions != ws->n_reactions || ws_t->n_bricks != ws->n_bricks) {
+        sim_workspace_free(ws_t);
+        return NULL;
+    }
+    sim_calc_params_free(ws_t->params);
+    ws_t->params = sim_calc_params_defaults(NULL);
+    sim_calc_params_copy(ws->params, ws_t->params);
+    sim_calc_params_update(ws_t->params);
+    ws_t->ds_traj = ws->ds_traj;
+    ws_t->ms_spread = ws->ms_spread;
+    ws_t->ds_running = ws->ds_running;
+    ws_t->stop.ms = ws->stop.ms ? ws_t->ms : NULL;
+    ws_t->stragg.ms = ws->stragg.ms ? ws_t->ms : NULL;
+    return ws_t;
+}
+
+static void ds_workspaces_free(sim_workspace **wss, int n_threads) { /* Frees workspaces of other threads, wss[0] is the original workspace */
+    if(!wss) {
+        return;
+    }
+    for(int i = 1; i < n_threads; i++) {
+        sim_workspace_free(wss[i]);
+    }
+    free(wss);
+}
+
+static void ds_workspaces_sum(sim_workspace **wss, int n_threads) { /* Adds dual scattering spectra of other threads to the original workspace, in a fixed order */
+    sim_workspace *ws = wss[0];
+    for(int i = 1; i < n_threads; i++) {
+        for(size_t i_reaction = 0; i_reaction < ws->n_reactions; i_reaction++) {
+            jabs_histogram *h = ws->reactions[i_reaction]->histo_ds;
+            const jabs_histogram *h_t = wss[i]->reactions[i_reaction]->histo_ds;
+            if(!h || !h_t) {
+                continue;
+            }
+            for(size_t j = 0; j < h->n && j < h_t->n; j++) {
+                h->bin[j] += h_t->bin[j];
+            }
+        }
+    }
+}
+
 int simulate_with_ds(sim_workspace *ws) {
     if(!ws) {
         jabs_message(MSG_ERROR, "Congratulations, you've found a bug in %s:%i.\n", __FILE__, __LINE__);
@@ -1095,7 +1151,6 @@ int simulate_with_ds(sim_workspace *ws) {
     ion_set_angle(&ws->ion, 0.0, 0.0);
     ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
     ion ion1 = ws->ion;
-    ion ion2 = ion1;
     depth d_before = depth_seek(ws->sample, 0.0);
     int ds_steps_polar = ws->params->ds_steps_polar;
     int ds_steps_polar_substeps = ws->params->ds_steps_polar_substeps;
@@ -1155,6 +1210,34 @@ int simulate_with_ds(sim_workspace *ws) {
     double t_progress = t_start;
     const double E_start = ion1.E;
     size_t n_trajectories = 0;
+    int n_threads = 1;
+#ifdef _OPENMP
+    if(ws->ds_parallel) {
+        n_threads = omp_get_max_threads();
+    }
+#endif
+    sim_workspace **wss = calloc(n_threads, sizeof(sim_workspace *)); /* Workspace of each thread, wss[0] is ws */
+    ds_trajectory_index *trajs = malloc(n_traj * ds_steps_azi * sizeof(ds_trajectory_index)); /* Trajectories of one depth step */
+    if(!wss || !trajs) {
+        free(wss);
+        free(trajs);
+        free(bin_low);
+        free(bin_high);
+        free(weights);
+        return EXIT_FAILURE;
+    }
+    wss[0] = ws;
+    for(int i = 1; i < n_threads; i++) {
+        wss[i] = ds_workspace_clone(ws);
+        if(!wss[i]) {
+            jabs_message(MSG_WARNING, "Could not make workspaces for parallel dual scattering, using %i thread%s.\n", i, i == 1 ? "" : "s");
+            n_threads = i;
+            break;
+        }
+    }
+    if(n_threads > 1) {
+        jabs_message(MSG_VERBOSE, "Dual scattering trajectories are calculated in %i threads.\n", n_threads);
+    }
     for(size_t i_depth = 0; ; i_depth++) {
         if(last) {
             break;
@@ -1185,8 +1268,6 @@ int simulate_with_ds(sim_workspace *ws) {
 
         jabs_message(MSG_VERBOSE, "\rDS depth from %9.3lf to %9.3lf tfu, E from %6.1lf to %6.1lf keV.", d_before.x / C_TFU, d_after.x / C_TFU, E_front / C_KEV,
                      E_back / C_KEV);
-        ws->ds_traj.x1 = d_halfdepth.x;
-        ws->ds_traj.l1 = d_halfdepth.x * inverse_cosine_in;
         int n_running = 0; /* How many reactions are still producing data, largest number of all simulations for this depth step. */
         for(int i_polar = 0; i_polar < n_bins; i_polar++) { /* Weights (fraction of incident ions scattered) of all first scattering possibilities */
             const double ds_polar_low = bin_low[i_polar];
@@ -1218,57 +1299,81 @@ int simulate_with_ds(sim_workspace *ws) {
             }
         }
         ds_weights_skip_smallest(weights, n_traj, ws->params->ds_skip_fraction);
+        int n_traj_step = 0;
         for(int i_polar = 0; i_polar < n_bins; i_polar++) {
-            const double ds_polar_low = bin_low[i_polar];
-            const double ds_polar_step = bin_high[i_polar] - ds_polar_low;
-            const double ds_polar = ds_polar_low + ds_polar_step * polar_offset;
-            ws->ds_traj.first_small = (ds_polar < DUAL_SCATTER_ANGLE_MIN);
-            ws->ds_traj.active = ds_small_angles;
-            ws->ds_traj.lateral = ds_lateral;
             for(size_t i = 0; i < n_isotopes; i++) {
-                const ds_weight *dw = &weights[i_polar * n_isotopes + i];
-                if(dw->skip) {
+                if(weights[i_polar * n_isotopes + i].skip) {
                     continue;
                 }
-                const jibal_isotope *target = ws->sample->isotopes[i];
-                double fluence_tot = dw->fluence;
-                double fluence_azi = fluence_tot / (1.0 * (ds_steps_azi));
                 for(int i_azi = 0; i_azi < ds_steps_azi; i_azi++) {
-                    ion2 = ion1;
-                    double K = jibal_kin_rbs(incident->mass, target->mass, ds_polar, '+');
-                    ion2.E *= K;
-                    ion2.S *= pow2(K);
-                    double ds_azi = C_2PI * (i_azi + azi_offset) / (ds_steps_azi * 1.0);
-                    ion_rotate(&ion2, ds_polar, ds_azi); /* Dual scattering: first scattering to some angle (scattering angle: ds_polar). Note that this does not follow SimNRA conventions. */
-                    if(fabs(ion2.inverse_cosine_theta) > grazing_inverse_cosine_max) { /* Path (nearly) parallel to surface */
-                        continue;
-                    }
-                    ws->fluence = fluence_azi * fluence;
-                    double scatangle = scattering_angle(&ion2, ws->sim->sample_theta, ws->sim->sample_phi, ws->det);
-                    if(d_before.x == 0.0) {
-                        DEBUGMSG("DS polar %.3lf, azi %.3lf, scatter %.3lf", ds_polar/C_DEG, ds_azi/C_DEG, scatangle/C_DEG);
-                    }
-                    if(scatangle > scatangle_min * (1.0 - 1e-6)) {
-                        int n_ok = simulate(&ion2, d_halfdepth, ws, ws->sample);
-                        n_trajectories++;
-                        if(n_ok < 0) {
-                            ws->ds_traj.active = FALSE;
-                            ws->ds_traj.lateral = FALSE;
-                            ws->stop.ms = stop_ms_orig;
-                            ws->stragg.ms = stop_ms_orig;
-                            ws->ms_spread = ms_spread_orig;
-                            ws->ds_running = FALSE;
-                            free(bin_low);
-                            free(bin_high);
-                            free(weights);
-                            return EXIT_FAILURE;
-                        }
-                        if(n_ok > n_running) {
-                            n_running = n_ok;
-                        }
-                    }
+                    trajs[n_traj_step++] = (ds_trajectory_index) {.i_polar = i_polar, .i_isotope = i, .i_azi = i_azi};
                 }
             }
+        }
+        int error = FALSE;
+        size_t n_traj_done = 0;
+        /* Trajectories are distributed to threads in a fixed way (round-robin), so results do not depend on timing. Each thread has its own workspace and spectra. */
+#pragma omp parallel for num_threads(n_threads) schedule(static, 1) reduction(max:n_running) reduction(+:n_traj_done) if(n_threads > 1)
+        for(int k = 0; k < n_traj_step; k++) {
+#ifdef _OPENMP
+            sim_workspace *ws_t = wss[omp_get_thread_num()];
+#else
+            sim_workspace *ws_t = ws;
+#endif
+            const ds_trajectory_index *ti = &trajs[k];
+            const double ds_polar_low = bin_low[ti->i_polar];
+            const double ds_polar_step = bin_high[ti->i_polar] - ds_polar_low;
+            const double ds_polar = ds_polar_low + ds_polar_step * polar_offset;
+            const ds_weight *dw = &weights[ti->i_polar * n_isotopes + ti->i_isotope];
+            const jibal_isotope *target = ws->sample->isotopes[ti->i_isotope];
+            ion ion2 = ion1;
+            double K = jibal_kin_rbs(incident->mass, target->mass, ds_polar, '+');
+            ion2.E *= K;
+            ion2.S *= pow2(K);
+            double ds_azi = C_2PI * (ti->i_azi + azi_offset) / (ds_steps_azi * 1.0);
+            ion_rotate(&ion2, ds_polar, ds_azi); /* Dual scattering: first scattering to some angle (scattering angle: ds_polar). Note that this does not follow SimNRA conventions. */
+            if(fabs(ion2.inverse_cosine_theta) > grazing_inverse_cosine_max) { /* Path (nearly) parallel to surface */
+                continue;
+            }
+            ws_t->fluence = dw->fluence / (1.0 * (ds_steps_azi)) * fluence;
+            ws_t->ds_traj.x1 = d_halfdepth.x;
+            ws_t->ds_traj.l1 = d_halfdepth.x * inverse_cosine_in;
+            ws_t->ds_traj.first_small = (ds_polar < DUAL_SCATTER_ANGLE_MIN);
+            ws_t->ds_traj.active = ds_small_angles;
+            ws_t->ds_traj.lateral = ds_lateral;
+            double scatangle = scattering_angle(&ion2, ws->sim->sample_theta, ws->sim->sample_phi, ws->det);
+            if(d_before.x == 0.0) {
+                DEBUGMSG("DS polar %.3lf, azi %.3lf, scatter %.3lf", ds_polar/C_DEG, ds_azi/C_DEG, scatangle/C_DEG);
+            }
+            if(scatangle > scatangle_min * (1.0 - 1e-6)) {
+                int n_ok = simulate(&ion2, d_halfdepth, ws_t, ws->sample);
+                n_traj_done++;
+                if(n_ok < 0) {
+#pragma omp atomic write
+                    error = TRUE;
+                    continue;
+                }
+                if(n_ok > n_running) {
+                    n_running = n_ok;
+                }
+            }
+        }
+        n_trajectories += n_traj_done;
+        for(int i = 0; i < n_threads; i++) {
+            wss[i]->ds_traj.active = FALSE;
+            wss[i]->ds_traj.lateral = FALSE;
+        }
+        if(error) {
+            ws->stop.ms = stop_ms_orig;
+            ws->stragg.ms = stop_ms_orig;
+            ws->ms_spread = ms_spread_orig;
+            ws->ds_running = FALSE;
+            ds_workspaces_free(wss, n_threads);
+            free(trajs);
+            free(bin_low);
+            free(bin_high);
+            free(weights);
+            return EXIT_FAILURE;
         }
         ws->ds_traj.active = FALSE;
         const double t_now = jabs_clock();
@@ -1287,9 +1392,13 @@ int simulate_with_ds(sim_workspace *ws) {
             break;
         }
     }
+    ds_workspaces_sum(wss, n_threads);
+    ds_workspaces_free(wss, n_threads);
+    free(trajs);
     free(bin_low);
     free(bin_high);
     free(weights);
+    ws->fluence = fluence;
     ws->stop.ms = stop_ms_orig;
     ws->stragg.ms = stop_ms_orig;
     ws->ms_spread = ms_spread_orig;

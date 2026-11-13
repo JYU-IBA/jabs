@@ -36,6 +36,7 @@ typedef struct ds_trajectory { /* Dual scattering trajectory information, used f
 
 typedef struct sim_workspace {
     double fluence; /* With DS can be different from sim->fluence, otherwise the same */
+    const jibal *jibal;
     const simulation *sim;
     const detector *det;
     const sample *sample; /* Note that simulate() can be passed a sample explicitly, but in most cases it should be this. Also this should be exactly the same as sim->sample. */
@@ -46,6 +47,7 @@ typedef struct sim_workspace {
     jabs_histogram *histo_ds; /* Dual scattering contribution to histo_sum (sum of reaction histo_ds), NULL if dual scattering is not calculated */
     int ds_running; /* TRUE while dual scattering trajectories are calculated, spectra are then convoluted to histo_ds of reactions */
     int progress; /* Report progress of (long) calculations, e.g. dual scattering, to terminal. FALSE by default (e.g. fits). */
+    int ds_parallel; /* Dual scattering trajectories are calculated in parallel (OpenMP), each thread has its own workspace. FALSE by default (e.g. fits, which are parallel already). */
     ion ion;
     sim_reaction **reactions; /* table of reaction pointers, size n_reactions */
     const jibal_isotope *isotopes;

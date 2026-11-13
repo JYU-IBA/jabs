@@ -187,6 +187,7 @@ script_command_status script_simulate(script_session *s, int argc, char *const *
             return SCRIPT_COMMAND_FAILURE;
         }
         ws->progress = TRUE;
+        ws->ds_parallel = TRUE;
         if(simulate_with_ds(ws)) {
             jabs_message(MSG_ERROR, "Simulation failed.\n");
             sim_workspace_free(ws);
