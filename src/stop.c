@@ -69,11 +69,11 @@ void stop_ms_step(const ms_model *ms, ion *ion, const sample *sample, const dept
     }
 }
 
-static double stop_gsto(const ion *incident, gsto_stopping_type type, int Z2, double em) { /* Electronic stopping or straggling of incident ion in element Z2, see ion_gsto_table_init() */
+static double stop_gsto(const ion *incident, gsto_stopping_type type, int Z2, double em, double ln_em) { /* Electronic stopping or straggling of incident ion in element Z2, see ion_gsto_table_init(). ln_em = log(em). */
     const jabs_ion_gsto_data *gd = &incident->ion_gsto->gsto_data[Z2];
     const jabs_gsto_table *t = (type == GSTO_STO_STRAGG) ? &gd->stragg : &gd->stop;
     assert(t->file);
-    return ion_gsto_table_eval(t, em);
+    return ion_gsto_table_eval_ln(t, em, ln_em);
 }
 
 static void stop_sample_sw(const jabs_stop *stop, const jabs_stop *stragg, const ion *incident, const sample *sample, const depth depth, double E, stop_sw *sw) { /* Stopping, straggling and stopping gradient in one go */
@@ -84,6 +84,7 @@ static void stop_sample_sw(const jabs_stop *stop, const jabs_stop *stragg, const
         return;
     }
     const double em = E * incident->mass_inverse;
+    const double ln_em = log(em); /* Once for all tables */
     double inverse_width = 0.0; /* Concentrations are linear within a range. Zero if concentrations are constant. */
     if(!sample->no_conc_gradients) {
         double width = sample->ranges[depth.i + 1].x - sample->ranges[depth.i].x;
@@ -106,8 +107,8 @@ static void stop_sample_sw(const jabs_stop *stop, const jabs_stop *stragg, const
         int Z2 = target->Z;
         assert(Z2 <= incident->ion_gsto->Z2_max);
         if(Z2 != Z2_old) { /* Electronic stopping and straggling are the same for all isotopes of the same element */
-            S_Z2 = stop_gsto(incident, stop->type, Z2, em);
-            W_Z2 = stop_gsto(incident, stragg->type, Z2, em);
+            S_Z2 = stop_gsto(incident, stop->type, Z2, em, ln_em);
+            W_Z2 = stop_gsto(incident, stragg->type, Z2, em, ln_em);
             Z2_old = Z2;
         }
         double S = S_Z2;
@@ -374,6 +375,7 @@ double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sam
     if(incident->Z == 0) {
         return 0.0;
     }
+    const double ln_em = log(em); /* Once for all tables */
     for(size_t i_isotope = 0; i_isotope < sample->n_isotopes; i_isotope++) {
         const jibal_isotope *target = sample->isotopes[i_isotope];
         double c = get_conc(sample, depth, i_isotope);
@@ -382,7 +384,7 @@ double stop_sample(const jabs_stop *stop, const ion *incident, const sample *sam
         int Z2 = target->Z;
         assert(Z2 <= incident->ion_gsto->Z2_max);
         if(Z2 != Z2_old) { /* Electronic stopping (or straggling) is the same for all isotopes of the same element */
-            S_Z2 = stop_gsto(incident, stop->type, Z2, em);
+            S_Z2 = stop_gsto(incident, stop->type, Z2, em, ln_em);
             Z2_old = Z2;
         }
         double S = S_Z2;

@@ -75,14 +75,7 @@ void ion_set_angle(ion *ion, double theta, double phi) {
     ion->inverse_cosine_phi = 1.0/ion->cosine_phi;
 }
 
-double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, double E) {
-#ifdef DEBUG
-    assert(isotope->i < ion->nucl_stop->n_isotopes);
-    assert(ion->nucl_stop->t[isotope->i].target == isotope);
-#endif
-    nucl_stop_pair x = ion->nucl_stop->t[isotope->i];
-    return x.k * nuclear_stopping_universal(ion->nucl_stop, x.eps0 * E);
-}
+extern inline double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, double E);
 
 void ion_rotate(ion *ion, double theta2, double phi2) { /* Wrapper for rotate() */
     double theta, phi;
@@ -179,6 +172,10 @@ void ion_gsto_table_free(jabs_gsto_table *t) {
 }
 
 double ion_gsto_table_eval(const jabs_gsto_table *t, double em) { /* Interpolated value (SI units) at em (energy per mass), see ion_gsto_table_init() */
+    return ion_gsto_table_eval_ln(t, em, t->deriv ? log(em) : 0.0);
+}
+
+double ion_gsto_table_eval_ln(const jabs_gsto_table *t, double em, double ln_em) {
     const gsto_file_t *file = t->file;
     const double *data = t->data;
     const size_t n = file->xpoints;
@@ -195,7 +192,7 @@ double ion_gsto_table_eval(const jabs_gsto_table *t, double em) { /* Interpolate
         lo = GSL_MIN_INT(GSL_MAX_INT(lo, 0), (int)n - 2);
         return t->unit_factor * jibal_linear_interpolation(file->em[lo], file->em[lo + 1], data[lo], data[lo + 1], em);
     }
-    const double x = log(em);
+    const double x = ln_em;
     size_t lo;
     if(t->inv_dlnem > 0.0) {
         lo = (size_t)((x - t->lnem0) * t->inv_dlnem);

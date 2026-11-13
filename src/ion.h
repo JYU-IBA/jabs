@@ -15,6 +15,7 @@
  */
 #ifndef JABS_ION_H
 #define JABS_ION_H
+#include <assert.h>
 #include <jibal_masses.h>
 #include <jibal_gsto.h>
 #include "nuclear_stopping.h"
@@ -81,12 +82,20 @@ void ion_reset(ion *ion);
 void ion_ms_reset(ion_ms *ms); /* Resets multiple scattering state, i.e. start of a new path */
 void ion_set_isotope(ion *ion, const jibal_isotope *isotope);
 void ion_set_angle(ion *ion, double theta, double phi);
-double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, double E);
+inline double ion_nuclear_stop(const ion *ion, const jibal_isotope *isotope, double E) {
+#ifdef DEBUG
+    assert(isotope->i < ion->nucl_stop->n_isotopes);
+    assert(ion->nucl_stop->t[isotope->i].target == isotope);
+#endif
+    nucl_stop_pair x = ion->nucl_stop->t[isotope->i];
+    return x.k * nuclear_stopping_universal(ion->nucl_stop, x.eps0 * E);
+}
 void ion_rotate(ion *ion, double theta2, double phi2);
 void ion_print(FILE *f, const ion *ion);
 void ion_gsto_table_init(jabs_gsto_table *t, const gsto_file_t *file, const double *data, double unit_factor);
 void ion_gsto_table_free(jabs_gsto_table *t);
 double ion_gsto_table_eval(const jabs_gsto_table *t, double em);
+double ion_gsto_table_eval_ln(const jabs_gsto_table *t, double em, double ln_em); /* Same as ion_gsto_table_eval(), ln_em = log(em) is given by the caller (computed once for many tables) */
 jabs_ion_gsto *ion_gsto_new(const jibal_isotope *incident, const jibal_gsto *gsto, const int *Z2_used); /* Z2_used is an array of gsto->Z2_max + 1 elements, data is used only for Z2 where Z2_used[Z2] is TRUE. NULL means all assigned Z2. */
 jabs_ion_gsto *ion_gsto_shared(jabs_ion_gsto *ion_gsto);
 int ion_gsto_warn_range(const jabs_ion_gsto *ion_gsto, double emin, double emax); /* Warns (jabs_message()) if stopping or straggling data does not cover energy range [emin, emax]. Simulation is cut off below ion_gsto->emin, values at ion_gsto->emax are used above it. Returns TRUE if warnings were issued. */
