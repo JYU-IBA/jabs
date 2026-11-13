@@ -115,16 +115,10 @@ int script_prepare_sim_or_fit(script_session *s) {
         jabs_message(MSG_ERROR, "Preparing incident ion failed. Possibly issue with either nuclear stopping or GSTO stopping.\n");
         return EXIT_FAILURE;
     }
-    if(fit->sim->ion.ion_gsto->emax < fit->sim->beam_E) {
-        jabs_message(MSG_ERROR, "Maximum energy for incident %s is %g keV for some target element(s) based on stopping data (GSTO), which is more than beam energy of %g keV.\n",
-                     fit->sim->ion.isotope->name, fit->sim->ion.ion_gsto->emax / C_KEV, fit->sim->beam_E / C_KEV);
+    if(sim_prepare_reactions(fit->sim, fit->jibal->isotopes, fit->jibal->gsto)) {
         return EXIT_FAILURE;
     }
-    if(fit->sim->ion.ion_gsto->emin > fit->sim->emin) {
-        jabs_message(MSG_WARNING, "Minimum energy for incident %s is %g keV for some target element(s) based on stopping data (GSTO), which is more than current workspace minimum energy of %g keV.\n",
-                     fit->sim->ion.isotope->name, fit->sim->ion.ion_gsto->emin / C_KEV, fit->sim->emin / C_KEV);
-    }
-    if(sim_prepare_reactions(fit->sim, fit->jibal->isotopes, fit->jibal->gsto)) {
+    if(sim_check_energy_limits(fit->sim)) {
         return EXIT_FAILURE;
     }
     reactions_print(fit->sim->reactions, fit->sim->n_reactions);
@@ -256,6 +250,16 @@ script_command_status script_fit(script_session *s, int argc, char *const *argv)
     }
     if(script_prepare_sim_or_fit(s)) {
         return SCRIPT_COMMAND_FAILURE;
+    }
+    for(size_t i = 0; i < fit->fit_params->n; i++) { /* Energy limits are checked before the fit only (see sim_check_energy_limits()) */
+        const fit_variable *var = &fit->fit_params->vars[i];
+        int changes_limits = (var->value == &fit->sim->beam_E);
+        for(size_t i_det = 0; i_det < fit->sim->n_det; i_det++) {
+            changes_limits |= (var->value == &fit->sim->det[i_det]->theta);
+        }
+        if(var->active && changes_limits) {
+            jabs_message(MSG_WARNING, "Fit parameter %s changes the energies of the incident ion or reaction products. Stopping and straggling data ranges are checked for initial values only.\n", var->name);
+        }
     }
     fit->fit_iter_callback = s->fit_iter_callback;
     if(fit_do(fit) < 0) {

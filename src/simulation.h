@@ -42,7 +42,7 @@ typedef struct simulation {
     const jibal_isotope *beam_isotope;
     aperture *beam_aperture;
     double beam_E;
-    double beam_E_broad; /* Variance */
+    double beam_E_broad; /* FWHM */
     double emin;
     sim_calc_params *params;
     jabs_stop *stop;
@@ -73,6 +73,7 @@ double sim_exit_angle(const simulation *sim, const detector *det);
 int sim_do_we_need_erd(const simulation *sim);
 int sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto);
 int sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto);
+int sim_check_energy_limits(const simulation *sim); /* Before simulation: warns if stopping or straggling data does not cover the energies of the incident ion and reaction products (see ion_gsto_warn_range()). Fails if beam energy is above the data. Call after sim_prepare_ion() and sim_prepare_reactions(). */
 #ifdef __cplusplus
 }
 #endif

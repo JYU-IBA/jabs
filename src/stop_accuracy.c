@@ -318,7 +318,7 @@ static int scenario_run(jibal *jibal, const scenario *sc) {
     ion.E = sc->E;
     ion.S = pow2(sc->sigma0);
     ion.nucl_stop = nuclear_stopping_new(isotope, jibal->isotopes);
-    ion.ion_gsto = ion_gsto_new(isotope, jibal->gsto);
+    ion.ion_gsto = ion_gsto_new(isotope, jibal->gsto, NULL);
     depth d = depth_seek(sample, sc->x0);
 
     sim_calc_params *p = sim_calc_params_defaults(NULL);

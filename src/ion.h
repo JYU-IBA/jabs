@@ -39,8 +39,12 @@ typedef struct jabs_gsto_assignment {
 
 typedef struct jabs_ion_gsto {
     jabs_ion_gsto_data *gsto_data; /* Array of gsto->Z2_max + 1 elements */
-    double emin;
+    double emin; /* Stopping and straggling data is available for all assigned target elements in energy range [emin, emax] */
     double emax;
+    const gsto_file_t *emin_file; /* File (stopping or straggling) that determines emin, NULL if none */
+    int emin_Z2; /* Target element of emin_file */
+    const gsto_file_t *emax_file;
+    int emax_Z2;
     const jibal_isotope *incident;
     int refcount;
     int Z2_max; /* Copy of gsto->Z2_max */
@@ -83,8 +87,9 @@ void ion_print(FILE *f, const ion *ion);
 void ion_gsto_table_init(jabs_gsto_table *t, const gsto_file_t *file, const double *data, double unit_factor);
 void ion_gsto_table_free(jabs_gsto_table *t);
 double ion_gsto_table_eval(const jabs_gsto_table *t, double em);
-jabs_ion_gsto *ion_gsto_new(const jibal_isotope *incident, const jibal_gsto *gsto);
+jabs_ion_gsto *ion_gsto_new(const jibal_isotope *incident, const jibal_gsto *gsto, const int *Z2_used); /* Z2_used is an array of gsto->Z2_max + 1 elements, data is used only for Z2 where Z2_used[Z2] is TRUE. NULL means all assigned Z2. */
 jabs_ion_gsto *ion_gsto_shared(jabs_ion_gsto *ion_gsto);
+int ion_gsto_warn_range(const jabs_ion_gsto *ion_gsto, double emin, double emax); /* Warns (jabs_message()) if stopping or straggling data does not cover energy range [emin, emax]. Simulation is cut off below ion_gsto->emin, values at ion_gsto->emax are used above it. Returns TRUE if warnings were issued. */
 void ion_gsto_free(jabs_ion_gsto *ion_gsto);
 #ifdef __cplusplus
 }

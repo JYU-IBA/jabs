@@ -264,6 +264,9 @@ des_table *des_table_compute(const jabs_stop *stop, const jabs_stop *stragg, con
     if(incident->ion_gsto->emin < emin) {
         emin = incident->ion_gsto->emin;
         DEBUGMSG("DES table emin set from ion emin = %g keV", emin / C_KEV);
+    } else if(incident->ion_gsto->emin > emin) { /* No stopping or straggling data below ion emin, table is not extrapolated (see ion_gsto_warn_range()) */
+        emin = incident->ion_gsto->emin;
+        DEBUGMSG("DES table emin raised to ion emin = %g keV", emin / C_KEV);
     }
     do {
         if(i == dt->n) {

@@ -340,13 +340,39 @@ int sim_do_we_need_erd(const simulation *sim) {
     return forward_angles; /* If any detector is in forward angle, we might need ERD */
 }
 
+static int *sim_Z2_used(const simulation *sim, int Z2_max) { /* Array of Z2_max + 1 elements, TRUE for elements in sample and detector foils */
+    int *Z2_used = calloc(Z2_max + 1, sizeof(int));
+    const sample *samples[] = {sim->sample, NULL};
+    for(const sample **s = samples; *s; s++) {
+        for(size_t i = 0; i < (*s)->n_isotopes; i++) {
+            if((*s)->isotopes[i]->Z <= Z2_max) {
+                Z2_used[(*s)->isotopes[i]->Z] = TRUE;
+            }
+        }
+    }
+    for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
+        const detector *det = sim->det[i_det];
+        if(!det || !det->foil) {
+            continue;
+        }
+        for(size_t i = 0; i < det->foil->n_isotopes; i++) {
+            if(det->foil->isotopes[i]->Z <= Z2_max) {
+                Z2_used[det->foil->isotopes[i]->Z] = TRUE;
+            }
+        }
+    }
+    return Z2_used;
+}
+
 int sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto) {
     nuclear_stopping_free(ion->nucl_stop);
     ion_gsto_free(ion->ion_gsto);
     ion_reset(ion);
     ion_set_isotope(ion, sim->beam_isotope);
     ion->nucl_stop = nuclear_stopping_new(sim->beam_isotope, isotopes);
-    ion->ion_gsto = ion_gsto_new(sim->beam_isotope, gsto);
+    int *Z2_used = sim_Z2_used(sim, gsto->Z2_max);
+    ion->ion_gsto = ion_gsto_new(sim->beam_isotope, gsto, Z2_used);
+    free(Z2_used);
     if(!ion->nucl_stop || !ion->ion_gsto) {
         DEBUGMSG("Preparing ion failed, nucl_stop = %p, ion_gsto = %p.", (void *)ion->nucl_stop, (void *)ion->ion_gsto);
         nuclear_stopping_free(ion->nucl_stop);
@@ -357,6 +383,7 @@ int sim_prepare_ion(ion *ion, const simulation *sim, const jibal_isotope *isotop
 }
 
 int sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes, const jibal_gsto *gsto) {
+    int *Z2_used = sim_Z2_used(sim, gsto->Z2_max);
     for(size_t i = 0; i < sim->n_reactions; i++) {
         reaction *r = sim->reactions[i];
         nuclear_stopping_free(r->nucl_stop);
@@ -366,11 +393,65 @@ int sim_prepare_reactions(const simulation *sim, const jibal_isotope *isotopes, 
             r->ion_gsto = ion_gsto_shared(sim->ion.ion_gsto);
         } else {
             r->nucl_stop = nuclear_stopping_new(r->product, isotopes);
-            r->ion_gsto = ion_gsto_new(r->product, gsto);
+            r->ion_gsto = ion_gsto_new(r->product, gsto, Z2_used);
         }
         if(!r->nucl_stop || !r->ion_gsto) {
             jabs_message(MSG_ERROR, "Error in preparing reaction %s: problems assigning stopping data.", r->name);
+            free(Z2_used);
             return EXIT_FAILURE;
+        }
+    }
+    free(Z2_used);
+    return EXIT_SUCCESS;
+}
+
+static double sim_det_theta_min(const simulation *sim, const detector *det) { /* Smallest scattering angle of reaction products reaching detector, product energies are highest there */
+    if(sim->params->ds) {
+        return 0.0; /* With DS reaction products can reach the detector from any direction */
+    }
+    double delta_theta = 0.0;
+    if(sim->params->geostragg) { /* Upper bound of spread in scattering angle (dtheta/dbeta is at most one), see geostragg_vars_calculate() */
+        delta_theta = GSL_MAX_DBL(exit_angle_delta(sim->sample_theta, sim->sample_phi, det, sim->beam_aperture, 'x'),
+                                  exit_angle_delta(sim->sample_theta, sim->sample_phi, det, sim->beam_aperture, 'y')) / 2.0;
+    }
+    return GSL_MAX_DBL(det->theta - delta_theta, 0.0);
+}
+
+int sim_check_energy_limits(const simulation *sim) {
+    const jabs_ion_gsto *ig = sim->ion.ion_gsto;
+    if(ig->emax < sim->beam_E) {
+        jabs_message(MSG_ERROR, "Beam energy %g keV is above the maximum energy of %s data for %s in Z2 = %i, %g keV (file \"%s\").\n",
+                     sim->beam_E / C_KEV, ig->emax_file && ig->emax_file->type == GSTO_STO_STRAGG ? "straggling" : "stopping", sim->beam_isotope->name, ig->emax_Z2, ig->emax / C_KEV,
+                     ig->emax_file ? ig->emax_file->name : "");
+        return EXIT_FAILURE;
+    }
+    const double E_incident_max = sim->beam_E + sim->params->sigmas_cutoff * sim->beam_E_broad / C_FWHM; /* Same as in simulate_reaction(), see also sim_workspace_init_reactions() */
+    ion_gsto_warn_range(ig, sim->emin, E_incident_max);
+    for(size_t i = 0; i < sim->n_reactions; i++) {
+        const reaction *r = sim->reactions[i];
+        if(r->product == sim->beam_isotope) { /* ion_gsto is shared with incident ion, product energy is at most the incident energy */
+            continue;
+        }
+        int same_product_before = FALSE; /* Warning is given once per product, e.g. 1H from ERD and NRA */
+        for(size_t j = 0; j < i; j++) {
+            same_product_before |= (sim->reactions[j]->product == r->product);
+        }
+        if(same_product_before) {
+            continue;
+        }
+        double E_product_max = 0.0; /* Maximum energy of product at any detector, zero if product can not be detected */
+        for(size_t i_det = 0; i_det < sim->n_det; i_det++) {
+            const detector *det = sim->det[i_det];
+            if(r->type == REACTION_ERD && det->theta >= C_PI_2 && !sim->params->ds) {
+                continue; /* Recoils can not be detected at backward angles, see sim_do_we_need_erd() */
+            }
+            double E = reaction_product_energy(r, sim_det_theta_min(sim, det), E_incident_max); /* NaN if reaction is not possible */
+            if(E > E_product_max) {
+                E_product_max = E;
+            }
+        }
+        if(E_product_max > 0.0) {
+            ion_gsto_warn_range(r->ion_gsto, sim->emin, E_product_max);
         }
     }
     return EXIT_SUCCESS;
