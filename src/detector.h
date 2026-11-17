@@ -61,8 +61,13 @@ typedef struct detector {
     double pileup_rise; /* Rise time of the trapezoidal shaper */
     double pileup_flat; /* Flat top of the trapezoidal shaper, pulse amplitude is sampled at the end of the flat top */
     double pileup_shaping; /* Shaping time of the Gaussian shaper */
-    double pileup_pair_resolution; /* Pair resolution time of the pile-up rejector, zero if there is no rejector */
-    double live_time; /* Count rate (for pile-up) is the number of counts in the simulated spectrum divided by live time */
+    size_t pileup_order; /* Pulse shape of the Gaussian shaper is CR-RC^n with this n */
+    pileup_tail pileup_tail; /* Recording of the second pulse of a pair (tail pile-up), see pileup.h */
+    double pileup_conversion_delay; /* Gaussian: conversion starts this long after the first maximum of a pulse */
+    double pileup_pair_resolution; /* Pulses closer than this are not resolved (pile-up rejector or trigger filter), zero if not known */
+    int pileup_reject; /* Pile-up rejection: pairs resolved by pile-up inspection (pileup_pair_resolution > 0) are rejected */
+    double live_time; /* Time the system is not dead (dead time includes decay of the signal and conversion), pile-up is simulated if this is non-zero */
+    double real_time; /* Count rate (for pile-up) is the number of counts in the simulated spectrum divided by real time, simulated spectrum is scaled by live time / real time. Zero: simulated spectrum corresponds to live time. */
 } detector;
 
 calibration *detector_get_calibration(const detector *det, int Z); /* Returns Z specific calibration (if it exists) det->calibration otherwise. */

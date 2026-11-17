@@ -1,8 +1,9 @@
 #!/usr/bin/env jabs
-# Pile-up of pulse pairs. Thin layer, N = 100019.5 counts without pile-up in live time 1 s, so count rate r = 1.0002e5 1/s. Every pulse in live
-# time is a leading pulse, pulses following within merging time T are merged with it (lost in dead time). Without pile-up rejection the number of
-# counts is conserved. With a pile-up rejector only pairs closer than pair resolution time t_p are recorded, N * (1 - exp(-r * t_p)) counts, and
-# N * exp(-r * T) counts are not piled up.
+# Pile-up of pulse pairs. Thin layer, N = 100019.5 counts without pile-up. Live time is 1 s and real time is not given, so the simulated spectrum
+# corresponds to live time and count rate is r = 1.0002e5 1/s. Every pulse arriving in live time is a leading pulse, pulses following within time T
+# arrive in dead time and pile up with it. Without pile-up rejection and with one event per pair (trailing pulse is lost) the number of counts is
+# conserved. With a pile-up rejector pairs with pair resolution time t_p <= dt < T are rejected and recorded pairs are rejected if a third pulse
+# follows within T, N * exp(-r * T) * (2 - exp(-r * t_p)) counts are recorded.
 set ion 4He
 set energy 2MeV
 set alpha 0deg
@@ -16,17 +17,53 @@ set det live_time 1s pileup_shaper trapezoid pileup_rise 1us pileup_flat 0.5us
 simulate
 save spectra "pileup_out.csv"
 test roi [0:3000] 100019.5 1e-3
+# Real time 2 s, rate is halved and spectrum is scaled by live time / real time.
+set det real_time 2s
+simulate
+test roi [0:3000] 50009.75 1e-3
+set det real_time 0
 # Rejector, t_p = 0.25 us is shorter than flat top, so all recorded pairs are in the sum peak.
 set det pileup_pair_resolution 0.25us
 simulate
-test roi [0:3000] 88555.02 1e-3
-test roi [1750:1950] 2469.97 1e-3
-# Gaussian shaper, shaping time 0.5 us, peaking time 1.1 us, CR-RC^7 pulses, peak detection. T is the time from start of a pulse until it falls to
-# 1e-3 of maximum, T = 3.1268 * 1.1 us. With t_p = 0.4 us amplitudes of recorded pairs are between 0.9 and 1 times the sum.
-set det pileup_shaper gaussian pileup_shaping 0.5us pileup_pair_resolution 0
+test roi [0:3000] 88210.92 1e-3
+test roi [1750:1950] 2125.857 1e-3
+# Trigger filter resolves pulses at least t_p apart, no rejection. Tail both: trailing pulse triggers its own event, a recorded trailing pulse may be
+# followed by another, so N * exp(r * (T - t_p)) counts are recorded.
+set det pileup_reject false
+simulate
+test roi [0:3000] 113339.70 1e-3
+set det pileup_tail sum
 simulate
 test roi [0:3000] 100019.5 1e-3
-set det pileup_pair_resolution 0.4us
+# Gaussian shaper, shaping time 0.5 us, peaking time 1.1 us, CR-RC^7 pulses, peak detection. T is the time from start of a pulse until it falls to
+# 1e-3 of maximum, T = 3.1268 * 1.1 us. Tail sum and first: one event per pair, number of counts is conserved.
+set det pileup_shaper gaussian pileup_shaping 0.5us pileup_pair_resolution 0 pileup_reject true
 simulate
-test roi [0:3000] 74827.84 1e-3
-test roi [1500:1900] 3922.57 1e-3
+test roi [0:3000] 100019.5 1e-3
+test roi [1500:1900] 5327.04 1e-3
+test roi [940:1400] 9006.948 1e-3
+# Tail first: peak detector holds the first maximum, the rising second pulse is followed until conversion starts.
+set det pileup_tail first
+simulate
+test roi [0:3000] 100019.5 1e-3
+test roi [940:1400] 2099.554 1e-3
+set det pileup_conversion_delay 0.3us
+simulate
+test roi [0:3000] 100019.5 1e-3
+test roi [940:1400] 2263.977 1e-3
+# Tail both: second pulse is recorded if the sum has two maxima (tail pile-up). Two maxima are at least 0.6 peaking times apart, so this delay does
+# not change the number of counts.
+set det pileup_tail both
+simulate
+test roi [0:3000] 129378.65 1e-3
+test roi [940:1400] 11774.22 1e-3
+# With t_p = 0.4 us amplitudes of recorded pairs are between 0.9 and 1 times the sum (sums have one maximum, tail has no effect).
+set det pileup_pair_resolution 0.4us pileup_conversion_delay 0
+simulate
+test roi [0:3000] 73686.04 1e-3
+test roi [1500:1900] 2780.767 1e-3
+# CR-RC (order 1), T is longer (10.23 times peaking time), count rate 1e4 1/s.
+set det pileup_order 1 pileup_pair_resolution 0 live_time 10s
+simulate
+test roi [0:3000] 110699.0 1e-3
+test roi [1500:1900] 1629.610 1e-3

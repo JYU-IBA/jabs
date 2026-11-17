@@ -101,8 +101,16 @@ int detector_sanity_check(const detector *det, size_t n_channels) {
             return -1;
         }
     }
-    if(det->pileup_rise < 0.0 || det->pileup_flat < 0.0 || det->pileup_shaping < 0.0 || det->pileup_pair_resolution < 0.0 || det->live_time < 0.0) {
-        jabs_message(MSG_ERROR, "Pile-up times (rise %g s, flat top %g s, shaping %g s, pair resolution %g s) and live time (%g s) can not be negative.\n", det->pileup_rise, det->pileup_flat, det->pileup_shaping, det->pileup_pair_resolution, det->live_time);
+    if(det->pileup_rise < 0.0 || det->pileup_flat < 0.0 || det->pileup_shaping < 0.0 || det->pileup_conversion_delay < 0.0 || det->pileup_pair_resolution < 0.0 || det->live_time < 0.0 || det->real_time < 0.0) {
+        jabs_message(MSG_ERROR, "Pile-up times (rise %g s, flat top %g s, shaping %g s, conversion delay %g s, pair resolution %g s), live time (%g s) and real time (%g s) can not be negative.\n", det->pileup_rise, det->pileup_flat, det->pileup_shaping, det->pileup_conversion_delay, det->pileup_pair_resolution, det->live_time, det->real_time);
+        return -1;
+    }
+    if(det->real_time > 0.0 && det->live_time > det->real_time) {
+        jabs_message(MSG_ERROR, "Live time (%g s) is longer than real time (%g s).\n", det->live_time, det->real_time);
+        return -1;
+    }
+    if(det->pileup_order < 1 || det->pileup_order > PILEUP_GAUSSIAN_ORDER_MAX) {
+        jabs_message(MSG_ERROR, "Pile-up pulse shape order (%zu) must be from 1 to %i.\n", det->pileup_order, PILEUP_GAUSSIAN_ORDER_MAX);
         return -1;
     }
     if(det->type == DETECTOR_TOF && det->length < 1 * C_MM) {
@@ -138,8 +146,13 @@ detector *detector_default(detector *det) {
     det->pileup_rise = 0.0;
     det->pileup_flat = 0.0;
     det->pileup_shaping = 0.0;
+    det->pileup_order = PILEUP_GAUSSIAN_ORDER_DEFAULT;
+    det->pileup_tail = PILEUP_TAIL_BOTH;
+    det->pileup_conversion_delay = 0.0;
     det->pileup_pair_resolution = 0.0;
+    det->pileup_reject = TRUE;
     det->live_time = 0.0;
+    det->real_time = 0.0;
     calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, ENERGY_SLOPE_DEFAULT);
     calibration_set_param(det->calibration, CALIBRATION_PARAM_RESOLUTION, DETECTOR_RESOLUTION_DEFAULT);
     calibration_set_param(det->calibration, CALIBRATION_PARAM_RESOLUTION_SLOPE, 0.0);
@@ -230,6 +243,9 @@ int detector_print(const jibal *jibal, const detector *det) {
     if(det->live_time > 0.0) {
         jabs_message(MSG_INFO, "live_time = %g s\n", det->live_time);
     }
+    if(det->real_time > 0.0) {
+        jabs_message(MSG_INFO, "real_time = %g s (dead time %.3lf %%)\n", det->real_time, 100.0 * (1.0 - det->live_time / det->real_time));
+    }
     if(det->pileup_shaper != PILEUP_SHAPER_NONE) {
         jabs_message(MSG_INFO, "pileup_shaper = %s\n", jibal_option_get_string(pileup_shaper_option, det->pileup_shaper));
         if(det->pileup_shaper == PILEUP_SHAPER_TRAPEZOID) {
@@ -237,8 +253,12 @@ int detector_print(const jibal *jibal, const detector *det) {
             jabs_message(MSG_INFO, "pileup_flat = %g us\n", det->pileup_flat / C_US);
         } else if(det->pileup_shaper == PILEUP_SHAPER_GAUSSIAN) {
             jabs_message(MSG_INFO, "pileup_shaping = %g us (peaking time %g us)\n", det->pileup_shaping / C_US, PILEUP_GAUSSIAN_PEAKING_FACTOR * det->pileup_shaping / C_US);
+            jabs_message(MSG_INFO, "pileup_order = %zu (CR-RC^%zu)\n", det->pileup_order, det->pileup_order);
+            jabs_message(MSG_INFO, "pileup_conversion_delay = %g us\n", det->pileup_conversion_delay / C_US);
         }
-        jabs_message(MSG_INFO, "pileup_pair_resolution = %g us%s\n", det->pileup_pair_resolution / C_US, det->pileup_pair_resolution > 0.0 ? "" : " (no pile-up rejection)");
+        jabs_message(MSG_INFO, "pileup_tail = %s\n", jibal_option_get_string(pileup_tail_option, det->pileup_tail));
+        jabs_message(MSG_INFO, "pileup_pair_resolution = %g us\n", det->pileup_pair_resolution / C_US);
+        jabs_message(MSG_INFO, "pileup_reject = %s%s\n", det->pileup_reject ? "true" : "false", (det->pileup_reject && det->pileup_pair_resolution > 0.0) ? "" : " (no pile-up rejection)");
         if(!detector_pileup(det)) {
             jabs_message(MSG_INFO, "pile-up is not simulated (live_time and shaper times must be non-zero)\n");
         }
@@ -378,7 +398,11 @@ void detector_pileup_params(const detector *det, pileup_params *p) {
     p->rise = det->pileup_rise;
     p->flat = det->pileup_flat;
     p->shaping = det->pileup_shaping;
+    p->order = det->pileup_order;
+    p->tail = det->pileup_tail;
+    p->conversion_delay = det->pileup_conversion_delay;
     p->pair_resolution = det->pileup_pair_resolution;
+    p->reject = det->pileup_reject;
 }
 
 int detector_pileup(const detector *det) {
@@ -398,8 +422,9 @@ int detector_set_name(detector *det, const char *name) {
                                      "aperture", "beta", "calibration", "channels",
                                      "column", "compress", "distance", "foil", "length",
                                      "name", "offset", "phi", "resolution", "slope",
-                                     "solid", "theta", "type", "live_time", "pileup_shaper", "pileup_rise",
-                                     "pileup_flat", "pileup_shaping", "pileup_pair_resolution", 0}; /* Not allowed names */
+                                     "solid", "theta", "type", "live_time", "real_time", "pileup_shaper", "pileup_rise",
+                                     "pileup_flat", "pileup_shaping", "pileup_order", "pileup_tail",
+                                     "pileup_conversion_delay", "pileup_pair_resolution", "pileup_reject", 0}; /* Not allowed names */
 
 
     for(const char **k = keywords; *k != 0; k++) {

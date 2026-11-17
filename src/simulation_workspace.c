@@ -267,18 +267,21 @@ int sim_workspace_calculate_pileup(sim_workspace *ws) {
     }
     pileup_params p;
     detector_pileup_params(det, &p);
-    p.rate = N / det->live_time;
+    const double real_time = det->real_time > 0.0 ? det->real_time : det->live_time; /* Without real time simulated spectrum corresponds to live time */
+    const double live_fraction = det->live_time / real_time;
+    p.rate = N / real_time;
     pileup_result result;
     jabs_histogram_reset(ws->histo_pileup);
     if(pileup_calculate(ws->histo_sum, ws->histo_pileup, &p, &result)) {
         jabs_message(MSG_ERROR, "Pile-up calculation failed.\n");
         return EXIT_FAILURE;
     }
-    jabs_histogram_scale(ws->histo_sum, result.scale);
+    jabs_histogram_scale(ws->histo_pileup, live_fraction); /* Leading pulses arrive in live time */
+    jabs_histogram_scale(ws->histo_sum, live_fraction * result.scale);
     if(ws->histo_ds) {
-        jabs_histogram_scale(ws->histo_ds, result.scale);
+        jabs_histogram_scale(ws->histo_ds, live_fraction * result.scale);
     }
-    sim_workspace_histograms_scale(ws, result.scale);
+    sim_workspace_histograms_scale(ws, live_fraction * result.scale);
     for(size_t i = 0; i < ws->histo_sum->n; i++) {
         ws->histo_sum->bin[i] += ws->histo_pileup->bin[i];
     }

@@ -602,6 +602,10 @@ script_command_status script_set_detector_val(script_session *s, int val, int ar
             value_double = &(det->live_time);
             unit_type = JIBAL_UNIT_TYPE_TIME;
             break;
+        case 'e': /* real_time */
+            value_double = &(det->real_time);
+            unit_type = JIBAL_UNIT_TYPE_TIME;
+            break;
         case 'u': /* pileup_rise */
             value_double = &(det->pileup_rise);
             unit_type = JIBAL_UNIT_TYPE_TIME;
@@ -624,6 +628,30 @@ script_command_status script_set_detector_val(script_session *s, int val, int ar
         case 'P': /* pileup_pair_resolution */
             value_double = &(det->pileup_pair_resolution);
             unit_type = JIBAL_UNIT_TYPE_TIME;
+            break;
+        case 'n': /* pileup_order */
+            value_size = &(det->pileup_order);
+            break;
+        case 'D': /* pileup_conversion_delay */
+            value_double = &(det->pileup_conversion_delay);
+            unit_type = JIBAL_UNIT_TYPE_TIME;
+            break;
+        case 'm': /* pileup_tail */
+            if(jibal_option_get_value(pileup_tail_option, argv[0]) == 0 && strcmp(argv[0], "sum") != 0) {
+                jabs_message(MSG_ERROR, "Pile-up tail \"%s\" is unknown, valid options are sum, first and both.\n", argv[0]);
+                return SCRIPT_COMMAND_FAILURE;
+            }
+            det->pileup_tail = jibal_option_get_value(pileup_tail_option, argv[0]);
+            break;
+        case 'j': /* pileup_reject */
+            if(strcmp(argv[0], "true") == 0) {
+                det->pileup_reject = TRUE;
+            } else if(strcmp(argv[0], "false") == 0) {
+                det->pileup_reject = FALSE;
+            } else {
+                jabs_message(MSG_ERROR, "Pile-up rejection must be true or false, not \"%s\".\n", argv[0]);
+                return SCRIPT_COMMAND_FAILURE;
+            }
             break;
         default:
             jabs_message(MSG_ERROR, "Unhandled value %i in script_set_detector_val. Report to developer.\n", val);
@@ -1301,12 +1329,17 @@ script_command *script_commands_create(script_session *s) {
     script_command_list_add_command(&c_detector->subcommands, script_command_new("beta", "Set exit angle (angle of ion in sample) for this detector (manually).", 'b', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "Set detector azimuth angle, 0 = IBM, 90 deg = Cornell.", 'p', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("name", "Set detector name.", 0, 0, &script_set_detector_name));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("live_time", "Set live time (pile-up count rate is counts in simulated spectrum divided by live time).", 'L', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("live_time", "Set live time, i.e. time not dead (dead time includes decay of signal and conversion). Pile-up is simulated if this is set.", 'L', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("real_time", "Set real time (pile-up count rate is counts in simulated spectrum divided by real time, spectrum is scaled by live time / real time). If not set, simulated spectrum corresponds to live time.", 'e', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_shaper", "Set pulse shaper for pile-up calculation (none, trapezoid, gaussian).", 'H', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_rise", "Set rise time of trapezoidal shaper (pile-up).", 'u', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_shaping", "Set shaping time of Gaussian shaper (pile-up), peaking time is 2.2 times this.", 'g', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_flat", "Set flat top of trapezoidal shaper (pile-up), amplitude is sampled at the end of the flat top.", 'f', 0, NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_pair_resolution", "Set pair resolution time of pile-up rejector, zero = no rejector.", 'P', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_order", "Set order n of CR-RC^n pulse shape of Gaussian shaper (pile-up), default 7.", 'n', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_conversion_delay", "Set time from first maximum of pulse to start of conversion (Gaussian shaper, pile-up).", 'D', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_tail", "Set recording of pulse pairs (pile-up): sum (highest maximum), first (first maximum) or both (also second pulse, tail pile-up).", 'm', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_pair_resolution", "Set pair resolution time of pile-up rejector or trigger filter, zero = not known.", 'P', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_reject", "Set pile-up rejection (true or false), pairs resolved by pile-up inspection are rejected.", 'j', 0, NULL));
     script_command_list_add_command(&c_set->subcommands, c_detector);
 
     script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, 0, &script_set_ion));

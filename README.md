@@ -86,7 +86,7 @@ The scripting language is not a programming language, there is no flow control, 
  - Export of simulations to IDF (partial support)
  - Simulation of large angle plural scattering (dual scattering model), with the assumption that first scattering is RBS (not ERD).
  - Multiprocessor support when simulating multiple detectors and when fitting multiple parameters
- - Pile-up of pulse pairs with a trapezoidal (digital) or Gaussian (analog) shaper, with or without pile-up rejection (e.g. `set det live_time 100s pileup_shaper gaussian pileup_shaping 0.5us pileup_pair_resolution 0.4us` or `pileup_shaper trapezoid pileup_rise 1us pileup_flat 0.5us`)
+ - Pile-up of pulse pairs with a trapezoidal (digital) or Gaussian (analog, CR-RC^n) shaper, with or without pile-up rejection, including tail pile-up (e.g. `set det live_time 100s real_time 102s pileup_shaper gaussian pileup_shaping 0.5us pileup_pair_resolution 0.4us` or `pileup_shaper trapezoid pileup_rise 1us pileup_flat 0.5us`). Second pulse of a pair is recorded (`pileup_tail both`, default) or lost (`first`, peak detector holds the first maximum until conversion starts, see `pileup_conversion_delay`), or the pair is recorded at the highest maximum (`sum`). See [docs/pileup.md](docs/pileup.md).
 
 ### Not implemented, but planned or being worked on
  - Support for more input and output data formats (CSV, ...)
