@@ -584,6 +584,11 @@ fit_params *fit_params_all(fit_data *fit) {
         snprintf(param_name, param_name_max_len, "%sphi", det_name);
         fit_params_add_parameter(params, FIT_VARIABLE_DETECTOR, &det->phi, param_name, "deg", C_DEG, i_det);
 
+        if(detector_pileup(det)) { /* Pile-up level is proportional to count rate, i.e. inversely proportional to live time */
+            snprintf(param_name, param_name_max_len, "%slive_time", det_name);
+            fit_params_add_parameter(params, FIT_VARIABLE_DETECTOR, &det->live_time, param_name, "s", 1.0, i_det);
+        }
+
         for(int Z = JIBAL_ANY_Z; Z <= det->cal_Z_max; Z++) {
             calibration *c = detector_get_calibration(det, Z);
             if(Z != JIBAL_ANY_Z && c == det->calibration) /* No Z-specific calibration */
