@@ -86,11 +86,12 @@ The scripting language is not a programming language, there is no flow control, 
  - Export of simulations to IDF (partial support)
  - Simulation of large angle plural scattering (dual scattering model), with the assumption that first scattering is RBS (not ERD).
  - Multiprocessor support when simulating multiple detectors and when fitting multiple parameters
+ - Pile-up of pulse pairs with a trapezoidal (digital) or Gaussian (analog) shaper, with or without pile-up rejection (e.g. `set det live_time 100s pileup_shaper gaussian pileup_shaping 0.5us pileup_pair_resolution 0.4us` or `pileup_shaper trapezoid pileup_rise 1us pileup_flat 0.5us`)
 
 ### Not implemented, but planned or being worked on
  - Support for more input and output data formats (CSV, ...)
  - Multiple scattering (small angle)
- - Simulation of pile-up and dead time
+ - Simulation of dead time
  - Simulation of time-of-flight spectra
 
 ### Distant future, if ever

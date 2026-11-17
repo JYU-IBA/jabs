@@ -745,7 +745,8 @@ void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *spectra, const det
     const ds_reaction_spectra_type ds_rs = ws->params->ds_reaction_spectra;
     const int ds = (ws->histo_ds != NULL);
     const int ds_separate = ds && ds_rs == DS_REACTION_SPECTRA_SEPARATE;
-    spectra->n_spectra = RESULT_SPECTRA_N_FIXED + ws->n_reactions * (ds_separate ? 2 : 1) + (ds ? 1 : 0); /* Simulated, experimental, confidence limits (2) + reaction spectra (+ dual scattering of each reaction) + dual scattering sum */
+    const int pileup = (ws->histo_pileup != NULL);
+    spectra->n_spectra = RESULT_SPECTRA_N_FIXED + ws->n_reactions * (ds_separate ? 2 : 1) + (ds ? 1 : 0) + (pileup ? 1 : 0); /* Simulated, experimental, confidence limits (2) + reaction spectra (+ dual scattering of each reaction) + dual scattering sum + pile-up */
     spectra->s = calloc(spectra->n_spectra, sizeof(result_spectrum));
     result_spectrum_set(&spectra->s[RESULT_SPECTRA_SIMULATED], ws->histo_sum, "Simulated", NULL, REACTION_NONE);
     result_spectrum_set(&spectra->s[RESULT_SPECTRA_EXPERIMENTAL], exp, "Experimental", NULL, REACTION_NONE);
@@ -780,10 +781,13 @@ void fit_data_spectra_copy_to_spectra_from_ws(result_spectra *spectra, const det
         s->type = r->type;
         s->ds = TRUE;
     }
-    if(ds) { /* Sum of dual scattering is the last spectrum */
-        result_spectrum *s = &spectra->s[i_spectrum];
+    if(ds) { /* Sum of dual scattering */
+        result_spectrum *s = &spectra->s[i_spectrum++];
         result_spectrum_set(s, ws->histo_ds, "Dual scattering", NULL, REACTION_NONE);
         s->ds = TRUE;
+    }
+    if(pileup) { /* Pile-up is the last spectrum */
+        result_spectrum_set(&spectra->s[i_spectrum], ws->histo_pileup, "Pile-up", NULL, REACTION_NONE);
     }
 }
 

@@ -101,6 +101,10 @@ int detector_sanity_check(const detector *det, size_t n_channels) {
             return -1;
         }
     }
+    if(det->pileup_rise < 0.0 || det->pileup_flat < 0.0 || det->pileup_shaping < 0.0 || det->pileup_pair_resolution < 0.0 || det->live_time < 0.0) {
+        jabs_message(MSG_ERROR, "Pile-up times (rise %g s, flat top %g s, shaping %g s, pair resolution %g s) and live time (%g s) can not be negative.\n", det->pileup_rise, det->pileup_flat, det->pileup_shaping, det->pileup_pair_resolution, det->live_time);
+        return -1;
+    }
     if(det->type == DETECTOR_TOF && det->length < 1 * C_MM) {
         jabs_message(MSG_ERROR, "Warning: ToF length is small (%g mm)\n", det->length/C_MM);
         return -1;
@@ -130,6 +134,12 @@ detector *detector_default(detector *det) {
     det->calibration = calibration_init_linear();
     det->cal_Z_max = -1;
     det->calibration_Z = NULL;
+    det->pileup_shaper = PILEUP_SHAPER_NONE;
+    det->pileup_rise = 0.0;
+    det->pileup_flat = 0.0;
+    det->pileup_shaping = 0.0;
+    det->pileup_pair_resolution = 0.0;
+    det->live_time = 0.0;
     calibration_set_param(det->calibration, CALIBRATION_PARAM_SLOPE, ENERGY_SLOPE_DEFAULT);
     calibration_set_param(det->calibration, CALIBRATION_PARAM_RESOLUTION, DETECTOR_RESOLUTION_DEFAULT);
     calibration_set_param(det->calibration, CALIBRATION_PARAM_RESOLUTION_SLOPE, 0.0);
@@ -215,6 +225,22 @@ int detector_print(const jibal *jibal, const detector *det) {
         if(foil_str) {
             jabs_message(MSG_INFO, "foil = %s\n", foil_str);
             free(foil_str);
+        }
+    }
+    if(det->live_time > 0.0) {
+        jabs_message(MSG_INFO, "live_time = %g s\n", det->live_time);
+    }
+    if(det->pileup_shaper != PILEUP_SHAPER_NONE) {
+        jabs_message(MSG_INFO, "pileup_shaper = %s\n", jibal_option_get_string(pileup_shaper_option, det->pileup_shaper));
+        if(det->pileup_shaper == PILEUP_SHAPER_TRAPEZOID) {
+            jabs_message(MSG_INFO, "pileup_rise = %g us\n", det->pileup_rise / C_US);
+            jabs_message(MSG_INFO, "pileup_flat = %g us\n", det->pileup_flat / C_US);
+        } else if(det->pileup_shaper == PILEUP_SHAPER_GAUSSIAN) {
+            jabs_message(MSG_INFO, "pileup_shaping = %g us (peaking time %g us)\n", det->pileup_shaping / C_US, PILEUP_GAUSSIAN_PEAKING_FACTOR * det->pileup_shaping / C_US);
+        }
+        jabs_message(MSG_INFO, "pileup_pair_resolution = %g us%s\n", det->pileup_pair_resolution / C_US, det->pileup_pair_resolution > 0.0 ? "" : " (no pile-up rejection)");
+        if(!detector_pileup(det)) {
+            jabs_message(MSG_INFO, "pile-up is not simulated (live_time and shaper times must be non-zero)\n");
         }
     }
     return EXIT_SUCCESS;
@@ -346,6 +372,21 @@ double detector_param_unit_factor(const detector *det) {
     }
 }
 
+void detector_pileup_params(const detector *det, pileup_params *p) {
+    p->shaper = det->pileup_shaper;
+    p->rate = 0.0;
+    p->rise = det->pileup_rise;
+    p->flat = det->pileup_flat;
+    p->shaping = det->pileup_shaping;
+    p->pair_resolution = det->pileup_pair_resolution;
+}
+
+int detector_pileup(const detector *det) {
+    pileup_params p;
+    detector_pileup_params(det, &p);
+    return det->live_time > 0.0 && pileup_merge_time(&p) > 0.0;
+}
+
 int detector_set_name(detector *det, const char *name) {
     if(!name) {
         return EXIT_FAILURE;
@@ -357,7 +398,8 @@ int detector_set_name(detector *det, const char *name) {
                                      "aperture", "beta", "calibration", "channels",
                                      "column", "compress", "distance", "foil", "length",
                                      "name", "offset", "phi", "resolution", "slope",
-                                     "solid", "theta", "type", 0}; /* Not allowed names */
+                                     "solid", "theta", "type", "live_time", "pileup_shaper", "pileup_rise",
+                                     "pileup_flat", "pileup_shaping", "pileup_pair_resolution", 0}; /* Not allowed names */
 
 
     for(const char **k = keywords; *k != 0; k++) {

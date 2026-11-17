@@ -598,6 +598,33 @@ script_command_status script_set_detector_val(script_session *s, int val, int ar
             value_double = &(det->phi);
             unit_type = JIBAL_UNIT_TYPE_ANGLE;
             break;
+        case 'L': /* live_time */
+            value_double = &(det->live_time);
+            unit_type = JIBAL_UNIT_TYPE_TIME;
+            break;
+        case 'u': /* pileup_rise */
+            value_double = &(det->pileup_rise);
+            unit_type = JIBAL_UNIT_TYPE_TIME;
+            break;
+        case 'f': /* pileup_flat */
+            value_double = &(det->pileup_flat);
+            unit_type = JIBAL_UNIT_TYPE_TIME;
+            break;
+        case 'g': /* pileup_shaping */
+            value_double = &(det->pileup_shaping);
+            unit_type = JIBAL_UNIT_TYPE_TIME;
+            break;
+        case 'H': /* pileup_shaper */
+            det->pileup_shaper = jibal_option_get_value(pileup_shaper_option, argv[0]);
+            if(det->pileup_shaper == PILEUP_SHAPER_NONE && strcmp(argv[0], JIBAL_OPTION_STR_NONE) != 0) {
+                jabs_message(MSG_ERROR, "Pile-up shaper \"%s\" is unknown, valid options are none, trapezoid and gaussian.\n", argv[0]);
+                return SCRIPT_COMMAND_FAILURE;
+            }
+            break;
+        case 'P': /* pileup_pair_resolution */
+            value_double = &(det->pileup_pair_resolution);
+            unit_type = JIBAL_UNIT_TYPE_TIME;
+            break;
         default:
             jabs_message(MSG_ERROR, "Unhandled value %i in script_set_detector_val. Report to developer.\n", val);
             return SCRIPT_COMMAND_FAILURE;
@@ -1274,6 +1301,12 @@ script_command *script_commands_create(script_session *s) {
     script_command_list_add_command(&c_detector->subcommands, script_command_new("beta", "Set exit angle (angle of ion in sample) for this detector (manually).", 'b', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("phi", "Set detector azimuth angle, 0 = IBM, 90 deg = Cornell.", 'p', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("name", "Set detector name.", 0, 0, &script_set_detector_name));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("live_time", "Set live time (pile-up count rate is counts in simulated spectrum divided by live time).", 'L', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_shaper", "Set pulse shaper for pile-up calculation (none, trapezoid, gaussian).", 'H', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_rise", "Set rise time of trapezoidal shaper (pile-up).", 'u', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_shaping", "Set shaping time of Gaussian shaper (pile-up), peaking time is 2.2 times this.", 'g', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_flat", "Set flat top of trapezoidal shaper (pile-up), amplitude is sampled at the end of the flat top.", 'f', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_pair_resolution", "Set pair resolution time of pile-up rejector, zero = no rejector.", 'P', 0, NULL));
     script_command_list_add_command(&c_set->subcommands, c_detector);
 
     script_command_list_add_command(&c_set->subcommands, script_command_new("ion", "Set incident ion (isotope).", 0, 0, &script_set_ion));

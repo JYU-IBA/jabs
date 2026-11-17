@@ -1,0 +1,32 @@
+#!/usr/bin/env jabs
+# Pile-up of pulse pairs. Thin layer, N = 100019.5 counts without pile-up in live time 1 s, so count rate r = 1.0002e5 1/s. Every pulse in live
+# time is a leading pulse, pulses following within merging time T are merged with it (lost in dead time). Without pile-up rejection the number of
+# counts is conserved. With a pile-up rejector only pairs closer than pair resolution time t_p are recorded, N * (1 - exp(-r * t_p)) counts, and
+# N * exp(-r * T) counts are not piled up.
+set ion 4He
+set energy 2MeV
+set alpha 0deg
+set det theta 165deg solid 1msr slope 2keV resolution 15keV
+set sample Au 10tfu
+set fluence 1.2162e15
+simulate
+test roi [0:3000] 100019.5 1e-3
+# Trapezoidal shaper, rise 1 us, flat top 0.5 us, amplitude sampled at the end of the flat top, T = 1.5 us.
+set det live_time 1s pileup_shaper trapezoid pileup_rise 1us pileup_flat 0.5us
+simulate
+save spectra "pileup_out.csv"
+test roi [0:3000] 100019.5 1e-3
+# Rejector, t_p = 0.25 us is shorter than flat top, so all recorded pairs are in the sum peak.
+set det pileup_pair_resolution 0.25us
+simulate
+test roi [0:3000] 88555.02 1e-3
+test roi [1750:1950] 2469.97 1e-3
+# Gaussian shaper, shaping time 0.5 us, peaking time 1.1 us, CR-RC^7 pulses, peak detection. T is the time from start of a pulse until it falls to
+# 1e-3 of maximum, T = 3.1268 * 1.1 us. With t_p = 0.4 us amplitudes of recorded pairs are between 0.9 and 1 times the sum.
+set det pileup_shaper gaussian pileup_shaping 0.5us pileup_pair_resolution 0
+simulate
+test roi [0:3000] 100019.5 1e-3
+set det pileup_pair_resolution 0.4us
+simulate
+test roi [0:3000] 74827.84 1e-3
+test roi [1500:1900] 3922.57 1e-3

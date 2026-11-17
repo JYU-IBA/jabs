@@ -19,6 +19,7 @@
 #include "sample.h"
 #include "aperture.h"
 #include "calibration.h"
+#include "pileup.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -56,6 +57,12 @@ typedef struct detector {
     size_t compress;
     sample_model *foil_sm;
     sample *foil;
+    pileup_shaper pileup_shaper; /* Pile-up is simulated if this is not none and live_time is non-zero, see pileup.h */
+    double pileup_rise; /* Rise time of the trapezoidal shaper */
+    double pileup_flat; /* Flat top of the trapezoidal shaper, pulse amplitude is sampled at the end of the flat top */
+    double pileup_shaping; /* Shaping time of the Gaussian shaper */
+    double pileup_pair_resolution; /* Pair resolution time of the pile-up rejector, zero if there is no rejector */
+    double live_time; /* Count rate (for pile-up) is the number of counts in the simulated spectrum divided by live time */
 } detector;
 
 calibration *detector_get_calibration(const detector *det, int Z); /* Returns Z specific calibration (if it exists) det->calibration otherwise. */
@@ -78,6 +85,8 @@ char *detector_resolution_to_string(const detector *det, int Z);
 void detector_update(detector *det);
 const char *detector_param_unit(const detector *det); /* return a suitable unit based on detector type, e.g. "keV" when type == DETECTOR_ENERGY. TODO: use this wisely (we can simulate energy spectra with a ToF detector!) */
 double detector_param_unit_factor(const detector *det);
+int detector_pileup(const detector *det); /* TRUE if pile-up is simulated */
+void detector_pileup_params(const detector *det, pileup_params *p); /* Sets parameters except rate */
 int detector_set_name(detector *det, const char *name);
 const char *detector_name(const detector *det);
 detector *detector_clone(const detector *det_orig);

@@ -45,6 +45,7 @@ typedef struct sim_workspace {
     size_t n_channels; /* in histograms */
     jabs_histogram *histo_sum;
     jabs_histogram *histo_ds; /* Dual scattering contribution to histo_sum (sum of reaction histo_ds), NULL if dual scattering is not calculated */
+    jabs_histogram *histo_pileup; /* Pile-up contribution to histo_sum, NULL if pile-up is not calculated. With pile-up histo_sum has more channels than reaction histograms. */
     int ds_running; /* TRUE while dual scattering trajectories are calculated, spectra are then convoluted to histo_ds of reactions */
     int progress; /* Report progress of (long) calculations, e.g. dual scattering, to terminal. FALSE by default (e.g. fits). */
     int ds_parallel; /* Dual scattering trajectories are calculated in parallel (OpenMP), each thread has its own workspace. FALSE by default (e.g. fits, which are parallel already). */
@@ -71,6 +72,7 @@ void sim_workspace_calculate_number_of_bricks(sim_workspace *ws);
 void sim_workspace_free(sim_workspace *ws);
 void sim_workspace_recalculate_n_channels(sim_workspace *ws, const simulation *sim);
 void sim_workspace_calculate_sum_spectra(sim_workspace *ws);
+int sim_workspace_calculate_pileup(sim_workspace *ws); /* Adds pile-up to histo_sum (call after sim_workspace_calculate_sum_spectra()), spectra of reactions and dual scattering are scaled by the fraction of pulses that are not piled up */
 
 void sim_workspace_histograms_reset(sim_workspace *ws);
 size_t sim_workspace_histograms_calculate(sim_workspace *ws);

@@ -1146,7 +1146,7 @@ int simulate_with_ds(sim_workspace *ws) {
     }
     if(!ws->params->ds) {
         sim_workspace_calculate_sum_spectra(ws);
-        return EXIT_SUCCESS;
+        return sim_workspace_calculate_pileup(ws);
     }
     ion_set_angle(&ws->ion, 0.0, 0.0);
     ion_rotate(&ws->ion, ws->sim->sample_theta, ws->sim->sample_phi);
@@ -1415,5 +1415,5 @@ int simulate_with_ds(sim_workspace *ws) {
     }
     jabs_message(MSG_VERBOSE, "\nDual scattering simulation complete.\n");
     sim_workspace_calculate_sum_spectra(ws);
-    return EXIT_SUCCESS;
+    return sim_workspace_calculate_pileup(ws);
 }

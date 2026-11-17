@@ -19,6 +19,7 @@
 #include "message.h"
 #include "simulation_workspace.h"
 #include "spectrum.h"
+#include "pileup.h"
 
 
 void sim_workspace_init_reactions(sim_workspace *ws) {
@@ -106,12 +107,23 @@ sim_workspace *sim_workspace_init(const jibal *jibal, const simulation *sim, con
         return NULL;
     }
 
-    ws->histo_sum = jabs_histogram_alloc(ws->n_channels);
+    const size_t n_channels_sum = detector_pileup(det) ? GSL_MIN(2 * ws->n_channels, CHANNELS_ABSOLUTE_MAX) : ws->n_channels; /* Pile-up extends to twice the highest amplitude */
+    ws->histo_sum = jabs_histogram_alloc(n_channels_sum);
     if(!ws->histo_sum) {
         return NULL;
     }
     calibration_apply_to_histogram(ws->det->calibration, ws->histo_sum); /* Calibration (assuming default calibration) can be set now. */
     jabs_histogram_reset(ws->histo_sum); /* This is not necessary, since contents should be set after simulation is over (successfully). */
+    if(detector_pileup(det)) {
+        ws->histo_pileup = jabs_histogram_alloc(n_channels_sum);
+        if(!ws->histo_pileup) {
+            return NULL;
+        }
+        calibration_apply_to_histogram(ws->det->calibration, ws->histo_pileup);
+        jabs_histogram_reset(ws->histo_pileup);
+    } else {
+        ws->histo_pileup = NULL;
+    }
     if(ws->params->ds) {
         ws->histo_ds = jabs_histogram_alloc(ws->n_channels);
         if(!ws->histo_ds) {
@@ -176,6 +188,7 @@ void sim_workspace_free(sim_workspace *ws) {
     gsl_integration_workspace_free(ws->w_int_cs_stragg);
     jabs_histogram_free(ws->histo_sum);
     jabs_histogram_free(ws->histo_ds);
+    jabs_histogram_free(ws->histo_pileup);
     ms_model_free(ws->ms);
     stop_range_tables_free(ws->stop.range_tables);
     free(ws);
@@ -243,10 +256,43 @@ void sim_workspace_calculate_sum_spectra(sim_workspace *ws) {
     }
 }
 
+int sim_workspace_calculate_pileup(sim_workspace *ws) {
+    if(!ws->histo_pileup) {
+        return EXIT_SUCCESS;
+    }
+    const detector *det = ws->det;
+    double N = 0.0;
+    for(size_t i = 0; i < ws->histo_sum->n; i++) {
+        N += ws->histo_sum->bin[i];
+    }
+    pileup_params p;
+    detector_pileup_params(det, &p);
+    p.rate = N / det->live_time;
+    pileup_result result;
+    jabs_histogram_reset(ws->histo_pileup);
+    if(pileup_calculate(ws->histo_sum, ws->histo_pileup, &p, &result)) {
+        jabs_message(MSG_ERROR, "Pile-up calculation failed.\n");
+        return EXIT_FAILURE;
+    }
+    jabs_histogram_scale(ws->histo_sum, result.scale);
+    if(ws->histo_ds) {
+        jabs_histogram_scale(ws->histo_ds, result.scale);
+    }
+    sim_workspace_histograms_scale(ws, result.scale);
+    for(size_t i = 0; i < ws->histo_sum->n; i++) {
+        ws->histo_sum->bin[i] += ws->histo_pileup->bin[i];
+    }
+    jabs_message(ws->progress ? MSG_INFO : MSG_VERBOSE, "Pile-up: count rate %.4g 1/s, pile-up events %.3lf %% of recorded events, unpiled pulses scaled by %.5lf.\n", p.rate, 100.0 * result.fraction, result.scale);
+    return EXIT_SUCCESS;
+}
+
 void sim_workspace_histograms_reset(sim_workspace *ws) {
     jabs_histogram_reset(ws->histo_sum);
     if(ws->histo_ds) {
         jabs_histogram_reset(ws->histo_ds);
+    }
+    if(ws->histo_pileup) {
+        jabs_histogram_reset(ws->histo_pileup);
     }
     for(size_t i = 0; i < ws->n_reactions; i++) {
         sim_reaction *r = ws->reactions[i];
