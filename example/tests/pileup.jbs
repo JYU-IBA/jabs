@@ -29,7 +29,7 @@ test roi [0:3000] 88210.92 1e-3
 test roi [1750:1950] 2125.857 1e-3
 # Trigger filter resolves pulses at least t_p apart, no rejection. Tail both: trailing pulse triggers its own event, a recorded trailing pulse may be
 # followed by another, so N * exp(r * (T - t_p)) counts are recorded.
-set det pileup_reject false
+set det pileup_reject false pileup_tail both
 simulate
 test roi [0:3000] 113339.70 1e-3
 set det pileup_tail sum

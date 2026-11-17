@@ -29,7 +29,7 @@ All parameters are detector variables (`set det ...`). Times take units (e.g. `1
 | `pileup_flat` | 0 | Trapezoid: flat top. Amplitude is sampled at the end of the flat top. |
 | `pileup_shaping` | 0 | Gaussian: shaping time. Peaking time is 2.2 times this (Ortec convention), for any order. |
 | `pileup_order` | 7 | Gaussian: pulse shape is CR-RC^n with this n (1 to 16). CR-RC^7 has a 0.1 % width of 2.97 peaking times (Ortec: 2.9). For a true CR-RC^n amplifier with time constant RC, set shaping time n RC / 2.2. |
-| `pileup_tail` | `both` | What is recorded when two pulses overlap, see below: `sum`, `first` or `both`. |
+| `pileup_tail` | `first` | What is recorded when two pulses overlap, see below: `sum`, `first` or `both`. |
 | `pileup_conversion_delay` | 0 | Gaussian: conversion starts this long after the first maximum of a pulse. Until then the peak detector follows the signal. |
 | `pileup_pair_resolution` | 0 | Pulses closer than this are not resolved (by a pile-up rejector or a trigger filter). Zero: not known. |
 | `pileup_reject` | `true` | Pile-up rejection. Pairs resolved by pile-up inspection (`pileup_pair_resolution` > 0) are rejected. |
@@ -46,7 +46,7 @@ pile-up, the second pulse rides on the tail of the first).
 | `both` | As `first`, and the second maximum, if it comes after the start of the conversion, is recorded as another event at its amplitude (Molodtsov and Gurbich, NIMB 267 (2009) 3484). | A second pulse at least `pileup_pair_resolution` after the first triggers its own event (if not rejected), sampled on the falling edge of the first trapezoid. |
 
 `both` is an ADC that can convert the second pulse, `first` an ADC that is still converting (or waiting for the signal to return to baseline)
-when the second maximum comes. Merged pulses (one maximum) give one event in all modes.
+when the second maximum comes. `first` is the default. Merged pulses (one maximum) give one event in all modes.
 
 ## Model
 

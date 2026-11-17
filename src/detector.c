@@ -147,7 +147,7 @@ detector *detector_default(detector *det) {
     det->pileup_flat = 0.0;
     det->pileup_shaping = 0.0;
     det->pileup_order = PILEUP_GAUSSIAN_ORDER_DEFAULT;
-    det->pileup_tail = PILEUP_TAIL_BOTH;
+    det->pileup_tail = PILEUP_TAIL_FIRST;
     det->pileup_conversion_delay = 0.0;
     det->pileup_pair_resolution = 0.0;
     det->pileup_reject = TRUE;

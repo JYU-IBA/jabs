@@ -1337,7 +1337,7 @@ script_command *script_commands_create(script_session *s) {
     script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_flat", "Set flat top of trapezoidal shaper (pile-up), amplitude is sampled at the end of the flat top.", 'f', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_order", "Set order n of CR-RC^n pulse shape of Gaussian shaper (pile-up), default 7.", 'n', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_conversion_delay", "Set time from first maximum of pulse to start of conversion (Gaussian shaper, pile-up).", 'D', 0, NULL));
-    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_tail", "Set recording of pulse pairs (pile-up): sum (highest maximum), first (first maximum) or both (also second pulse, tail pile-up).", 'm', 0, NULL));
+    script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_tail", "Set recording of pulse pairs (pile-up): sum (highest maximum), first (first maximum, default) or both (also second pulse, tail pile-up).", 'm', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_pair_resolution", "Set pair resolution time of pile-up rejector or trigger filter, zero = not known.", 'P', 0, NULL));
     script_command_list_add_command(&c_detector->subcommands, script_command_new("pileup_reject", "Set pile-up rejection (true or false), pairs resolved by pile-up inspection are rejected.", 'j', 0, NULL));
     script_command_list_add_command(&c_set->subcommands, c_detector);
