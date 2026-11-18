@@ -104,6 +104,8 @@ extern "C" {
 #define MS_HWHM_MAX_FRACTION (0.5) /* Multiple scattering theory fails at large energy losses. HWHM of multiple scattering energy spread is limited to this fraction of detected energy. */
 #define MS_SIGMA_MAX_FRACTION (1.0) /* Standard deviation of each component of multiple scattering energy spread mixture is limited to this fraction of detected energy */
 #define BRICK_MS_COMPONENT_CUTOFF (1.0e-6) /* Components of multiple scattering mixture are convoluted to a range where weight times gaussian is above this */
+#define BRICK_MS_HWHM_CHANGE_PER_SIGMA (0.25) /* Bricks are shortened until relative change of multiple scattering HWHM across a brick is at most this times brick_width_sigmas */
+#define BRICK_MS_REFINE_MAX (16.0) /* Bricks are shortened at most by this factor due to change of multiple scattering energy spread, the first brick is always shortened by this factor */
 #define BRICK_SPLIT_SIGMA_STEP (0.25) /* Bricks narrow compared to the change in energy spread are split into sub-bricks (for convolution only) so that the relative change in sigma between sub-bricks is at most this */
 #define BRICK_SPLIT_MAX (8) /* Maximum number of sub-bricks in convolution */
 #define BRICK_DEGENERATE_WIDTH (1.0e-3) /* Bricks narrower (in energy) than this times sigma are convoluted as gaussians */

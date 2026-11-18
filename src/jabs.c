@@ -491,6 +491,27 @@ static double brick_step_yield_limited(const sim_workspace *ws, const des_table 
     return E_change;
 }
 
+static double brick_step_ms_limited(const sim_workspace *ws, const brick *b_prev, const brick *b, double E_change) {
+    /* Shortens the incident ion energy step E_change (negative) of the next brick until the HWHM of multiple scattering energy spread changes at most
+     * brick_width_sigmas times BRICK_MS_HWHM_CHANGE_PER_SIGMA (relative) across the brick, extrapolating the change across the previous brick. Widths of the
+     * components of the MS mixture are interpolated linearly in variance across a brick (see bricks_convolute()), but near the surface the HWHM grows
+     * approximately linearly with depth, from zero. The first brick starts from zero and it is shortened by BRICK_MS_REFINE_MAX, after this the bricks grow
+     * approximately geometrically until the step based on resolution is reached. The step is shortened at most by BRICK_MS_REFINE_MAX. */
+    const double E_change_min = E_change / BRICK_MS_REFINE_MAX;
+    if(!b_prev) {
+        return E_change_min;
+    }
+    if(b->ms_hwhm <= 0.0 || b_prev->E_0 <= b->E_0) {
+        return E_change;
+    }
+    const double dhwhm_dE = fabs(b->ms_hwhm - b_prev->ms_hwhm) / (b_prev->E_0 - b->E_0);
+    if(dhwhm_dE <= 0.0) {
+        return E_change;
+    }
+    const double E_change_ms = -ws->params->brick_width_sigmas * BRICK_MS_HWHM_CHANGE_PER_SIGMA * b->ms_hwhm / dhwhm_dE;
+    return GSL_MAX_DBL(E_change, GSL_MIN_DBL(E_change_ms, E_change_min));
+}
+
 static double brick_product_residual_range(const jabs_stop *stop, const ion *p, const sample *material, depth d, double emin) {
     /* Path length the reaction product (energy p->E) could still go in material at depth d before its energy drops to emin. Simpson's rule for integral of 1/S. */
     if(p->E <= emin) {
@@ -762,6 +783,9 @@ int simulate_reaction(const ion *incident, const depth depth_start, sim_workspac
             assert(E_change < 0.0);
             if(ws->params->brick_yield_max_variation > 0.0) {
                 E_change = brick_step_yield_limited(ws, dt, sample, sim_r, &ion1, d_after, i_des, E_change);
+            }
+            if(ws->ms_spread) {
+                E_change = brick_step_ms_limited(ws, b_prev, b, E_change);
             }
             ion1.E += E_change;
         }
