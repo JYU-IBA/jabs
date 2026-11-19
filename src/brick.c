@@ -28,6 +28,7 @@ void bricks_calculate_sigma(const detector *det, const jibal_isotope *isotope, b
 typedef struct {
     double w; /* Weight */
     double S_low, S_high; /* Widths (sigma) at low and high edges */
+    double S_slope; /* Change of width per energy across the brick (dS/dE), when brick is not split */
     int n_sub; /* Number of sub-bricks, zero if brick is not split */
     int degenerate; /* Brick has no width in energy, sub-bricks are gaussians */
     double S_inv_sub[BRICK_SPLIT_MAX]; /* Inverse of width of each sub-brick */
@@ -79,6 +80,7 @@ void bricks_convolute(jabs_histogram *h, const calibration *c, const brick *bric
             const double S_min = GSL_MIN_DBL(S_l, S_h);
             bc->S_low = S_l;
             bc->S_high = S_h;
+            bc->S_slope = (dE_brick != 0.0) ? (S_h - S_l) / dE_brick : 0.0;
             bc->n_sub = 0; /* Zero: the brick is convoluted using different widths at the low and high edges */
             bc->degenerate = (fabs(dE_brick) < BRICK_DEGENERATE_WIDTH * S_min); /* Brick has (practically) no width, it is a gaussian */
             if(S_min > 0.0 && (bc->degenerate || sigmas_cutoff * fabs(S_h - S_l) > fabs(dE_brick))) {
@@ -125,7 +127,17 @@ void bricks_convolute(jabs_histogram *h, const calibration *c, const brick *bric
                 }
                 double y;
                 if(bc->n_sub == 0) {
-                    y = (erf_Q((b_low->E - E) / bc->S_low) - erf_Q((b_high->E - E) / bc->S_high)) * b_w_inv;
+                    /* Difference of gaussian CDFs with widths of the edges is not the convolution of the brick when the width changes, the mean would be shifted by
+                     * (S_high^2 - S_low^2)/(2*dE_brick). Exact convolution (width changing linearly across the brick) is a series in powers of the slope dS/dE,
+                     * which converges since bricks are split when sigmas_cutoff * |dS/dE| > 1. Terms up to second order are included (normalization is exact). */
+                    const double x_low = (b_low->E - E) / bc->S_low;
+                    const double x_high = (b_high->E - E) / bc->S_high;
+                    const double s = bc->S_slope;
+                    y = (1.0 + s * s) * (erf_Q(x_low) - erf_Q(x_high));
+                    if(s != 0.0) {
+                        y += s * (exp(-0.5 * x_low * x_low) * (1.0 + s * x_low) - exp(-0.5 * x_high * x_high) * (1.0 + s * x_high)) / BRICK_SQRT_2PI;
+                    }
+                    y *= b_w_inv;
                 } else {
                     if(E < bc->E_low || E > bc->E_high) {
                         continue;

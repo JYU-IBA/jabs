@@ -40,23 +40,23 @@ test roi [0:3000] 100019.5 1e-3
 set det pileup_shaper gaussian pileup_shaping 0.5us pileup_pair_resolution 0 pileup_reject true
 simulate
 test roi [0:3000] 100019.5 1e-3
-test roi [1500:1900] 5327.04 1e-3
-test roi [940:1400] 9006.948 1e-3
+test roi [1500:1900] 5328.395 1e-3
+test roi [940:1400] 9019.558 1e-3
 # Tail first: peak detector holds the first maximum, the rising second pulse is followed until conversion starts.
 set det pileup_tail first
 simulate
 test roi [0:3000] 100019.5 1e-3
-test roi [940:1400] 2099.554 1e-3
+test roi [940:1400] 2098.355 1e-3
 set det pileup_conversion_delay 0.3us
 simulate
 test roi [0:3000] 100019.5 1e-3
-test roi [940:1400] 2263.977 1e-3
+test roi [940:1400] 2263.345 1e-3
 # Tail both: second pulse is recorded if the sum has two maxima (tail pile-up). Two maxima are at least 0.6 peaking times apart, so this delay does
 # not change the number of counts.
 set det pileup_tail both
 simulate
 test roi [0:3000] 129378.65 1e-3
-test roi [940:1400] 11774.22 1e-3
+test roi [940:1400] 11791.21 1e-3
 # With t_p = 0.4 us amplitudes of recorded pairs are between 0.9 and 1 times the sum (sums have one maximum, tail has no effect).
 set det pileup_pair_resolution 0.4us pileup_conversion_delay 0
 simulate
@@ -66,4 +66,4 @@ test roi [1500:1900] 2780.767 1e-3
 set det pileup_order 1 pileup_pair_resolution 0 live_time 10s
 simulate
 test roi [0:3000] 110699.0 1e-3
-test roi [1500:1900] 1629.610 1e-3
+test roi [1500:1900] 1630.165 1e-3
